@@ -1,4 +1,11 @@
+#include <fstream>
+
 #include "Vocabulary.hh"
+
+Vocabulary::Vocabulary()
+  : m_oov_string("<UNK>")
+{
+}
 
 int
 Vocabulary::add(const std::string &word)
@@ -36,6 +43,15 @@ Vocabulary::read(std::istream &in)
     // Insert word
     add(word);
   }
+}
+
+void
+Vocabulary::read(const char *file)
+{
+  std::ifstream in(file);
+  if (!in)
+    throw OpenError();
+  read(in);
 }
 
 void

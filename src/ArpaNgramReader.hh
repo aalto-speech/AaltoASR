@@ -15,9 +15,15 @@ public:
   ArpaNgramReader(const Vocabulary &vocabulary);
   ~ArpaNgramReader();
   void read(std::istream &in);
+  void read(const char *file);
   Ngram &ngram() { return m_ngram; }
 
   int lineno() const { return m_lineno; }
+
+  struct OpenError : public std::exception {
+    virtual const char *what() const throw()
+      { return "ArpaNgramReader: open error"; }
+  };
 
   struct ReadError : public std::exception {
     virtual const char *what() const throw()
@@ -85,7 +91,7 @@ private:
   void read_ngram(int order);
   void read_ngrams(int order);
 
-  Vocabulary m_vocabulary;
+  const Vocabulary &m_vocabulary;
   Ngram m_ngram;
 
   // Regular expressions
@@ -98,7 +104,6 @@ private:
   // Temporary variables
   std::istream *m_in;
   std::string m_str;
-  int m_max_order;
   std::vector<int> m_counts;
   std::vector<int> m_words;
   std::vector<int> m_word_stack;

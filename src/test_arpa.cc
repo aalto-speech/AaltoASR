@@ -1,5 +1,7 @@
+#include <math.h>
 #include <fstream>
 #include <iostream>
+#include <deque>
 
 #include "ArpaNgramReader.hh"
 
@@ -8,26 +10,12 @@ main(int argc, char *argv[])
 {
   // Vocabulary
   Vocabulary v;
-  {
-    std::cout << "reading vocab" << std::endl;
-    std::ifstream in(argv[1]);
-    if (!in) {
-      std::cerr << "could not read vocabulary" << std::endl;
-      exit(1);
-    }
-    v.read(in);
-  }
+  v.read(argv[1]);
 
   // Language model
   ArpaNgramReader r(v);
   try {
-    std::cout << "reading arpa" << std::endl;
-    std::ifstream in(argv[2]);
-    if (!in) {
-      std::cerr << "could not read vocabulary" << std::endl;
-      exit(1);
-    }
-    r.read(in);
+    r.read(argv[2]);
   }
   catch (std::exception &e) {
     std::cerr << e.what() << " on line " << r.lineno() << std::endl;
@@ -41,13 +29,15 @@ main(int argc, char *argv[])
 
   int order = 3;
 
-  std::deque<int> history(order, -1);
+  std::cout << "evaluating" << std::endl;
+  std::deque<int> history;
   while (std::cin >> str) {
     int word = v.index(str);
 
-    history.pop_front();
+    while (history.size() >= order)
+      history.pop_front();
     history.push_back(word);
 
-    
+    std::cout << n.log_prob(history.begin(), history.end()) << std::endl;
   }
 }

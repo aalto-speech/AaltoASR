@@ -9,6 +9,8 @@
 
 class Vocabulary {
 public:
+  Vocabulary();
+
   // If size() index is used for out-of-vocabulary words.  The
   // vocabulary size is also affected.  The string presentation of the
   // unknown word is "OOV".  OOV is not read/written in/from the
@@ -33,11 +35,16 @@ public:
   // Read vocabulary from a stream: one word per line.  # comments are
   // removed.  Spaces are removed.
   void read(std::istream &in);
+  void read(const char *file);
   
   // Write vocabulary to a stream.
   void write(std::ostream &out) const;
 
-  // Exception: supplied index was out of range
+  struct OpenError : public std::exception {
+    virtual const char *what() const throw()
+      { return "Vocabulary: open error"; }
+  };
+
   struct OutOfRange : public std::exception {
     virtual const char *what() const throw()
       { return "Vocabulary: out of range"; }
@@ -46,11 +53,14 @@ public:
 protected:
   std::map<std::string,int> m_indices;
   std::vector<std::string> m_words;
+  std::string m_oov_string;
 };
 
 const std::string&
 Vocabulary::word(unsigned int index) const
 {
+  if (index == m_words.size())
+    return m_oov_string;
   if (index < 0 || index > m_words.size())
     throw OutOfRange();
 

@@ -6,13 +6,14 @@
 
 template <class Vector, class Value>
 inline int
-find(Vector &nodes, const Value &value, int first, int last)
+find(Vector &nodes, const Value &value, int first, int end)
 {
   int middle;
   int half;
 
-  int len = last - first;
-  while (len > 1) {
+  int len = end - first;
+
+  while (len > 3) { // FIXME: magic value
     half = len / 2;
     middle = first + half;
 
@@ -22,17 +23,23 @@ find(Vector &nodes, const Value &value, int first, int last)
 
     // First half
     if (nodes[middle] > value) {
-      last = middle;
-      len = last - first;
+      end = middle;
+      len = end - first;
     }
 
     // Second half
     else {
       first = middle + 1;
-      len = last - first;
+      len = end - first;
     }
   }
-  
+
+  while (first < end) {
+    if (nodes[first] == value)
+      return first;
+    first++;
+  }
+
   return -1;
 }
 
@@ -54,11 +61,16 @@ public:
     inline bool operator>(int value) const { return word > value; }
     inline bool operator==(int value) const { return word == value; }
 
-    template<class RandomAccessIterator>
-    inline float log_prob(RandomAccessIterator begin, RandomAccessIterator end);
   };
 
-  inline Node *node(int word, Node *node = NULL)
+  template<class RandomAccessIterator>
+  float log_prob(RandomAccessIterator begin, RandomAccessIterator end);
+
+  inline Ngram() : m_order(0) { }
+  inline int order() const { return m_order; }
+  inline Node *node(int index) { return &m_nodes[index]; }
+  inline int nodes() const { return m_nodes.size(); }
+  inline Node *child(int word, Node *node = NULL)
     {
       if (node == NULL)
 	return &m_nodes[word];
@@ -66,39 +78,52 @@ public:
       if (node->first < 0)
 	return NULL;
 
-      int last = (node + 1)->first - 1;
-      int index = find(m_nodes, word, node->first, last);
+      int end = (node + 1)->first;
+      if (end < 0)
+	end = m_nodes.size();
+
+      int index = find(m_nodes, word, node->first, end);
       if (index < 0)
 	return NULL;
       return &m_nodes[index];
     }
 
 private:
+  int m_order;
   std::vector<Node> m_nodes;
 };
-
-Ngram::Node*
-Ngram::find(RandomAccessIterator begin, RandomAccessIterator end)
-{
-  
-}
 
 template<class RandomAccessIterator>
 float
 Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end)
 {
-  int length = distance(begin, end);
+  RandomAccessIterator it;
+  double log_prob = 0;
 
-  std::vector<Node*> grams(length);
-  std::vector<Node*> back_offs(length);
+  for (; begin != end; begin++) {
+    Node *node = node(*begin);
+    assert(node != NULL); // We must have a unigram for each word.
 
-  Node *n = NULL;
-  for (RandomAccessIterator it = begin; it != end; it++) {
-    int word = *it;
-    n = node(n, word);
+    for (it = begin+1; it != end; it++) {
+      Node *next = this->child(*it, node);
+      if (!next)
+	break;
+      node = next;
+    }
+    
+    // Full ngram found
+    if (it == end) {
+      log_prob += node->log_prob;
+      return log_prob;
+    }
+
+    // Backoff found
+    if (it + 1 == end)
+      log_prob += node->back_off;
   }
 
-  
+  assert(false);
+  return 0;
 }
 
 #endif /* NGRAM_HH */

@@ -1,3 +1,4 @@
+#include <fstream>
 #include <string>
 
 #include <errno.h>
@@ -111,11 +112,11 @@ ArpaNgramReader::read_counts()
     m_lineno++;
     if (!regexec(&m_r_count, m_str.c_str()))
       break;
-    m_max_order = atoi(&m_str.c_str()[start(1)]);
+    m_ngram.m_order = atoi(&m_str.c_str()[start(1)]);
     int value = atoi(&m_str.c_str()[start(2)]);
     total_ngrams += value;
     m_counts.push_back(value);
-    if (m_counts.size() != m_max_order)
+    if (m_counts.size() != m_ngram.m_order)
       throw InvalidOrder();
   }
   if (!*m_in)
@@ -123,10 +124,10 @@ ArpaNgramReader::read_counts()
 
   m_ngram.m_nodes.clear();
   m_ngram.m_nodes.reserve(total_ngrams);
-  m_words.reserve(m_max_order);
-  m_word_stack.resize(m_max_order);
-  m_index_stack.resize(m_max_order - 1); // The last index is not used
-  m_points.reserve(m_max_order + 2); // Words + log_prob and back_off
+  m_words.reserve(m_ngram.m_order);
+  m_word_stack.resize(m_ngram.m_order);
+  m_index_stack.resize(m_ngram.m_order - 1); // The last index is not used
+  m_points.reserve(m_ngram.m_order + 2); // Words + log_prob and back_off
 }
 
 inline void
@@ -175,17 +176,20 @@ ArpaNgramReader::read_ngram(int order)
       if (m_word_stack[i] != word) {
 	reset_stacks(i+1);
 
-	Ngram::Node *next_node = &m_ngram.m_nodes[m_index_stack[i - 1]];
+	Ngram::Node *root = &m_ngram.m_nodes[m_index_stack[i - 1]];
+	Ngram::Node *root_next = root + 1;
 	int index;
 
 	// Find the correct index
-	for (index = m_index_stack[i] + 1; 
-	     m_ngram.m_nodes[index].word != word; 
-	     index++) 
-	{
-	  if (index == next_node->first)
+	if (m_index_stack[i] < 0)
+	  index = root->first;
+	else
+	  index = m_index_stack[i] + 1; 
+	while (m_ngram.m_nodes[index].word != word) {
+	  if (index == root_next->first)
 	    throw UnknownPrefix();
 	  m_ngram.m_nodes[index].first = m_ngram.m_nodes.size();
+	  index++;
 	}
 
 	m_word_stack[i] = word;
@@ -242,6 +246,14 @@ ArpaNgramReader::read_ngrams(int order)
       ngrams_read++;
     }
   }
+
+  // Fix the 'first' fields.
+  if (order > 1) {
+    for (int i = m_index_stack[order - 2] + 1; 
+	 i < m_ngram.m_nodes.size() - m_counts[order - 1];
+	 i++)
+      m_ngram.node(i)->first = m_ngram.m_nodes.size();
+  }
 }
 
 // FIXME: ugly code
@@ -256,9 +268,19 @@ ArpaNgramReader::read(std::istream &in)
   read_counts();
 
   // Read all ngrams
-  for (int order = 1; order <= m_max_order; order++)
+  for (int order = 1; order <= m_ngram.m_order; order++)
     read_ngrams(order);
 
   if (!in)
     throw ReadError();
 }
+
+void
+ArpaNgramReader::read(const char *file)
+{
+  std::ifstream in(file);
+  if (!in)
+    throw OpenError();
+  read(in);
+}
+
