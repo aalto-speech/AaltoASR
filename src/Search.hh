@@ -219,12 +219,14 @@ public:
   void print_sure();
 
   // Operate
+  void reset_search(int start_frame);
   void init_search(int expand_window, int stacks, int reserved_hypos);
   void sort_stack(int frame, int top = 0);
   bool expand(int frame);
   void move_buffer(int frame);
   void go(int frame);
   bool run();
+  bool recognize_segment(int start_frame, int end_frame);
   void prune_similar(int frame, int length);
 
   // Info
@@ -237,6 +239,8 @@ public:
     { return m_stacks[frame2stack(frame)]; }
 
   // Options
+  void set_end_frame(int end_frame) { m_end_frame = end_frame; }
+
   void set_hypo_limit(int hypo_limit) { m_hypo_limit = hypo_limit; }
   void set_word_limit(int word_limit) { m_word_limit = word_limit; }
   void set_word_beam(double word_beam) { m_word_beam = word_beam; }
@@ -283,6 +287,7 @@ private:
 
   // options
   int m_expand_window;	
+  int m_end_frame;
   double m_lm_scale;
   double m_lm_offset;
   double m_unk_offset;

@@ -85,7 +85,8 @@ public:
   void move_buffer(int frame);
   void go(int frame);
   bool run();
-  void runto(int frame);
+  bool runto(int frame);
+	bool recognize_segment(int start_frame, int end_frame);
 
   int frame();
   int first_frame();

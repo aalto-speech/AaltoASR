@@ -174,3 +174,9 @@ Toolbox::runto(int frame)
 
   return true;
 }
+
+bool
+Toolbox::recognize_segment(int start_frame, int end_frame)
+{
+  return m_search.recognize_segment(start_frame, end_frame);
+}

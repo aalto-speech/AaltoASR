@@ -52,6 +52,7 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_last_hypo_frame(0),
 
     // Options
+    m_end_frame(-1),
     m_lm_scale(1),
     m_lm_offset(0),
     m_unk_offset(0),
@@ -171,51 +172,29 @@ Search::print_sure()
 }
 
 void
-Search::init_search(int expand_window, int stacks, int reserved_hypos)
+Search::reset_search(int start_frame)
 {
-  m_frame = 0;
-  m_expand_window = expand_window;
+  m_last_printed_path = NULL;
 
   // FIXME!  Are all beams reset properly here.  Test reinitializing
   // the search!
   m_global_best = 1e10;
   m_global_frame = -1;
 
-  // Initialize stacks
-  m_stacks.resize(stacks);
-  m_first_frame = 0;
-  m_last_frame = m_first_frame + stacks;
-  m_first_stack = 0;
-  m_last_stack = m_first_stack + stacks;
-  m_last_hypo_frame = 0;
-
-  // Clear stacks and reserve some space.  Stacks grow dynamically,
-  // but if we need space anyway, it is better to have some already.
-  for (int i = 0; i < m_stacks.size(); i++) {
+  // Clear stacks
+  for (int i = 0; i < m_stacks.size(); i++)
     m_stacks[i].clear();
-    m_stacks[i].reserve(reserved_hypos);
-  }
-
-  m_last_printed_path = NULL;
+  m_end_frame = -1;
+  m_frame = start_frame;
+  m_first_frame = start_frame;
+  m_last_frame = m_first_frame + m_stacks.size();
+  m_first_stack = start_frame;
+  m_last_stack = m_first_stack + m_stacks.size();
+  m_last_hypo_frame = start_frame;
 
   // Create initial empty hypothesis.
   Hypo hypo(0, 0, new HypoPath(0, 0, NULL));
-  m_stacks[0].add(hypo);
-
-  // Create mapping between words in the lexicon and the language model
-  if (m_ngram.order() > 0) {
-    int count = 0;
-    m_lex2lm.resize(m_vocabulary.size());
-    for (int i = 0; i < m_vocabulary.size(); i++) {
-      m_lex2lm[i] = m_ngram.index(m_vocabulary.word(i));
-      if (m_lex2lm[i] == 0) {
-	std::cerr << m_vocabulary.word(i) << " not in LM" << std::endl;
-	count++;
-      }
-    }
-    if (count > 0)
-      std::cerr << "there were " << count << " out-of-LM words" << std::endl;
-  }
+  m_stacks[frame2stack(start_frame)].add(hypo);
 
   // Reset pruning statistics
   m_stack_expansions = 0;
@@ -223,6 +202,39 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
   m_limit_prunings = 0;
   m_beam_prunings = 0;
   m_similar_prunings = 0;
+
+  m_history.clear();
+}
+
+void
+Search::init_search(int expand_window, int stacks, int reserved_hypos)
+{
+  m_expand_window = expand_window;
+
+  // Initialize stacks and reserve some space beforehand
+  m_stacks.resize(stacks);
+  for (int i = 0; i < m_stacks.size(); i++) {
+    m_stacks[i].clear();
+    m_stacks[i].reserve(reserved_hypos);
+  }
+
+  reset_search(0);
+
+  // Create mapping between words in the lexicon and the language model
+  if (m_ngram.order() > 0) {
+    int count = 0;
+    m_lex2lm.clear();
+    m_lex2lm.resize(m_vocabulary.size());
+    for (int i = 0; i < m_vocabulary.size(); i++) {
+      m_lex2lm[i] = m_ngram.index(m_vocabulary.word(i));
+      if (m_lex2lm[i] == 0) {
+//	std::cerr << m_vocabulary.word(i) << " not in LM" << std::endl;
+	count++;
+      }
+    }
+    if (count > 0)
+      std::cerr << "there were " << count << " out-of-LM words" << std::endl;
+  }
 }
 
 int
@@ -348,7 +360,10 @@ Search::expand(int frame)
   // Expand the stack
   if (!stack.empty()) {
     // Fit word lexicon to acoustic data
-    m_expander.expand(frame, m_expand_window);
+    if (m_end_frame > 0 && (frame + m_expand_window > m_end_frame))
+      m_expander.expand(frame, m_end_frame - frame);
+    else
+      m_expander.expand(frame, m_expand_window);
     m_stack_expansions++;
 
     // Get only the best words
@@ -371,7 +386,7 @@ Search::expand(int frame)
 
 	// Prune words much worse than the best words on average
 	if (word->avg_log_prob < words[0]->avg_log_prob * m_word_beam)
-	  continue;
+	  continue; // FIXME: could we break here if words are sorted?
 
 	double log_prob = hypo.log_prob + word->log_prob;
 	double lm_log_prob = 0;
@@ -458,4 +473,17 @@ Search::run()
     m_frame++;
     return true;
   }
+}
+
+bool
+Search::recognize_segment(int start_frame, int end_frame)
+{
+  reset_search(start_frame);
+  set_end_frame(end_frame);
+  while (m_frame <= end_frame) {
+    if (!expand(m_frame))
+      return false;
+    m_frame++;
+  }
+  return true;
 }

@@ -76,6 +76,12 @@ LnaReaderCircular::go_to(int frame)
   if (m_eof_frame > 0 && frame >= m_eof_frame)
     return false;
 
+  if (frame < m_frames_read - m_buffer_size)
+    seek(frame);
+
+  // FIXME: do we want to seek forward if skip is great?  Currently we
+  // just read until the desired frame is reached.
+
   while (m_frames_read <= frame) {
 
     // Read a frame
@@ -108,9 +114,6 @@ LnaReaderCircular::go_to(int frame)
 
     m_frames_read++;
   }
-
-  if (frame < m_frames_read - m_buffer_size)
-    throw FrameForgotten();
 
   int index = m_first_index - (m_frames_read - frame) * m_num_models;
   if (index < 0)

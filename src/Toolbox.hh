@@ -52,6 +52,7 @@ public:
   void go(int frame) { m_search.go(frame); }
   bool run() { return m_search.run(); }
   bool runto(int frame);
+  bool recognize_segment(int start_frame, int end_frame);
 
   // Info
   int frame() { return m_search.frame(); }
