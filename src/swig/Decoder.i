@@ -118,6 +118,7 @@ public:
   void set_state_beam(float beam);
   void set_duration_scale(float scale);
   void set_transition_scale(float scale);
+  void set_rabiner_post_mode(int mode);
   void set_hypo_beam(float beam);
   void set_global_beam(float beam);
   void set_max_state_duration(int duration);

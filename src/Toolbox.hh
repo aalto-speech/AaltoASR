@@ -78,6 +78,7 @@ public:
   void set_state_beam(float beam) { m_expander.set_beam(beam); }
   void set_duration_scale(float scale) { m_expander.set_duration_scale(scale); }
   void set_transition_scale(float scale) { m_expander.set_transition_scale(scale); }
+  void set_rabiner_post_mode(int mode) { m_expander.set_rabiner_post_mode(mode); }
   void set_hypo_beam(float beam) { m_search.set_hypo_beam(beam); }
   void set_global_beam(float beam) 
   { m_search.set_global_beam(beam); }

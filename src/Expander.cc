@@ -27,6 +27,8 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_max_state_duration(0x7fff), // FIXME
     m_duration_scale(1),
     m_transition_scale(1),
+    m_post_durations(false),
+    m_rabiner_post_mode(0),
     m_words(),
     m_active_words()
 {
@@ -307,6 +309,11 @@ Expander::move_all_tokens()
             m_duration_scale *
             hmm_state.duration.get_log_prob(source_token->state_duration + 1);
         }
+
+        if (m_rabiner_post_mode)
+        {
+          dur_log_prob += m_transition_scale*transition.log_prob;
+        }
       }
 
       // Target state is a sink state.  Clone the token to the next
@@ -326,15 +333,15 @@ Expander::move_all_tokens()
 	  // of the next word.  This also assumes that there can not
 	  // be an empty word in lexicon.
 	  if (!m_forced_end || m_frame == m_frames - 1) {
-	    float log_prob = (m_post_durations ? dur_log_prob : log_prob);
+	    float node_log_prob = (m_post_durations ? dur_log_prob : log_prob);
 
 	    // FIXME: is this correct?  Do we really want to add the
 	    // lexicon node probabilities only at word ends?
-	    log_prob += source_node->log_prob;
-	    assert(log_prob < 0);
+	    node_log_prob += source_node->log_prob;
+	    assert(node_log_prob < 0);
 
 	    // Update the best
-	    float avg_log_prob = log_prob / m_frame;
+	    float avg_log_prob = node_log_prob / m_frame;
 	    if (!word->active || avg_log_prob > word->best_avg_log_prob) {
 	      word->best_avg_log_prob = avg_log_prob;
 	      word->best_length = m_frame;
@@ -344,9 +351,9 @@ Expander::move_all_tokens()
 	    // there may be several transitions leading to this state.
 	    // Store only the best.
             if (word->last_length < m_frame + 1 ||
-                word->log_probs[m_frame] < log_prob)
+                word->log_probs[m_frame] < node_log_prob)
             {
-              word->log_probs[m_frame] = log_prob;
+              word->log_probs[m_frame] = node_log_prob;
               word->last_length = m_frame + 1;
             }
             

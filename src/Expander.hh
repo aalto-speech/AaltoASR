@@ -64,6 +64,7 @@ public:
   void set_transition_scale(float scale) { m_transition_scale = scale; }
 
   void set_post_durations(bool durations) { m_post_durations = durations; }
+  void set_rabiner_post_mode(int mode) { m_rabiner_post_mode = mode; }
 
   // Info
   inline std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
@@ -118,6 +119,7 @@ private:
   float m_duration_scale;
   float m_transition_scale;
   bool m_post_durations;
+  int m_rabiner_post_mode;
 
   std::vector<Lexicon::Token*> m_token_pool;
 
