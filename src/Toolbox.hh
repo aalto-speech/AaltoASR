@@ -92,6 +92,8 @@ public:
   { m_search.set_print_frames(print_frames); }
   void set_word_boundary(const std::string &word)
   { m_search.set_word_boundary(word); }
+  void set_dummy_word_boundaries(bool value)
+  { m_search.set_dummy_word_boundaries(value); }
 
   // Debug
   void print_prunings()

@@ -127,6 +127,7 @@ public:
   void set_print_frames(bool print_frames);
   void set_multiple_endings(int multiple_endings);
   void set_word_boundary(const std::string &word);
+  void set_dummy_word_boundaries(bool value);
 
 	void print_prunings();
   void print_hypo(Hypo &hypo);

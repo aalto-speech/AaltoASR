@@ -204,6 +204,7 @@ public:
   void set_print_indices(bool print_indices) { m_print_indices = print_indices; }
   void set_print_frames(bool print_frames) { m_print_frames = print_frames; }
   void set_word_boundary(const std::string &word);
+  void set_dummy_word_boundaries(bool value) { m_dummy_word_boundaries = value; }
 
   // Exceptions
   struct InvalidFrame : public std::exception {
@@ -261,12 +262,18 @@ private:
   /** Index of the word boundary in LM context (negative if not used)
    *
    * Currently, when a hypothesis is expanded with word W, it is also
-   * expanded with a word bounadry and W.
+   * expanded with a word bounadry and W. (see m_dummy_word_boundaries)
    *
    * Also subsequent word boundary words are combined into a single
    * word boundary word, because language model does not have doubles.
    **/
   int m_word_boundary;
+
+  /**
+   * Currently, when a hypothesis is expanded with word W, it is also
+   * expanded with a word bounadry and W. (on by default)
+   **/
+  int m_dummy_word_boundaries;
 
   // Pruning options
   int m_word_limit;	// How many best words are expanded

@@ -86,6 +86,7 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
 
     // Pruning options
     m_word_boundary(-1),
+    m_dummy_word_boundaries(true),
     m_word_limit(0),
     m_word_beam(1e10),
     m_hypo_limit(0),
@@ -262,6 +263,8 @@ Search::init_search(int expand_window)
     m_lex2lm.resize(m_vocabulary.size());
     for (int i = 0; i < m_vocabulary.size(); i++) {
       m_lex2lm[i] = m_ngram.index(m_vocabulary.word(i));
+
+      // FIXME: We get "UNK is not in LM" messages even if it is.
       if (m_lex2lm[i] == 0) {
 	fprintf(stderr, "%s not in LM\n", m_vocabulary.word(i).c_str());
 	count++;
@@ -406,7 +409,8 @@ Search::expand_hypo_with_word(const Hypo &hypo, int word, int target_frame,
   // path, and remove the previous silence.  We should not modify the
   // previous silence, because it is still used by other hypotheses.
   // FIXME: ensure that everything goes fine, there was a nasty bug once
-  if (word == m_word_boundary && hypo.path->word_id == m_word_boundary) {
+  if (word == m_word_boundary && hypo.path->word_id == m_word_boundary) 
+  {
     HypoPath *prev = new_hypo.path->prev;
     new_hypo.path->prev = prev->prev;
     prev->prev->link();
@@ -426,7 +430,7 @@ Search::expand_hypo_with_word(const Hypo &hypo, int word, int target_frame,
 
   // Add also the hypothesis with word boundary
   // FIXME: it is useless to do this if no LM is used!
-  if (m_word_boundary > 0 && word != m_word_boundary) {
+  if (m_dummy_word_boundaries && m_word_boundary > 0 && word != m_word_boundary) {
     new_hypo.add_path(m_word_boundary, target_frame);
     new_hypo.path->ac_log_prob = 0;
     // FIXME: we do not need this here, because of the previous
