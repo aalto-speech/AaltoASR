@@ -121,7 +121,7 @@ Search::print_sure(Hypo &hypo, bool clear)
       }
       break;
     }
-    if (path->word_id >= 0)
+    if (path->word_id > 0)
       std::cout << m_vocabulary.word(path->word_id) << " ";
   }
   std::cout.flush();
@@ -153,7 +153,7 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
   }
 
   // Create initial empty hypothesis.
-  Hypo hypo(0, 0, new HypoPath(-1, -1, NULL));
+  Hypo hypo(0, 0, new HypoPath(0, 0, NULL));
   m_stacks[0].add(hypo);
 }
 
@@ -163,8 +163,10 @@ Search::frame2stack(int frame) const
   // Check that we have the frame in buffer
   if (frame < m_first_frame)
     throw ForgottenFrame();
-  if (frame >= m_last_frame)
+  if (frame >= m_last_frame) {
+    std::cerr << frame << std::endl;
     throw FutureFrame();
+  }
 
   // Find the stack corresponding to the given frame
   int index = frame - m_first_frame;

@@ -222,7 +222,6 @@ ArpaNgramReader::read_ngrams(int order)
   for (int ngrams_read = 0; ngrams_read < m_counts[order - 1];) {
     if (!std::getline(*m_in, m_str))
       throw ReadError();
-    std::cerr << m_str << std::endl;
     m_lineno++;
 
     // Skip empty lines
