@@ -668,7 +668,10 @@ bool
 TreeGram::Iterator::down()
 {
   Node &node = m_gram->m_nodes[m_index_stack.back()];
-  if (node.child_index < 0)
+  Node &next = m_gram->m_nodes[m_index_stack.back() + 1];
+  if (node.child_index < 0 || 
+      next.child_index < 0 ||
+      node.child_index == next.child_index)
     return false;
   m_index_stack.push_back(node.child_index);
   return true;

@@ -39,7 +39,9 @@ The important invariants in the structure are
   the number of children is (node[i+1].child - node[i])
 
   <li> node[i] does not have children, if and only if, either
-  (node[i].child = -1) or (node[i+1].child = -1).
+  (node[i].child = -1) or (node[i+1].child = -1).  FIXME: is one
+  possibility also that (node[i].child == node[i+1].child) (thirsima
+  6.10.2004)
 
 </ul>
 
@@ -65,5 +67,5 @@ The important invariants in the structure are
 
 <hr>
 <address></address>
-<!-- hhmts start --> Last modified: Mon Nov 17 14:36:46 EET 2003 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Wed Oct  6 10:15:29 EEST 2004 <!-- hhmts end -->
 </body> </html>
