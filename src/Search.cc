@@ -105,10 +105,9 @@ Search::print_sure(Hypo &hypo, bool clear)
   std::stack<HypoPath*> stack;
   HypoPath *path = hypo.path;
   
-  std::cout << std::endl;
   while (path != NULL) {
     stack.push(path);
-    std::cout << path->word_id << " " << path->count() << std::endl;
+//    std::cout << path->word_id << " " << path->count() << std::endl;
     path = path->prev;
   }
 
