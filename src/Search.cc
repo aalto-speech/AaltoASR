@@ -6,11 +6,10 @@
 
 int HypoPath::count = 0;
 
+// Assumes sorted
 void
 HypoStack::prune_similar(int length)
 {
-  sort();
-
   for (int h1 = 0; h1 + 1 < size(); h1++) {
     for (int h2 = h1 + 1; h2 < size(); h2++) {
       bool match = true;
@@ -59,6 +58,7 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_word_limit(0),
     m_word_beam(1e10),
     m_hypo_limit(0),
+    m_prune_similar(0),
     m_beam(1e10),
     m_global_beam(1e10),
 
@@ -200,6 +200,12 @@ Search::expand(int frame)
 {
   int stack_index = frame2stack(frame);
   HypoStack &stack = m_stacks[stack_index];
+
+  stack.sort();
+
+  // Prune similar endings
+  if (m_prune_similar > 0)
+    stack.prune_similar(m_prune_similar);
 
   // Prune stack
   if (m_hypo_limit > 0)

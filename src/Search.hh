@@ -126,7 +126,7 @@ Hypo::add_path(int word_id, int frame)
 
 class HypoStack : private std::vector<Hypo> {
 public:
-  inline HypoStack() : m_best_log_prob(-1e10), m_num_sorted(0) { }
+  inline HypoStack() : m_best_log_prob(-1e10) { }
 
   // Inherited from vector
   inline Hypo &operator[](int index) 
@@ -152,7 +152,6 @@ public:
 private:
   double m_best_log_prob;
   int m_best_index;
-  int m_num_sorted; // Number of sorted hypotheses in the beginning
 };
 
 void
@@ -168,9 +167,6 @@ HypoStack::add(const Hypo &hypo)
 void
 HypoStack::partial_sort(int top)
 {
-  if (top < m_num_sorted)
-    return;
-
   if (top == 0 || top >= size()) {
     top = size();
     sort();
@@ -179,34 +175,23 @@ HypoStack::partial_sort(int top)
     std::partial_sort(begin(), begin() + top, end());
     m_best_index = 0;
   }
-
-  m_num_sorted = top;
 }
 
 void
 HypoStack::sort()
 {
-  assert(m_num_sorted <= size());
-
-  if (m_num_sorted == size())
-    return;
-
   std::sort(begin(), end());
   m_best_index = 0;
-  m_num_sorted = size();
 }
 
+// Assumes sort
 void
 HypoStack::prune(int top)
 {
   if (top == 0)
     clear();
-  else if (top < size()) {
-    partial_sort(top);
+  else if (top < size())
     resize(top);
-  }
-
-  m_num_sorted = size();
 }
 
 void
@@ -214,8 +199,6 @@ HypoStack::clear()
 { 
   std::vector<Hypo>::clear(); 
   reset_best();
-
-  m_num_sorted = 0;
 }
 
 class Search {
@@ -252,6 +235,7 @@ public:
   void set_word_beam(double word_beam) { m_word_beam = word_beam; }
   void set_lm_scale(double lm_scale) { m_lm_scale = lm_scale; }
   void set_lm_offset(double lm_offset) { m_lm_offset = lm_offset; }
+  void set_prune_similar(int prune_similar) { m_prune_similar = prune_similar; }
   void set_beam(double beam) { m_beam = beam; }
   void set_global_beam(double beam) { m_global_beam = beam; }
   void set_verbose(bool verbose) { m_verbose = verbose; }
@@ -293,6 +277,7 @@ private:
   // Pruning options
   int m_word_limit;	// How many best words are expanded
   double m_word_beam;   // Do not expand words outside this beam
+  int m_prune_similar;  // Prune similar N-word endings 
   int m_hypo_limit;	// How many best hypos in a stack are expanded
   double m_beam;
 
