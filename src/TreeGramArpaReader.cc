@@ -43,6 +43,9 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       exit(1);
     }
 
+    if (line == "\\interpolated")
+      tree_gram->set_type(TreeGram::INTERPOLATED);
+
     if (line == "\\data\\")
       break;
   }
@@ -83,7 +86,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       max_order_count = count;
     number_of_nodes += count;
     m_counts.push_back(count);
-    if (atoi(vec[0].c_str()) != order || m_counts.back() <= 0)
+    if (atoi(vec[0].c_str()) != order || m_counts.back() < 0)
       read_error();
     order++;
   }
