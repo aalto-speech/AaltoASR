@@ -19,17 +19,17 @@ public:
   inline int count() const { return m_reference_count; }
   int word_id;
   int frame;
-  float ac_log_prob;
-  float lm_log_prob;
   HypoPath *prev;
+  float lm_log_prob;
+  float ac_log_prob;
   static int g_count;
 private:
   int m_reference_count;
 };
 
 HypoPath::HypoPath(int word_id, int frame, HypoPath *prev)
-  : word_id(word_id), frame(frame), prev(prev), m_reference_count(0),
-    lm_log_prob(0), ac_log_prob(0)
+  : word_id(word_id), frame(frame), prev(prev),
+    lm_log_prob(0), ac_log_prob(0), m_reference_count(0)
 {
   if (prev)
     prev->link();
