@@ -12,7 +12,7 @@ class Ngram;
 
 class ArpaNgramReader {
 public:
-  ArpaNgramReader(const Vocabulary &vocabulary);
+  ArpaNgramReader();
   ~ArpaNgramReader();
   void read(std::istream &in);
   void read(const char *file);
@@ -91,7 +91,6 @@ private:
   void read_ngram(int order);
   void read_ngrams(int order);
 
-  const Vocabulary &m_vocabulary;
   Ngram m_ngram;
 
   // Regular expressions

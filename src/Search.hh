@@ -19,6 +19,8 @@ public:
   inline int count() const { return m_reference_count; }
   int word_id;
   int frame;
+  float ac_log_prob;
+  float lm_log_prob;
   HypoPath *prev;
   static int g_count;
 private:
@@ -26,7 +28,8 @@ private:
 };
 
 HypoPath::HypoPath(int word_id, int frame, HypoPath *prev)
-  : word_id(word_id), frame(frame), prev(prev), m_reference_count(0)
+  : word_id(word_id), frame(frame), prev(prev), m_reference_count(0),
+    lm_log_prob(0), ac_log_prob(0)
 {
   if (prev)
     prev->link();
@@ -242,6 +245,7 @@ public:
   void set_beam(double beam) { m_beam = beam; }
   void set_global_beam(double beam) { m_global_beam = beam; }
   void set_verbose(int verbose) { m_verbose = verbose; }
+  void set_print_probs(bool print_probs) { m_print_probs = print_probs; }
 
   // Exceptions
   struct ForgottenFrame : public std::exception {
@@ -261,6 +265,9 @@ private:
   const Vocabulary &m_vocabulary;
   const Ngram &m_ngram;
 
+  // Mapping between lexicon and language model
+  std::vector<int> m_lex2lm;
+  
   // State
   int m_frame;
 
@@ -277,6 +284,7 @@ private:
   double m_lm_scale;
   double m_lm_offset;
   int m_verbose;
+  bool m_print_probs;
   HypoPath *m_last_printed_path;
 
   // Pruning options

@@ -12,7 +12,7 @@ Toolbox::Toolbox()
 
     m_lna_reader(),
 
-    m_ngram_reader(m_vocabulary),
+    m_ngram_reader(),
     m_ngram(m_ngram_reader.ngram()),
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),

@@ -78,6 +78,8 @@ public:
   void set_max_state_duration(int duration) 
     { m_expander.set_max_state_duration(duration); }
   void set_verbose(int verbose) { m_search.set_verbose(verbose); }
+  void set_print_probs(bool print_probs) 
+    { m_search.set_print_probs(print_probs); }
 
   // Debug
   void print_hypo(Hypo &hypo);

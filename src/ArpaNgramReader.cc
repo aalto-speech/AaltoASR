@@ -5,8 +5,7 @@
 
 #include "ArpaNgramReader.hh"
 
-// FIXME:
-// - check order when reading
+// FIXME: NGram assumes sorted nodes, so check the order when reading
 
 inline void
 ArpaNgramReader::regcomp(regex_t *preg, const char *regex, int cflags)
@@ -53,9 +52,8 @@ ArpaNgramReader::split(std::string &str, std::vector<int> &points)
   }
 }
 
-ArpaNgramReader::ArpaNgramReader(const Vocabulary &vocabulary)
-  : m_vocabulary(vocabulary),
-    m_matches(4),
+ArpaNgramReader::ArpaNgramReader()
+  : m_matches(4),
     m_in(NULL)
 {
   int cflags = REG_EXTENDED;
@@ -144,20 +142,18 @@ ArpaNgramReader::read_ngram(int order)
   if (m_points.size() == order + 2)
     back_off = atof(&m_str[m_points[order + 1]]);
 
-  // Parse words using vocabulary
+  // Parse words using vocabulary and build the internal LM
+  // vocabulary.  Note, that Ngram::add() does not insert duplicates,
+  // so this is safe.
   m_words.clear();
   for (int i = 0; i < order; i++) {
-    int word_id = m_vocabulary.index(&m_str[m_points[i + 1]]);
+    int word_id = m_ngram.add(&m_str[m_points[i + 1]]);
     m_words.push_back(word_id);
   }
 
-  // Read unigram.  The order of words must follow the order in
-  // the vocabulary.
-  if (order == 1) {
-    if (m_words[0] != m_ngram.m_nodes.size())
-      throw UnigramOrder();
+  // Read unigrams
+  if (order == 1)
     m_ngram.m_nodes.push_back(Ngram::Node(m_words[0], log_prob, back_off));
-  }
 
   // Find the path to the current n-gram
   else {

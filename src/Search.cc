@@ -53,7 +53,9 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
 
     // Options
     m_lm_scale(1),
-    m_lm_offset(1),
+    m_lm_offset(0),
+    m_verbose(0),
+    m_print_probs(false),
     m_last_printed_path(NULL),
 
     // Pruning options
@@ -116,6 +118,9 @@ Search::debug_print_hypo(Hypo &hypo)
     stack.pop();
     if (path->word_id > 0 && path != m_last_printed_path) {
       std::cout << m_vocabulary.word(path->word_id) << " ";
+      if (m_print_probs)
+	std::cout << path->ac_log_prob << " "
+		  << path->lm_log_prob << " ";
 //	      << "<" << path->frame << "> "
 //	      << "(" << path->word_id << ")"
     }
@@ -145,6 +150,10 @@ Search::print_sure()
       m_last_printed_path = path;
 //      path->printed = true;
       std::cout << m_vocabulary.word(path->word_id) << " ";
+//		<< m_lex2lm[path->word_id] << " "
+      if (m_print_probs)
+	std::cout << path->ac_log_prob << " "
+		  << path->lm_log_prob << " ";
     }
   }
   std::cout.flush();
@@ -181,6 +190,21 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
   // Create initial empty hypothesis.
   Hypo hypo(0, 0, new HypoPath(0, 0, NULL));
   m_stacks[0].add(hypo);
+
+  // Create mapping between words in the lexicon and the language model
+  if (m_ngram.order() > 0) {
+    int count = 0;
+    m_lex2lm.resize(m_vocabulary.size());
+    for (int i = 0; i < m_vocabulary.size(); i++) {
+      m_lex2lm[i] = m_ngram.index(m_vocabulary.word(i));
+      if (m_lex2lm[i] == 0) {
+	std::cerr << m_vocabulary.word(i) << " not in LM" << std::endl;
+	count++;
+      }
+    }
+    if (count > 0)
+      std::cerr << "there were " << count << " out-of-LM words" << std::endl;
+  }
 }
 
 int
@@ -318,11 +342,11 @@ Search::expand(int frame)
 	  continue;
 
 	double log_prob = hypo.log_prob + word->log_prob;
-	  
+	double lm_log_prob = 0;
 	// Calculate language model probabilities
 	if (m_ngram.order() > 0) {
 	  m_history.clear();
-	  m_history.push_front(word->word_id);
+	  m_history.push_front(m_lex2lm[word->word_id]);
 	  HypoPath *path = hypo.path;
 	  for (int i = 0; i < m_ngram.order(); i++) {
 	    if (!path)
@@ -331,9 +355,10 @@ Search::expand(int frame)
 	    path = path->prev;
 	  }
 
-	  log_prob += m_lm_offset + m_lm_scale * 
+	  lm_log_prob = m_lm_offset + m_lm_scale * 
 //	    word->frames * // Do we need this really?!
 	    m_ngram.log_prob(m_history.begin(), m_history.end());
+	  log_prob += lm_log_prob;
 	}
 
 	// Ensure stack space
@@ -347,6 +372,10 @@ Search::expand(int frame)
 	  int target_frame = frame + word->frames;
 	  Hypo new_hypo(target_frame, log_prob, hypo.path);
 	  new_hypo.add_path(word->word_id, hypo.frame);
+	  
+	  new_hypo.path->lm_log_prob = lm_log_prob;
+	  new_hypo.path->ac_log_prob = word->log_prob;
+
 	  target_stack.add(new_hypo);
 	  if (target_frame > m_last_hypo_frame)
 	    m_last_hypo_frame = target_frame;

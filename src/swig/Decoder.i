@@ -107,6 +107,7 @@ public:
   void set_global_beam(double beam);
   void set_max_state_duration(int duration);
   void set_verbose(int verbose);
+  void set_print_probs(bool print_probs);
 
   void print_hypo(Hypo &hypo);
   void print_sure();

@@ -28,7 +28,7 @@ Main::Main()
   : hr(),
     lr(hr.hmm_map(), hr.hmms()), 
     lna(),
-    nr(lr.vocabulary())
+    nr()
 {
 }
 
