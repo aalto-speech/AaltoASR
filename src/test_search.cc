@@ -9,6 +9,7 @@
 #include "NowayLexiconReader.hh"
 #include "Expander.hh"
 #include "Search.hh"
+#include "ArpaNgramReader.hh"
 
 using namespace std;
 
@@ -20,12 +21,14 @@ public:
   NowayHmmReader hr;
   NowayLexiconReader lr;
   LnaReaderCircular lna;
+  ArpaNgramReader nr;
 };
 
 Main::Main()
   : hr(),
     lr(hr.hmm_map(), hr.hmms()), 
-    lna()
+    lna(),
+    nr(lr.vocabulary())
 {
 }
 
@@ -79,10 +82,10 @@ Main::run()
     std::cout << "load lexicon" << std::endl;
 //    std::ifstream in("/home/neuro/thirsima/share/synt/iso64000.lex");
 //    std::ifstream in("/home/neuro/thirsima/share/synt/words20000.lex");
-    std::ifstream in("synt.lex");
+//    std::ifstream in("synt.lex");
 //    std::ifstream in("tavu.lex");
 //    std::ifstream in("synt.lex");
-//    std::ifstream in("/home/neuro/thirsima/share/synt/pk_synt5.lex");
+    std::ifstream in("/home/neuro/thirsima/share/synt/lexicon");
     if (!in) {
       std::cerr << "could not open lex file" << std::endl;
       exit(1);
@@ -92,15 +95,29 @@ Main::run()
     } 
     catch (std::exception &e) {
       std::cerr << e.what() << std::endl
-		<< lr.word() << std::endl;
+		<< "word: " << lr.word() << std::endl
+		<< "phone: " << lr.phone() << std::endl;
+      exit(1);
+    }
+  }
+
+  {
+    std::cout << "load ngram" << std::endl;
+    try {
+      nr.read("/home/neuro/thirsima/share/synt/arpa");
+    }
+    catch (std::exception &e) {
+      std::cerr << e.what() << std::endl
+		<< "on line " << nr.lineno() << std::endl;
       exit(1);
     }
   }
 
   // 16k frames buffer
-  lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76, 1024*16);
+  // lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76, 1024*16);
+  lna.open("/home/neuro/thirsima/share/synt/tiny.lna", 76, 1024*16);
 
-  std::cout << "expand" << std::endl;
+  std::cout << "recognize" << std::endl;
 
   Expander ex(hr.hmms(), lr.lexicon(), lna);
 
@@ -109,10 +126,11 @@ Main::run()
 //    timer.stop();
 //    std::cout << std::endl << timer.sec() << " seconds" << std::endl;
 
-  ex.set_token_limit(1000);
-  ex.set_max_state_duration(8);
+  ex.set_token_limit(500);
+  // ex.set_max_state_duration(8);
 
-  Search search(ex, lr.vocabulary(), 125*10);
+  Search search(ex, lr.vocabulary(), nr.ngram(), 125*2);
+  // search.set_lm_scale(.1);
 
   search.run();
 

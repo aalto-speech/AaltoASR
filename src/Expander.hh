@@ -47,6 +47,7 @@ public:
   void debug_print_tokens();
   std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
   std::vector<Word*> &words() { return m_sorted_words; }
+  inline int eof_frame() const { return m_acoustics.eof_frame(); }
 
 private:
   const std::vector<Hmm> &m_hmms;

@@ -3,8 +3,8 @@
 #include "Vocabulary.hh"
 
 Vocabulary::Vocabulary()
-  : m_oov_string("<UNK>")
 {
+  m_words.push_back("<UNK>");
 }
 
 int
@@ -57,6 +57,6 @@ Vocabulary::read(const char *file)
 void
 Vocabulary::write(std::ostream &out) const
 {
-  for (unsigned int i = 0; i < m_words.size(); i++)
+  for (unsigned int i = 1; i < m_words.size(); i++)
     out << m_words[i] << std::endl;
 }

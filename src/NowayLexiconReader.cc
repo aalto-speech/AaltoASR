@@ -102,7 +102,6 @@ NowayLexiconReader::read(std::istream &in)
     }
 
     // Read phones and insert them to lexicon
-    std::string phone;
     Lexicon::Node *node = m_lexicon.root();
     bool insert_rest = false;
 
@@ -115,10 +114,10 @@ NowayLexiconReader::read(std::istream &in)
 	break;
       if (in.peek() == '\n')
 	break;
-      get_until(in, phone, " \t\n");
+      get_until(in, m_phone, " \t\n");
 
       // Find the index of the hmm
-      std::map<std::string,int>::const_iterator it = m_hmm_map.find(phone);
+      std::map<std::string,int>::const_iterator it = m_hmm_map.find(m_phone);
       if (it == m_hmm_map.end())
 	throw UnknownHmm();
       int hmm_id = (*it).second;

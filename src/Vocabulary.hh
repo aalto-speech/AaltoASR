@@ -11,16 +11,11 @@ class Vocabulary {
 public:
   Vocabulary();
 
-  // If size() index is used for out-of-vocabulary words.  The
-  // vocabulary size is also affected.  The string presentation of the
-  // unknown word is "OOV".  OOV is not read/written in/from the
-  // vocabulary stream.
-
   // Return the string of the index'th word
   inline const std::string &word(unsigned int index) const;
 
   // Returns true if index is OOV
-  inline bool oov(int index) const { return index == size(); }
+  inline bool oov(int index) const { return index == 0; }
 
   // Return the index of the string 'word'
   inline int index(const std::string &word) const;
@@ -29,8 +24,8 @@ public:
   // Duplicates are detected and not inserted again.
   int add(const std::string &word);
 
-  // Return the number of words in the vocabulary.  May include OOV.
-  inline int size() const { return m_indices.size(); }
+  // Return the number of words in the vocabulary.  Does not include OOV.
+  inline int size() const { return m_indices.size() - 1; }
 
   // Read vocabulary from a stream: one word per line.  # comments are
   // removed.  Spaces are removed.
@@ -53,15 +48,12 @@ public:
 protected:
   std::map<std::string,int> m_indices;
   std::vector<std::string> m_words;
-  std::string m_oov_string;
 };
 
 const std::string&
 Vocabulary::word(unsigned int index) const
 {
-  if (index == m_words.size())
-    return m_oov_string;
-  if (index < 0 || index > m_words.size())
+  if (index < 0 || index >= m_words.size())
     throw OutOfRange();
 
   return m_words[index];
@@ -72,7 +64,7 @@ Vocabulary::index(const std::string &word) const
 {
   std::map<std::string,int>::const_iterator i = m_indices.find(word);
   if (i == m_indices.end())
-    return m_indices.size();
+    return 0;
   return (*i).second;
 }
 

@@ -34,6 +34,8 @@ public:
   inline Vocabulary &vocabulary() { return m_vocabulary; }
   inline const std::string &word() const { return m_word; }
 
+  inline const std::string &phone() const { return m_phone; }
+
   struct ReadError : public std::exception {
     virtual const char *what() const throw()
       { return "NowayLexiconReader: read error"; }
@@ -57,6 +59,9 @@ protected:
   int m_line_no;
 
   std::string m_word;
+
+  // Temporary variables
+  std::string m_phone;
 };
 
 #endif /* NOWAYLEXICONREADER_HH */

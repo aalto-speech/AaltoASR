@@ -147,8 +147,7 @@ Lexicon::Token::operator=(const Token &t)
   if (this == &t)
     return *this;
 
-  if (path)
-    Path::unlink(path);
+  Path *old_path = path;
 
   frame = t.frame;
   state_duration = t.state_duration;
@@ -158,6 +157,10 @@ Lexicon::Token::operator=(const Token &t)
   path = t.path;
   if (path)
     path->link();
+
+  if (old_path)
+    Path::unlink(old_path);
+
   return *this;
 }
 

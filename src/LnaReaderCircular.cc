@@ -8,7 +8,6 @@ LnaReaderCircular::LnaReaderCircular()
     m_first_index(0),
     m_frames_read(0),
     m_log_prob_buffer(0),
-    m_eof_frame(-1),
     m_read_buffer(0)
 {
 }

@@ -136,8 +136,8 @@ Expander::token_to_state(const Lexicon::Token *source_token,
 void
 Expander::move_all_tokens()
 {
-  for (int t = 0; t < m_tokens.size(); t++) {
-    const Lexicon::Token *token = m_tokens[t];
+  for (int i = 0; i < m_tokens.size(); i++) {
+    const Lexicon::Token *token = m_tokens[i];
     Lexicon::Node *node = token->node;
     Lexicon::State &state = node->states[token->state];
     assert(state.outgoing_token == NULL);
@@ -180,12 +180,13 @@ Expander::move_all_tokens()
 	  // because the current frame is actually already the start
 	  // of the next word.  This also assumes that there can not
 	  // be an empty word in lexicon.
-	  double avg_log_prob = source_token->log_prob / m_frame;
+	  double log_prob = source_token->log_prob + source_node->log_prob;
+	  double avg_log_prob = log_prob / m_frame;
 	  if (!word->active || avg_log_prob > word->avg_log_prob) {
 	    if (!word->active)
 	      m_sorted_words.push_back(word);
 	    word->avg_log_prob = avg_log_prob;
-	    word->log_prob = source_token->log_prob;
+	    word->log_prob = log_prob;
 	    word->frames = m_frame;
 	    word->active = true;
 	  }
@@ -194,7 +195,9 @@ Expander::move_all_tokens()
 	// ITERATE NEXT NODES
 	for (int n = 0; n < source_node->next.size(); n++) {
 	  Lexicon::Node *target_node = source_node->next[n];
-	  log_prob += target_node->log_prob;
+
+	  // FIXME: we do not want to do this here?  Only in word ends.
+	  // log_prob += target_node->log_prob;
 
 	  Lexicon::State &target_state = target_node->states[0];
 	  Lexicon::Token *new_token = 

@@ -69,7 +69,6 @@ private:
   int m_first_index;  // Index of the last value in the last frame
   int m_frames_read;  // Frames read
   std::vector<double> m_log_prob_buffer;
-  int m_eof_frame;
 
   // Temporary buffers
   std::vector<char> m_read_buffer;

@@ -64,13 +64,14 @@ public:
   };
 
   template<class RandomAccessIterator>
-  float log_prob(RandomAccessIterator begin, RandomAccessIterator end);
+  float log_prob(RandomAccessIterator begin, RandomAccessIterator end) const;
 
   inline Ngram() : m_order(0) { }
   inline int order() const { return m_order; }
   inline Node *node(int index) { return &m_nodes[index]; }
+  inline const Node *node(int index) const { return &m_nodes[index]; }
   inline int nodes() const { return m_nodes.size(); }
-  inline Node *child(int word, Node *node = NULL)
+  inline const Node *child(int word, const Node *node = NULL) const
     {
       if (node == NULL)
 	return &m_nodes[word];
@@ -95,17 +96,17 @@ private:
 
 template<class RandomAccessIterator>
 float
-Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end)
+Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end) const
 {
   RandomAccessIterator it;
   double log_prob = 0;
 
   for (; begin != end; begin++) {
-    Node *node = node(*begin);
+    const Node *node = node(*begin);
     assert(node != NULL); // We must have a unigram for each word.
 
     for (it = begin+1; it != end; it++) {
-      Node *next = this->child(*it, node);
+      const Node *next = this->child(*it, node);
       if (!next)
 	break;
       node = next;
