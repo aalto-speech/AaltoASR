@@ -17,6 +17,7 @@ public:
   inline void link() { m_reference_count++; }
   inline static void unlink(HypoPath *path);
   inline int count() const { return m_reference_count; }
+  inline bool guard() { return prev == NULL; }
   int word_id;
   int frame;
   HypoPath *prev;

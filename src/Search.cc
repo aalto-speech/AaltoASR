@@ -117,7 +117,7 @@ Search::debug_print_hypo(Hypo &hypo)
 //    std::cout << std::setw(5) << hypo.frame;
 //    std::cout << std::setw(10) << hypo.log_prob;
 
-  while (path != NULL) {
+  while (!path->guard()) {
     stack.push(path);
     if (path == m_last_printed_path)
       break;
@@ -127,7 +127,8 @@ Search::debug_print_hypo(Hypo &hypo)
   while (!stack.empty()) {
     path = stack.top();
     stack.pop();
-    if (path->word_id > 0 && path != m_last_printed_path) {
+    if (path != m_last_printed_path) {
+      assert(!path->guard());
       std::cout << m_vocabulary.word(path->word_id) << " ";
       if (m_print_probs)
 	std::cout << path->ac_log_prob << " "
@@ -145,7 +146,7 @@ Search::print_sure()
   std::stack<HypoPath*> stack;
   HypoPath *path = this->stack(m_last_hypo_frame).at(0).path;
   
-  while (path != NULL) {
+  while (!path->guard()) {
     stack.push(path);
     if (path == m_last_printed_path)
       break;
@@ -157,7 +158,8 @@ Search::print_sure()
     stack.pop();
     if (path->count() != 1)
       break;
-    if (path->word_id > 0 && path != m_last_printed_path) {
+    if (path != m_last_printed_path) {
+      assert(!path->guard());
       m_last_printed_path = path;
 //      path->printed = true;
       std::cout << m_vocabulary.word(path->word_id) << " ";
@@ -173,8 +175,6 @@ Search::print_sure()
 void
 Search::reset_search(int start_frame)
 {
-  m_last_printed_path = NULL;
-
   // FIXME!  Are all beams reset properly here.  Test reinitializing
   // the search!
   m_global_best = 1e10;
@@ -192,6 +192,7 @@ Search::reset_search(int start_frame)
 
   // Create initial empty hypothesis.
   Hypo hypo(0, 0, new HypoPath(0, 0, NULL));
+  m_last_printed_path = hypo.path;
   m_stacks[m_first_stack].add(hypo);
 
   // Reset pruning statistics
@@ -376,7 +377,6 @@ Search::expand(int frame)
 
     // Expand all hypotheses in the stack...
     for (int h = 0; h < stack.size(); h++) {
-
       Hypo &hypo = stack[h];
 
       // ... Using the best words
@@ -397,7 +397,7 @@ Search::expand(int frame)
 	  m_history.push_front(lm_word_id);
 	  HypoPath *path = hypo.path;
 	  for (int i = 0; i < m_ngram.order()-1; i++) {
-	    if (!path)
+	    if (path->guard())
 	      break;
 	    m_history.push_front(m_lex2lm[path->word_id]);
 	    path = path->prev;
@@ -406,8 +406,7 @@ Search::expand(int frame)
 	  double tmp = m_ngram.log_prob(m_history.begin(), m_history.end());
 	  lm_log_prob = m_lm_offset + m_lm_scale * 
 //	    word->frames * // Do we need this really?!
-	    (tmp + 
-	     (lm_word_id == 0 ? m_unk_offset : 0));
+	    (tmp + (lm_word_id == 0 ? m_unk_offset : 0));
 
 	  log_prob += lm_log_prob;
 	}
