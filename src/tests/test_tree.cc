@@ -19,10 +19,10 @@ main(int argc, char *argv[])
   {
     TreeGram::Iterator i(&g);
     while (i.next()) {
-      printf("( ");
+      fprintf(stderr, "( ");
       for (int o = 1; o <= i.order(); o++)
-	printf("%d ", i.node(o).word);
-      printf(") %g %g\n", i.node().log_prob, i.node().back_off);
+	fprintf(stderr, "%d ", i.node(o).word);
+      fprintf(stderr, ") %g %g\n", i.node().log_prob, i.node().back_off);
     }
   }
 

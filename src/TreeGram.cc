@@ -267,26 +267,25 @@ TreeGram::write(FILE *file, bool reflip)
 {
   fputs(format_str.c_str(), file);
 
-  // Write type and interpolation weights
+  // Write type
   if (m_type == BACKOFF)
     fputs("backoff\n", file);
   else if (m_type == INTERPOLATED)
     fputs("interpolated\n", file);
 
+  // Write vocabulary 
   fprintf(file, "%d\n", num_words());
   for (int i = 0; i < num_words(); i++)
     fprintf(file, "%s\n", word(i).c_str());
+
+  // Order, number of nodes and order counts
   fprintf(file, "%d %d\n", m_order, m_nodes.size());
+  for (int i = 0; i < m_order; i++)
+    fprintf(file, "%d\n", m_order_count[i]);
 
   // Use correct endianity
   if (Endian::big) 
     flip_endian(); 
-
-  // Write possible interpolation weights
-  if (m_type == INTERPOLATED) {
-    assert(m_interpolation.size() == m_order);
-    fwrite(&m_interpolation[0], m_order * sizeof(m_interpolation[0]), 1, file);
-  }
 
   // Write nodes
   fwrite(&m_nodes[0], m_nodes.size() * sizeof(TreeGram::Node), 1, file);
@@ -352,18 +351,18 @@ TreeGram::read(FILE *file)
   }
 
   // Read the order and the number of nodes
-  int m_nodes_size;
-  fscanf(file, "%d %d\n", &m_order, &m_nodes_size);
-  reserve_nodes(m_nodes_size);
+  int number_of_nodes;
+  fscanf(file, "%d %d\n", &m_order, &number_of_nodes);
 
-  // Read the possible interpolation weights
-  if (m_type == INTERPOLATED) {
-    m_interpolation.resize(m_order);
-    fread(&m_interpolation[0], sizeof(float) * m_order, 1, file);
-  }
+  // Read the counts for each order
+  m_order_count.resize(m_order);
+  for (int i = 0; i < m_order; i++)
+    fscanf(file, "%d\n", &m_order_count[i]);
 
   // Read the nodes
-  size_t block_size = m_nodes.size() * sizeof(TreeGram::Node);
+  m_nodes.clear();
+  m_nodes.resize(number_of_nodes);
+  size_t block_size = number_of_nodes * sizeof(TreeGram::Node);
   size_t blocks_read = fread(&m_nodes[0], block_size, 1, file);
   if (blocks_read != 1) {
       fprintf(stderr, "TreeGram::read(): "

@@ -12,6 +12,7 @@ public:
   typedef std::deque<int> Gram;
 
   struct Node {
+    Node() : word(-1), log_prob(0), back_off(0), child_index(-1) {}
     Node(int word, float log_prob, float back_off, int child_index)
       : word(word), log_prob(log_prob), back_off(back_off), 
 	child_index(child_index) {}
