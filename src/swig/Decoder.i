@@ -1,5 +1,7 @@
 # -*- tab-width: 2 -*-
 
+%include exception.i
+
 %module Decoder
 %{
 #include "Toolbox.hh"
@@ -11,7 +13,7 @@
 	}
 	catch (std::exception &e) {
 		std::cerr << e.what() << std::endl;
-		exit(1);
+		SWIG_exception(SWIG_RuntimeError, "Exception");
 	}
 }
 

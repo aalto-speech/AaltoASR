@@ -89,7 +89,7 @@ Expander::token_to_state(const Lexicon::Token *source_token,
     else {
       new_token = target_state.incoming_token;
 
-      assert(new_token != source_token);
+      assert(new_token != source_token); // FIXME! Can this happen?!
 
       *new_token = *source_token;
     }

@@ -12,23 +12,30 @@ class Toolbox {
 public:
   Toolbox();
   
+  // HMM models
   void hmm_read(const char *file);
+
+  // Lexicon
   void lex_read(const char *file);
   const std::string &lex_word() const { return m_lexicon_reader.word(); }
   const std::string &lex_phone() const { return m_lexicon_reader.phone(); }
 
+  // Ngram
   void ngram_read(const char *file);
   int ngram_lineno() const { return m_ngram_reader.lineno(); }
 
+  // Lna
   void lna_open(const char *file, int models, int size);
   void lna_close();
   void lna_seek(int frame) { m_lna_reader.seek(frame); }
 
-  void expand(int frame, int frames) { m_expander.expand(frame, frames); }
+  // Expander
+  void expand(int frame, int frames);
   const std::string &best_word();
   void print_words(int words);
   int find_word(const std::string &word);
 
+  // Search
   void init(int expand_window, int stacks, int reserved_hypos) 
     { 
       m_search.init_search(expand_window, stacks, reserved_hypos); 
@@ -40,6 +47,7 @@ public:
   bool run() { return m_search.run(); }
   bool runto(int frame);
 
+  // Info
   int frame() { return m_search.frame(); }
   int first_frame() { return m_search.first_frame(); }
   int last_frame() { return m_search.last_frame(); }
@@ -47,6 +55,7 @@ public:
   void prune(int frame, int top);
   int paths() const { return HypoPath::count; }
 
+  // Options
   void set_forced_end(bool forced_end) 
     { m_expander.set_forced_end(forced_end); }
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
@@ -63,6 +72,7 @@ public:
     { m_expander.set_max_state_duration(duration); }
   void set_verbose(bool verbose) { m_search.set_verbose(verbose); }
 
+  // Debug
   void print_hypo(Hypo &hypo);
 
   struct OpenError : public std::exception {
@@ -85,6 +95,8 @@ private:
   const Ngram &m_ngram;
 
   Expander m_expander;
+  std::vector<Expander::Word*> &m_best_words;
+
   Search m_search;
 };
 

@@ -16,8 +16,17 @@ Toolbox::Toolbox()
     m_ngram(m_ngram_reader.ngram()),
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
+    m_best_words(m_expander.words()),
+
     m_search(m_expander, m_vocabulary, m_ngram)
 {
+}
+
+void
+Toolbox::expand(int frame, int frames)
+{ 
+  m_expander.expand(frame, frames);
+  std::sort(m_best_words.begin(), m_best_words.end(), Expander::WordCompare());
 }
 
 const std::string&
@@ -25,10 +34,8 @@ Toolbox::best_word()
 {
   static const std::string noword("*");
 
-  std::vector<Expander::Word*> &sorted_words = m_expander.words();
-  std::sort(sorted_words.begin(), sorted_words.end(), Expander::WordCompare());
-  if (sorted_words.size() > 0)
-    return m_vocabulary.word(sorted_words[0]->word_id);
+  if (m_best_words.size() > 0)
+    return m_vocabulary.word(m_best_words[0]->word_id);
   else
     return noword;
 }

@@ -92,9 +92,10 @@ LnaReaderCircular::go_to(int frame)
       }
       if (bytes_read != m_num_models + 1)
 	throw ShortFrame();
-      if (m_read_buffer[0] != 0 && (unsigned char)m_read_buffer[0] != 0x80)
-	throw InvalidFrameId();
+      throw ReadError();
     }
+    if (m_read_buffer[0] != 0 && (unsigned char)m_read_buffer[0] != 0x80)
+      throw InvalidFrameId();
 
     // Parse frame to the circular buffer
     for (int i = 0; i < m_num_models; i++) {

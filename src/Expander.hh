@@ -30,6 +30,13 @@ public:
   // Actions
   Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
 	   Acoustics &m_acoustics);
+  inline void get_settings(const Expander &expander)
+    {
+      m_forced_end = expander.m_forced_end;
+      m_token_limit = expander.m_token_limit;
+      m_beam = expander.m_beam;
+      m_max_state_duration = expander.m_max_state_duration;
+    }
   void sort_best_tokens(int tokens);
   void keep_best_tokens(int tokens);
   void move_all_tokens();
