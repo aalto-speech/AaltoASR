@@ -92,8 +92,10 @@ void NowayHmmReader::read_durations(std::istream &in)
 {
   std::istream::iostate old_state = in.exceptions();
   in.exceptions(in.badbit | in.failbit | in.eofbit);
+  int version;
   int hmm_id;
   float a,b;
+  float a0,a1,b0,b1;
 
   try {
     if (m_hmms.size() == 0)
@@ -101,17 +103,66 @@ void NowayHmmReader::read_durations(std::istream &in)
       std::cerr << "NowayHmmReader::read_durations(): Error: HMMs must be loaded before duration file!" << std::endl;
       exit(1);
     }
-    for (int i = 0; i < m_hmms.size(); i++)
+    in >> version;
+    if (version != 1 && version != 2 && version != 3)
+      throw InvalidFormat();
+    if (version == 3)
     {
-      in >> hmm_id;
-      if (hmm_id != i+1)
-        throw InvalidFormat();
-
-      for (int s = 2; s < m_hmms[i].states.size(); s++)
+      std::vector<float> a_table;
+      std::vector<float> b_table;
+      int num_states, state_id;
+      in >> num_states;
+      a_table.reserve(num_states);
+      b_table.reserve(num_states);
+      for (int i = 0; i < num_states; i++)
       {
-        HmmState &state = m_hmms[i].states[s];
+        in >> state_id;
+        if (state_id != i)
+          throw InvalidFormat();
         in >> a >> b;
-        state.duration.set_parameters(a,b);
+        a_table.push_back(a);
+        b_table.push_back(b);
+      }
+      for (int i = 0; i < m_hmms.size(); i++)
+      {
+        for (int s = 2; s < m_hmms[i].states.size(); s++)
+        {
+          HmmState &state = m_hmms[i].states[s];
+          state.duration.set_parameters(a_table[state.model],
+                                        b_table[state.model]);
+        }
+      }
+    }
+    else
+    {
+      for (int i = 0; i < m_hmms.size(); i++)
+      {
+        in >> hmm_id;
+        if (hmm_id != i+1)
+          throw InvalidFormat();
+
+        if (version == 2)
+        {
+          in >> a >> b;
+          m_hmms[i].set_pho_dur_stat(a,b);
+        }
+
+        for (int s = 2; s < m_hmms[i].states.size(); s++)
+        {
+          HmmState &state = m_hmms[i].states[s];
+          in >> a >> b;
+          state.duration.set_parameters(a,b);
+        }
+
+        if (version == 2)
+        {
+          for (int s = 2; s < m_hmms[i].states.size(); s++)
+          {
+            HmmState &state = m_hmms[i].states[s];
+            in >> a0 >> a1 >> b0 >> b1;
+            state.duration.set_sr_parameters(a0,a1,b0,b1);
+          }
+        }
       }
     }
   }

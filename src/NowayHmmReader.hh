@@ -13,9 +13,9 @@ public:
   void read(std::istream &in);
   void read_durations(std::istream &in);
   
-  const std::map<std::string, int> &hmm_map() const 
+  std::map<std::string, int> &hmm_map()
     { return m_hmm_map; }
-  const std::vector<Hmm> &hmms() const 
+  std::vector<Hmm> &hmms()
     { return m_hmms; }
   int num_models() const { return m_num_models; }
 

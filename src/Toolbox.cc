@@ -5,7 +5,9 @@
 #include "Toolbox.hh"
 
 Toolbox::Toolbox()
-  : m_hmm_reader(),
+  : m_use_stack_decoder(1),
+
+    m_hmm_reader(),
     m_hmm_map(m_hmm_reader.hmm_map()),
     m_hmms(m_hmm_reader.hmms()),
 
@@ -15,8 +17,10 @@ Toolbox::Toolbox()
 
     m_lna_reader(),
 
-    m_expander(m_hmms, m_lexicon, m_lna_reader),
+    m_tp_lexicon_reader(m_hmm_map, m_hmms, m_tp_lexicon, m_tp_vocabulary),
+    m_tp_search(m_tp_lexicon, m_tp_vocabulary, m_lna_reader),
 
+    m_expander(m_hmms, m_lexicon, m_lna_reader),
     m_search(m_expander, m_vocabulary)
 {
 }
@@ -100,7 +104,10 @@ Toolbox::lex_read(const char *filename)
   FILE *file = fopen(filename, "r");
   if (!file)
     throw OpenError();
-  m_lexicon_reader.read(file);
+  if (m_use_stack_decoder)
+    m_lexicon_reader.read(file);
+  else
+    m_tp_lexicon_reader.read(file);
   fclose(file);
 }
 
@@ -114,9 +121,23 @@ Toolbox::ngram_read(const char *file, float weight)
     exit(1);
   }
 
-  m_ngrams.push_back(new TreeGram());
-  m_ngrams.back()->read(f);
-  m_search.add_ngram(m_ngrams.back(), weight);
+  if (m_use_stack_decoder)
+  {
+    m_ngrams.push_back(new TreeGram());
+    m_ngrams.back()->read(f);
+    m_search.add_ngram(m_ngrams.back(), weight);
+  }
+  else
+  {
+    if (m_ngrams.size() > 0)
+    {
+      delete m_ngrams[0];
+      m_ngrams.clear();
+    }
+    m_ngrams.push_back(new TreeGram());
+    m_ngrams.back()->read(f);
+    m_tp_search.set_ngram(m_ngrams.back());
+  }
 
   fclose(f);
 }

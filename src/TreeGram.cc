@@ -454,6 +454,36 @@ TreeGram::fetch_gram(const Gram &gram, int first)
   }
 }
 
+
+void
+TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
+                            std::vector<float> &result_buffer)
+{
+  float back_off_w;
+  int i;
+  int child_index, next_child_index;
+  float *lm_buf = new float[m_words.size()];
+  
+  // Get backoff weight
+  back_off_w = m_nodes[prev_word_id].back_off;
+  // Fill the unigram probabilities
+  for (i = 0; i < m_words.size(); i++)
+    lm_buf[i] = back_off_w + m_nodes[i].log_prob;
+  // Fill the bigram probabilities
+  child_index = m_nodes[prev_word_id].child_index;
+  next_child_index = m_nodes[prev_word_id+1].child_index;
+  if (child_index != -1 && next_child_index > child_index)
+  {
+    for (i = child_index; i < next_child_index; i++)
+      lm_buf[m_nodes[i].word] = m_nodes[i].log_prob;
+  }
+
+  // Map to result_buffer
+  for (i = 0; i < next_word_id.size(); i++)
+    result_buffer[i] = lm_buf[next_word_id[i]];
+  delete lm_buf;
+}
+
 float
 TreeGram::log_prob(const Gram &gram)
 {

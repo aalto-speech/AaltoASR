@@ -106,6 +106,10 @@ public:
   HypoStack &stack(int frame);
   int paths();
 
+	void print_best_path(bool only_not_printed);
+
+	void select_decoder(int stack_dec);
+
   void set_forced_end(bool forced_end);
   void set_hypo_limit(int hypo_limit);
   void set_prune_similar(int prune_similar);
@@ -121,7 +125,12 @@ public:
   void set_rabiner_post_mode(int mode);
   void set_hypo_beam(float beam);
   void set_global_beam(float beam);
+	void set_word_end_beam(float beam);
+	void set_eq_depth_beam(float beam);
+  void set_eq_word_count_beam(float beam);
   void set_max_state_duration(int duration);
+  void set_lm_lookahead(int lmlh);
+	void set_insertion_penalty(float ip);
   void set_verbose(int verbose);
   void set_print_probs(bool print_probs);
   void set_print_indices(bool print_indices);
@@ -129,8 +138,13 @@ public:
   void set_multiple_endings(int multiple_endings);
   void set_word_boundary(const std::string &word);
   void set_dummy_word_boundaries(bool value);
+  
+  void set_avg_ac_alpha(float alpha);
 
 	void print_prunings();
   void print_hypo(Hypo &hypo);
   void print_sure();
+	
+	void print_tp_lex_node(int node);
+  void print_tp_lex_lookahead(int node);
 };

@@ -70,6 +70,9 @@ public:
   void read(FILE *file);
   void write(FILE *file, bool reflip);
 
+  void fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
+                         std::vector<float> &result_buffer);
+  
   float log_prob(const Gram &gram);
   int order() { return m_order; }
   int last_order() { return m_last_order; }
@@ -100,7 +103,6 @@ private:
   // For creating the model
   std::vector<int> m_insert_stack;	// indices of the last gram inserted
   Gram m_last_gram;			// the last ngram added to the model
-
 };
 
 #endif /* TREEGRAM_HH */

@@ -47,7 +47,7 @@ private:
   // Temporary buffers
   std::vector<char> m_read_buffer;
 
-  bool m_two_byte;
+  int m_lna_bytes;
 };
 
 #endif /* LNAREADERCIRCULAR_HH */

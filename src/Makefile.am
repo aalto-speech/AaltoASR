@@ -1,9 +1,12 @@
 SUBDIRS = . swig
 
-noinst_PROGRAMS = arpasort perplexity test_arpa lna arpa2bin 
+noinst_PROGRAMS = arpasort perplexity test_arpa lna arpa2bin test_token_pass
 # test_expander 
 # test_lexicon 
 #	test_arpa
+
+test_token_pass_SOURCES = test_token_pass.cc
+test_token_pass_LDADD = libdecoder.a
 
 test_arpa_SOURCES = test_arpa.cc
 test_arpa_LDADD = libdecoder.a
@@ -50,4 +53,7 @@ libdecoder_a_SOURCES = \
 	TreeGram.cc			TreeGram.hh \
 	TreeGramArpaReader.cc		TreeGramArpaReader.hh \
 	tools.cc			tools.hh \
-	Vocabulary.cc			Vocabulary.hh
+	Vocabulary.cc			Vocabulary.hh \
+	TPNowayLexReader.cc		TPNowayLexReader.hh \
+	TPLexPrefixTree.cc		TPLexPrefixTree.hh \
+	TokenPassSearch.cc		TokenPassSearch.hh
