@@ -75,7 +75,7 @@ public:
   void lex_read(const char *file);
   const std::string &lex_word();
   const std::string &lex_phone();
-  void ngram_read(const char *file);
+  void ngram_read(const char *file, float weight);
 
   // Lna
   void lna_open(const char *file, int size);
@@ -88,9 +88,6 @@ public:
   const std::string &best_word();
   void print_words(int words);
   int find_word(const std::string &word);
-  void add_history(int word);
-  void add_history_word(const std::string &word);
-  void add_ngram_probs();
 
   // Search
   void init(int expand_window);

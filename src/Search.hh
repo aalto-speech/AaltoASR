@@ -159,8 +159,7 @@ private:
 class Search {
 public:
 
-  Search(Expander &expander, const Vocabulary &vocabulary, 
-	 Ngram &ngram);
+  Search(Expander &expander, const Vocabulary &vocabulary);
 
   // Debug and print
   void print_prunings();
@@ -169,6 +168,7 @@ public:
   void print_sure();
 
   // Operate
+  void add_ngram(Ngram *ngram, float weight);
   void reset_search(int start_frame);
   void init_search(int expand_window);
   bool expand_stack(int frame);
@@ -227,10 +227,15 @@ private:
 
   Expander &m_expander;
   const Vocabulary &m_vocabulary; // Words in lexicon (not the words in lm)
-  Ngram &m_ngram;
 
-  // Mapping between lexicon and language model
-  std::vector<int> m_lex2lm;
+  struct LanguageModel {
+    LanguageModel() : ngram(NULL), weight(0) {}
+    Ngram *ngram;
+    float weight;
+    std::vector<int> lex2lm;
+  };
+  std::vector<LanguageModel> m_ngrams;
+  int m_max_lm_order;
   
   // State
   int m_frame;
@@ -295,7 +300,8 @@ private:
   int m_similar_prunings;
 
   // Temporary variables
-  std::deque<int> m_history;
+  std::deque<int> m_history_lex;
+  std::deque<int> m_history_lm;
 };
 
 #endif /* SEARCH_HH */

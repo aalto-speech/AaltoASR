@@ -61,11 +61,9 @@ HypoStack::sorted_insert(const Hypo &hypo)
   insert(it, hypo);
 }
 
-Search::Search(Expander &expander, const Vocabulary &vocabulary, 
-	       Ngram &ngram)
+Search::Search(Expander &expander, const Vocabulary &vocabulary)
   : m_expander(expander),
     m_vocabulary(vocabulary),
-    m_ngram(ngram),
 
     // Stacks states
     m_first_frame(0),
@@ -92,10 +90,7 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_prune_similar(0),
     m_hypo_limit(0),
     m_hypo_beam(1e10),
-    m_global_beam(1e10),
-
-    // Temp
-    m_history(0)
+    m_global_beam(1e10)
 {
 }
 
@@ -242,7 +237,34 @@ Search::reset_search(int start_frame)
   m_beam_prunings = 0;
   m_similar_prunings = 0;
 
-  m_history.clear();
+  m_history_lex.clear();
+}
+
+void
+Search::add_ngram(Ngram *ngram, float weight)
+{
+  int count = 0;
+
+  m_ngrams.push_back(LanguageModel());
+  m_ngrams.back().ngram = ngram;
+  m_ngrams.back().lex2lm.clear();
+  m_ngrams.back().lex2lm.resize(m_vocabulary.num_words());
+
+  // Create the mapping between lexicon and the model.
+  for (int i = 0; i < m_vocabulary.num_words(); i++) {
+    m_ngrams.back().lex2lm[i] = ngram->word_index(m_vocabulary.word(i));
+
+    // Warn about words not in lm.
+    if (m_ngrams.back().lex2lm[i] == 0 && i != 0) {
+      fprintf(stderr, "%s not in LM %d\n", m_vocabulary.word(i).c_str(), 
+	      m_ngrams.size());
+      count++;
+    }
+  }
+
+  if (count > 0)
+    fprintf(stderr, "there were %d out-of-LM words in total in LM %d\n", 
+	    count, m_ngrams.size());
 }
 
 void
@@ -258,24 +280,6 @@ Search::init_search(int expand_window)
   }
 
   reset_search(0);
-
-  // Create mapping between words in the lexicon and the language model
-  if (m_ngram.order() > 0) {
-    int count = 0;
-    m_lex2lm.clear();
-    m_lex2lm.resize(m_vocabulary.num_words());
-    for (int i = 0; i < m_vocabulary.num_words(); i++) {
-      m_lex2lm[i] = m_ngram.word_index(m_vocabulary.word(i));
-
-      // FIXME: We get "UNK is not in LM" messages even if it is.
-      if (m_lex2lm[i] == 0 && i != 0) {
-	fprintf(stderr, "%s not in LM\n", m_vocabulary.word(i).c_str());
-	count++;
-      }
-    }
-    if (count > 0)
-      fprintf(stderr, "there were %d out-of-LM words\n", count);
-  }
 }
 
 int
@@ -313,18 +317,31 @@ Search::compute_lm_log_prob(const Hypo &hypo)
 {
   float lm_log_prob = 0;
 
-  if (m_ngram.order() > 0 && m_lm_scale > 0) {
-    m_history.clear();
+  if (m_max_lm_order > 0 && m_lm_scale > 0) {
+
+    // Create history using lexicon indices
+    m_history_lex.clear();
     HypoPath *path = hypo.path;
     int last_word = path->word_id;
-    for (int i = 0; i < m_ngram.order(); i++) {
+    for (int i = 0; i < m_max_lm_order; i++) {
       if (path->guard())
 	break;
-      m_history.push_front(m_lex2lm[path->word_id]);
+      m_history_lex.push_front(path->word_id);
       path = path->prev;
     }
 
-    float ngram_log_prob = m_ngram.log_prob(m_history.begin(), m_history.end());
+    // Compute the interpolated language model log-probability.
+    float ngram_log_prob = 0;
+    m_history_lm.resize(m_history_lex.size());
+    for (int lm = 0; lm < m_ngrams.size(); lm++) {
+
+      // Convert history to lm indices.
+      for (int j = 0; j < m_history_lex.size(); j++)
+	m_history_lm[j] = m_ngrams[lm].lex2lm[m_history_lex[j]];
+					     
+      ngram_log_prob += m_ngrams[lm].weight *
+	m_ngrams[lm].ngram->log_prob(m_history_lm.begin(), m_history_lm.end());
+    }
 
     // With m_unk_offset it is possible to distribute the
     // log-probability of the single UNK word of the LM over several

@@ -1,6 +1,6 @@
 #include <algorithm>
-
 #include <assert.h>
+#include <errno.h>
 
 #include "Toolbox.hh"
 
@@ -15,12 +15,9 @@ Toolbox::Toolbox()
 
     m_lna_reader(),
 
-    m_ngram(),
-    m_ngram_reader(),
-
     m_expander(m_hmms, m_lexicon, m_lna_reader),
 
-    m_search(m_expander, m_vocabulary, m_ngram)
+    m_search(m_expander, m_vocabulary)
 {
 }
 
@@ -40,39 +37,6 @@ Toolbox::best_word()
     return m_vocabulary.word(m_expander.words()[0]->word_id);
   else
     return noword;
-}
-
-void
-Toolbox::add_history(int word)
-{
-  while (m_history.size() >= m_ngram.order())
-    m_history.pop_front();
-
-  m_history.push_back(word);
-}
-
-void
-Toolbox::add_history_word(const std::string &word)
-{
-  add_history(m_vocabulary.word_index(word));
-}
-
-void
-Toolbox::add_ngram_probs()
-{
-  // Not supported at the moment, because structure of Word has changed.
-  assert(false);
-
-//   for (int i = 0; i < m_best_words.size(); i++) {
-//     m_history.push_back(m_best_words[i]->word_id);
-//     m_best_words[i]->log_prob += 
-//       m_ngram.log_prob(m_history.begin(), m_history.end()) * 
-//       m_best_words[i]->frames;
-//     m_best_words[i]->avg_log_prob = m_best_words[i]->log_prob / 
-//       m_best_words[i]->frames;
-//     m_history.pop_back();
-//   }
-//   std::sort(m_best_words.begin(), m_best_words.end(), Expander::WordCompare());
 }
 
 void
@@ -137,13 +101,21 @@ Toolbox::lex_read(const char *filename)
 }
 
 void
-Toolbox::ngram_read(const char *file)
+Toolbox::ngram_read(const char *file, float weight)
 {
-  FILE *fp = fopen(file, "r");
-  if (!fp)
-    throw OpenError();
-  m_ngram_reader.read(fp, &m_ngram);
-  fclose(fp);
+  FILE *f = fopen(file, "r");
+  if (!f) {
+    fprintf(stderr, "ngram_read(): could not open %s: %s\n", 
+	    file, strerror(errno));
+    exit(1);
+  }
+
+  m_ngrams.push_back(Ngram());
+  BinNgramReader reader;
+  reader.read(f, &m_ngrams.back());
+  m_search.add_ngram(&m_ngrams.back(), weight);
+
+  fclose(f);
 }
 
 void

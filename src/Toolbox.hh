@@ -29,7 +29,7 @@ public:
   const std::string &word(int index) const { return m_vocabulary.word(index); }
 
   // Ngram
-  void ngram_read(const char *file);
+  void ngram_read(const char *file, float weight);
 
   // Lna
   void lna_open(const char *file, int size);
@@ -43,9 +43,6 @@ public:
   void print_words(int words);
   int find_word(const std::string &word);
   std::vector<Expander::Word*> words() { return m_expander.words(); }
-  void add_history(int word);
-  void add_history_word(const std::string &word);
-  void add_ngram_probs();
 
   // Search
   void init(int expand_window);
@@ -125,8 +122,7 @@ private:
 
   LnaReaderCircular m_lna_reader;
 
-  Ngram m_ngram;
-  BinNgramReader m_ngram_reader;
+  std::vector<Ngram> m_ngrams;
   std::deque<int> m_history;
 
   Expander m_expander;
