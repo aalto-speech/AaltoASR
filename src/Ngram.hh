@@ -112,6 +112,7 @@ Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end)
   RandomAccessIterator it;
   float log_prob = 0;
   m_last_order = end - begin;
+  assert(m_last_order > 0);
   assert(m_last_order <= m_order);
 
   for (; begin != end; begin++) {

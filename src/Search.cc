@@ -178,7 +178,7 @@ Search::print_hypo(const Hypo &hypo)
     }
   }
 
-  printf(": %d %.2f\n", hypo.frame, hypo.log_prob);
+//  printf(": %d %.2f\n", hypo.frame, hypo.log_prob);
   fflush(stdout);
 }
 
@@ -247,6 +247,7 @@ Search::add_ngram(Ngram *ngram, float weight)
 
   m_ngrams.push_back(LanguageModel());
   m_ngrams.back().ngram = ngram;
+  m_ngrams.back().weight = weight;
   m_ngrams.back().lex2lm.clear();
   m_ngrams.back().lex2lm.resize(m_vocabulary.num_words());
 
@@ -330,15 +331,19 @@ Search::compute_lm_log_prob(const Hypo &hypo)
       path = path->prev;
     }
 
-    // Compute the interpolated language model log-probability.
+    // FOR each interpolated LM
     float ngram_log_prob = 0;
-    m_history_lm.resize(m_history_lex.size());
     for (int lm = 0; lm < m_ngrams.size(); lm++) {
 
-      // Convert history to lm indices.
-      for (int j = 0; j < m_history_lex.size(); j++)
-	m_history_lm[j] = m_ngrams[lm].lex2lm[m_history_lex[j]];
-					     
+      // Convert lexicon history to the currente LM indices.
+      m_history_lm.clear();
+      for (int j = m_history_lex.size(); j > 0; j--) {
+	if (m_history_lm.size() == m_ngrams[lm].ngram->order())
+	  break;
+	m_history_lm.push_front(m_ngrams[lm].lex2lm[m_history_lex[j - 1]]);
+      }
+
+      // Add the current LM probability with weight
       ngram_log_prob += m_ngrams[lm].weight *
 	m_ngrams[lm].ngram->log_prob(m_history_lm.begin(), m_history_lm.end());
     }

@@ -78,6 +78,7 @@ public:
     inline Token &operator=(const Token &token);
     inline ~Token();
     inline void add_path(int hmm_id, int frame, float log_prob);
+    inline void reset();
 
     int frame; // FIXME: do we need frame counter in token?
     char state_duration;
@@ -196,6 +197,20 @@ Lexicon::Token::add_path(int hmm_id, int frame, float log_prob)
   path->link();
   if (old_path)
     Path::unlink(old_path);
+}
+
+void
+Lexicon::Token::reset()
+{
+  if (path)
+    Path::unlink(path);
+  frame = -1;
+  state_duration = 0;
+  state = 0;
+  node = NULL;
+  log_prob = 0;
+  dur_log_prob = 0;
+  path = NULL;
 }
 
 #endif /* LEXICON_HH */
