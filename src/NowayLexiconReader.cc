@@ -14,17 +14,17 @@ NowayLexiconReader::NowayLexiconReader(
 {
 }
 
-std::istream&
-skip_while(std::istream &in, const char *chars)
+void
+skip_while(FILE *file, const char *chars)
 {
-  char c;
+  int c;
 
   WHILE:
   {
     // Read character
-    in.read(&c, 1);
-    if (!in)
-      return in;
+    c = fgetc(file);
+    if (c == EOF)
+      return;
 
     // Check if in chars
     for (int i = 0; chars[i] != 0; i++)
@@ -32,38 +32,27 @@ skip_while(std::istream &in, const char *chars)
 	goto WHILE;
   }
 
-  in.unget();
-  return in;
+  ungetc(c, file);
 }
 
 // Reads chars to 'str' until one of the 'delims' is reached.  The
 // delim is left unread.
-std::istream&
-get_until(std::istream &in, std::string &str, char *delims)
+void
+get_until(FILE *file, std::string &str, char *delims)
 {
-  str.resize(0);
+  str.clear();
 
   while (1) {
-    char c;
-    in.read(&c, 1);
+    int c;
+    c = fgetc(file);
+    if (c == EOF)
+      return;
 
-    if (in.bad())
-      return in;
-
-    // Clear flags if EOF reached after string.  Leave flags untouched
-    // only if nothing read to string so yet.
-    if (!in) {
-      if (str.size() == 0)
-	return in;
-      in.clear();
-      return in;
-    }
-    
     // Check delimiters
     for (int i = 0; delims[i] != 0; i++) {
       if (c == delims[i]) {
-	in.unget();
-	return in;
+	ungetc(c, file);
+	return;
       }
     }
     
@@ -72,23 +61,24 @@ get_until(std::istream &in, std::string &str, char *delims)
       str.reserve(str.capacity() > 0 ? str.capacity() * 2 : 1);
     str += c;
   }
-  return in;
 }
 
 void
-NowayLexiconReader::read(std::istream &in)
+NowayLexiconReader::read(FILE *file)
 {
   m_word.reserve(128); // The size is not necessary, just for efficiency
 
   while (1) {
     // Read first word
-    skip_while(in, " \t\n");
-    get_until(in, m_word, " \t\n");
-    if (in.bad())
+    skip_while(file, " \t\n");
+    get_until(file, m_word, " \t\n");
+
+    if (ferror(file))
       throw ReadError();
-    if (!in)
+
+    if (feof(file) && m_word.length() == 0)
       return;
-    
+
     // Parse possible probability
     int left = m_word.find('(');
     int right = m_word.rfind(')');
@@ -111,14 +101,17 @@ NowayLexiconReader::read(std::istream &in)
 
     while (1) {
       // Skip whitespace and read phone
-      skip_while(in, " \t");
-      if (in.bad())
+      skip_while(file, " \t");
+      if (ferror(file))
 	throw ReadError();
-      if (!in)
+      if (feof(file))
 	break;
-      if (in.peek() == '\n')
+      
+      int peek = fgetc(file);
+      ungetc(peek, file);
+      if (peek == '\n')
 	break;
-      get_until(in, m_phone, " \t\n");
+      get_until(file, m_phone, " \t\n");
 
       // Find the index of the hmm
       std::map<std::string,int>::const_iterator it = m_hmm_map.find(m_phone);

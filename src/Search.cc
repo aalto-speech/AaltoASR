@@ -127,7 +127,10 @@ Search::set_word_boundary(const std::string &word)
 {
   // FIXME: currently lexicon must be loaded before calling this.
   m_word_boundary = m_vocabulary.index(word);
-  assert(m_word_boundary > 0);
+  if (m_word_boundary == 0) {
+    fprintf(stderr, "Search::set_word_boundary(): word boundary not in vocabulary\n");
+    exit(1);
+  }
 }
 
 void
@@ -265,7 +268,7 @@ Search::init_search(int expand_window)
       m_lex2lm[i] = m_ngram.index(m_vocabulary.word(i));
 
       // FIXME: We get "UNK is not in LM" messages even if it is.
-      if (m_lex2lm[i] == 0) {
+      if (m_lex2lm[i] == 0 && i != 0) {
 	fprintf(stderr, "%s not in LM\n", m_vocabulary.word(i).c_str());
 	count++;
       }

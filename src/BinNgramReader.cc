@@ -3,6 +3,7 @@
 void 
 BinNgramReader::write(FILE *out, Ngram *ng, bool reflip) 
 {
+  fprintf (out, "cis-binlm1\n");
   fprintf (out, "%d\n", ng->size());
   for (int i=0; i<ng->size(); i++) {
     fprintf(out, "%s\n", ng->word(i).c_str());
@@ -16,21 +17,54 @@ BinNgramReader::write(FILE *out, Ngram *ng, bool reflip)
 void 
 BinNgramReader::read(FILE *in, Ngram *ng) 
 {
-  char cbuf[1000];
-  int si;
+  char cbuf[4096];
+  int words;
+  char *ptr;
 
-  fscanf(in, "%d\n", &si);
-  for (int i=0; i<si; i++) {
-    fgets(cbuf, 1000, in);
-    cbuf[strlen(cbuf)-1]='\0';
+  // Read the header
+  ptr = fgets(cbuf, 4096, in);
+  if (strcmp(cbuf, "cis-binlm1\n") != 0) {
+    fprintf(stderr, "BinNgramReader::read(): invalid file format\n");
+    exit(1);
+  }
+
+  // Read the number of words
+  ptr = fgets(cbuf, 4096, in);
+  if (!ptr) {
+    fprintf(stderr, "BinNgramReader::read(): unexpected end of file\n");
+    exit(1);
+  }
+  words = atoi(cbuf);
+  if (words < 1) {
+    fprintf(stderr, "BinNgramReader::read(): invalid number of words: %s\n", 
+	    cbuf);
+    exit(1);
+  }
+  
+  // Read the vocabulary
+  for (int i=0; i < words; i++) {
+    ptr = fgets(cbuf, 4096, in);
+    if (!ptr) {
+      fprintf(stderr, "BinNgramReader::read(): read error while reading vocabulary\n");
+      exit(1);
+    }
+    cbuf[strlen(cbuf) - 1]='\0';
     ng->add(cbuf);
   }
+
+  // Read nodes
   int m_nodes_size;
   fscanf(in, "%d %d\n", &ng->m_order, &m_nodes_size);
   ng->m_nodes.resize(m_nodes_size);
 
-  fread(&ng->m_nodes[0], ng->m_nodes.size()*sizeof(Ngram::Node), 1, in);
-  if (Endian::big) {flip_endian(ng);} // Big-endian system here
+  size_t block_size = ng->m_nodes.size() * sizeof(Ngram::Node);
+  size_t blocks_read = fread(&ng->m_nodes[0], block_size, 1, in);
+  if (blocks_read != 1) {
+      fprintf(stderr, "BinNgramReader::read(): read error while reading ngrams\n");
+      exit(1);
+  }
+  if (Endian::big) 
+    flip_endian(ng);
 }
 
 void BinNgramReader::flip_endian(Ngram *ng) 

@@ -1,6 +1,6 @@
 SUBDIRS = . swig
 
-noinst_PROGRAMS = test_search lna arpa2bin
+noinst_PROGRAMS = lna arpa2bin
 # test_expander 
 # test_lexicon 
 #	test_arpa
@@ -20,8 +20,8 @@ lna_LDADD = libdecoder.a
 arpa2bin_SOURCES = arpa2bin.cc
 arpa2bin_LDADD = libdecoder.a
 
-test_search_SOURCES = test_search.cc
-test_search_LDADD = libdecoder.a
+#test_search_SOURCES = test_search.cc
+#test_search_LDADD = libdecoder.a
 
 noinst_LIBRARIES = libdecoder.a
 

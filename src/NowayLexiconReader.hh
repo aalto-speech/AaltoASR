@@ -1,7 +1,7 @@
 #ifndef NOWAYLEXICONREADER_HH
 #define NOWAYLEXICONREADER_HH
 
-#include <iostream>
+#include <stdio.h>
 #include <map>
 #include <string>
 
@@ -35,7 +35,7 @@ class NowayLexiconReader {
 public:
   NowayLexiconReader(const std::map<std::string,int> &hmm_map, 
 		     const std::vector<Hmm> &hmms);
-  void read(std::istream &in);
+  void read(FILE *file);
 
   // Data
   inline Lexicon &lexicon() { return m_lexicon; }

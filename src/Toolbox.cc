@@ -116,12 +116,13 @@ Toolbox::hmm_read(const char *file)
 }
 
 void
-Toolbox::lex_read(const char *file)
+Toolbox::lex_read(const char *filename)
 {
-  std::ifstream in(file);
-  if (!in)
+  FILE *file = fopen(filename, "r");
+  if (!file)
     throw OpenError();
-  m_lexicon_reader.read(in);
+  m_lexicon_reader.read(file);
+  fclose(file);
 }
 
 void
