@@ -110,6 +110,7 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
 void
 Search::set_word_boundary(const std::string &word)
 {
+  // FIXME: currently lexicon must be loaded before calling this.
   m_word_boundary = m_vocabulary.index(word);
 }
 
@@ -376,8 +377,7 @@ Search::expand_hypo_with_word(const Hypo &hypo, int word, int target_frame,
     new_hypo.add_path(m_word_boundary, target_frame);
     new_hypo.path->ac_log_prob = 0;
     new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
-    new_hypo.log_prob = hypo.log_prob + ac_log_prob + 
-      new_hypo.path->lm_log_prob;
+    new_hypo.log_prob += new_hypo.path->lm_log_prob;
     insert_hypo(target_frame, new_hypo);
   }
 }
