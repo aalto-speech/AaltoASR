@@ -69,7 +69,7 @@ public:
   };
 
   template<class RandomAccessIterator>
-  float log_prob(RandomAccessIterator begin, RandomAccessIterator end) const;
+  float log_prob(RandomAccessIterator begin, RandomAccessIterator end);
 
   inline Ngram() : m_order(0) { }
   inline int order() const { return m_order; }
@@ -108,7 +108,7 @@ private:
 
 template<class RandomAccessIterator>
 float
-Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end) const
+Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end)
 {
   RandomAccessIterator it;
   float log_prob = 0;
