@@ -7,7 +7,8 @@
 
 class ArpaNgramReader {
 public:
-  ArpaNgramReader(const Vocabulary &vocabulary) : m_vocabulary(vocabulary) { }
+  inline ArpaNgramReader(const Vocabulary &vocabulary) 
+    : m_vocabulary(vocabulary) { }
   void read(std::istream &in);
   Ngram &ngram() { return m_ngram; }
 
