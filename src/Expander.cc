@@ -12,11 +12,17 @@ struct TokenCompare {
 
 Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
 		   Acoustics &acoustics)
-  : m_token_limit(0),
-    m_hmms(hmms),
+  : m_hmms(hmms),
     m_lexicon(lexicon),
-    m_acoustics(acoustics)
+    m_acoustics(acoustics),
+
+    m_token_limit(0),
+    m_words(lexicon.words()),
+    m_sorted_words()
 {
+  m_sorted_words.reserve(lexicon.words());
+  for (int i = 0; i < lexicon.words(); i++)
+    m_words[i].word_id = i;
 }
 
 void
@@ -164,6 +170,26 @@ Expander::move_all_tokens()
       // nodes in the lexicon.
       if (hmm.is_sink(target_state_id)) {
 
+	// If token is at word end, update the best words.
+	int word_id = source_node->word_id;
+	if (word_id >= 0) {
+	  Word *word = &m_words[word_id];
+
+	  // Note that we use (m_frame) instead of (m_frame + 1),
+	  // because the current frame is actually already the start
+	  // of the next word.  This also assumes that there can not
+	  // be an empty word in lexicon.
+	  double avg_log_prob = source_token->log_prob / m_frame;
+	  if (!word->active || avg_log_prob > word->avg_log_prob) {
+	    if (!word->active)
+	      m_sorted_words.push_back(word);
+	    word->avg_log_prob = avg_log_prob;
+	    word->log_prob = source_token->log_prob;
+	    word->frames = m_frame;
+	    word->active = true;
+	  }
+	}
+
 	// ITERATE NEXT NODES
 	for (int n = 0; n < source_node->next.size(); n++) {
 	  Lexicon::Node *target_node = source_node->next[n];
@@ -251,7 +277,7 @@ Expander::debug_print_history(Lexicon::Token *token)
   std::cout << std::setw(8) << token->log_prob << " ";
   for (int i = paths.size() - 1; i >= 0; i--) {
     Lexicon::Path *path = paths[i];
-    std::cout << m_hmms[paths[i]->hmm_id].label;
+    std::cout << m_hmms[path->hmm_id].label;
   }
 }
 
@@ -294,23 +320,28 @@ Expander::expand(int start_frame, int frames)
   clear_tokens();
   create_initial_tokens(start_frame);
 
-  for (int frame = 0; frames < 0 || frame < frames; frame++) {
+  // Clear best words list
+  for (int i = 0; i < m_words.size(); i++)
+    m_words[i].active = false;
+  m_sorted_words.clear();    
+
+  for (m_frame = 0; frames < 0 || m_frame < frames; m_frame++) {
     if (m_token_limit > 0)
       keep_best_tokens(m_token_limit);
-    if (!m_acoustics.go_to(start_frame + frame))
+    if (!m_acoustics.go_to(start_frame + m_frame))
       break;
     move_all_tokens();
 
-//      std::cout << frame << ": ";
+//      std::cout << m_frame << ": ";
 //      debug_print_history(m_tokens[0]);
 //      std::cout << std::endl;
 
-//      std::cout << "--- " << frame << " ---" << std::endl;
+//      std::cout << "--- " << m_frame << " ---" << std::endl;
 //      debug_print_tokens();
 
-    if (frame % 10 == 0)
-      std::cout << std::setw(8) << frame << ": " 
-		<< m_tokens.size() << std::endl;
+//      if (m_frame % 10 == 0)
+//        std::cout << std::setw(8) << m_frame << ": " 
+//  		<< m_tokens.size() << std::endl;
 
   }
 }

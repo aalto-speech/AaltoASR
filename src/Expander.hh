@@ -9,6 +9,24 @@
 
 class Expander {
 public:
+  // FIXME! Would it be much faster to use shorts and floats here?
+  class Word {
+  public:
+    Word() : 
+      avg_log_prob(0), log_prob(0), frames(-1), word_id(-1), active(false) { }
+    double avg_log_prob;
+    double log_prob;
+    int frames;
+    int word_id;
+    bool active;
+  };
+
+  struct WordCompare {
+    bool operator()(const Word *a, const Word *b) {
+      return a->avg_log_prob > b->avg_log_prob;
+    }
+  };
+
   Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
 	   Acoustics &m_acoustics);
   void sort_best_tokens(int tokens);
@@ -25,14 +43,19 @@ public:
   void debug_print_history(Lexicon::Token *token);
   void debug_print_tokens();
   std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
+  std::vector<Word*> &words() { return m_sorted_words; }
 
 private:
-  int m_token_limit;
-  std::vector<Lexicon::Token*> m_tokens;
-
   const std::vector<Hmm> &m_hmms;
   Lexicon &m_lexicon;
   Acoustics &m_acoustics;
+
+  int m_token_limit;
+  std::vector<Lexicon::Token*> m_tokens;
+  std::vector<Word> m_words;
+  std::vector<Word*> m_sorted_words;
+  int m_frame; // Current frame relative to the start frame.
+
 };
 
 #endif /* EXPANDER_HH */

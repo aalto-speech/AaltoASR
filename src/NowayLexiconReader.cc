@@ -155,5 +155,6 @@ NowayLexiconReader::read(std::istream &in)
     // Add word to lexicon
     int word_id = m_vocabulary.add(m_word);
     node->word_id = word_id;
+    m_lexicon.update_words(word_id);
   }
 }

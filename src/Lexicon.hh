@@ -62,6 +62,7 @@ public:
     int m_reference_count;
   };
 
+
   class Token {
   public:
     inline Token();
@@ -70,7 +71,7 @@ public:
     inline ~Token();
     inline void add_path(int hmm_id, int frame, double log_prob);
 
-    int frame;
+    int frame; // FIXME: do we need frame counter in token?
     int state;
     Lexicon::Node *node;
     double log_prob;
@@ -79,10 +80,19 @@ public:
 
   Lexicon();
   inline Lexicon::Node *root() { return &m_root_node; }
+  inline int words() const { return m_words; }
+  inline void update_words(int word) 
+    { 
+      if (word >= m_words)
+	m_words = word + 1;
+    }
 
 private:
+  int m_words; // Largest word_id in the nodes plus one
   Node m_root_node;
 };
+
+//////////////////////////////////////////////////////////////////////
 
 Lexicon::Path::Path(int hmm_id, int frame, double log_prob, Path *prev)
   : hmm_id(hmm_id),

@@ -9,7 +9,7 @@ class Main {
  public:
   Main() : hr(), lr(hr.hmm_map(), hr.hmms()) { }
   void print_node(const Lexicon::Node *node, int level, bool print_spaces);
-  void run();
+  void run(int argc, char *argv[]);
   NowayHmmReader hr;
   NowayLexiconReader lr;
 };
@@ -35,15 +35,15 @@ Main::print_node(const Lexicon::Node *node, int level, bool print_spaces)
 }
 
 void
-Main::run()
+Main::run(int argc, char *argv[])
 {
   {
-    std::ifstream in("test.hmm");
+    std::ifstream in(argv[1]);
     hr.read(in);
   }
 
   {
-    std::ifstream in("test.lex");
+    std::ifstream in(argv[2]);
     lr.read(in);
   }
 
@@ -55,7 +55,7 @@ main(int argc, char *argv[])
 {
   try {
     Main m;
-    m.run();
+    m.run(argc, argv);
   } 
   catch (std::exception &e) {
     std::cerr << e.what() << std::endl;
