@@ -5,8 +5,8 @@
 
 #include "NowayHmmReader.hh"
 #include "NowayLexiconReader.hh"
+#include "BinNgramReader.hh"
 #include "LnaReaderCircular.hh"
-#include "ArpaNgramReader.hh"
 #include "Expander.hh"
 #include "Search.hh"
 
@@ -24,7 +24,6 @@ public:
 
   // Ngram
   void ngram_read(const char *file);
-  int ngram_lineno() const { return m_ngram_reader.lineno(); }
 
   // Lna
   void lna_open(const char *file, int models, int size);
@@ -108,8 +107,8 @@ private:
 
   LnaReaderCircular m_lna_reader;
 
-  ArpaNgramReader m_ngram_reader;
-  const Ngram &m_ngram;
+  Ngram m_ngram;
+  BinNgramReader m_ngram_reader;
   std::deque<int> m_history;
 
   Expander m_expander;

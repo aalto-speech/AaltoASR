@@ -12,8 +12,8 @@ Toolbox::Toolbox()
 
     m_lna_reader(),
 
+    m_ngram(),
     m_ngram_reader(),
-    m_ngram(m_ngram_reader.ngram()),
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
     m_best_words(m_expander.words()),
@@ -89,14 +89,11 @@ Toolbox::print_words(int words)
   if (words == 0 || words > sorted_words.size())
     words = sorted_words.size();
 
-  std::cout.setf(std::cout.fixed, std::cout.floatfield);
-  std::cout.setf(std::cout.right, std::cout.adjustfield);
-  std::cout.precision(2);
   for (int i = 0; i < words; i++) {
-    std::cout << sorted_words[i]->frames << "\t"
-	      << sorted_words[i]->log_prob << "\t"
-	      << sorted_words[i]->avg_log_prob << "\t"
-	      << m_vocabulary.word(sorted_words[i]->word_id)
+    std::cout << m_vocabulary.word(sorted_words[i]->word_id) << " "
+	      << sorted_words[i]->frames << " "
+	      << sorted_words[i]->log_prob << " "
+	      << sorted_words[i]->avg_log_prob << " "
 	      << std::endl;
   }
 }
@@ -139,10 +136,11 @@ Toolbox::lex_read(const char *file)
 void
 Toolbox::ngram_read(const char *file)
 {
-  std::ifstream in(file);
-  if (!in)
+  FILE *fp = fopen(file, "r");
+  if (!fp)
     throw OpenError();
-  m_ngram_reader.read(in);
+  m_ngram_reader.read(fp, &m_ngram);
+  fclose(fp);
 }
 
 void

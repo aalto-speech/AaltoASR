@@ -9,7 +9,7 @@
 
 class Expander {
 public:
-  // FIXME! Would it be much faster to use shorts and floats here?
+
   class Word {
   public:
     Word() : 
@@ -30,26 +30,15 @@ public:
   // Actions
   Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
 	   Acoustics &m_acoustics);
-  inline void get_settings(const Expander &expander)
-    {
-      m_forced_end = expander.m_forced_end;
-      m_token_limit = expander.m_token_limit;
-      m_beam = expander.m_beam;
-      m_max_state_duration = expander.m_max_state_duration;
-    }
-  void sort_best_tokens(int tokens);
-  void keep_best_tokens(int tokens);
-  void move_all_tokens();
-  void clear_tokens();
-  void create_initial_tokens(int start_frame);
   void expand(int start_frame, int frames);
 
   // Options
-  inline void set_forced_end(bool forced_end) { m_forced_end = forced_end; }
-  inline void set_token_limit(int limit) { m_token_limit = limit; }
-  inline void set_beam(float beam) { m_beam = beam; }
-  inline void set_max_state_duration(int duration) 
-    { m_max_state_duration = duration; }
+  void set_forced_end(bool forced_end) { m_forced_end = forced_end; }
+  void set_token_limit(int limit) { m_token_limit = limit; }
+  void set_beam(float beam) { m_beam = beam; }
+  void set_max_state_duration(int duration) { m_max_state_duration = duration;}
+  void sort_words() { std::sort(m_found_words.begin(), m_found_words.end(), 
+				Expander::WordCompare()); }
 
   // Info
   inline std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
@@ -68,6 +57,11 @@ public:
   void debug_print_tokens();
 
 private:
+  void sort_best_tokens(int tokens);
+  void keep_best_tokens(int tokens);
+  void move_all_tokens();
+  void clear_tokens();
+  void create_initial_tokens(int start_frame);
   Lexicon::Token *token_to_state(const Lexicon::Token *source_token,
 				 Lexicon::State &source_state,
 				 Lexicon::State &target_state,

@@ -6,7 +6,6 @@
 #include "Vocabulary.hh"
 #include "Endian.hh"
 
-
 class BinNgramReader{
 public:
   void read(FILE *in, Ngram *ng);

@@ -62,7 +62,6 @@ public:
   const std::string &lex_word();
   const std::string &lex_phone();
   void ngram_read(const char *file);
-  int ngram_lineno();
 
   // Lna
   void lna_open(const char *file, int models, int size);
