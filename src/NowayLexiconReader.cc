@@ -115,8 +115,11 @@ NowayLexiconReader::read(FILE *file)
 
       // Find the index of the hmm
       std::map<std::string,int>::const_iterator it = m_hmm_map.find(m_phone);
-      if (it == m_hmm_map.end())
-	throw UnknownHmm();
+      if (it == m_hmm_map.end()) {
+	fprintf(stderr, "NowayLexiconReader::read(): unknown hmm %s\n",
+		m_phone.c_str());
+	exit(1);
+      }
       int hmm_id = (*it).second;
       
       prev_node = node;
