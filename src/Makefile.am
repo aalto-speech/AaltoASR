@@ -18,7 +18,7 @@ libdecoder_a_SOURCES = \
 	Expander.cc			Expander.hh \
 	Hmm.cc				Hmm.hh \
 	Lexicon.cc			Lexicon.hh \
-	LnaReader.cc			LnaReader.hh \
+	LnaReaderCircular.cc		LnaReaderCircular.hh \
 	NowayLexiconReader.cc		NowayLexiconReader.hh \
 	NowayHmmReader.cc		NowayHmmReader.hh \
 	Search.cc			Search.hh \

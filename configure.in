@@ -22,4 +22,5 @@ AC_OUTPUT(\
 	Makefile \
 	src/Makefile \
 	src/swig/Makefile \
+	src/tests/Makefile \
 )

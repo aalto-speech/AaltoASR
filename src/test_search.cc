@@ -4,7 +4,7 @@
 #include <errno.h>
 
 #include "Timer.hh"
-#include "LnaReader.hh"
+#include "LnaReaderCircular.hh"
 #include "NowayHmmReader.hh"
 #include "NowayLexiconReader.hh"
 #include "Expander.hh"
@@ -19,7 +19,7 @@ public:
   void print_token(Lexicon::Token *token);
   NowayHmmReader hr;
   NowayLexiconReader lr;
-  LnaReader lna;
+  LnaReaderCircular lna;
 };
 
 Main::Main()
@@ -79,8 +79,9 @@ Main::run()
     std::cout << "load lexicon" << std::endl;
 //    std::ifstream in("/home/neuro/thirsima/share/synt/iso64000.lex");
 //    std::ifstream in("/home/neuro/thirsima/share/synt/words20000.lex");
+    std::ifstream in("/home/neuro/thirsima/share/synt/1000.lex");
 //    std::ifstream in("tavu.lex");
-    std::ifstream in("synt.lex");
+//    std::ifstream in("synt.lex");
 //    std::ifstream in("/home/neuro/thirsima/share/synt/pk_synt5.lex");
     if (!in) {
       std::cerr << "could not open lex file" << std::endl;
@@ -96,7 +97,8 @@ Main::run()
     }
   }
 
-  lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76);
+  // 16k frames buffer
+  lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76, 1024*16);
 
   std::cout << "expand" << std::endl;
 

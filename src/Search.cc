@@ -60,13 +60,11 @@ void
 Search::run()
 {
   int frame = 0;
-  int word_limit = 10;
-  int hypo_limit = 10;
+  int word_limit = 20;
+  int hypo_limit = 20;
 
   Hypo hypo;
   m_stacks[0].push_back(hypo);
-
-  double best_score = -1e10;
 
   while (1) {
 //    std::cout << "--- " << frame << " ---" << std::endl;
@@ -80,6 +78,8 @@ Search::run()
     }
 
     if (!stack.empty()) {
+
+      debug_print_hypo(stack[0]);
 
       // Expand
       m_expander.expand(frame, m_frames - 2); // FIXME: magic number
@@ -102,13 +102,6 @@ Search::run()
 			       word->log_prob + hypo.log_prob,
 			       new Path(word->word_id, hypo.frame, hypo.path));
 	  m_stacks[target_stack].push_back(new_hypo);
-
-	  double score = (new_hypo.log_prob - 100) / new_hypo.frame;
-	  if (score > best_score) {
-	    best_score = score;
-	    std::cout << "---" << std::endl;
-	    debug_print_history(new_hypo);
-	  }
 
 //	  std::cout << "  ";
 //	  debug_print_hypo(new_hypo);
