@@ -9,6 +9,8 @@ int HypoPath::count = 0;
 void
 HypoStack::prune_similar(int length)
 {
+  sort();
+
   for (int h1 = 0; h1 + 1 < size(); h1++) {
     for (int h2 = h1 + 1; h2 < size(); h2++) {
       bool match = true;
@@ -85,8 +87,8 @@ Search::debug_print_hypo(Hypo &hypo)
 
   for (int i = debug_paths.size() - 1; i >= 0; i--) {
     std::cout << " " 
-	      << "<" << debug_paths[i]->frame << "> "
-	      << "(" << debug_paths[i]->word_id << ")"
+//	      << "<" << debug_paths[i]->frame << "> "
+//	      << "(" << debug_paths[i]->word_id << ")"
 	      << m_vocabulary.word(debug_paths[i]->word_id);
   }
   std::cout << " <" << hypo.frame << ">" << std::endl;

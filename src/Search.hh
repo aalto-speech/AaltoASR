@@ -126,7 +126,7 @@ Hypo::add_path(int word_id, int frame)
 
 class HypoStack : private std::vector<Hypo> {
 public:
-  inline HypoStack() : m_best_log_prob(-1e10) { }
+  inline HypoStack() : m_best_log_prob(-1e10), m_num_sorted(0) { }
 
   // Inherited from vector
   inline Hypo &operator[](int index) 
@@ -152,6 +152,7 @@ public:
 private:
   double m_best_log_prob;
   int m_best_index;
+  int m_num_sorted; // Number of sorted hypotheses in the beginning
 };
 
 void
@@ -167,19 +168,32 @@ HypoStack::add(const Hypo &hypo)
 void
 HypoStack::partial_sort(int top)
 {
-  if (top == 0 || top >= size())
+  if (top < m_num_sorted)
+    return;
+
+  if (top == 0 || top >= size()) {
+    top = size();
     sort();
+  }
   else {
     std::partial_sort(begin(), begin() + top, end());
     m_best_index = 0;
   }
+
+  m_num_sorted = top;
 }
 
 void
 HypoStack::sort()
 {
+  assert(m_num_sorted <= size());
+
+  if (m_num_sorted == size())
+    return;
+
   std::sort(begin(), end());
   m_best_index = 0;
+  m_num_sorted = size();
 }
 
 void
@@ -191,6 +205,8 @@ HypoStack::prune(int top)
     partial_sort(top);
     resize(top);
   }
+
+  m_num_sorted = size();
 }
 
 void
@@ -198,6 +214,8 @@ HypoStack::clear()
 { 
   std::vector<Hypo>::clear(); 
   reset_best();
+
+  m_num_sorted = 0;
 }
 
 class Search {
