@@ -51,8 +51,10 @@ public:
   class Path {
   public:
     inline Path(int hmm_id, int frame, double log_prob, class Path *prev);
+    inline ~Path();
     inline void link() { m_reference_count++; }
     inline static void unlink(Path *path);
+    static int count;
 
     int hmm_id;
     int frame;
@@ -102,8 +104,14 @@ Lexicon::Path::Path(int hmm_id, int frame, double log_prob, Path *prev)
     prev(prev),
     m_reference_count(0)
 {
+  count++;
   if (prev)
     prev->link();
+}
+
+Lexicon::Path::~Path()
+{
+  count--;
 }
 
 void

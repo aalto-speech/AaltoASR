@@ -67,7 +67,7 @@ void
 Search::run()
 {
   int frame = 0;
-  int word_limit = 50;
+  int word_limit = 10;
   int hypo_limit = 10;
 
   Hypo hypo;

@@ -352,7 +352,6 @@ Expander::debug_print_tokens()
 void
 Expander::expand(int start_frame, int frames)
 {
-  clear_tokens();
   create_initial_tokens(start_frame);
 
   // Clear best words list
@@ -379,4 +378,5 @@ Expander::expand(int start_frame, int frames)
 //  		<< m_tokens.size() << std::endl;
 
   }
+  clear_tokens();
 }
