@@ -1,8 +1,7 @@
 #ifndef ARPANGRAMREADER_HH
 #define ARPANGRAMREADER_HH
 
-#include <iostream> 
-
+#include <stdio.h>
 #include <regex.h>
 
 #include "Ngram.hh"
@@ -12,7 +11,7 @@ class ArpaNgramReader {
 public:
   ArpaNgramReader();
   ~ArpaNgramReader();
-  void read(std::istream &in);
+  void read(FILE *file);
   void read(const char *file);
   Ngram &ngram() { return m_ngram; }
 
@@ -74,6 +73,8 @@ public:
   };
 
 private:
+  bool getline(std::string *str, bool chomp = true);
+
   float str2float(const char *str);
   void regcomp(regex_t *preg, const char *regex, int cflags);
   bool regexec(const regex_t *preg, const char *string);
@@ -99,7 +100,7 @@ private:
   std::vector<regmatch_t> m_matches;
 
   // Temporary variables
-  std::istream *m_in;
+  FILE *m_file;
   std::string m_str;
   std::vector<int> m_counts;
   std::vector<int> m_words;

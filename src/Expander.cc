@@ -194,6 +194,9 @@ Expander::check_best(int info, bool tmp)
 // IMPORTANT ASSUMPTIONS:
 // 
 // - Lexicon tree may contain the same word id in several nodes.
+// - Lexicon may skip states
+// - Is it allowed to have big loops?
+
 void
 Expander::move_all_tokens()
 {

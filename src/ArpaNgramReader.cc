@@ -1,4 +1,3 @@
-#include <fstream>
 #include <string>
 
 #include <cerrno>
@@ -7,7 +6,34 @@
 
 // FIXME: NGram assumes sorted nodes, so check the order when reading
 
-inline void
+bool
+ArpaNgramReader::getline(std::string *str, bool chomp)
+{
+  char *ptr;
+  char buf[4096];
+
+  str->clear();
+  while (1) {
+    ptr = fgets(buf, 4096, m_file);
+    if (!ptr)
+      break;
+
+    str->append(buf);
+    if ((*str)[str->length() - 1] == '\n') {
+      break;
+    }
+  }
+
+  if (ferror(m_file) || str->length() == 0)
+    return false;
+
+  if (chomp && (*str)[str->length() - 1] == '\n')
+    str->resize(str->length() - 1);
+
+  return true;
+}
+
+void
 ArpaNgramReader::regcomp(regex_t *preg, const char *regex, int cflags)
 {
   int result = ::regcomp(preg, regex, cflags);
@@ -20,7 +46,6 @@ ArpaNgramReader::regcomp(regex_t *preg, const char *regex, int cflags)
 }
 
 
-inline
 bool
 ArpaNgramReader::regexec(const regex_t *preg, const char *string)
 {
@@ -28,7 +53,6 @@ ArpaNgramReader::regexec(const regex_t *preg, const char *string)
   return result == 0;
 }
 
-inline
 void
 ArpaNgramReader::split(std::string &str, std::vector<int> &points) 
 {
@@ -54,7 +78,7 @@ ArpaNgramReader::split(std::string &str, std::vector<int> &points)
 
 ArpaNgramReader::ArpaNgramReader()
   : m_matches(4),
-    m_in(NULL)
+    m_file(NULL)
 {
   int cflags = REG_EXTENDED;
 
@@ -68,7 +92,7 @@ ArpaNgramReader::~ArpaNgramReader()
   regfree(&m_r_order);
 }
 
-inline float 
+float 
 ArpaNgramReader::str2float(const char *str)
 {
   char *endptr;
@@ -80,33 +104,33 @@ ArpaNgramReader::str2float(const char *str)
   return value;
 }
 
-inline void
+void
 ArpaNgramReader::reset_stacks(int first)
 {
   std::fill(&m_word_stack[first], &m_word_stack[m_word_stack.size()], -1);
   std::fill(&m_index_stack[first], &m_index_stack[m_index_stack.size()], -1);
 }
 
-inline void
+void
 ArpaNgramReader::read_header()
 {
   // Skip header
-  while (std::getline(*m_in, m_str)) {
+  while (getline(&m_str)) {
     m_lineno++;
     if (m_str == "\\data\\")
       break;
   }
-  if (!*m_in)
+  if (ferror(m_file))
     throw ReadError();
 }
 
-inline void
+void
 ArpaNgramReader::read_counts()
 {
   int total_ngrams = 0;
 
   m_counts.clear();
-  while (std::getline(*m_in, m_str)) {
+  while (getline(&m_str)) {
     m_lineno++;
     if (!regexec(&m_r_count, m_str.c_str()))
       break;
@@ -117,7 +141,7 @@ ArpaNgramReader::read_counts()
     if (m_counts.size() != m_ngram.m_order)
       throw InvalidOrder();
   }
-  if (!*m_in)
+  if (ferror(m_file))
     throw ReadError();
 
   m_ngram.m_nodes.clear();
@@ -128,7 +152,7 @@ ArpaNgramReader::read_counts()
   m_points.reserve(m_ngram.m_order + 2); // Words + log_prob and back_off
 }
 
-inline void
+void
 ArpaNgramReader::read_ngram(int order)
 {
   // Divide line in words
@@ -264,7 +288,7 @@ ArpaNgramReader::read_ngram(int order)
   }
 }
 
-inline void
+void
 ArpaNgramReader::read_ngrams(int order)
 {
   bool header = false;
@@ -272,7 +296,7 @@ ArpaNgramReader::read_ngrams(int order)
   reset_stacks();
 
   for (int ngrams_read = 0; ngrams_read < m_counts[order - 1];) {
-    if (!std::getline(*m_in, m_str))
+    if (!getline(&m_str))
       throw ReadError();
     m_lineno++;
 
@@ -311,10 +335,10 @@ ArpaNgramReader::read_ngrams(int order)
 
 // FIXME: ugly code
 void
-ArpaNgramReader::read(std::istream &in)
+ArpaNgramReader::read(FILE *file)
 {
-  m_in = &in;
-  m_str.reserve(512); // Just for efficiency
+  m_file = file;
+  m_str.reserve(4096); // Just for efficiency
   m_lineno = 0;
 
   read_header();
@@ -324,16 +348,18 @@ ArpaNgramReader::read(std::istream &in)
   for (int order = 1; order <= m_ngram.m_order; order++)
     read_ngrams(order);
 
-  if (!in)
+  if (ferror(m_file))
     throw ReadError();
 }
 
 void
 ArpaNgramReader::read(const char *file)
 {
-  std::ifstream in(file);
-  if (!in)
+  m_file = fopen(file, "r");
+  if (!m_file)
     throw OpenError();
-  read(in);
+  read(m_file);
+  fclose(m_file);
+  m_file = NULL;
 }
 
