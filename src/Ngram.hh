@@ -42,17 +42,33 @@ public:
 
   class Node {
   public:
-    short word; 
+    unsigned short word; 
     float log_prob;
+    float back_off;
     int first;
-    int last;
-
+    
+    inline Node() : word(0), log_prob(0), back_off(0), first(-1) { }
+    inline Node(unsigned short word, float log_prob, float back_off)
+      : word(word), log_prob(log_prob), back_off(back_off), first(-1) { }
     inline bool operator<(int value) const { return word < value; }
     inline bool operator>(int value) const { return word > value; }
     inline bool operator==(int value) const { return word == value; }
   };
 
-  inline Node *unigram(int word) { return &m_nodes[word]; }
+  inline Node *node(int word, Node *node = NULL)
+    {
+      if (node == NULL)
+	return &m_nodes[word];
+
+      if (node->first < 0)
+	return NULL;
+
+      int last = (node + 1)->first - 1;
+      int index = find(m_nodes, word, node->first, last);
+      if (index < 0)
+	return NULL;
+      return &m_nodes[index];
+    }
 
 private:
   std::vector<Node> m_nodes;

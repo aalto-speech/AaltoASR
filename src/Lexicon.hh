@@ -122,7 +122,7 @@ Lexicon::Path::unlink(Path *path)
 Lexicon::Token::Token()
   : frame(-1),
     state_duration(0),
-    state(-1),
+    state(0),
     node(NULL),
     log_prob(0),
     path(NULL)

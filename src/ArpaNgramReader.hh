@@ -54,6 +54,21 @@ public:
       { return "ArpaNgramReader: reg exp error"; }
   };
 
+  struct UnigramOrder : public std::exception {
+    virtual const char *what() const throw()
+      { return "ArpaNgramReader: unigram order"; }
+  };
+
+  struct UnknownPrefix : public std::exception {
+    virtual const char *what() const throw()
+      { return "ArpaNgramReader: unknown prefix"; }
+  };
+
+  struct Duplicate : public std::exception {
+    virtual const char *what() const throw()
+      { return "ArpaNgramReader: duplicate"; }
+  };
+
 private:
   double str2double(const char *str);
   void regcomp(regex_t *preg, const char *regex, int cflags);
@@ -64,6 +79,12 @@ private:
   inline regoff_t end(int index) { return m_matches[index].rm_eo; }
   inline regoff_t length(int index) { return end(index) - start(index); }
   
+  void reset_stacks(int first = 0);
+  void read_header();
+  void read_counts();
+  void read_ngram(int order);
+  void read_ngrams(int order);
+
   Vocabulary m_vocabulary;
   Ngram m_ngram;
 
@@ -73,6 +94,16 @@ private:
   regex_t m_r_order;
   regex_t m_r_ngram;
   std::vector<regmatch_t> m_matches;
+
+  // Temporary variables
+  std::istream *m_in;
+  std::string m_str;
+  int m_max_order;
+  std::vector<int> m_counts;
+  std::vector<int> m_words;
+  std::vector<int> m_word_stack;
+  std::vector<int> m_index_stack;
+  std::vector<int> m_points;
 };
 
 #endif /* ARPANGRAMREADER_HH */

@@ -4,6 +4,9 @@
 
 #include "ArpaNgramReader.hh"
 
+// FIXME:
+// - check order when reading
+
 inline void
 ArpaNgramReader::regcomp(regex_t *preg, const char *regex, int cflags)
 {
@@ -32,7 +35,7 @@ ArpaNgramReader::split(std::string &str, std::vector<int> &points)
   bool spaces = true;
 
   points.clear();
-  for (int i = 0; i < str.length(); i++) {
+  for (int i = 0; i < m_str.length(); i++) {
     if (spaces) {
       if (str[i] != ' ' && str[i] != '\t') {
 	spaces = false;
@@ -50,25 +53,20 @@ ArpaNgramReader::split(std::string &str, std::vector<int> &points)
 }
 
 ArpaNgramReader::ArpaNgramReader(const Vocabulary &vocabulary)
-  : m_vocabulary(vocabulary)
+  : m_vocabulary(vocabulary),
+    m_matches(4),
+    m_in(NULL)
 {
   int cflags = REG_EXTENDED;
 
   regcomp(&m_r_count, "^ngram ([0-9]+)=([0-9]+)$", cflags);
   regcomp(&m_r_order, "^\\\\([0-9]+)-grams:$", cflags);
-
-#define RFLOAT "-?[0-9]*\\.[0-9]+"
-  regcomp(&m_r_ngram, "^(" RFLOAT ")(.*)(" RFLOAT ")$", cflags);
-#undef RFLOAT
-
-  m_matches.resize(4);
 }
 
 ArpaNgramReader::~ArpaNgramReader()
 {
   regfree(&m_r_count);
   regfree(&m_r_order);
-  regfree(&m_r_ngram);
 }
 
 inline double 
@@ -83,96 +81,184 @@ ArpaNgramReader::str2double(const char *str)
   return value;
 }
 
+inline void
+ArpaNgramReader::reset_stacks(int first)
+{
+  std::fill(&m_word_stack[first], &m_word_stack[m_word_stack.size()], -1);
+  std::fill(&m_index_stack[first], &m_index_stack[m_index_stack.size()], -1);
+}
+
+inline void
+ArpaNgramReader::read_header()
+{
+  // Skip header
+  while (std::getline(*m_in, m_str)) {
+    m_lineno++;
+    if (m_str == "\\data\\")
+      break;
+  }
+  if (!*m_in)
+    throw ReadError();
+}
+
+inline void
+ArpaNgramReader::read_counts()
+{
+  int total_ngrams = 0;
+
+  m_counts.clear();
+  while (std::getline(*m_in, m_str)) {
+    m_lineno++;
+    if (!regexec(&m_r_count, m_str.c_str()))
+      break;
+    m_max_order = atoi(&m_str.c_str()[start(1)]);
+    int value = atoi(&m_str.c_str()[start(2)]);
+    total_ngrams += value;
+    m_counts.push_back(value);
+    if (m_counts.size() != m_max_order)
+      throw InvalidOrder();
+  }
+  if (!*m_in)
+    throw ReadError();
+
+  m_ngram.m_nodes.clear();
+  m_ngram.m_nodes.reserve(total_ngrams);
+  m_words.reserve(m_max_order);
+  m_word_stack.resize(m_max_order);
+  m_index_stack.resize(m_max_order - 1); // The last index is not used
+  m_points.reserve(m_max_order + 2); // Words + log_prob and back_off
+}
+
+inline void
+ArpaNgramReader::read_ngram(int order)
+{
+  // Divide line in words
+  split(m_str, m_points);
+  if (m_points.size() < order + 1 || m_points.size() > order + 2)
+    throw InvalidNgram();
+
+  // Parse log_prob and back_off
+  double log_prob = atof(&m_str[m_points[0]]);
+  double back_off = 0;
+  if (m_points.size() == order + 2)
+    back_off = atof(&m_str[m_points[order + 1]]);
+
+  // Parse words using vocabulary
+  m_words.clear();
+  for (int i = 0; i < order; i++) {
+    int word_id = m_vocabulary.index(&m_str[m_points[i + 1]]);
+    m_words.push_back(word_id);
+  }
+
+  // Unigram
+  if (order == 1) {
+    if (m_words[0] != m_ngram.m_nodes.size())
+      throw UnigramOrder();
+    m_ngram.m_nodes.push_back(Ngram::Node(m_words[0], log_prob, back_off));
+  }
+
+  // Find the path to the current n-gram
+  else {
+
+    // Handle the first word specially
+    if (m_word_stack[0] != m_words[0]) {
+      m_word_stack[0] = m_words[0];
+      m_index_stack[0] = m_words[0];
+      reset_stacks(1);
+    }
+
+    // Handle the words 2..order-1
+    for (int i = 1; i < order-1; i++) {
+      int word = m_words[i];
+
+      // Path differs
+      if (m_word_stack[i] != word) {
+	reset_stacks(i+1);
+
+	Ngram::Node *next_node = &m_ngram.m_nodes[m_index_stack[i - 1]];
+	int index;
+
+	// Find the correct index
+	for (index = m_index_stack[i] + 1; 
+	     m_ngram.m_nodes[index].word != word; 
+	     index++) 
+	{
+	  if (index == next_node->first)
+	    throw UnknownPrefix();
+	  m_ngram.m_nodes[index].first = m_ngram.m_nodes.size();
+	}
+
+	m_word_stack[i] = word;
+	m_index_stack[i] = index;
+      }
+    }
+
+    // Handle the last word, we must not have duplicate
+    int word = m_words.back();
+    if (m_word_stack[order - 1] == word)
+      throw Duplicate();
+    m_word_stack[order - 1] = word;
+
+    // Insert the ngram and update root node
+    Ngram::Node *root = &m_ngram.m_nodes[m_index_stack[order - 2]];
+    if (root->first < 0)
+      root->first = m_ngram.m_nodes.size();
+    m_ngram.m_nodes.push_back(Ngram::Node(m_words.back(), log_prob, back_off));
+  }
+}
+
+inline void
+ArpaNgramReader::read_ngrams(int order)
+{
+  bool header = false;
+
+  reset_stacks();
+
+  for (int ngrams_read = 0; ngrams_read < m_counts[order - 1];) {
+    if (!std::getline(*m_in, m_str))
+      throw ReadError();
+    m_lineno++;
+
+    // Skip empty lines
+    if (m_str.length() == 0)
+      continue;
+
+    // Command
+    if (m_str[0] == '\\') {
+      if (!header && regexec(&m_r_order, m_str.c_str())) {
+	int new_order = atoi(&m_str.c_str()[start(1)]);
+	if (new_order != order)
+	  throw InvalidOrder();
+	header = true;
+      }
+
+      else
+	throw InvalidCommand();
+    }
+
+    // Ngram
+    else {
+      read_ngram(order);
+      ngrams_read++;
+    }
+  }
+}
+
 // FIXME: ugly code
 void
 ArpaNgramReader::read(std::istream &in)
 {
+  m_in = &in;
+  m_str.reserve(512); // Just for efficiency
   m_lineno = 0;
 
-  std::string str; 
-  str.reserve(256); // Size just for efficiency
-
-  // Skip header
-  while (std::getline(in, str)) {
-    m_lineno++;
-    if (str == "\\data\\")
-      break;
-  }
-  if (!in)
-    throw ReadError();
-
-  // Read counts
-  int max_order = 0;
-  int total_ngrams = 0;
-  std::vector<int> ngrams; // The number of ngrams for each order
-  while (std::getline(in, str)) {
-    m_lineno++;
-    if (!regexec(&m_r_count, str.c_str()))
-      break;
-    max_order = atoi(&str.c_str()[start(1)]);
-    int value = atoi(&str.c_str()[start(2)]);
-    total_ngrams += value;
-    ngrams.push_back(value);
-    if (ngrams.size() != max_order)
-      throw InvalidOrder();
-  }
-  if (!in)
-    throw ReadError();
+  read_header();
+  read_counts();
 
   // Read all ngrams
-  std::vector<int> ngram(max_order);
-  std::vector<int> points(max_order + 1);
-  for (int order = 1; order <= max_order; order++) {
-    bool header = false;
+  for (int order = 1; order <= m_max_order; order++)
+    read_ngrams(order);
 
-    // Read ngram of current order
-    for (int ngrams_read = 0; ngrams_read < ngrams[order];) {
-      if (!std::getline(in, str))
-	throw ReadError();
-      m_lineno++;
-
-      // Command
-      if (str[0] == '\\') {
-	if (regexec(&m_r_order, str.c_str())) {
-	  int new_order = atoi(&str.c_str()[start(1)]);
-	  if (new_order != order)
-	    throw InvalidOrder();
-	  header = true;
-	}
-
-	else
-	  throw InvalidCommand();
-      }
-    
-      // Ngram
-      else if (header && regexec(&m_r_ngram, str.c_str())) {
-	double log_prob = atof(&str[start(1)]);
-	double back_off = 0;
-	if (start(3) >= 0)
-	  back_off = atof(&str[start(3)]);
-
-	split(str, points);
-
-	if (points.size() < order + 1)
-	  throw InvalidNgram();
-
-	ngram.clear();
-	for (int i = 0; i < order; i++) {
-	  int point = points[i + 1];
-	  if (point >= end(2))
-	    throw InvalidNgram();
-	  int word_id = m_vocabulary.index(&str[point]);
-	  ngram.push_back(word_id);
-	}
-	ngrams_read++;
-      }
-      else 
-	throw InvalidNgram();
-    }
-
-    if (order == 0)
-      throw InvalidOrder();
-  }
   if (!in)
     throw ReadError();
 }
