@@ -1,5 +1,5 @@
-#include <cmath>
-#include <cstring>
+#include <math.h>
+#include <string.h>
 
 #include "NowayHmmReader.hh"
 

@@ -2,7 +2,7 @@
 #include <vector>
 #include <map>
 
-#include <cmath>
+#include <math.h>
 
 #include "NowayHmmReader.hh"
 #include "LnaReaderCircular.hh"

@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <assert.h>
 
 #include "TreeGramArpaReader.hh"
 #include "tools.hh"

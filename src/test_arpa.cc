@@ -2,7 +2,7 @@
 #include <iostream>
 #include <deque>
 
-#include <cmath>
+#include <math.h>
 
 #include "ArpaNgramReader.hh"
 

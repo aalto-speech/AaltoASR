@@ -1,7 +1,7 @@
 #ifndef BINNGRAMREADER_HH
 #define BINNGRAMREADER_HH
 
-#include <cstdio>
+#include <stdio.h>
 #include "Ngram.hh"
 #include "Vocabulary.hh"
 #include "Endian.hh"

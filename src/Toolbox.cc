@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include <cassert>
+#include <assert.h>
 
 #include "Toolbox.hh"
 

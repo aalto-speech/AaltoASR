@@ -27,19 +27,26 @@ read_line(std::string *str, FILE *file)
 bool
 read_string(std::string *str, size_t length, FILE *file)
 {
-  str->erase();
+  assert(length >= 0);
 
-  // Reserve space for the string
-  size_t size = str->capacity();
-  while (size < length)
-    size *= 2;
-  str->reserve(size);
-  str->resize(length);
+  str->erase();
+  if (length == 0)
+    return true;
+  str->reserve(length);
 
   // Read the string
-  size_t ret = fread(&str[0], length, 1, file);
-  if (ret != 1)
-    return false;
+  char buf[4096];
+  size_t buf_size = 4096;
+  while (length > 0) {
+    if (length < buf_size)
+      buf_size = length;
+    size_t ret = fread(buf, buf_size, 1, file);
+    if (ret != 1)
+      return false;
+    
+    str->append(buf, buf_size);
+    length -= buf_size;
+  }
 
   return true;
 }

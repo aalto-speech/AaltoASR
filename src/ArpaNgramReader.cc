@@ -1,5 +1,6 @@
 #include <string>
-#include <cerrno>
+#include <errno.h>
+#include <assert.h>
 
 #include "ArpaNgramReader.hh"
 #include "tools.hh"

@@ -2,9 +2,9 @@
 #include <stack>
 #include <algorithm>
 
-#include <cassert>
-#include <cmath>
-#include <cstdio>
+#include <assert.h>
+#include <math.h>
+#include <stdio.h>
 
 #include "Search.hh"
 

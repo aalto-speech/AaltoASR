@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <assert.h>
 
 #include "Endian.hh"
 #include "TreeGram.hh"
@@ -8,7 +9,8 @@ static std::string format_str("cis-binlm2\n");
 
 TreeGram::TreeGram()
   : m_type(BACKOFF),
-    m_order(0)
+    m_order(0),
+    m_last_order(0)
 {
 }
 
@@ -419,6 +421,7 @@ TreeGram::log_prob(const Gram &gram)
     // Full gram found?
     if (m_fetch_stack.size() == gram.size()) {
       log_prob += m_nodes[m_fetch_stack.back()].log_prob;
+      m_last_order = gram.size() - n;
       break;
     }
     

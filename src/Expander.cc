@@ -2,9 +2,9 @@
 #include <iostream>
 #include <algorithm>
 
-#include <cassert>
-#include <cfloat>
-#include <cstdio>
+#include <assert.h>
+#include <float.h>
+#include <stdio.h>
 
 #include "Expander.hh"
 

@@ -1,9 +1,9 @@
 #ifndef WORDGRAPH_HH
 #define WORDGRAPH_HH
 
-#include <cctype>
-#include <cstdio>
-#include <cstdlib>
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <exception>
 #include <iostream>
 #include <vector>

@@ -4,7 +4,7 @@
 #include <vector>
 #include <deque>
 
-#include <cfloat>
+#include <float.h>
 
 #include "Ngram.hh"
 #include "WordGraph.hh"

@@ -12,7 +12,9 @@ public:
   typedef std::deque<int> Gram;
 
   struct Node {
-    Node(int word, float log_prob, float back_off, int child_index);
+    Node(int word, float log_prob, float back_off, int child_index)
+      : word(word), log_prob(log_prob), back_off(back_off), 
+	child_index(child_index) {}
     int word;
     float log_prob;
     float back_off;
@@ -36,6 +38,8 @@ public:
   void write(FILE *file, bool reflip);
 
   float log_prob(const Gram &gram);
+  int order() { return m_order; }
+  int last_order() { return m_last_order; }
 
 private:
   int binary_search(int word, int first, int last);
@@ -52,6 +56,7 @@ private:
   std::vector<float> m_interpolation;	// interpolation weights
   std::vector<Node> m_nodes;		// storage for the nodes
   std::vector<int> m_fetch_stack;	// indices of the gram requested
+  int m_last_order;			// order of the last hit
 
   // For creating the model
   std::vector<int> m_insert_stack;	// indices of the last gram inserted

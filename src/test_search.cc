@@ -1,7 +1,7 @@
 #include <iomanip>
 #include <fstream>
 
-#include <cerrno>
+#include <errno.h>
 
 #include "Timer.hh"
 #include "LnaReaderCircular.hh"

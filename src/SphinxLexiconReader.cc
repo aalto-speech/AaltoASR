@@ -1,8 +1,8 @@
 #include <iostream> // DEBUG
 #include <sstream>
 
-#include <cassert>
-#include <cmath>
+#include <assert.h>
+#include <math.h>
 
 #include "NowayLexiconReader.hh"
 

@@ -71,11 +71,13 @@ BinNgramReader::read(FILE *file, Ngram *ng)
       fprintf(stderr, "BinNgramReader::read(): read error while reading ngrams\n");
       exit(1);
   }
+
   if (Endian::big) 
     flip_endian(ng);
 }
 
-void BinNgramReader::flip_endian(Ngram *ng) 
+void 
+BinNgramReader::flip_endian(Ngram *ng) 
 {
   for (int i=0; i<ng->m_nodes.size(); i++) {
     Endian::convert(&ng->m_nodes[i].word, 4);

@@ -1,9 +1,10 @@
 #ifndef TREEGRAMARPAREADER_HH
 #define TREEGRAMARPAREADER_HH
 
-#include <stdio.h>
-#include "TreeGram.hh"
 #include <map>
+#include <stdio.h>
+
+#include "TreeGram.hh"
 
 class TreeGramArpaReader {
 public:
