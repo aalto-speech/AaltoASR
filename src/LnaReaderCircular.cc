@@ -80,23 +80,23 @@ LnaReaderCircular::go_to(int frame)
       }
       if (bytes_read != m_num_models + 1)
 	throw ShortFrame();
-      if (m_read_buffer[0] != 0 && m_read_buffer[0] != -1)
+      if (m_read_buffer[0] != 0 && (unsigned char)m_read_buffer[0] != 0x80)
 	throw InvalidFrameId();
     }
 
     // Parse frame to the circular buffer
     for (int i = 0; i < m_num_models; i++) {
-      double tmp = (unsigned char)m_read_buffer[i] / -24.0;
+      double tmp = (unsigned char)m_read_buffer[i + 1] / -24.0;
       m_log_prob_buffer[m_first_index] = tmp;
       m_first_index++;
-      if (m_first_index > m_log_prob_buffer.size())
+      if (m_first_index >= m_log_prob_buffer.size())
 	m_first_index = 0;
     }
 
     m_frames_read++;
   }
 
-  if (frame <= m_frames_read - m_buffer_size)
+  if (frame < m_frames_read - m_buffer_size)
     throw FrameForgotten();
 
   int index = m_first_index - (m_frames_read - frame) * m_num_models;
