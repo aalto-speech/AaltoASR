@@ -79,7 +79,7 @@ Main::run()
     std::cout << "load lexicon" << std::endl;
 //    std::ifstream in("/home/neuro/thirsima/share/synt/iso64000.lex");
 //    std::ifstream in("/home/neuro/thirsima/share/synt/words20000.lex");
-    std::ifstream in("/home/neuro/thirsima/share/synt/1000.lex");
+    std::ifstream in("synt.lex");
 //    std::ifstream in("tavu.lex");
 //    std::ifstream in("synt.lex");
 //    std::ifstream in("/home/neuro/thirsima/share/synt/pk_synt5.lex");
@@ -109,9 +109,9 @@ Main::run()
 //    timer.stop();
 //    std::cout << std::endl << timer.sec() << " seconds" << std::endl;
 
-  ex.set_token_limit(2000);
+  ex.set_token_limit(1000);
 
-  Search search(ex, lr.vocabulary(), 200);
+  Search search(ex, lr.vocabulary(), 125);
 
   search.run();
 

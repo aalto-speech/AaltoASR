@@ -60,8 +60,8 @@ void
 Search::run()
 {
   int frame = 0;
-  int word_limit = 20;
-  int hypo_limit = 20;
+  int word_limit = 3;
+  int hypo_limit = 3;
 
   Hypo hypo;
   m_stacks[0].push_back(hypo);
