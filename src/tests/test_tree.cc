@@ -16,7 +16,7 @@ main(int argc, char *argv[])
   }
 
   // Print the model
-  {
+  if (argc > 2) {
     TreeGram::Iterator i(&g);
     while (i.next()) {
       fprintf(stderr, "( ");

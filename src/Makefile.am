@@ -31,6 +31,7 @@ libdecoder_a_SOURCES = \
 	BinNgramReader.cc		BinNgramReader.hh \
 	Endian.cc			Endian.hh \
 	Expander.cc			Expander.hh \
+	GramSorter.cc			GramSorter.hh \
 	Hmm.cc				Hmm.hh \
 	Lexicon.cc			Lexicon.hh \
 	LnaReaderCircular.cc		LnaReaderCircular.hh \

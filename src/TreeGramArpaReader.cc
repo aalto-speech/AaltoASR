@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <cassert>
 
+#include "GramSorter.hh"
 #include "TreeGramArpaReader.hh"
 #include "tools.hh"
 
@@ -49,6 +50,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
   // Read header
   int order = 1;
   int number_of_nodes = 0;
+  int max_order_count = 0;
   while (1) {
     ok = read_line(&line, file);
     chomp(&line);
@@ -59,7 +61,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 	      "error on line %d while reading counts", m_lineno);
       exit(1);
     }
-
+    
     // Header ends in a \-command
     if (line[0] == '\\')
       break;
@@ -77,6 +79,8 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       read_error();
 
     int count = atoi(vec[1].c_str());
+    if (count > max_order_count)
+      max_order_count = count;
     number_of_nodes += count;
     m_counts.push_back(count);
     if (atoi(vec[0].c_str()) != order || m_counts.back() <= 0)
@@ -104,7 +108,8 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       exit(1);
     }
 
-    // Read the grams of each order
+    // Read the grams of each order into the sorter
+    GramSorter sorter(order, m_counts[order - 1]);
     TreeGram::Gram gram;
     gram.resize(order);
     for (int w = 0; w < m_counts[order-1]; w++) {
@@ -142,13 +147,23 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       if (vec.size() == order + 2)
 	back_off = strtod(vec[order + 1].c_str(), NULL);
 
+      // Add the gram to sorter
       for (int i = 0; i < order; i++)
 	gram[i] = tree_gram->add_word(vec[i + 1]);
-
-      tree_gram->add_gram(gram, log_prob, back_off);
+      sorter.add_gram(gram, log_prob, back_off);
     }
 
-    // Skip empty lines
+    // Sort all grams read above and add them to the tree gram.
+    sorter.sort();
+    assert(sorter.num_grams() == m_counts[order - 1]);
+    for (int i = 0; i < sorter.num_grams(); i++) {
+      GramSorter::Data data = sorter.data(i);
+      gram = sorter.gram(i);
+
+      tree_gram->add_gram(gram, data.log_prob, data.back_off);
+    }
+
+    // Skip empty lines before the next order.
     while (1) {
       if (!read_line(&line, file)) {
 	if (ferror(file))
