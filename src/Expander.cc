@@ -23,6 +23,8 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_token_limit(0),
     m_beam(1e10),
     m_max_state_duration(0x7fff), // FIXME
+    m_duration_scale(1),
+    m_transition_scale(1),
     m_words(),
     m_active_words()
 {
@@ -75,7 +77,7 @@ Lexicon::Token*
 Expander::token_to_state(const Lexicon::Token *source_token, 
 			 Lexicon::State &source_state,
 			 Lexicon::State &target_state,
-			 float new_log_prob,
+			 float new_log_prob, float new_dur_log_prob,
 			 bool update_best)
 		       
 {
@@ -107,6 +109,7 @@ Expander::token_to_state(const Lexicon::Token *source_token,
   }
 
   new_token->log_prob = new_log_prob;
+  new_token->dur_log_prob = new_dur_log_prob;
 
   // Update beam threshold, but only if we are not in sink state!
   if (update_best && new_log_prob > m_beam_best_tmp)
@@ -252,7 +255,17 @@ Expander::move_all_tokens()
     for (int r = 0; r < hmm_state.transitions.size(); r++) {
       const HmmTransition &transition = hmm_state.transitions[r];
       int target_state_id = transition.target;
-      float log_prob = source_token->log_prob + transition.log_prob;
+      float log_prob = source_token->log_prob +
+                       m_transition_scale*transition.log_prob;
+      float dur_log_prob = source_token->dur_log_prob;
+
+#ifdef STATE_DURATION_PROBS
+      if (target_state_id != source_token->state) {
+        dur_log_prob +=
+          m_duration_scale *
+          hmm_state.duration.get_log_prob(source_token->state_duration);
+      }
+#endif
 
       // Target state is a sink state.  Clone the token to the next
       // nodes in the lexicon.
@@ -271,7 +284,9 @@ Expander::move_all_tokens()
 	  // of the next word.  This also assumes that there can not
 	  // be an empty word in lexicon.
 	  if (!m_forced_end || m_frame == m_frames - 1) {
-	    float log_prob = source_token->log_prob;
+#ifdef STATE_DURATION_PROBS
+	    float log_prob = dur_log_prob;
+#endif // Otherwise use the log_prob calculated above
 	    // FIXME: is this correct?  Do we really want to add the
 	    // lexicon node probabilities only at word ends?
 	    log_prob += source_node->log_prob;
@@ -284,9 +299,17 @@ Expander::move_all_tokens()
 	      word->best_length = m_frame;
 	    }
 
-	    // Store word end probabilities for each frame
-	    word->log_probs[m_frame] = log_prob;
-	    word->last_length = m_frame + 1;
+	    // Store word end probabilities for each frame.  Note that
+	    // there may be several transitions leading to this state.
+	    // Store only the best.
+            if (word->last_length < m_frame + 1 ||
+                word->log_probs[m_frame] < log_prob)
+            {
+              word->log_probs[m_frame] = log_prob;
+              word->last_length = m_frame + 1;
+            }
+            
+            // Word not in active list yet, add it.
 	    if (!word->active) {
 	      word->first_length = m_frame;
 	      m_active_words.push_back(word);
@@ -322,7 +345,7 @@ Expander::move_all_tokens()
 	  // Our target source state is empty.
 	  else {
 	    new_token = token_to_state(source_token, source_state, target_state, 
-				       log_prob, false);
+				       log_prob, dur_log_prob, false);
 	    // The new token is in source state now.  We want to move
 	    // it again during current token loop.
 	    target_state.incoming_token = NULL;
@@ -343,18 +366,19 @@ Expander::move_all_tokens()
       // Target state is not a sink state.  Just clone the token.
       else {
 
-	// FIXME: Maximum state duration test
 	if (target_state_id == source_token->state 
 	    && hmm.label[0] != '_') {
 	  source_token->state_duration++;
-	  if (source_token->state_duration >= m_max_state_duration)
-	    continue;
+          // FIXME: Maximum state duration test
+	  //if (source_token->state_duration >= m_max_state_duration)
+	  //  continue;
 	}
 	else {
-	  source_token->state_duration = 0;
+	  source_token->state_duration = 1;
 	}
 
-	log_prob += m_acoustics.log_prob(hmm.states[target_state_id].model); 
+	log_prob += m_acoustics.log_prob(hmm.states[target_state_id].model);
+        dur_log_prob += m_acoustics.log_prob(hmm.states[target_state_id].model);
 
 	// Beam pruning using already the temporary beam_best, which
 	// is under calculation for the next frame.
@@ -365,7 +389,7 @@ Expander::move_all_tokens()
 	Lexicon::State &target_state = source_node->states[target_state_id];
 	Lexicon::Token *new_token = 
 	  token_to_state(source_token, source_state, target_state, log_prob,
-			 true);
+			 dur_log_prob, true);
 	if (new_token != NULL) {
 	  new_token->state = target_state_id;
 	  new_token->frame++;
@@ -422,6 +446,7 @@ Expander::create_initial_tokens(int start_frame)
     token->state = 0;
     token->node = node->next[next_id];
     token->log_prob = 0;
+    token->dur_log_prob = 0;
 //    token->add_path(node->next[next_id]->hmm_id, 0, start_frame);
     m_tokens.push_back(token);
   }

@@ -15,7 +15,11 @@ public:
   Toolbox();
   
   // HMM models
+#ifdef STATE_DURATION_PROBS
+  void hmm_read(const char *hmm_file, const char *dur_file);
+#else
   void hmm_read(const char *file);
+#endif
   const std::vector<Hmm> &hmms() const { return m_hmms; }
 
   // Lexicon
@@ -79,6 +83,8 @@ public:
   void set_unk_offset(float unk_offset) { m_search.set_unk_offset(unk_offset); }
   void set_token_limit(int limit) { m_expander.set_token_limit(limit); }
   void set_state_beam(float beam) { m_expander.set_beam(beam); }
+  void set_duration_scale(float scale) { m_expander.set_duration_scale(scale); }
+  void set_transition_scale(float scale) { m_expander.set_transition_scale(scale); }
   void set_hypo_beam(float beam) { m_search.set_hypo_beam(beam); }
   void set_global_beam(float beam) 
   { m_search.set_global_beam(beam); }

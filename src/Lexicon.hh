@@ -84,6 +84,7 @@ public:
     char state;
     Lexicon::Node *node;
     float log_prob;
+    float dur_log_prob;
     Path *path;
   };
 
@@ -139,6 +140,7 @@ Lexicon::Token::Token()
     state(0),
     node(NULL),
     log_prob(0),
+    dur_log_prob(0),
     path(NULL)
 {
 }
@@ -149,6 +151,7 @@ Lexicon::Token::Token(const Token &t)
     state(t.state),
     node(t.node),
     log_prob(t.log_prob),
+    dur_log_prob(t.log_prob),
     path(t.path)
 {
   if (path)
@@ -168,6 +171,7 @@ Lexicon::Token::operator=(const Token &t)
   state = t.state;
   node = t.node;
   log_prob = t.log_prob;
+  dur_log_prob = t.dur_log_prob;
   path = t.path;
   if (path)
     path->link();

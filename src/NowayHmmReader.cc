@@ -75,3 +75,35 @@ NowayHmmReader::read(std::istream &in)
   
   in.exceptions(old_state);
 }
+
+#ifdef STATE_DURATION_PROBS
+void NowayHmmReader::read_durations(std::istream &in)
+{
+  std::istream::iostate old_state = in.exceptions();
+  in.exceptions(in.badbit | in.failbit | in.eofbit);
+  int hmm_id;
+  float a,b;
+
+  try {
+    for (int i = 0; i < m_hmms.size(); i++)
+    {
+      in >> hmm_id;
+      if (hmm_id != i+1)
+        throw InvalidFormat();
+
+      for (int s = 2; s < m_hmms[i].states.size(); s++)
+      {
+        HmmState &state = m_hmms[i].states[s];
+        in >> a >> b;
+        state.duration.set_parameters(a,b);
+      }
+    }
+  }
+  catch (std::exception &e) {
+    in.exceptions(old_state);
+    throw InvalidFormat();
+  }
+  
+  in.exceptions(old_state);
+}
+#endif

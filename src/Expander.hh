@@ -58,6 +58,9 @@ public:
   void set_max_state_duration(int duration) { m_max_state_duration = duration;}
   void sort_words(int top = 0);
 
+  void set_duration_scale(float scale) { m_duration_scale = scale; }
+  void set_transition_scale(float scale) { m_transition_scale = scale; }
+
   // Info
   inline std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
 
@@ -89,6 +92,7 @@ private:
 				 Lexicon::State &source_state,
 				 Lexicon::State &target_state,
 				 float new_log_prob,
+                                 float new_dur_log_prob,
 				 bool update_best);
 
   const std::vector<Hmm> &m_hmms;
@@ -100,6 +104,8 @@ private:
   int m_token_limit;
   float m_beam;
   int m_max_state_duration;
+  float m_duration_scale;
+  float m_transition_scale;
 
   // State
   std::vector<Lexicon::Token*> m_tokens;

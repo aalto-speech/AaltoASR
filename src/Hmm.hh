@@ -6,6 +6,17 @@
 #include <vector>
 #include <string>
 
+class StateDuration {
+public:
+  StateDuration();
+  void set_parameters(float a, float b);
+  float get_log_prob(int duration) const;
+
+private:
+  float a,b;
+  float const_term;
+};
+
 struct HmmTransition {
   int target;
   float log_prob;
@@ -15,6 +26,9 @@ struct HmmState {
 public:
   int model;
   std::vector<HmmTransition> transitions;
+#ifdef STATE_DURATION_PROBS
+  StateDuration duration;
+#endif
 };
 
 

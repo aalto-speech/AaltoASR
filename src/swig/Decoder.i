@@ -69,7 +69,8 @@ class Toolbox {
 public:
   Toolbox();
   
-  void hmm_read(const char *file);
+#  void hmm_read(const char *hmm_file, const char *dur_file);
+  void hmm_read(const char *hmm_file);
   const std::vector<Hmm> &hmms();
   void lex_read(const char *file);
   const std::string &lex_word();
@@ -119,6 +120,8 @@ public:
   void set_unk_offset(float unk_offset);
   void set_token_limit(int limit);
   void set_state_beam(float beam);
+  void set_duration_scale(float scale);
+  void set_transition_scale(float scale);
   void set_hypo_beam(float beam);
   void set_global_beam(float beam);
   void set_max_state_duration(int duration);
