@@ -215,13 +215,16 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off)
 
   check_order(gram);
 
-  // Update order counts
+  // Initialize new order count
   if (gram.size() > m_order_count.size()) {
     m_order_count.push_back(0);
     m_order++;
   }
   assert(m_order_count.size() == gram.size());
-  m_order_count[gram.size()-1]++;
+
+  // Update order counts, but only if we do not have UNK-unigram
+  if (gram.size() > 1 || gram[0] != 0)
+    m_order_count[gram.size()-1]++;
 
   // Handle unigrams separately
   if (gram.size() == 1) {
@@ -355,9 +358,18 @@ TreeGram::read(FILE *file)
   fscanf(file, "%d %d\n", &m_order, &number_of_nodes);
 
   // Read the counts for each order
+  int sum = 0;
   m_order_count.resize(m_order);
-  for (int i = 0; i < m_order; i++)
+  for (int i = 0; i < m_order; i++) {
     fscanf(file, "%d\n", &m_order_count[i]);
+    sum += m_order_count[i];
+  }
+  if (sum != number_of_nodes) {
+    fprintf(stderr, "TreeGram::read(): "
+	    "the sum of order counts %d does not match number of nodes %d\n",
+	    sum, number_of_nodes);
+    exit(1);
+  }
 
   // Read the nodes
   m_nodes.clear();

@@ -104,6 +104,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       exit(1);
     }
 
+    // Read the grams of each order
     TreeGram::Gram gram;
     gram.resize(order);
     for (int w = 0; w < m_counts[order-1]; w++) {
@@ -128,12 +129,9 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 		"%d columns on line %d\n", vec.size(), m_lineno);
 	exit(1);
       }
-      if ((order < m_counts.size() && vec.size() != order + 2) ||
-	  (order == m_counts.size() && vec.size() != order + 1))
-      {
+      if (order == m_counts.size() && vec.size() != order + 1)
 	fprintf(stderr, "WARNING: %d columns on line %d\n", vec.size(), 
 		m_lineno);
-      }
 
       // FIXME: should we deny new words in higher order ngrams?
 
