@@ -1,14 +1,12 @@
 #ifndef ARPANGRAMREADER_HH
 #define ARPANGRAMREADER_HH
 
-#include <iostream> // FIXME: istream
+#include <iostream> 
 
 #include <regex.h>
 
 #include "Ngram.hh"
 #include "Vocabulary.hh"
-
-class Ngram;
 
 class ArpaNgramReader {
 public:

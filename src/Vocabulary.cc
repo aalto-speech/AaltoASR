@@ -26,7 +26,7 @@ Vocabulary::read(std::istream &in)
 {
   std::string word;
 
-  while (getline(in, word)) {
+  while (std::getline(in, word)) {
     
     // Remove comments
     int comment = word.find('#');

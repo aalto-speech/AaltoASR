@@ -49,6 +49,7 @@ find(Vector &nodes, const Value &value, int first, int end)
 class Ngram : private Vocabulary {
 public:
   friend class ArpaNgramReader;
+  friend class BinNgramReader; // For accessing m_nodes directly
 
   class Node {
   public:
