@@ -12,7 +12,7 @@ public:
   Vocabulary();
 
   // Return the string of the index'th word
-  inline const std::string &word(unsigned int index) const;
+  inline const std::string &word(int index) const;
 
   // Returns true if index is OOV
   inline bool oov(int index) const { return index == 0; }
@@ -51,7 +51,7 @@ protected:
 };
 
 const std::string&
-Vocabulary::word(unsigned int index) const
+Vocabulary::word(int index) const
 {
   if (index < 0 || index >= m_words.size())
     throw OutOfRange();
