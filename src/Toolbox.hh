@@ -16,6 +16,7 @@ public:
   
   // HMM models
   void hmm_read(const char *file);
+  const std::vector<Hmm> &hmms() const { return m_hmms; }
 
   // Lexicon
   void lex_read(const char *file);
@@ -29,6 +30,7 @@ public:
   void lna_open(const char *file, int models, int size);
   void lna_close();
   void lna_seek(int frame) { m_lna_reader.seek(frame); }
+  Acoustics &acoustics() { return m_lna_reader; }
 
   // Expander
   void expand(int frame, int frames);
@@ -50,6 +52,9 @@ public:
   bool run() { return m_search.run(); }
   bool runto(int frame);
   bool recognize_segment(int start_frame, int end_frame);
+
+  // Miscellaneous
+  void segment(const std::string &str, int start_frame, int end_frame);
 
   // Info
   int frame() { return m_search.frame(); }

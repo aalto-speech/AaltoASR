@@ -64,6 +64,7 @@ Expander::keep_best_tokens(int tokens)
     Lexicon::Node *node = token->node;
     Lexicon::State &state = node->states[token->state];
     assert(state.incoming_token == token);
+    assert(state.outgoing_token == NULL);
     state.incoming_token = NULL;
     delete token;
     m_tokens.pop_back();
@@ -74,7 +75,9 @@ Lexicon::Token*
 Expander::token_to_state(const Lexicon::Token *source_token, 
 			 Lexicon::State &source_state,
 			 Lexicon::State &target_state,
-			 float new_log_prob)
+			 float new_log_prob,
+			 bool update_best)
+		       
 {
   Lexicon::Token *new_token;
 
@@ -105,8 +108,8 @@ Expander::token_to_state(const Lexicon::Token *source_token,
 
   new_token->log_prob = new_log_prob;
 
-  // Update beam threshold
-  if (new_log_prob > m_beam_best_tmp)
+  // Update beam threshold, but only if we are not in sink state!
+  if (update_best && new_log_prob > m_beam_best_tmp)
     m_beam_best_tmp = new_log_prob;
 
   return new_token;
@@ -130,6 +133,25 @@ Expander::check_words()
       assert(m_words[i].first_length >= 0);
       assert(m_words[i].last_length > m_words[i].first_length);
     }
+  }
+}
+
+// Only for sanity debugging
+void
+Expander::check_best(int info, bool tmp)
+{
+  float best_found = -1e10;
+  float best = tmp ? m_beam_best_tmp : m_beam_best;
+
+  for (int i = 0; i < m_tokens.size(); i++) {
+    const Lexicon::Token *token = m_tokens[i];
+    if (token->log_prob > best_found)
+      best_found = token->log_prob;
+  }
+  
+  if (best > -1e10 && best_found != best) {
+    fprintf(stderr, "%d best found %f, should be %f\n", info, best_found, best);
+    abort();
   }
 }
 
@@ -163,7 +185,12 @@ Expander::check_words()
 //
 // 3) Add new tokens in the end of the vector so that they will be
 // processed in the same round.
-
+//
+// BUG WARNING!!!
+//
+// - When keeping track of the best token, ignore tokens in dummy sink
+//   states!
+//
 // ASSUMPTIONS:
 // 
 // - Lexicon tree may contain the same word id in several nodes.
@@ -171,7 +198,6 @@ void
 Expander::move_all_tokens()
 {
   // FIXME: remove stupid asserts
-
   for (int i = 0; i < m_tokens.size(); i++) {
     const Lexicon::Token *token = m_tokens[i];
     Lexicon::Node *node = token->node;
@@ -181,7 +207,7 @@ Expander::move_all_tokens()
     state.outgoing_token = state.incoming_token;
     state.incoming_token = NULL;
   }
-
+  
   // ITERATE ALL TOKENS
   for (int t = 0; t < m_tokens.size(); t++) {
     Lexicon::Token *source_token = m_tokens[t];
@@ -258,7 +284,8 @@ Expander::move_all_tokens()
 
 	  Lexicon::State &target_state = target_node->states[0];
 	  Lexicon::Token *new_token = 
-	    token_to_state(source_token, source_state, target_state, log_prob);
+	    token_to_state(source_token, source_state, target_state, 
+			   log_prob, false);
 	  if (new_token != NULL) {
 	    new_token->state = 0;
 	    new_token->node = target_node;
@@ -293,12 +320,13 @@ Expander::move_all_tokens()
 	// Beam pruning using already the temporary beam_best, which
 	// is under calculation for the next frame.
 	// FIXME: this might be quite unnecessary
-  	if (source_token->log_prob < m_beam_best_tmp - m_beam)
-  	  continue;
+  	// if (source_token->log_prob < m_beam_best_tmp - m_beam)
+	//   continue;
 
 	Lexicon::State &target_state = source_node->states[target_state_id];
 	Lexicon::Token *new_token = 
-	  token_to_state(source_token, source_state, target_state, log_prob);
+	  token_to_state(source_token, source_state, target_state, log_prob,
+			 true);
 	if (new_token != NULL) {
 	  new_token->state = target_state_id;
 	  new_token->frame++;
@@ -459,14 +487,18 @@ Expander::expand(int start_frame, int frames)
     m_beam_best = m_beam_best_tmp;
     m_beam_best_tmp = -1e10;
 
+    // FIXME: REMOVE debug
+    // fprintf(stderr, "%d\t%.2f\t%d\n", m_frame, m_beam_best, m_tokens.size());
+
     if (m_token_limit > 0)
       keep_best_tokens(m_token_limit);
+
     if (!m_acoustics.go_to(start_frame + m_frame))
       break;
     move_all_tokens();
 
-    if (m_tokens.empty())
-      break;
+    // It should be impossible to lose all tokens!
+    assert(!m_tokens.empty());
 
 //      std::cout << m_frame << ": ";
 //      debug_print_history(m_tokens[0]);

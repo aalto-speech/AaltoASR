@@ -79,6 +79,7 @@ public:
 
 private:
   void check_words(); // FIXME: remove
+  void check_best(int info, bool tmp = false); // FIXME: remove
 
   void sort_best_tokens(int tokens);
   void keep_best_tokens(int tokens);
@@ -88,7 +89,8 @@ private:
   Lexicon::Token *token_to_state(const Lexicon::Token *source_token,
 				 Lexicon::State &source_state,
 				 Lexicon::State &target_state,
-				 float new_log_prob);
+				 float new_log_prob,
+				 bool update_best);
 
   const std::vector<Hmm> &m_hmms;
   Lexicon &m_lexicon;

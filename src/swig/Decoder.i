@@ -53,11 +53,24 @@ public:
   void sorted_insert(const Hypo &hypo);
 };
 
+class Expander {
+  Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon, Acoustics &m_acoustics);
+  void expand(int start_frame, int frames);
+  void set_forced_end(bool forced_end);
+  void set_token_limit(int limit);
+  void set_beam(float beam);
+  void set_max_state_duration(int duration);
+  void sort_words();
+  const std::vector<Word*> &words();
+  Word* word(int index);
+};
+
 class Toolbox {
 public:
   Toolbox();
   
   void hmm_read(const char *file);
+  const std::vector<Hmm> &hmms();
   void lex_read(const char *file);
   const std::string &lex_word();
   const std::string &lex_phone();
@@ -67,6 +80,7 @@ public:
   void lna_open(const char *file, int models, int size);
   void lna_close();
   void lna_seek(int frame);
+  Acoustics &acoustics();
 
   // Expander
   void expand(int frame, int frames);

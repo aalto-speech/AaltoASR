@@ -167,3 +167,26 @@ Toolbox::recognize_segment(int start_frame, int end_frame)
 {
   return m_search.recognize_segment(start_frame, end_frame);
 }
+
+void
+Toolbox::segment(const std::string &str, int start_frame, int end_frame)
+{
+//   // Create lexicon
+//   Lexicon lex;
+//   Lexicon::Node *node = lex.root_node();
+//   istringstream in(str);
+//   std::string label;
+//   while (in >> label) {
+//     int hmm_id = m_hmm_map[label];
+//     Hmm &hmm = m_hmms[hmm_id];
+//     Lexicon::Node *next = new Lexicon::Node(hmm.states.size());
+//     next->hmm_id = hmm_id;
+//     node->next.push_back(next);
+//     node = next;
+//   }
+
+//   // Expand
+//   Expander e(m_hmms, lex, m_acoustics);
+//   e.set_forced_end(true);
+//   e.expand(start_frame, end_frame - start_frame);
+}

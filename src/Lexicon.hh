@@ -69,7 +69,8 @@ public:
     int m_reference_count;
   };
 
-
+  // FIXME: if we do not need the path, we can remove reference counting
+  // and special copying functions.
   class Token {
   public:
     inline Token();
