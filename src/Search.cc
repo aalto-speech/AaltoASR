@@ -82,13 +82,13 @@ Search::debug_print_hypo(Hypo &hypo)
     debug_paths.push_back(path);
     path = path->prev;
   }
-  
+
   for (int i = debug_paths.size() - 1; i >= 0; i--) {
     std::cout << " " 
 	      << "<" << debug_paths[i]->frame << "> "
+	      << "(" << debug_paths[i]->word_id << ")"
 	      << m_vocabulary.word(debug_paths[i]->word_id);
   }
-
   std::cout << " <" << hypo.frame << ">" << std::endl;
 }
 
@@ -104,7 +104,7 @@ Search::debug_print_history(Hypo &hypo)
     paths.push_back(path);
     path = path->prev;
   }
-  
+
   for (int i = paths.size() - 1; i > 0; i--) {
     std::cout << paths[i]->frame*128 << " " << paths[i-1]->frame*128
 	      << " " << m_vocabulary.word(paths[i]->word_id) << std::endl;
