@@ -167,12 +167,6 @@ HypoStack::add(const Hypo &hypo)
 void
 HypoStack::partial_sort(int top)
 {
-<<<<<<< Search.hh
-//    if (top < m_num_sorted)
-//      return;
-
-=======
->>>>>>> 1.14
   if (top == 0 || top >= size()) {
     top = size();
     sort();
