@@ -172,7 +172,7 @@ Search::print_sure()
   std::stack<HypoPath*> stack;
   HypoPath *path = this->stack(m_last_hypo_frame).at(0).path;
   
-  while (!path->guard()) {
+  while (1) {
     stack.push(path);
     if (path == m_last_printed_path)
       break;
@@ -182,10 +182,9 @@ Search::print_sure()
   while (!stack.empty()) {
     path = stack.top();
     stack.pop();
-    if (path->count() != 1)
+    if (path->count() > 1)
       break;
     if (path != m_last_printed_path) {
-      assert(!path->guard());
       m_last_printed_path = path;
       print_path(path);
     }
@@ -212,7 +211,7 @@ Search::reset_search(int start_frame)
   m_last_hypo_frame = start_frame;
 
   // Create initial empty hypothesis.
-  Hypo hypo(0, 0, new HypoPath(0, 0, NULL));
+  Hypo hypo(0, 0, new HypoPath(-1, -1, NULL));
   m_last_printed_path = hypo.path;
   m_stacks[m_first_stack].add(hypo);
 
