@@ -69,7 +69,6 @@ public:
    * beginning of the next expand.
    **/
   inline const std::vector<Word*> &words() { return m_active_words; }
-
   inline Word* word(int index) { return &m_words[index]; }
 
   // Debug

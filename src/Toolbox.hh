@@ -37,6 +37,7 @@ public:
   const std::string &best_word();
   void print_words(int words);
   int find_word(const std::string &word);
+  std::vector<Expander::Word*> words() { return m_expander.words(); }
   void add_history(int word);
   void add_history_word(const std::string &word);
   void add_ngram_probs();
