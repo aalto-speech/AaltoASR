@@ -248,7 +248,7 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
     for (int i = 0; i < m_vocabulary.size(); i++) {
       m_lex2lm[i] = m_ngram.index(m_vocabulary.word(i));
       if (m_lex2lm[i] == 0) {
-//	std::cerr << m_vocabulary.word(i) << " not in LM" << std::endl;
+	std::cerr << m_vocabulary.word(i) << " not in LM" << std::endl;
 	count++;
       }
     }
@@ -479,6 +479,8 @@ Search::expand_stack(int frame)
       expand_hypo(stack[h]);
     stack.clear();
   }
+
+  print_sure();
 
   return true;
 }
