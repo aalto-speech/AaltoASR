@@ -53,7 +53,7 @@ public:
 
   class Node {
   public:
-    unsigned short word; 
+    int word; 
     float log_prob;
     float back_off;
     int first;

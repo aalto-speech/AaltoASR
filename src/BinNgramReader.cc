@@ -30,12 +30,17 @@ void BinNgramReader::read(FILE *in, Ngram *ng) {
 }
 
 void BinNgramReader::flip_endian(Ngram *ng) {
-  char *ptr;
   for (int i=0; i<ng->m_nodes.size(); i++) {
-    ptr=(char *) &(ng->m_nodes[i]); // Ugliness, we want the pointer
-    Endian::convert(ptr,2);         // to increment one byte at time
-    Endian::convert(ptr+2,4);
-    Endian::convert(ptr+6,4);
-    Endian::convert(ptr+10,4);
+    Endian::convert(&ng->m_nodes[i].word,4);
+    Endian::convert(&ng->m_nodes[i].log_prob,4);
+    Endian::convert(&ng->m_nodes[i].back_off,4);
+    Endian::convert(&ng->m_nodes[i].first,4);
+
+    // FIXME: remove check perhaps
+    if (ng->m_nodes[i].first >= ng->m_nodes.size()) {
+      fprintf(stderr, "node[%d]->first is %d, but only %d nodes\n",
+	      i, ng->m_nodes[i].first, ng->m_nodes.size());
+      exit(1);
+    }
   }
 }
