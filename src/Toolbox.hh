@@ -47,6 +47,8 @@ public:
   }
   void sort(int frame, int top = 0) { m_search.sort_stack(frame, top); }
   bool expand_stack(int frame) { return m_search.expand_stack(frame); }
+  void expand_words(int frame, const std::string &words) 
+  { m_search.expand_words(frame, words); }
   void go(int frame) { m_search.go(frame); }
   bool run() { return m_search.run(); }
   bool runto(int frame);
@@ -80,6 +82,8 @@ public:
   void set_verbose(int verbose) { m_search.set_verbose(verbose); }
   void set_print_probs(bool print_probs) 
   { m_search.set_print_probs(print_probs); }
+  void set_multiple_endings(int multiple_endings) 
+  { m_search.set_multiple_endings(multiple_endings); }
   void set_print_indices(bool print_indices) 
   { m_search.set_print_indices(print_indices); }
   void set_word_boundary(const std::string &word)

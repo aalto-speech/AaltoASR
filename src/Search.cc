@@ -1,3 +1,4 @@
+#include <strstream>
 #include <stack>
 #include <algorithm>
 #include <iomanip>
@@ -68,6 +69,7 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_unk_offset(0),
     m_verbose(0),
     m_print_probs(false),
+    m_multiple_endings(0),
     m_last_printed_path(NULL),
 
     // Pruning options
@@ -364,18 +366,32 @@ Search::expand_hypo_with_word(const Hypo &hypo, int word, int target_frame,
 			      float ac_log_prob)
 {
   // Add the expanded hypothesis
-  Hypo new_hypo(target_frame, 0, hypo.path);
-  new_hypo.add_path(word, target_frame);
-  new_hypo.path->ac_log_prob = ac_log_prob;
-  new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
-  new_hypo.log_prob = hypo.log_prob + ac_log_prob + new_hypo.path->lm_log_prob;
+  Hypo new_hypo(target_frame, hypo.log_prob, hypo.path);
+
+  // Merge subsequent silences
+  if (word == m_word_boundary && hypo.path->word_id == m_word_boundary) {
+    new_hypo.path->frame = target_frame;
+    new_hypo.path->ac_log_prob += ac_log_prob;
+    new_hypo.log_prob += ac_log_prob;
+  }
+  // else add the new word to the path
+  else {
+    new_hypo.add_path(word, target_frame);
+    new_hypo.path->ac_log_prob = ac_log_prob;
+    new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
+    new_hypo.log_prob += ac_log_prob + new_hypo.path->lm_log_prob;
+  }
   insert_hypo(target_frame, new_hypo);
 
   // Add also the hypothesis with word boundary
   // FIXME: it is useless to do this if no LM is used!
-  if (m_word_boundary > 0) {
+  if (m_word_boundary > 0 && word != m_word_boundary) {
     new_hypo.add_path(m_word_boundary, target_frame);
     new_hypo.path->ac_log_prob = 0;
+    // FIXME: we do not need this here, because of the previous
+    // merge_silences() right?
+    //
+    // merge_silences(new_hypo.path);
     new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
     new_hypo.log_prob += new_hypo.path->lm_log_prob;
     insert_hypo(target_frame, new_hypo);
@@ -395,9 +411,21 @@ Search::expand_hypo(const Hypo &hypo)
     if (words[w]->avg_log_prob < words[0]->avg_log_prob * m_word_beam)
       continue; 
 
-    expand_hypo_with_word(hypo, words[w]->word_id,
-			  hypo.frame + words[w]->frames, 
-			  words[w]->log_prob);
+    if (m_multiple_endings > 0) {
+      for (int f = -m_multiple_endings; f < m_multiple_endings; f++) {
+	// FIXME: is this correct?  Magic number!
+	if (words[w]->frames + f*2 < 1)
+	  continue;
+	expand_hypo_with_word(hypo, words[w]->word_id,
+			      hypo.frame + words[w]->frames + f*2, 
+			      words[w]->log_prob + f*2 * words[w]->avg_log_prob);
+      }
+    }
+    else {
+      expand_hypo_with_word(hypo, words[w]->word_id,
+			    hypo.frame + words[w]->frames, 
+			    words[w]->log_prob);
+    }
   }
 }
 
@@ -504,6 +532,38 @@ Search::expand_stack(int frame)
   }
 
   return true;
+}
+
+void
+Search::expand_words(int frame, const std::string &words)
+{
+  std::istrstream in(words.c_str());
+  std::string str;
+  
+  if (stack(frame).empty()) {
+    fprintf(stderr, "stack empty at frame %d\n", frame);
+    return;
+  }
+
+  while (in >> str) {
+    find_best_words(frame);
+    int index = m_vocabulary.index(str);
+    if (index == 0) {
+      fprintf(stderr, "word '%s' not in lexicon\n", str.c_str());
+      return;
+    }
+
+    Expander::Word *word = m_expander.word(m_vocabulary.index(str));
+    if (!word->active) {
+      fprintf(stderr, "word '%s' did not survive\n", str.c_str());
+      return;
+    }
+
+    expand_hypo_with_word(stack(frame)[0], word->word_id, frame + word->frames,
+			  word->log_prob);
+    frame += word->frames;
+    fprintf(stderr, "%d\t%s\n", frame, str.c_str());
+  }
 }
 
 void

@@ -51,6 +51,8 @@ public:
    **/
   inline std::vector<Word*> &words() { return m_found_words; }
 
+  inline Word* word(int index) { return &m_words[index]; }
+
   // Debug
   void debug_print_history(Lexicon::Token *token);
   void debug_print_timit(Lexicon::Token *token);

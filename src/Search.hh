@@ -225,6 +225,7 @@ public:
   void init_search(int expand_window, int stacks, int reserved_hypos);
   void sort_stack(int frame, int top = 0);
   bool expand_stack(int frame);
+  void expand_words(int frame, const std::string &words);
   void go(int frame);
   bool run();
   bool recognize_segment(int start_frame, int end_frame);
@@ -247,7 +248,10 @@ public:
   void set_lm_scale(float lm_scale) { m_lm_scale = lm_scale; }
   void set_lm_offset(float lm_offset) { m_lm_offset = lm_offset; }
   void set_unk_offset(float unk_offset) { m_unk_offset = unk_offset; }
-  void set_prune_similar(int prune_similar) { m_prune_similar = prune_similar; }
+  void set_prune_similar(int prune_similar) 
+  { m_prune_similar = prune_similar; }
+  void set_multiple_endings(int multiple_endings) 
+  { m_multiple_endings = multiple_endings; }
   void set_hypo_beam(float hypo_beam) { m_hypo_beam = hypo_beam; }
   void set_global_beam(float beam) { m_global_beam = beam; }
   void set_verbose(int verbose) { m_verbose = verbose; }
@@ -307,6 +311,7 @@ private:
   float m_unk_offset;
   int m_verbose;
   bool m_print_probs;
+  int m_multiple_endings;
   bool m_print_indices;
   HypoPath *m_last_printed_path;
 
