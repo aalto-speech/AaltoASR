@@ -9,7 +9,7 @@ main(int argc, char *argv[])
 {
   std::string arg(argv[1]);
 
-  if (!Endian::big)
+  if (Endian::big)
     puts("this host is big");
   else
     puts("this host is little");
