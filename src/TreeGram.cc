@@ -40,6 +40,10 @@ TreeGram::print_gram(FILE *file, const Gram &gram)
 void
 TreeGram::check_order(const Gram &gram)
 {
+  // UNK can be updated anytime
+  if (gram.size() == 1 && gram[0] == 0)
+    return;
+
   // Order must be the same or the next.
   if (gram.size() < m_last_gram.size() ||
       gram.size() > m_last_gram.size() + 1)
