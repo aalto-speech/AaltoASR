@@ -62,7 +62,7 @@ HypoStack::sorted_insert(const Hypo &hypo)
 }
 
 Search::Search(Expander &expander, const Vocabulary &vocabulary, 
-	       const Ngram &ngram)
+	       Ngram &ngram)
   : m_expander(expander),
     m_vocabulary(vocabulary),
     m_ngram(ngram),

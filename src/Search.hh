@@ -160,7 +160,7 @@ class Search {
 public:
 
   Search(Expander &expander, const Vocabulary &vocabulary, 
-	 const Ngram &ngram);
+	 Ngram &ngram);
 
   // Debug and print
   void print_prunings();
@@ -227,7 +227,7 @@ private:
 
   Expander &m_expander;
   const Vocabulary &m_vocabulary; // Words in lexicon (not the words in lm)
-  const Ngram &m_ngram;
+  Ngram &m_ngram;
 
   // Mapping between lexicon and language model
   std::vector<int> m_lex2lm;

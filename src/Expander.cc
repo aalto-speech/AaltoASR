@@ -191,7 +191,7 @@ Expander::check_best(int info, bool tmp)
 // - When keeping track of the best token, ignore tokens in dummy sink
 //   states!
 //
-// ASSUMPTIONS:
+// IMPORTANT ASSUMPTIONS:
 // 
 // - Lexicon tree may contain the same word id in several nodes.
 void
@@ -488,8 +488,24 @@ Expander::expand(int start_frame, int frames)
     m_beam_best_tmp = -1e10;
 
     // FIXME: REMOVE debug
-    // fprintf(stderr, "%d\t%.2f\t%d\n", m_frame, m_beam_best, m_tokens.size());
+    // fprintf(stderr, "%d\t%.2f\t%d\n", 
+    //    m_frame, m_beam_best, m_tokens.size());
 
+    // FIXED 24.6.2003: we should apply beam pruning before
+    // keep_best_tokens, because after pruning, the sorting may be
+    // useless!
+    
+    // Beam pruning using the beam calculated in the last frame
+    for (int t = 0; t < m_tokens.size(); t++) {
+      Lexicon::Token *token = m_tokens[t];
+      if (token->log_prob < m_beam_best - m_beam) {
+	if (m_tokens.size() > t + 1)
+	  m_tokens[t] = m_tokens[m_tokens.size() - 1];
+	m_tokens.pop_back();
+      }
+    }
+
+    // Limit pruning
     if (m_token_limit > 0)
       keep_best_tokens(m_token_limit);
 
