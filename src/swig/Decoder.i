@@ -109,4 +109,5 @@ public:
 	void set_verbose(bool verbose);
 
   void print_hypo(Hypo &hypo);
+  void print_sure(Hypo &hypo);
 };

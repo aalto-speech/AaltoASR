@@ -59,7 +59,7 @@ public:
   int last_frame() { return m_search.last_frame(); }
   HypoStack &stack(int frame) { return m_search.stack(frame); }
   void prune(int frame, int top);
-  int paths() const { return HypoPath::count; }
+  int paths() const { return HypoPath::g_count; }
 
   // Options
   void set_forced_end(bool forced_end) 
@@ -81,6 +81,7 @@ public:
 
   // Debug
   void print_hypo(Hypo &hypo);
+  void print_sure(Hypo &hypo) { m_search.print_sure(hypo); }
 
   struct OpenError : public std::exception {
     virtual const char *what() const throw()

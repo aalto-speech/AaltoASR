@@ -1,10 +1,11 @@
+#include <stack>
 #include <algorithm>
 #include <iomanip>
 
 #include <math.h>
 #include "Search.hh"
 
-int HypoPath::count = 0;
+int HypoPath::g_count = 0;
 
 // Assumes sorted
 void
@@ -70,47 +71,61 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
 void
 Search::debug_print_hypo(Hypo &hypo)
 {
-  static std::vector<HypoPath*> debug_paths(128);
+  std::stack<HypoPath*> stack;
 
   HypoPath *path = hypo.path;
-  std::cout.setf(std::cout.fixed, std::cout.floatfield);
-  std::cout.setf(std::cout.right, std::cout.adjustfield);
-  std::cout.precision(2);
-  std::cout << std::setw(5) << hypo.frame;
-  std::cout << std::setw(10) << hypo.log_prob;
+//    std::cout.setf(std::cout.fixed, std::cout.floatfield);
+//    std::cout.setf(std::cout.right, std::cout.adjustfield);
+//    std::cout.precision(2);
+//    std::cout << std::setw(5) << hypo.frame;
+//    std::cout << std::setw(10) << hypo.log_prob;
 
-  debug_paths.clear();
   while (path != NULL) {
-    debug_paths.push_back(path);
+    stack.push(path);
     path = path->prev;
   }
 
-  for (int i = debug_paths.size() - 1; i >= 0; i--) {
+  while (!stack.empty()) {
+    path = stack.top();
+    stack.pop();
+    if (path->word_id < 0)
+      continue;
     std::cout << " " 
-//	      << "<" << debug_paths[i]->frame << "> "
-//	      << "(" << debug_paths[i]->word_id << ")"
-	      << m_vocabulary.word(debug_paths[i]->word_id);
+//	      << "<" << path->frame << "> "
+//	      << "(" << path->word_id << ")"
+	      << m_vocabulary.word(path->word_id);
   }
-  std::cout << " <" << hypo.frame << ">" << std::endl;
+//  std::cout << " <" << hypo.frame << ">" << std::endl;
+  std::cout << std::endl;
 }
 
 void
-Search::debug_print_history(Hypo &hypo)
+Search::print_sure(Hypo &hypo, bool clear)
 {
-  static std::vector<HypoPath*> paths(128);
-
+  std::stack<HypoPath*> stack;
   HypoPath *path = hypo.path;
-
-  paths.clear();
+  
+  std::cout << std::endl;
   while (path != NULL) {
-    paths.push_back(path);
+    stack.push(path);
+    std::cout << path->word_id << " " << path->count() << std::endl;
     path = path->prev;
   }
 
-  for (int i = paths.size() - 1; i > 0; i--) {
-    std::cout << paths[i]->frame*128 << " " << paths[i-1]->frame*128
-	      << " " << m_vocabulary.word(paths[i]->word_id) << std::endl;
+  while (stack.size() > 0) {
+    HypoPath *path = stack.top();
+    stack.pop();
+    if (path->count() != 1) {
+      if (clear) {
+	HypoPath::unlink(path->prev);
+	path->prev = NULL;
+      }
+      break;
+    }
+    if (path->word_id >= 0)
+      std::cout << m_vocabulary.word(path->word_id) << " ";
   }
+  std::cout.flush();
 }
 
 void
@@ -127,9 +142,9 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
   // Initialize stacks
   m_stacks.resize(stacks);
   m_first_frame = 0;
-  m_last_frame = m_first_frame + stacks - 1;
+  m_last_frame = m_first_frame + stacks;
   m_first_stack = 0;
-  m_last_stack = m_first_stack + stacks - 1;
+  m_last_stack = m_first_stack + stacks;
 
   // Clear stacks and reserve some space.  Stacks grow dynamically,
   // but if we need space anyway, it is better to have some already.
@@ -139,7 +154,7 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
   }
 
   // Create initial empty hypothesis.
-  Hypo hypo;
+  Hypo hypo(0, 0, new HypoPath(-1, -1, NULL));
   m_stacks[0].add(hypo);
 }
 
@@ -149,7 +164,7 @@ Search::frame2stack(int frame) const
   // Check that we have the frame in buffer
   if (frame < m_first_frame)
     throw ForgottenFrame();
-  if (frame > m_last_frame)
+  if (frame >= m_last_frame)
     throw FutureFrame();
 
   // Find the stack corresponding to the given frame
@@ -178,7 +193,7 @@ Search::circulate(int &stack)
 void
 Search::move_buffer(int frame)
 {
-  while (m_last_frame < frame) {
+  while (m_last_frame <= frame) {
     m_stacks[m_first_stack].clear();
     circulate(m_first_stack);
     circulate(m_last_stack);
@@ -213,8 +228,13 @@ Search::expand(int frame)
 
   // Debug print
   if (m_verbose && !stack.empty()) {
-    std::cout << HypoPath::count << " " << Lexicon::Path::count << " ";
-    debug_print_hypo(stack[stack.best_index()]);
+    static int step = 100;
+    static int next = 0;
+    if (frame > next) {
+      print_sure(stack[0]);
+      while (frame > next)
+	next += step;
+    }
   }
 
   // FIXME?!

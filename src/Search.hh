@@ -16,10 +16,11 @@ public:
   inline ~HypoPath();
   inline void link() { m_reference_count++; }
   inline static void unlink(HypoPath *path);
+  inline int count() const { return m_reference_count; }
   int word_id;
   int frame;
   HypoPath *prev;
-  static int count;
+  static int g_count;
 private:
   int m_reference_count;
 };
@@ -29,17 +30,19 @@ HypoPath::HypoPath(int word_id, int frame, HypoPath *prev)
 {
   if (prev)
     prev->link();
-  count++;
+  g_count++;
 }
 
 HypoPath::~HypoPath()
 {
-  count--;
+  g_count--;
 }
 
 void
 HypoPath::unlink(HypoPath *path)
 {
+  if (path == NULL)
+    return;
   while (path->m_reference_count == 1) {
     HypoPath *prev = path->prev;
     delete path;
@@ -207,9 +210,9 @@ public:
   Search(Expander &expander, const Vocabulary &vocabulary, 
 	 const Ngram &ngram);
 
-  // Debug
+  // Debug and print
   void debug_print_hypo(Hypo &hypo);
-  void debug_print_history(Hypo &hypo);
+  void print_sure(Hypo &hypo, bool clear = true);
 
   // Operate
   void init_search(int expand_window, int stacks, int reserved_hypos);

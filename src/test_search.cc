@@ -163,7 +163,7 @@ main(int argc, char *argv[])
   }
 
   std::cout << "lexicon paths: " << Lexicon::Path::count << std::endl;
-  std::cout << "hypo paths: " << HypoPath::count << std::endl;
+  std::cout << "hypo paths: " << HypoPath::g_count << std::endl;
 
   exit(0);
 }
