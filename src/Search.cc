@@ -527,18 +527,21 @@ Search::find_best_words(int frame)
       m_expander.expand(frame, m_end_frame - frame);
     else {
       m_expander.expand(frame, m_expand_window);
-    
-      if (m_expander.words().empty()) {
-	float beam = m_expander.get_beam();
-	float new_beam = beam + 1;
-	m_expander.set_beam(new_beam);
-	fprintf(stderr, "WARNING: expander did not return words at all!\n");
-	fprintf(stderr, "Increasing expander state beam from %f to %f\n", 
-		beam, new_beam);
-	continue;
-      }
     }
     
+// FIXME: removed this for now, because the end of audio is problematic
+// thirsima 6.9.2004
+
+//     if (m_expander.words().empty()) {
+//       float beam = m_expander.get_beam();
+//       float new_beam = beam + 1;
+//       m_expander.set_beam(new_beam);
+//       fprintf(stderr, "WARNING: expander did not return words at all!\n");
+//       fprintf(stderr, "Increasing expander state beam from %f to %f\n", 
+// 	      beam, new_beam);
+//       continue;
+//     }
+
     break;
   }
 
