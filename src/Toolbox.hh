@@ -15,11 +15,8 @@ public:
   ~Toolbox();
   
   // HMM models
-#ifdef STATE_DURATION_PROBS
-  void hmm_read(const char *hmm_file, const char *dur_file);
-#else
   void hmm_read(const char *file);
-#endif
+  void duration_read(const char *dur_file);
   const std::vector<Hmm> &hmms() const { return m_hmms; }
 
   // Lexicon

@@ -11,10 +11,12 @@ public:
   StateDuration();
   void set_parameters(float a, float b);
   float get_log_prob(int duration) const;
+  int get_mode(void) const { return mode; }
 
 private:
   float a,b;
   float const_term;
+  int mode;
 };
 
 struct HmmTransition {
@@ -26,9 +28,7 @@ struct HmmState {
 public:
   int model;
   std::vector<HmmTransition> transitions;
-#ifdef STATE_DURATION_PROBS
   StateDuration duration;
-#endif
 };
 
 

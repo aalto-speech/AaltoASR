@@ -69,8 +69,8 @@ class Toolbox {
 public:
   Toolbox();
   
-#  void hmm_read(const char *hmm_file, const char *dur_file);
   void hmm_read(const char *hmm_file);
+  void duration_read(const char *dur_file);
   const std::vector<Hmm> &hmms();
   void lex_read(const char *file);
   const std::string &lex_word();

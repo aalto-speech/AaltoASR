@@ -10,6 +10,7 @@
 
 int HypoPath::g_count = 0;
 
+
 // FIXME: check that every log_prob has the same base!  Now they
 // should be log10 everywhere.
 
@@ -483,7 +484,7 @@ Search::expand_hypo(const Hypo &hypo)
 
     // FIXME: We could break here if words were always sorted.  Are they?
     if (words[w]->best_avg_log_prob < words[0]->best_avg_log_prob * m_word_beam)
-      continue; 
+      continue;
 
     // In addition to the best ending time, expand also to
     // neighbouring frames.  The change in log_prob is approximated.
@@ -491,7 +492,7 @@ Search::expand_hypo(const Hypo &hypo)
       for (int i = -m_multiple_endings; i <= m_multiple_endings; i++) {
 	int df = i;
 
-	int length = words[w]->best_length + df;
+        int length = words[w]->best_length + df;
 	if (length < words[w]->first_length || length >= words[w]->last_length)
 	  continue;
 	

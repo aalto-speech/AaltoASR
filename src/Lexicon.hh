@@ -2,6 +2,7 @@
 #define LEXICON_HH
 
 #include <vector>
+#include <deque>
 
 #include "Lexicon.hh"
 
@@ -81,7 +82,7 @@ public:
     inline void reset();
 
     int frame; // FIXME: do we need frame counter in token?
-    char state_duration;
+    unsigned char state_duration;
     char state;
     Lexicon::Node *node;
     float log_prob;

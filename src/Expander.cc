@@ -14,6 +14,7 @@ struct TokenCompare {
   }
 };
 
+
 Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
 		   Acoustics &acoustics)
   : m_hmms(hmms),
@@ -29,6 +30,13 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_words(),
     m_active_words()
 {
+}
+
+Expander::~Expander()
+{
+  for (int i = 0; i < m_token_pool.size(); i++)
+    delete m_token_pool[i];
+  m_token_pool.clear();
 }
 
 void
@@ -69,7 +77,8 @@ Expander::keep_best_tokens(int tokens)
     assert(state.incoming_token == token);
     assert(state.outgoing_token == NULL);
     state.incoming_token = NULL;
-    delete token;
+    //delete token;
+    release_token(token);
     m_tokens.pop_back();
   }
 }
@@ -79,20 +88,35 @@ Expander::token_to_state(const Lexicon::Token *source_token,
 			 Lexicon::State &source_state,
 			 Lexicon::State &target_state,
 			 float new_log_prob, float new_dur_log_prob,
-			 bool update_best)
-		       
+                         float aco_log_prob,
+			 bool update_best, bool same_state, bool silence,
+                         const HmmState &target_hmm_state)
 {
   Lexicon::Token *new_token;
+  int next_state_duration;
 
+  // Just update the log probs
+  new_log_prob += aco_log_prob;
+  new_dur_log_prob += aco_log_prob;
+  
+  // Increase duration
+  if (same_state && !silence)
+  {
+    next_state_duration = source_token->state_duration + 1;
+  }
+  else
+  {
+    next_state_duration = 0;
+  }
+  
   // Target state has already an incoming token.
   if (target_state.incoming_token != NULL) {
 
-    // New token is worse.  
+    // New token is worse?
     if (target_state.incoming_token->log_prob > new_log_prob)
       return NULL;
-
     // Old token is worse.  We replace the contents of the old token
-    // with the new token.
+    // with the new token
     else {
       new_token = target_state.incoming_token;
 
@@ -104,17 +128,23 @@ Expander::token_to_state(const Lexicon::Token *source_token,
 	  
   // Target state is empty.
   else {
-    new_token = new Lexicon::Token(*source_token);
+    //new_token = new Lexicon::Token(*source_token);
+    new_token = acquire_token(source_token);
     m_tokens.push_back(new_token);
     target_state.incoming_token = new_token;
   }
 
+  new_token->state_duration = next_state_duration;
+
   new_token->log_prob = new_log_prob;
   new_token->dur_log_prob = new_dur_log_prob;
-
+  
   // Update beam threshold, but only if we are not in sink state!
-  if (update_best && new_log_prob > m_beam_best_tmp)
-    m_beam_best_tmp = new_log_prob;
+  //if (update_best && new_log_prob > m_beam_best_tmp)
+  //  m_beam_best_tmp = new_log_prob;
+  if (update_best && new_token->log_prob > m_beam_best_tmp)
+    m_beam_best_tmp = new_token->log_prob;
+
 
   return new_token;
 }
@@ -229,6 +259,12 @@ Expander::move_all_tokens()
     Lexicon::State &source_state = source_node->states[source_token->state];
     const Hmm &hmm = m_hmms[source_node->hmm_id];
     const HmmState &hmm_state = hmm.states[source_token->state];
+    bool silence = false;
+
+    if (hmm.label[0]=='_')
+    {
+      silence = true;
+    }
 
     if (source_token == source_state.incoming_token)
       continue;
@@ -257,17 +293,21 @@ Expander::move_all_tokens()
     for (int r = 0; r < hmm_state.transitions.size(); r++) {
       const HmmTransition &transition = hmm_state.transitions[r];
       int target_state_id = transition.target;
+      const HmmState &target_hmm_state = hmm.states[target_state_id];
       float log_prob = source_token->log_prob +
                        m_transition_scale*transition.log_prob;
       float dur_log_prob = source_token->dur_log_prob;
 
-#ifdef STATE_DURATION_PROBS
-      if (target_state_id != source_token->state) {
-        dur_log_prob +=
-          m_duration_scale *
-          hmm_state.duration.get_log_prob(source_token->state_duration);
+      if (m_post_durations)
+      {
+        // NOTE: It seems like the best result is obtained if the staying
+        // in silence states is not penalized at all.
+        if (target_state_id != source_token->state && !silence) {
+          dur_log_prob +=
+            m_duration_scale *
+            hmm_state.duration.get_log_prob(source_token->state_duration + 1);
+        }
       }
-#endif
 
       // Target state is a sink state.  Clone the token to the next
       // nodes in the lexicon.
@@ -286,9 +326,8 @@ Expander::move_all_tokens()
 	  // of the next word.  This also assumes that there can not
 	  // be an empty word in lexicon.
 	  if (!m_forced_end || m_frame == m_frames - 1) {
-#ifdef STATE_DURATION_PROBS
-	    float log_prob = dur_log_prob;
-#endif // Otherwise use the log_prob calculated above
+	    float log_prob = (m_post_durations ? dur_log_prob : log_prob);
+
 	    // FIXME: is this correct?  Do we really want to add the
 	    // lexicon node probabilities only at word ends?
 	    log_prob += source_node->log_prob;
@@ -324,11 +363,6 @@ Expander::move_all_tokens()
 	// ITERATE NEXT NODES
 	for (int n = 0; n < source_node->next.size(); n++) {
 	  Lexicon::Node *target_node = source_node->next[n];
-
-	  // FIXME: why we do not want to do this here?  Why only in
-	  // word ends?  
-	  // log_prob += target_node->log_prob;
-
 	  Lexicon::State &target_state = target_node->states[0];
 	  Lexicon::Token *new_token;
 
@@ -346,9 +380,11 @@ Expander::move_all_tokens()
 
 	  // Our target source state is empty.
 	  else {
-	    new_token = token_to_state(source_token, source_state, 
-				       target_state, log_prob, dur_log_prob, 
-				       false);
+	    new_token = token_to_state(source_token, source_state,
+                                       target_state, log_prob, dur_log_prob,
+                                       0, false, false, false,
+                                       target_hmm_state);
+
 	    // The new token is in source state now.  We want to move
 	    // it again during current token loop.
 	    target_state.incoming_token = NULL;
@@ -361,7 +397,6 @@ Expander::move_all_tokens()
 	    new_token->state_duration = 0;
 //	    new_token->add_path(target_node->hmm_id, new_token->frame + 1,
 //				log_prob);
-
 	  }
 	}
       }
@@ -369,20 +404,10 @@ Expander::move_all_tokens()
       // Target state is not a sink state.  Just clone the token.
       else {
 
-	if (target_state_id == source_token->state 
-	    && hmm.label[0] != '_') {
-	  source_token->state_duration++;
-          // FIXME: Maximum state duration test
-	  //if (source_token->state_duration >= m_max_state_duration)
-	  //  continue;
-	}
-	else {
-	  source_token->state_duration = 1;
-	}
+        float aco_prob;
 
-	log_prob += m_acoustics.log_prob(hmm.states[target_state_id].model);
-        dur_log_prob += m_acoustics.log_prob(hmm.states[target_state_id].model);
-
+        aco_prob = m_acoustics.log_prob(hmm.states[target_state_id].model);
+        
 	// Beam pruning using already the temporary beam_best, which
 	// is under calculation for the next frame.
 	// FIXME: this might be quite unnecessary
@@ -392,7 +417,11 @@ Expander::move_all_tokens()
 	Lexicon::State &target_state = source_node->states[target_state_id];
 	Lexicon::Token *new_token = 
 	  token_to_state(source_token, source_state, target_state, log_prob,
-			 dur_log_prob, true);
+			 dur_log_prob,
+                         aco_prob,
+                         true, target_state_id == source_token->state,
+                         silence,
+                         target_hmm_state);
 	if (new_token != NULL) {
 	  new_token->state = target_state_id;
 	  new_token->frame++;
@@ -404,7 +433,8 @@ Expander::move_all_tokens()
     // The current token has been cloned (or pruned) according to all
     // transitions.  Replace the token by the last token in the
     // vector.
-    delete source_token;
+    //delete source_token;
+    release_token(source_token);
     if (m_tokens.size() > t + 1)
       m_tokens[t] = m_tokens[m_tokens.size() - 1];
     m_tokens.pop_back();
@@ -429,7 +459,8 @@ Expander::clear_tokens()
     Lexicon::Node *node = token->node;
     Lexicon::State &state = node->states[token->state];
     state.incoming_token = NULL;
-    delete m_tokens[t];
+    //delete m_tokens[t];
+    release_token(m_tokens[t]);
   }
   m_tokens.clear();
 }
@@ -442,7 +473,8 @@ Expander::create_initial_tokens(int start_frame)
   
   for (int next_id = 0; next_id < node->next.size(); next_id++) {
     Lexicon::State &state = node->next[next_id]->states[0];
-    token = new Lexicon::Token();
+    //token = new Lexicon::Token();
+    token = acquire_token();
 
     state.incoming_token = token;
     token->frame = start_frame - 1;
@@ -578,10 +610,12 @@ Expander::expand(int start_frame, int frames)
       Lexicon::State &state = node->states[token->state];
       assert(state.incoming_token == token);
       assert(state.outgoing_token == NULL);
-
+      assert(token->frame == start_frame + m_frame -1);
+      
       if (token->log_prob < m_beam_best - m_beam) {
 	// Delete the token
-	delete m_tokens[t];
+	//delete m_tokens[t];
+        release_token(m_tokens[t]);
 	state.incoming_token = NULL;
 
 	// Replace the token with the last token in the vector, in
@@ -619,6 +653,7 @@ Expander::expand(int start_frame, int frames)
 //  		<< m_tokens.size() << std::endl;
 
   }
+
   clear_tokens();
 }
 
@@ -631,4 +666,39 @@ Expander::sort_words(int top)
   else 
     std::sort(m_active_words.begin(), m_active_words.end(), 
 	      Expander::WordCompare());
+}
+
+
+Lexicon::Token* Expander::acquire_token(void)
+{
+  Lexicon::Token *t;
+  if (m_token_pool.size() == 0)
+    t = new Lexicon::Token();
+  else
+  {
+    t = m_token_pool.back();
+    m_token_pool.pop_back();
+  }
+  return t;
+}
+
+Lexicon::Token* Expander::acquire_token(const Lexicon::Token *source_token)
+{
+  Lexicon::Token *t;
+  if (m_token_pool.size() == 0)
+    t = new Lexicon::Token(*source_token);
+  else
+  {
+    t = m_token_pool.back();
+    *t = *source_token;
+    m_token_pool.pop_back();
+  }
+  return t;
+}
+
+void Expander::release_token(Lexicon::Token *token)
+{
+  if (token->path)
+    Lexicon::Path::unlink(token->path);
+  m_token_pool.push_back(token);
 }

@@ -88,7 +88,6 @@ NowayHmmReader::read(std::istream &in)
   in.exceptions(old_state);
 }
 
-#ifdef STATE_DURATION_PROBS
 void NowayHmmReader::read_durations(std::istream &in)
 {
   std::istream::iostate old_state = in.exceptions();
@@ -97,6 +96,11 @@ void NowayHmmReader::read_durations(std::istream &in)
   float a,b;
 
   try {
+    if (m_hmms.size() == 0)
+    {
+      std::cerr << "NowayHmmReader::read_durations(): Error: HMMs must be loaded before duration file!" << std::endl;
+      exit(1);
+    }
     for (int i = 0; i < m_hmms.size(); i++)
     {
       in >> hmm_id;
@@ -118,4 +122,4 @@ void NowayHmmReader::read_durations(std::istream &in)
   
   in.exceptions(old_state);
 }
-#endif
+

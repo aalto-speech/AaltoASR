@@ -76,18 +76,6 @@ Toolbox::find_word(const std::string &word)
   return -1;
 }
 
-
-#ifdef STATE_DURATION_PROBS
-void
-Toolbox::hmm_read(const char *hmm_file, const char *dur_file)
-{
-  std::ifstream hmm_in(hmm_file), dur_in(dur_file);
-  if (!hmm_in || !dur_in)
-    throw OpenError();
-  m_hmm_reader.read(hmm_in);
-  m_hmm_reader.read_durations(dur_in);
-}
-#else
 void
 Toolbox::hmm_read(const char *file)
 {
@@ -96,7 +84,15 @@ Toolbox::hmm_read(const char *file)
     throw OpenError();
   m_hmm_reader.read(in);
 }
-#endif
+
+void Toolbox::duration_read(const char *dur_file)
+{
+  std::ifstream dur_in(dur_file);
+  if (!dur_in)
+    throw OpenError();
+  m_hmm_reader.read_durations(dur_in);
+  m_expander.set_post_durations(true);
+}
 
 void
 Toolbox::lex_read(const char *filename)

@@ -44,6 +44,8 @@ public:
   Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
 	   Acoustics &m_acoustics);
 
+  ~Expander();
+
   /** Search the best words.  FIXME: the name should be better
    *
    * If the number of frames has changed since the last call, the
@@ -53,13 +55,15 @@ public:
 
   // Options
   void set_forced_end(bool forced_end) { m_forced_end = forced_end; }
-  void set_token_limit(int limit) { m_token_limit = limit; }
+  void set_token_limit(int limit) { m_token_limit = limit; m_token_pool.reserve(limit); }
   void set_beam(float beam) { m_beam = beam; }
   void set_max_state_duration(int duration) { m_max_state_duration = duration;}
   void sort_words(int top = 0);
 
   void set_duration_scale(float scale) { m_duration_scale = scale; }
   void set_transition_scale(float scale) { m_transition_scale = scale; }
+
+  void set_post_durations(bool durations) { m_post_durations = durations; }
 
   // Info
   inline std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
@@ -93,8 +97,15 @@ private:
 				 Lexicon::State &target_state,
 				 float new_log_prob,
                                  float new_dur_log_prob,
-				 bool update_best);
+                                 float aco_log_prob, // Added to the log probs
+				 bool update_best,
+                                 bool same_state, bool silence,
+                                 const HmmState &target_hmm_state);
 
+  Lexicon::Token* acquire_token(void);
+  Lexicon::Token* acquire_token(const Lexicon::Token *source_token);
+  void release_token(Lexicon::Token *token);
+  
   const std::vector<Hmm> &m_hmms;
   Lexicon &m_lexicon;
   Acoustics &m_acoustics;
@@ -106,6 +117,9 @@ private:
   int m_max_state_duration;
   float m_duration_scale;
   float m_transition_scale;
+  bool m_post_durations;
+
+  std::vector<Lexicon::Token*> m_token_pool;
 
   // State
   std::vector<Lexicon::Token*> m_tokens;

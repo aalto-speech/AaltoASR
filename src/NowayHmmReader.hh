@@ -11,10 +11,7 @@ class NowayHmmReader {
 public:
   NowayHmmReader();
   void read(std::istream &in);
-
-#ifdef STATE_DURATION_PROBS
   void read_durations(std::istream &in);
-#endif
   
   const std::map<std::string, int> &hmm_map() const 
     { return m_hmm_map; }
