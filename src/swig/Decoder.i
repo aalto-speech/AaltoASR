@@ -69,8 +69,9 @@ public:
 
 	// Expander
 	void expand(int frame, int frames);
-	void print_best();
+	const std::string &best_word();
 	void print_words(int words);
+	int find_word(const std::string &word);
 
 	// Search
   void init(int expand_window, int stacks, int reserved_hypos);

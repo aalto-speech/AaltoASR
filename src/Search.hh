@@ -131,7 +131,7 @@ public:
   // Inherited from vector
   inline Hypo &operator[](int index) 
     { return std::vector<Hypo>::operator[](index); }
-  inline Hypo &at(int index) { return std::vector<Hypo>::at(index); }
+  inline Hypo &at(int index) { return std::vector<Hypo>::operator[](index); }
   inline size_type size() const { return std::vector<Hypo>::size(); }
   inline void reserve(int size) { std::vector<Hypo>::reserve(size); }
   inline bool empty() const { return std::vector<Hypo>::empty(); }

@@ -25,8 +25,9 @@ public:
   void lna_seek(int frame) { m_lna_reader.seek(frame); }
 
   void expand(int frame, int frames) { m_expander.expand(frame, frames); }
-  void print_best();
+  const std::string &best_word();
   void print_words(int words);
+  int find_word(const std::string &word);
 
   void init(int expand_window, int stacks, int reserved_hypos) 
     { 

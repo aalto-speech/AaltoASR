@@ -20,15 +20,17 @@ Toolbox::Toolbox()
 {
 }
 
-void
-Toolbox::print_best()
+const std::string&
+Toolbox::best_word()
 {
+  static const std::string noword("*");
+
   std::vector<Expander::Word*> &sorted_words = m_expander.words();
   std::sort(sorted_words.begin(), sorted_words.end(), Expander::WordCompare());
   if (sorted_words.size() > 0)
-    std::cout << m_vocabulary.word(sorted_words[0]->word_id) << std::endl;
+    return m_vocabulary.word(sorted_words[0]->word_id);
   else
-    std::cout << "***NOWORD***" << std::endl;
+    return noword;
 }
 
 void
@@ -50,6 +52,17 @@ Toolbox::print_words(int words)
 	      << m_vocabulary.word(sorted_words[i]->word_id)
 	      << std::endl;
   }
+}
+
+int
+Toolbox::find_word(const std::string &word)
+{
+  std::vector<Expander::Word*> &sorted_words = m_expander.words();
+  for (int i = 0; i < sorted_words.size(); i++) {
+    if (m_vocabulary.word(sorted_words[i]->word_id) == word)
+      return i + 1;
+  }
+  return -1;
 }
 
 void
