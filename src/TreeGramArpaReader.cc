@@ -36,8 +36,11 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
     chomp(&line);
     m_lineno++;
 
-    if (!ok)
-      read_error();
+    if (!ok) {
+      fprintf(stderr, "TreeGramArpaReader::read(): "
+	      "error on line %d while waiting \\data\\", m_lineno);
+      exit(1);
+    }
 
     if (line == "\\data\\")
       break;
@@ -45,20 +48,24 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 
   // Read header
   int order = 1;
+  int number_of_nodes = 0;
   while (1) {
     ok = read_line(&line, file);
     chomp(&line);
     m_lineno++;
 
-    if (!ok)
-      read_error();
+    if (!ok) {
+      fprintf(stderr, "TreeGramArpaReader::read(): "
+	      "error on line %d while reading counts", m_lineno);
+      exit(1);
+    }
 
     // Header ends in a \-command
     if (line[0] == '\\')
       break;
 
     // Skip empty lines
-    if (line.find_first_not_of(" \t\n") < 0)
+    if (line.find_first_not_of(" \t\n") == line.npos)
       continue;
 
     // All non-empty header lines must be ngram counts
@@ -69,16 +76,25 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
     if (vec.size() != 2)
       read_error();
 
-    m_counts.push_back(atoi(vec[1].c_str()));
+    int count = atoi(vec[1].c_str());
+    number_of_nodes += count;
+    m_counts.push_back(count);
     if (atoi(vec[0].c_str()) != order || m_counts.back() <= 0)
       read_error();
+    order++;
   }
+
+  tree_gram->reserve_nodes(number_of_nodes);
 
   // Read ngrams order by order
   for (order = 1; order <= m_counts.size(); order++) {
 
     // We must always have the correct header line at this point
-    assert(line[0] == '\\');
+    if (line[0] != '\\') {
+      fprintf(stderr, "TreeGramArpaReader::read(): "
+	      "\\%d-grams expected on line %d\n", order, m_lineno);
+      exit(1);
+    }
     clean(&line, " \t");
     split(line, "-", false, &vec);
 
@@ -97,6 +113,13 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 	read_error();
       clean(&line, " \t\n");
       m_lineno++;
+
+      // Ignore empty lines
+      if (line.find_first_not_of(" \t\n") == line.npos) {
+	w--;
+	continue;
+      }
+
       split(line, " \t", true, &vec);
 
       // Check the number of columns on the line
@@ -125,6 +148,21 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 	gram[i] = tree_gram->add_word(vec[i + 1]);
 
       tree_gram->add_gram(gram, log_prob, back_off);
+    }
+
+    // Skip empty lines
+    while (1) {
+      if (!read_line(&line, file)) {
+	if (ferror(file))
+	  read_error();
+	if (feof(file))
+	  break;
+      }
+      chomp(&line);
+      m_lineno++;
+
+      if (line.find_first_not_of(" \t\n") != line.npos)
+	break;
     }
   }
 }

@@ -174,7 +174,7 @@ TreeGram::find_path(const Gram &gram)
   // The beginning of the path can be found quickly by using the index
   // stack.
   while (1) {
-    assert(order < m_last_gram.size() - 1);
+    assert(order < gram.size() - 1); // Otherwise we have a duplicate!
     if (gram[order] != m_last_gram[order])
       break;
     order++;
@@ -182,13 +182,12 @@ TreeGram::find_path(const Gram &gram)
   m_insert_stack.resize(order);
 
   // The rest of the path must be searched.
-  order--;
-  if (order < 0)
+  if (order == 0)
     prev = -1;
   else
     prev = m_insert_stack[order];
 
-  while (order < m_last_gram.size() - 1) {
+  while (order < gram.size()-1) {
     index = find_child(gram[order], prev);
     if (index < 0) {
       fprintf(stderr, "prefix not found\n");
