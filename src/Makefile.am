@@ -27,6 +27,7 @@ noinst_LIBRARIES = libdecoder.a
 libdecoder_a_SOURCES = \
 					Acoustics.hh \
 	ArpaNgramReader.cc		ArpaNgramReader.hh \
+	Endian.cc			Endian.hh \
 	Expander.cc			Expander.hh \
 	Hmm.cc				Hmm.hh \
 	Lexicon.cc			Lexicon.hh \
