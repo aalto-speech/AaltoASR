@@ -46,6 +46,7 @@ public:
     m_search.init_search(expand_window, stacks, reserved_hypos); 
   }
   void reset(int frame) { m_search.reset_search(frame); }
+  void set_end(int frame) { m_search.set_end_frame(frame); }
   void sort(int frame, int top = 0) { m_search.sort_stack(frame, top); }
   bool expand_stack(int frame) { return m_search.expand_stack(frame); }
   void expand_words(int frame, const std::string &words) 
@@ -87,6 +88,8 @@ public:
   { m_search.set_multiple_endings(multiple_endings); }
   void set_print_indices(bool print_indices) 
   { m_search.set_print_indices(print_indices); }
+  void set_print_frames(bool print_frames) 
+  { m_search.set_print_frames(print_frames); }
   void set_word_boundary(const std::string &word)
   { m_search.set_word_boundary(word); }
 

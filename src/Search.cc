@@ -1,4 +1,4 @@
-#include <strstream>
+#include <sstream>
 #include <stack>
 #include <algorithm>
 #include <iomanip>
@@ -69,6 +69,8 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_unk_offset(0),
     m_verbose(0),
     m_print_probs(false),
+    m_print_indices(false),
+    m_print_frames(false),
     m_multiple_endings(0),
     m_last_printed_path(NULL),
 
@@ -130,6 +132,10 @@ void
 Search::print_path(HypoPath *path)
 {
   std::cout << m_vocabulary.word(path->word_id);
+
+  if (m_print_frames)
+    std::cout << "[" << path->frame << "]";
+
   if (m_print_indices)
     std::cout << "(" << path->word_id << ")";
   std::cout << " ";
@@ -339,6 +345,7 @@ Search::insert_hypo(int target_frame, const Hypo &hypo)
 {
   assert(hypo.frame == target_frame);
   assert(hypo.path->frame == target_frame);
+  assert(m_end_frame < 0 || hypo.frame < m_end_frame);
 
   ensure_stack(target_frame);
 
@@ -420,17 +427,32 @@ Search::expand_hypo(const Hypo &hypo)
     if (words[w]->avg_log_prob < words[0]->avg_log_prob * m_word_beam)
       continue; 
 
+    // In addition to the best ending time, expand also to
+    // neighbouring frames.  The change in log_prob is approximated.
+    // FIXME: magic numbers *2 and 0.1!!
     if (m_multiple_endings > 0) {
-      for (int f = -m_multiple_endings; f <= m_multiple_endings; f++) {
-	// FIXME: is this correct?  Magic number!
-	if (words[w]->frames + f*2 < 1)
+      for (int i = -m_multiple_endings; i <= m_multiple_endings; i++) {
+	int df = i * 2;
+	int absdf = (df > 0) ? df : -df;
+
+	if (words[w]->frames + df < 1)
 	  continue;
+	if (m_end_frame > 0 && 
+	    hypo.frame + words[w]->frames + df >= m_end_frame)
+	  continue;
+
+	// Update log_prob starting from the best log_prob
+	float log_prob = words[w] -> log_prob;
+	log_prob += df * words[w]->avg_log_prob;
+	//log_prob *= (1.0 + 0.1 * absdf);
+
 	expand_hypo_with_word(hypo, words[w]->word_id,
-			      hypo.frame + words[w]->frames + f*2, 
-			      words[w]->log_prob + 	// best logprob
-			      f*2 * words[w]->avg_log_prob);
+			      hypo.frame + words[w]->frames + df, 
+			      log_prob);
       }
     }
+
+    // Expand only to the best ending time.
     else {
       expand_hypo_with_word(hypo, words[w]->word_id,
 			    hypo.frame + words[w]->frames, 
@@ -517,17 +539,16 @@ Search::check_stacks()
 bool
 Search::expand_stack(int frame)
 {
-  HypoStack &stack = this->stack(frame);
-  stack.sort();
-
   // Check if the end of speech has been reached.
   if (frame > m_last_hypo_frame) {
+    print_hypo(this->stack(m_last_hypo_frame)[0]);
     std::cerr << "no more hypos after frame " 
 	      << m_last_hypo_frame << std::endl;
-    print_sure();
     return false;
   }
 
+  HypoStack &stack = this->stack(frame);
+  stack.sort();
   initial_prunings(frame, stack);
 
   // Find the acoustically best words and expand all hypos in the stack.
@@ -544,7 +565,10 @@ Search::expand_stack(int frame)
       assert(stack[h].frame == frame);
       expand_hypo(stack[h]);
     }
-    stack.clear();
+
+    // FIXME: ugly, but works for now
+    if (m_expander.words().size() > 0)
+      stack.clear();
   }
 
   return true;
@@ -553,7 +577,7 @@ Search::expand_stack(int frame)
 void
 Search::expand_words(int frame, const std::string &words)
 {
-  std::istrstream in(words.c_str());
+  std::istringstream in(words);
   std::string str;
   
   if (stack(frame).empty()) {
@@ -614,5 +638,7 @@ Search::recognize_segment(int start_frame, int end_frame)
       return false;
     m_frame++;
   }
+  stack(m_last_hypo_frame).sort();
+  print_hypo(stack(m_last_hypo_frame)[0]);
   return true;
 }

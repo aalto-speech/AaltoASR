@@ -257,6 +257,7 @@ public:
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_print_probs(bool print_probs) { m_print_probs = print_probs; }
   void set_print_indices(bool print_indices) { m_print_indices = print_indices; }
+  void set_print_frames(bool print_frames) { m_print_frames = print_frames; }
   void set_word_boundary(const std::string &word);
 
   // Exceptions
@@ -313,6 +314,7 @@ private:
   bool m_print_probs;
   int m_multiple_endings;
   bool m_print_indices;
+  bool m_print_frames;
   HypoPath *m_last_printed_path;
 
   /** Index of the word boundary in LM context (negative if not used)
