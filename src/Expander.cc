@@ -159,11 +159,13 @@ Expander::check_best(int info, bool tmp)
 //
 // - Tokens are in incoming_token slots.
 // - Acoustics has been updated to current time.
+// - No tokens in sink or source states. FIXME: check this with asserts!
 //
 // POSTCONDITIONS:
 //
 // - The order and number of tokens is undefined.
 // - Tokens are in incoming_token slots.
+// - No tokens in sink or source states. FIXME: check this with asserts!
 //
 // IMPLEMENTATION NOTES:
 //
@@ -209,6 +211,10 @@ Expander::move_all_tokens()
     assert(state.incoming_token == token);
     state.outgoing_token = state.incoming_token;
     state.incoming_token = NULL;
+
+    // Tokens in sink states not allowed at all!
+    const Hmm &hmm = m_hmms[node->hmm_id];
+    assert(!hmm.is_sink(token->state));
   }
   
   // ITERATE ALL TOKENS
@@ -294,9 +300,30 @@ Expander::move_all_tokens()
 	  // log_prob += target_node->log_prob;
 
 	  Lexicon::State &target_state = target_node->states[0];
-	  Lexicon::Token *new_token = 
-	    token_to_state(source_token, source_state, target_state, 
-			   log_prob, false);
+	  Lexicon::Token *new_token;
+
+	  // Our target state is a source state and may already
+	  // contain an outgoing token.  Check whether we have better
+	  // token here.
+	  if (target_state.outgoing_token != NULL) {
+	    if (target_state.outgoing_token->log_prob < log_prob) {
+	      new_token = target_state.outgoing_token;
+	      (*new_token) = (*source_token);
+	    }
+	    else
+	      new_token = NULL;
+	  }
+
+	  // Our target source state is empty.
+	  else {
+	    new_token = token_to_state(source_token, source_state, target_state, 
+				       log_prob, false);
+	    // The new token is in source state now.  We want to move
+	    // it again during current token loop.
+	    target_state.incoming_token = NULL;
+	    target_state.outgoing_token = new_token;
+	  }
+
 	  if (new_token != NULL) {
 	    new_token->state = 0;
 	    new_token->node = target_node;
@@ -304,10 +331,6 @@ Expander::move_all_tokens()
 //	    new_token->add_path(target_node->hmm_id, new_token->frame + 1,
 //				log_prob);
 
-	    // The new token is in source state now.  We want to move
-	    // it again during current token loop.
-	    target_state.incoming_token = NULL;
-	    target_state.outgoing_token = new_token;
 	  }
 	}
       }
