@@ -3,8 +3,6 @@
 
 #include <deque>
 
-#include <stdio.h>
-
 #include "NowayHmmReader.hh"
 #include "NowayLexiconReader.hh"
 #include "LnaReaderCircular.hh"
@@ -24,12 +22,14 @@ public:
   const std::string &lex_word() const { return m_lexicon_reader.word(); }
   const std::string &lex_phone() const { return m_lexicon_reader.phone(); }
 
-  // SPS
-  void sps_init(FILE *file);
-
   // Ngram
   void ngram_read(const char *file);
   int ngram_lineno() const { return m_ngram_reader.lineno(); }
+
+  // Lna
+  void lna_open(const char *file, int models, int size);
+  void lna_close();
+  void lna_seek(int frame) { m_lna_reader.seek(frame); }
 
   // Expander
   void expand(int frame, int frames);
@@ -106,7 +106,7 @@ private:
   Lexicon &m_lexicon;
   const Vocabulary &m_vocabulary;
 
-  StateProbReader m_sps_reader;
+  LnaReaderCircular m_lna_reader;
 
   ArpaNgramReader m_ngram_reader;
   const Ngram &m_ngram;
