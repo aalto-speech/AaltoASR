@@ -138,7 +138,12 @@ Main::run()
   search.set_word_beam(2);
   search.set_hypo_limit(10);
   search.set_beam(50);
+  search.set_global_beam(20);
   search.set_lm_scale(0.1);
+  
+  ex.set_forced_end(true);
+  ex.expand(84,250);
+  ex.set_forced_end(false);
 
   while (search.run());
 

@@ -40,6 +40,8 @@ public:
   void create_initial_tokens(int start_frame);
   void expand(int start_frame, int frames);
 
+  // Options
+  void set_forced_end(bool forced_end) { m_forced_end = forced_end; }
   void set_token_limit(int limit) { m_token_limit = limit; }
   void set_beam(double beam) { m_beam = beam; }
   void set_max_state_duration(int duration) 
@@ -59,6 +61,7 @@ private:
   Acoustics &m_acoustics;
 
   // Options
+  bool m_forced_end;
   int m_token_limit;
   double m_beam;
   int m_max_state_duration;
@@ -68,6 +71,7 @@ private:
   std::vector<Word> m_words;
   std::vector<Word*> m_sorted_words;
   int m_frame; // Current frame relative to the start frame.
+  int m_frames; // Max frames per word
   double m_beam_best;
   double m_beam_best_tmp;
 };

@@ -53,6 +53,20 @@ LnaReaderCircular::close()
   m_in = NULL;
 }
 
+void
+LnaReaderCircular::seek(int frame)
+{
+  if (m_in == NULL)
+    throw NotOpened();
+
+  m_in->seekg((m_num_models + 1) * frame);
+  if (m_in->fail())
+    throw CannotSeek();
+
+  m_frames_read = frame;
+  m_first_index = 0;
+}
+
 bool
 LnaReaderCircular::go_to(int frame)
 {

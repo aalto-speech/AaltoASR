@@ -66,7 +66,7 @@ NowayHmmReader::read(std::istream &in)
   }
   catch (std::exception &e) {
     in.exceptions(old_state);
-    throw e;
+    throw InvalidFormat();
   }
   
   in.exceptions(old_state);

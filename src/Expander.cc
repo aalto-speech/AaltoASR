@@ -18,6 +18,7 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_lexicon(lexicon),
     m_acoustics(acoustics),
 
+    m_forced_end(false),
     m_token_limit(0),
     m_beam(1e10),
     m_max_state_duration(0x7fff), // FIXME
@@ -195,15 +196,17 @@ Expander::move_all_tokens()
 	  // NOTE: Previously we added pronounciation probability
 	  // (source_node->log_prob) here, but it is LM probability,
 	  // and should be scaled by Search class.
-	  double log_prob = source_token->log_prob;
-	  double avg_log_prob = log_prob / m_frame;
-	  if (!word->active || avg_log_prob > word->avg_log_prob) {
-	    if (!word->active)
-	      m_sorted_words.push_back(word);
-	    word->avg_log_prob = avg_log_prob;
-	    word->log_prob = log_prob;
-	    word->frames = m_frame;
-	    word->active = true;
+	  if (!m_forced_end || m_frame == m_frames - 1) {
+	    double log_prob = source_token->log_prob;
+	    double avg_log_prob = log_prob / m_frame;
+	    if (!word->active || avg_log_prob > word->avg_log_prob) {
+	      if (!word->active)
+		m_sorted_words.push_back(word);
+	      word->avg_log_prob = avg_log_prob;
+	      word->log_prob = log_prob;
+	      word->frames = m_frame;
+	      word->active = true;
+	    }
 	  }
 	}
 
@@ -391,8 +394,9 @@ Expander::expand(int start_frame, int frames)
 
   create_initial_tokens(start_frame);
 
+  m_frames = frames;
   m_beam_best_tmp = -1e10;
-  for (m_frame = 0; frames < 0 || m_frame < frames; m_frame++) {
+  for (m_frame = 0; m_frames < 0 || m_frame < m_frames; m_frame++) {
     m_beam_best = m_beam_best_tmp;
     m_beam_best_tmp = -1e10;
 

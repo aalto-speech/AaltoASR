@@ -12,6 +12,7 @@ public:
   void open(const char *file, int num_models, int size);
   void init(std::istream &in, int num_models, int size);
   void close();
+  void seek(int frame);
   
   virtual bool go_to(int frame);
 
@@ -43,6 +44,11 @@ public:
   struct InvalidFrameId : public std::exception {
     virtual const char *what() const throw()
       { return "LnaReaderCircular: invalid frame id"; }
+  };
+
+  struct CannotSeek : public std::exception {
+    virtual const char *what() const throw()
+      { return "LnaReaderCircular: cannot seek"; }
   };
 
 private:

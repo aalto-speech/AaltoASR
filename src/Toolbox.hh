@@ -22,8 +22,10 @@ public:
 
   void lna_open(const char *file, int models, int size);
   void lna_close();
+  void lna_seek(int frame) { m_lna_reader.seek(frame); }
 
   void expand(int frame, int frames) { m_expander.expand(frame, frames); }
+  void print_best();
   void print_words(int words);
 
   void init(int expand_window, int stacks, int reserved_hypos) 
@@ -43,6 +45,8 @@ public:
   void prune(int frame, int top);
   int paths() const { return HypoPath::count; }
 
+  void set_forced_end(bool forced_end) 
+    { m_expander.set_forced_end(forced_end); }
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
   void set_word_limit(int word_limit) { m_search.set_word_limit(word_limit); }
   void set_word_beam(double word_beam) { m_search.set_word_beam(word_beam); }
@@ -51,7 +55,8 @@ public:
   void set_token_limit(int limit) { m_expander.set_token_limit(limit); }
   void set_state_beam(double beam) { m_expander.set_beam(beam); }
   void set_hypo_beam(double beam) { m_search.set_beam(beam); }
-  void set_global_beam(double beam) { m_search.set_global_beam(beam); }
+  void set_global_beam(double beam) 
+    { m_search.set_global_beam(beam); }
   void set_max_state_duration(int duration) 
     { m_expander.set_max_state_duration(duration); }
   void set_verbose(bool verbose) { m_search.set_verbose(verbose); }

@@ -21,6 +21,17 @@ Toolbox::Toolbox()
 }
 
 void
+Toolbox::print_best()
+{
+  std::vector<Expander::Word*> &sorted_words = m_expander.words();
+  std::sort(sorted_words.begin(), sorted_words.end(), Expander::WordCompare());
+  if (sorted_words.size() > 0)
+    std::cout << m_vocabulary.word(sorted_words[0]->word_id) << std::endl;
+  else
+    std::cout << "***NOWORD***" << std::endl;
+}
+
+void
 Toolbox::print_words(int words)
 {
   std::vector<Expander::Word*> &sorted_words = m_expander.words();

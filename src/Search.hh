@@ -276,8 +276,10 @@ private:
   int m_hypo_limit;	// How many best hypos in a stack are expanded
   double m_beam;
 
-  double m_global_beam;
+  // Global pruning
   double m_global_best;
+  double m_global_angle;
+  double m_global_beam;
   int m_global_frame;
 
   // Temporary variables

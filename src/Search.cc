@@ -89,7 +89,7 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
 
   // FIXME!  Are all beams reset properly here.  Test reinitializing
   // the search!
-  m_global_best = -1e10;
+  m_global_best = 1e10;
   m_global_frame = -1;
 
   // Initialize stacks
@@ -177,14 +177,15 @@ Search::expand(int frame)
       
   // Reset global pruning if current stack is best
   if (m_global_frame == frame) {
-    m_global_best = -1e10;
+    m_global_best = 1e10;
     m_global_frame = -1;
   }
 
   // Expand all hypotheses in the stack, but only if inside the
   // global_beam
+  double ref = m_global_best + m_global_angle * (frame - m_global_frame);
   if (!stack.empty() &&
-      stack.best_log_prob() > m_global_best * m_global_beam) {
+      stack.best_log_prob() > ref - m_global_beam) {
     // Fit word lexicon to acoustic data
     m_expander.expand(frame, m_expand_window);
 
@@ -247,8 +248,8 @@ Search::expand(int frame)
 
 	  // Update global pruning
 	  double avg_log_prob = log_prob / target_frame;
-	  if (avg_log_prob > m_global_best) {
-	    m_global_best = avg_log_prob;
+	  if (avg_log_prob > m_global_best / m_global_frame) {
+	    m_global_best = log_prob;
 	    m_global_frame = target_frame;
 	  }
 	}

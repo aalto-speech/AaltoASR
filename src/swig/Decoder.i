@@ -65,9 +65,11 @@ public:
   // Lna
   void lna_open(const char *file, int models, int size);
   void lna_close();
+	void lna_seek(int frame);
 
 	// Expander
 	void expand(int frame, int frames);
+	void print_best();
 	void print_words(int words);
 
 	// Search
@@ -85,6 +87,7 @@ public:
 	void prune(int frame, int top);
 	int paths();
 
+	void set_forced_end(bool forced_end);
   void set_hypo_limit(int hypo_limit);
   void set_word_limit(int word_limit);
   void set_word_beam(double word_beam);
