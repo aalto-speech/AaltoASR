@@ -48,7 +48,6 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_first_frame(0),
     m_last_frame(0),
     m_first_stack(0),
-    m_last_stack(0),
     m_last_hypo_frame(0),
 
     // Options
@@ -188,13 +187,12 @@ Search::reset_search(int start_frame)
   m_frame = start_frame;
   m_first_frame = start_frame;
   m_last_frame = m_first_frame + m_stacks.size();
-  m_first_stack = start_frame;
-  m_last_stack = m_first_stack + m_stacks.size();
+  m_first_stack = frame2stack(start_frame);
   m_last_hypo_frame = start_frame;
 
   // Create initial empty hypothesis.
   Hypo hypo(0, 0, new HypoPath(0, 0, NULL));
-  m_stacks[frame2stack(start_frame)].add(hypo);
+  m_stacks[m_first_stack].add(hypo);
 
   // Reset pruning statistics
   m_stack_expansions = 0;
@@ -281,7 +279,6 @@ Search::move_buffer(int frame)
   while (m_last_frame <= frame) {
     m_stacks[m_first_stack].clear();
     circulate(m_first_stack);
-    circulate(m_last_stack);
     m_first_frame++;
     m_last_frame++;
   }
@@ -364,6 +361,7 @@ Search::expand(int frame)
       m_expander.expand(frame, m_end_frame - frame);
     else
       m_expander.expand(frame, m_expand_window);
+
     m_stack_expansions++;
 
     // Get only the best words
@@ -378,6 +376,7 @@ Search::expand(int frame)
 
     // Expand all hypotheses in the stack...
     for (int h = 0; h < stack.size(); h++) {
+
       Hypo &hypo = stack[h];
 
       // ... Using the best words
@@ -390,6 +389,7 @@ Search::expand(int frame)
 
 	double log_prob = hypo.log_prob + word->log_prob;
 	double lm_log_prob = 0;
+
 	// Calculate language model probabilities
 	if (m_ngram.order() > 0 && m_lm_scale > 0) {
 	  int lm_word_id = m_lex2lm[word->word_id];

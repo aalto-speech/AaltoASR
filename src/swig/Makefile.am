@@ -1,4 +1,3 @@
-SWIG = swig
 PYTHONINC = -I$(PYTHON_INCLUDE_PATH)
 
 all: Decoder.py Decodercmodule.so

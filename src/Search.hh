@@ -281,7 +281,6 @@ private:
   int m_first_frame;	
   int m_last_frame;
   int m_first_stack;
-  int m_last_stack;
   std::vector<HypoStack> m_stacks;
   int m_last_hypo_frame;
 
