@@ -22,6 +22,19 @@
 //   not work with shared HMM states.
 
 
+// Node flags
+#define NODE_NORMAL               0x00
+#define NODE_USE_WORD_END_BEAM    0x01
+#define NODE_AFTER_WORD_ID        0x02
+#define NODE_FAN_OUT              0x04
+#define NODE_FAN_OUT_FIRST        0x08
+#define NODE_FAN_IN               0x10
+#define NODE_FAN_IN_FIRST         0x20
+#define NODE_INSERT_WORD_BOUNDARY 0x40
+#define NODE_FAN_IN_CONNECTION    0x80
+#define NODE_LINKED               0x0100
+
+
 class TPLexPrefixTree {
 public:
 
@@ -45,6 +58,7 @@ public:
   class PathHistory {
   public:
     inline PathHistory(float ll, float dll, int depth, class PathHistory *p);
+
     inline void link() { m_reference_count++; }
     inline static void unlink(class PathHistory *hist);
     
@@ -78,8 +92,6 @@ public:
     //PathHistory *token_path;
     unsigned char depth;
     unsigned char dur;
-
-    unsigned char mode; // 0 = root, 1 = normal, 2 = after word_id
   };
 
   class Arc {
@@ -90,31 +102,39 @@ public:
 
   class Node {
   public:
-    inline Node() : word_id(-1), state(NULL), token_list(NULL) { }
-    inline Node(int wid) : word_id(wid), state(NULL), token_list(NULL) { }
-    inline Node(int wid, HmmState *s) : word_id(wid), state(s), token_list(NULL) { }
+    inline Node() : word_id(-1), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
+    inline Node(int wid) : word_id(wid), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
+    inline Node(int wid, HmmState *s) : word_id(wid), state(s), token_list(NULL), flags(NODE_NORMAL) { }
     int word_id; // -1 if none
     int node_id;
     HmmState *state;
     Token *token_list;
     std::vector<Arc> arcs;
 
+    unsigned short flags;
+
     std::vector<int> possible_word_id_list;
     SimpleHashCache<float> lm_lookahead_buffer;
   };
 
-  TPLexPrefixTree();
-  TPLexPrefixTree(const TPLexPrefixTree &lexicon) { assert(false); } // never copy lexicon
+  struct NodeArcId {
+    Node *node;
+    int arc_index;
+  };
+
+  TPLexPrefixTree(std::map<std::string,int> &hmm_map, std::vector<Hmm> &hmms);
   inline TPLexPrefixTree::Node *root() { return m_root_node; }
   inline int words() const { return m_words; }
 
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_lm_lookahead(int lm_lookahead) { m_lm_lookahead = lm_lookahead; }
 
+  void initialize_lex_tree(void);
   void add_word(std::vector<Hmm*> &hmm_list, int word_id);
   void finish_tree(void);
+  
   void prune_lookahead_buffers(int min_delta, int max_depth);
-  void set_lm_lookahead_cache_sizes(int root_size);
+  void set_lm_lookahead_cache_sizes(int cache_size);
 
   void clear_node_token_lists(void);
 
@@ -127,23 +147,65 @@ private:
                            int word_end,
                            std::vector<Node*> &hmm_state_nodes,
                            std::vector<Node*> &sink_nodes,
-                           std::vector<float> &sink_trans_log_probs);
+                           std::vector<float> &sink_trans_log_probs,
+                           unsigned short flags);
   void post_process_lex_branch(Node *node, std::vector<int> *lm_la_list);
+  bool post_process_fan_in(Node *node, std::vector<int> *lm_la_list);
+
+  void create_cross_word_network(void);
+  void add_hmm_to_fan_network(int hmm_id,
+                              bool fan_out);
+  void link_fan_out_node_to_fan_in(Node *node, const std::string &key);
+  void link_node_to_fan_network(const std::string &key,
+                                std::vector<Arc> &source_arcs,
+                                bool fan_out,
+                                bool ignore_length);
+  void add_single_hmm_word_for_cross_word_modeling(Hmm *hmm, int word_id);
+  void link_fan_in_nodes(void);
+  void create_lex_tree_links_from_fan_in(Node *fan_in_node,
+                                         const std::string &key);
+
+  void analyze_cross_word_network(void);
+  void count_fan_size(Node *node, unsigned short flag,
+                      int *num_nodes, int *num_arcs);
+  void count_prefix_tree_size(Node *node, int *num_nodes,
+                              int *num_arcs);
+  
+  void free_cross_word_network_connection_points(void);
+  Node* get_fan_out_entry_node(HmmState *state, const std::string &label);
+  Node* get_fan_out_last_node(HmmState *state, const std::string &label);
+  Node* get_fan_in_entry_node(HmmState *state, const std::string &label);
+  Node* get_fan_in_last_node(HmmState *state, const std::string &label);
+  Node* get_fan_state_node(HmmState *state, std::vector<Node*> *nodes);
+  std::vector<Node*>* get_fan_node_list(
+    const std::string &key,
+    std::map< std::string, std::vector<Node*>* > &nmap);
+  void add_fan_in_connection_node(Node *node, const std::string &prev_label);
+  
   void prune_lm_la_buffer(int delta_thr, int depth_thr,
                           Node *node, int last_size, int cur_depth);
-  void set_node_lm_lookahead_cache_size(Node *node, int cache_size,
-                                        int last_branches);
   
 private:
   int m_words; // Largest word_id in the nodes plus one
   Node *m_root_node;
   Node *m_end_node;
-  std::vector<Node*> word_end_list;
+  Node *m_silence_node;
   std::vector<Node*> node_list;
   int m_verbose;
   int m_lm_lookahead; // 0=None, 1=Only in first subtree nodes,
                       // 2=Full
+  bool m_cross_word_triphones;
   int m_lm_buf_count;
+
+  std::map<std::string,int> &m_hmm_map;
+  std::vector<Hmm> &m_hmms;
+
+  std::map< std::string, std::vector<Node*>* > m_fan_out_entry_nodes;
+  std::map< std::string, std::vector<Node*>* > m_fan_out_last_nodes;
+  std::map< std::string, std::vector<Node*>* > m_fan_in_entry_nodes;
+  std::map< std::string, std::vector<Node*>* > m_fan_in_last_nodes;
+  std::map< std::string, std::vector<Node*>* > m_fan_in_connection_nodes;
+  std::vector<NodeArcId> m_silence_arcs;
 };
 
 //////////////////////////////////////////////////////////////////////

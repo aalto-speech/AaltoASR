@@ -68,7 +68,7 @@ public:
   void segment(const std::string &str, int start_frame, int end_frame);
 
   // Info
-  int frame() { return m_search.frame(); }
+  int frame() { return (m_use_stack_decoder?m_search.frame():m_tp_search.frame()); }
   int first_frame() { return m_search.first_frame(); }
   int last_frame() { return m_search.last_frame(); }
   HypoStack &stack(int frame) { return m_search.stack(frame); }

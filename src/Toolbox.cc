@@ -17,6 +17,8 @@ Toolbox::Toolbox()
 
     m_lna_reader(),
 
+    m_tp_lexicon(m_hmm_map, m_hmms),
+
     m_tp_lexicon_reader(m_hmm_map, m_hmms, m_tp_lexicon, m_tp_vocabulary),
     m_tp_search(m_tp_lexicon, m_tp_vocabulary, m_lna_reader),
 

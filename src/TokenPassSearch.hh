@@ -42,6 +42,8 @@ public:
   void set_ngram(TreeGram *ngram);
   void set_lookahead_ngram(TreeGram *ngram);
 
+  int frame(void) { return m_frame; }
+
 private:
   void propagate_tokens(void);
   void propagate_token(TPLexPrefixTree::Token *token);

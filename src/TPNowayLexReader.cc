@@ -72,6 +72,8 @@ TPNowayLexReader::read(FILE *file)
   std::vector<Hmm*> hmm_list;
   m_word.reserve(128); // The size is not necessary, just for efficiency
 
+  m_lexicon.initialize_lex_tree();
+  
   while (1) {
     // Read first word
     skip_while(file, " \t\n");
