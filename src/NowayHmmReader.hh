@@ -1,7 +1,7 @@
 #ifndef NOWAYHMMREADER_HH
 #define NOWAYHMMREADER_HH
 
-#include <istream>
+#include <iostream>
 #include <vector>
 #include <map>
 

@@ -44,7 +44,7 @@ NowayHmmReader::read_hmm(std::istream &in, Hmm &hmm)
 void
 NowayHmmReader::read(std::istream &in)
 {
-  std::ios_base::iostate old_state = in.exceptions();
+  std::istream::iostate old_state = in.exceptions();
   in.exceptions(in.badbit | in.failbit | in.eofbit);
 
   try {

@@ -38,7 +38,7 @@ skip_while(std::istream &in, const char *chars)
 std::istream&
 get_until(std::istream &in, std::string &str, char *delims)
 {
-  str.clear();
+  str.resize(0);
 
   while (1) {
     char c;

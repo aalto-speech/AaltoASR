@@ -2,7 +2,7 @@
 #define HMM_HH
 
 #include <fstream>
-#include <istream>
+#include <iostream>
 #include <vector>
 #include <string>
 

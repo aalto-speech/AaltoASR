@@ -50,13 +50,6 @@ public:
     inline bool operator<(int value) const { return word < value; }
     inline bool operator>(int value) const { return word > value; }
     inline bool operator==(int value) const { return word == value; }
-    
-    inline Node *nextgram(int word) {
-      int index = find(nodes, word);
-      if (index < 0)
-	return NULL;
-      return &nodes[index];
-    }
   };
 
   inline Node *unigram(int word) { return &m_nodes[word]; }

@@ -1,6 +1,7 @@
 #ifndef TIMER_HH
 #define TIMER_HH
 
+#include <time.h>
 #include <sys/times.h>
 
 class Timer {
@@ -55,7 +56,7 @@ inline
 float
 Timer::sec() const
 {
-  return (float)m_ticks_total / (float)CLK_TCK;
+  return (float)m_ticks_total / (float)CLOCKS_PER_SEC;
 }
 
 #endif /* TIMER_HH */
