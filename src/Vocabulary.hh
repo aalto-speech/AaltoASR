@@ -27,6 +27,9 @@ public:
   // Return the number of words in the vocabulary.  Does not include OOV.
   inline int size() const { return m_indices.size() - 1; }
 
+  // Set the string for OOV word.  Warning: clears the vocabulary.
+  void set_oov(const std::string &word);
+
   // Read vocabulary from a stream: one word per line.  # comments are
   // removed.  Spaces are removed.
   void read(std::istream &in);

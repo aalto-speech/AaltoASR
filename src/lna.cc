@@ -180,7 +180,7 @@ main(int argc, char *argv[])
 
   try {
     load_hmms(hmmfile);
-    lna_reader.open(lnafile, models, 1024);
+    lna_reader.open(lnafile, 1024);
     load_trans(transfile);
     display2();
   }

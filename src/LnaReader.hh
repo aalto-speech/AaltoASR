@@ -19,7 +19,7 @@ public:
   LnaReader(std::istream &in, int num_models);
   LnaReader(const char *file, int num_models);
   
-  void open(const char *file, int num_models, bool two_byte = false);
+  void open(const char *file, int num_models);
   void close();
   bool sentence_end() const { return m_sentence_end; }
 

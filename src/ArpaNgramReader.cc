@@ -6,6 +6,16 @@
 
 // FIXME: NGram assumes sorted nodes, so check the order when reading
 
+void
+ArpaNgramReader::set_oov(const std::string &word)
+{
+  if (m_ngram.m_nodes.size() > 0) {
+    fprintf(stderr, "ArpaNgramReader::set_oov(): LM not empty");
+    exit(1);
+  }
+  m_ngram.set_oov(word);
+}
+
 bool
 ArpaNgramReader::getline(std::string *str, bool chomp)
 {
@@ -179,10 +189,12 @@ ArpaNgramReader::read_ngram(int order)
   // The UNK may be anywhere in the LM (at least SRI does not always
   // put UNK in the beginning of unigrams).
   if (order == 1) {
-
-    // Ensure the we have UNK.  It may be overwritten by the LM.
-    if (m_ngram.m_nodes.size() == 0)
-      m_ngram.m_nodes.push_back(Ngram::Node(0, -99, 0)); // FIXME: magic num
+    // No duplicates!
+    if (m_words[0] != 0 && m_words[0] != m_ngram.m_nodes.size()) {
+      fprintf(stderr, "ArpaNgramReader::read_ngram(): duplicate unigram '%s' "
+	      "on line %d\n", m_ngram.word(m_words[0]).c_str(), m_lineno);
+      exit(1);
+    }
 
     if (m_words[0] == 0)
       m_ngram.m_nodes[m_words[0]] = 
@@ -193,7 +205,6 @@ ArpaNgramReader::read_ngram(int order)
 
   // 2-grams or larger.  Find the path to the current n-gram.
   else {
-
     // The reader assumes that words in n-grams (n > 1) are sorted
     // in the same order as unigrams.
     if (m_words[0] < m_word_stack[0]) {
@@ -212,12 +223,12 @@ ArpaNgramReader::read_ngram(int order)
     }
 
     // Handle the words 2..order-1.
-    for (int i = 1; i < order-1; i++) {
-      int word = m_words[i];
+    for (int o = 1; o < order-1; o++) {
+      int word = m_words[o];
       
       // The reader assumes that words in n-grams (n > 1) are sorted
       // in the same order as unigrams.
-      if (word < m_word_stack[i]) {
+      if (word < m_word_stack[o]) {
 	fprintf(stderr, "%d: invalid sort order: ", m_lineno);
 	for (int i = 0; i < m_words.size(); i++) {
 	  fprintf(stderr, "%s ", m_ngram.word(m_words[i]).c_str());
@@ -226,32 +237,34 @@ ArpaNgramReader::read_ngram(int order)
       }
 
       // Path differs
-      if (m_word_stack[i] != word) {
-	reset_stacks(i+1);
+      if (m_word_stack[o] != word) {
+	reset_stacks(o+1);
 
-	Ngram::Node *root = &m_ngram.m_nodes[m_index_stack[i - 1]];
+	// The rest of the ngram (excluding the last word) must be
+	// already in the structure.  Find the path.
+	Ngram::Node *root = &m_ngram.m_nodes[m_index_stack[o - 1]];
 	Ngram::Node *root_next = root + 1;
 	int index;
 
-	// Find the correct index
-	if (m_index_stack[i] < 0)
+	if (m_index_stack[o] < 0)
 	  index = root->first;
 	else
-	  index = m_index_stack[i] + 1; 
+	  index = m_index_stack[o] + 1; 
+
 	while (m_ngram.m_nodes[index].word != word) {
+	  assert(index < root_next->first);
 	  if (index == root_next->first) {
 	    fprintf(stderr, "%d: ", m_lineno);
-	    for (int i = 0; i < m_words.size(); i++) {
+	    for (int i = 0; i < m_words.size(); i++)
 	      fprintf(stderr, "%s ", m_ngram.word(m_words[i]).c_str());
-	    }
+	    fputc('\n', stderr);
 	    throw UnknownPrefix();
 	  }
-	  m_ngram.m_nodes[index].first = m_ngram.m_nodes.size();
 	  index++;
 	}
 
-	m_word_stack[i] = word;
-	m_index_stack[i] = index;
+	m_word_stack[o] = word;
+	m_index_stack[o] = index;
       }
     }
 
@@ -279,12 +292,14 @@ ArpaNgramReader::read_ngram(int order)
     if (m_word_stack[order - 1] == word)
       throw Duplicate();
 
-    // Insert the ngram and update root node
+    // Insert the ngram, and update the 'first' field of the previous
+    // order.
     m_word_stack[order - 1] = word;
-    Ngram::Node *root = &m_ngram.m_nodes[m_index_stack[order - 2]];
-    if (root->first < 0)
-      root->first = m_ngram.m_nodes.size();
     m_ngram.m_nodes.push_back(Ngram::Node(m_words.back(), log_prob, back_off));
+
+    Ngram::Node *previous = &m_ngram.m_nodes[m_index_stack[order - 2]];
+    if (previous->first < 0)
+      previous->first = m_ngram.m_nodes.size() - 1;
   }
 }
 
@@ -292,6 +307,13 @@ void
 ArpaNgramReader::read_ngrams(int order)
 {
   bool header = false;
+  int last_index_of_previous_order = -1;
+
+  // Calculate the initial value for last_index_of_previous_order.  It
+  // is (the index of the first node of the previous order) minus one.
+  if (order > 1)
+    last_index_of_previous_order = 
+      m_ngram.m_nodes.size() - m_counts[order - 2] - 1;
 
   reset_stacks();
 
@@ -320,16 +342,30 @@ ArpaNgramReader::read_ngrams(int order)
     // Ngram
     else {
       read_ngram(order);
+
+      // Fix the 'first' fields in the n-grams of previous order.
+      if (order > 1) {
+	for (int i = last_index_of_previous_order + 1; 
+	     i < m_index_stack[order - 2]; i++) 
+	{
+	  assert(m_ngram.m_nodes[i].first == -1);
+	  m_ngram.m_nodes[i].first = m_ngram.m_nodes.size() - 1;
+	}
+	last_index_of_previous_order = m_index_stack[order - 2];
+      }
+
       ngrams_read++;
     }
   }
 
-  // Fix the 'first' fields.
+  // Fix the rest of the 'first' fields of previous order.
   if (order > 1) {
-    for (int i = m_index_stack[order - 2] + 1; 
+    for (int i = last_index_of_previous_order + 1;
 	 i < m_ngram.m_nodes.size() - m_counts[order - 1];
-	 i++)
+	 i++) {
+      assert(m_ngram.node(i)->first == -1);
       m_ngram.node(i)->first = m_ngram.m_nodes.size();
+    }
   }
 }
 
@@ -344,12 +380,83 @@ ArpaNgramReader::read(FILE *file)
   read_header();
   read_counts();
 
-  // Read all ngrams
-  for (int order = 1; order <= m_ngram.m_order; order++)
+  // Ensure the we have UNK.  It may be overwritten by the LM.
+  m_ngram.m_nodes.push_back(Ngram::Node(0, -99, 0)); // FIXME: magic num
+
+  // Read unigrams.  If UNK was not in the file, we must update the
+  // count, because we have inserted the UNK in the model.
+  read_ngrams(1);
+  if (m_ngram.m_nodes.size() != m_counts[0]) {
+    fprintf(stderr, "warning: %d unigrams resulted in %d nodes\n",
+	    m_counts[0], m_ngram.size());
+    assert(m_counts[0] + 1 == m_ngram.size());
+    fprintf(stderr, "warning: UNK was not in LM, so we inserted it\n");
+    m_counts[0]++;
+  }
+
+  // Read the rest.
+  for (int order = 2; order <= m_ngram.m_order; order++)
     read_ngrams(order);
 
   if (ferror(m_file))
     throw ReadError();
+
+  // FIXME: remove debug!
+  debug_sanity_check();
+}
+
+void
+ArpaNgramReader::debug_sanity_check()
+{
+  fprintf(stderr, "WARNING: time consuming sanity check in ArpaNgramReader\n");
+
+  // Calculate the starting points of the orders.
+  std::vector<int> starts;
+  starts.push_back(0);
+  for (int o = 2; o <= m_ngram.order(); o++) {
+    starts.push_back(starts[o-2] + m_counts[o-2]);
+  }
+  starts.push_back(m_ngram.m_nodes.size());
+
+  // Print counts
+  for (int o = 1; o <= m_ngram.order(); o++)
+    fprintf(stderr, "%d-grams: %d (start %d)\n", o, m_counts[o-1], 
+	    starts[o-1]);
+
+  int prev_first = 0;
+  int n = 0;
+  for (int o = 1; o < m_ngram.order(); o++) {
+    for (int i = 0; i < m_counts[o-1]; i++) {
+      int first = m_ngram.m_nodes[n].first;
+      if (first < prev_first || first <= 0) {
+	fprintf(stderr, "invalid first field (%d) in node %d (order %d)\n", 
+		first, n, o);
+	exit(1);
+      }
+
+      if (first < starts[o] || first > starts[o + 1]) {
+	fprintf(stderr, "first (%d) out of range (%d-%d) in node %d "
+		"(order %d)\n", first, starts[o], starts[o + 1], n, o);
+	exit(1);
+      }
+      prev_first = first;
+      n++;
+    }
+  }
+
+  for (int i = 0; i < m_counts[m_ngram.order()-1]; i++) {
+    if (m_ngram.m_nodes[n].first != -1) {
+      fprintf(stderr, "first not -1 (was %d) in node %d (order %d)\n", 
+	      m_ngram.m_nodes[n].first, n, m_ngram.order());
+      exit(1);
+    }
+    n++;
+  }
+
+  if (n != m_ngram.m_nodes.size()) {
+    fprintf(stderr, "size mismatch: %d vs %d\n", n, m_ngram.m_nodes.size());
+    exit(1);
+  }
 }
 
 void

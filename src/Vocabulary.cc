@@ -22,6 +22,15 @@ Vocabulary::add(const std::string &word)
 }
 
 void
+Vocabulary::set_oov(const std::string &word)
+{
+  m_words.clear();
+  m_indices.clear();
+  m_words.push_back(word);
+  m_indices[word] = 0;
+}
+
+void
 Vocabulary::read(std::istream &in)
 {
   std::string word;

@@ -20,9 +20,7 @@ Toolbox::Toolbox()
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
 
-    m_search(m_expander, m_vocabulary, m_ngram),
-
-    m_two_byte_lna(false)
+    m_search(m_expander, m_vocabulary, m_ngram)
 {
 }
 
@@ -149,9 +147,9 @@ Toolbox::ngram_read(const char *file)
 }
 
 void
-Toolbox::lna_open(const char *file, int models, int size)
+Toolbox::lna_open(const char *file, int size)
 {
-  m_lna_reader.open(file, models, size, m_two_byte_lna);
+  m_lna_reader.open(file, size);
 }
 
 void
@@ -205,4 +203,14 @@ Toolbox::segment(const std::string &str, int start_frame, int end_frame)
 //   Expander e(m_hmms, lex, m_acoustics);
 //   e.set_forced_end(true);
 //   e.expand(start_frame, end_frame - start_frame);
+}
+
+void
+Toolbox::init(int expand_window)
+{
+  if (m_lna_reader.num_models() != m_hmm_reader.num_models())
+    fprintf(stderr, "WARNING: %d states in LNA, but %d states in HMMs\n",
+	    m_lna_reader.num_models(), m_hmm_reader.num_models());
+
+  m_search.init_search(expand_window);
 }

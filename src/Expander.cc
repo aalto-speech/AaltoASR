@@ -344,8 +344,9 @@ Expander::move_all_tokens()
 
 	  // Our target source state is empty.
 	  else {
-	    new_token = token_to_state(source_token, source_state, target_state, 
-				       log_prob, dur_log_prob, false);
+	    new_token = token_to_state(source_token, source_state, 
+				       target_state, log_prob, dur_log_prob, 
+				       false);
 	    // The new token is in source state now.  We want to move
 	    // it again during current token loop.
 	    target_state.incoming_token = NULL;
@@ -594,6 +595,8 @@ Expander::expand(int start_frame, int frames)
     // Limit pruning
     if (m_token_limit > 0)
       keep_best_tokens(m_token_limit);
+
+    assert(m_tokens.size() > 0);
 
     if (!m_acoustics.go_to(start_frame + m_frame))
       break;

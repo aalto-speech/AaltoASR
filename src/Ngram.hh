@@ -18,7 +18,7 @@ find(Vector &nodes, const Value &value, int first, int end)
 
   int len = end - first;
 
-  while (len > 3) { // FIXME: magic value
+  while (len > 5) { // FIXME: magic value
     half = len / 2;
     middle = first + half;
 
@@ -73,7 +73,6 @@ public:
 
   inline Ngram() : m_order(0) { }
   inline int order() const { return m_order; }
-  inline int size() const { return Vocabulary::size(); }
   inline const std::string &word(unsigned int index) const
     { return Vocabulary::word(index); }
   inline Node *node(int index) { return &m_nodes[index]; }

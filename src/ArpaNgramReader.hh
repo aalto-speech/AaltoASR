@@ -11,6 +11,8 @@ class ArpaNgramReader {
 public:
   ArpaNgramReader();
   ~ArpaNgramReader();
+
+  void set_oov(const std::string &word);
   void read(FILE *file);
   void read(const char *file);
   Ngram &ngram() { return m_ngram; }
@@ -89,6 +91,8 @@ private:
   void read_counts();
   void read_ngram(int order);
   void read_ngrams(int order);
+
+  void debug_sanity_check();
 
   Ngram m_ngram;
 

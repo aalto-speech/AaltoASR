@@ -33,9 +33,9 @@ HypoStack::find_similar(const Hypo &hypo, int words)
       if (i == words)
 	return h;
 
-      // Both hypotheses are short, it is a match
+      // Both hypotheses are short, no match
       if (!path1 && !path2)
-	return h;
+	break;
 
       // Only the one of the hypotheses is short, no match
       if (!path1 || !path2)

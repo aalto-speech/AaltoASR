@@ -32,8 +32,7 @@ public:
   void ngram_read(const char *file);
 
   // Lna
-  void lna_set_two_byte(bool two_byte) { m_two_byte_lna = two_byte; }
-  void lna_open(const char *file, int models, int size);
+  void lna_open(const char *file, int size);
   void lna_close();
   void lna_seek(int frame) { m_lna_reader.seek(frame); }
   Acoustics &acoustics() { return m_lna_reader; }
@@ -49,7 +48,7 @@ public:
   void add_ngram_probs();
 
   // Search
-  void init(int expand_window) { m_search.init_search(expand_window); }
+  void init(int expand_window);
   void reset(int frame) { m_search.reset_search(frame); }
   void set_end(int frame) { m_search.set_end_frame(frame); }
   bool expand_stack(int frame) { return m_search.expand_stack(frame); }
@@ -133,8 +132,6 @@ private:
   Expander m_expander;
 
   Search m_search;
-
-  bool m_two_byte_lna;
 };
 
 #endif /* TOOLBOX_HH */

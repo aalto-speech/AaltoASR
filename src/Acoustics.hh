@@ -17,6 +17,7 @@ public:
   virtual bool go_to(int frame) = 0;
 
   inline float log_prob(int model) const { return m_log_prob[model]; }
+  inline int num_models() const { return m_num_models; }
 protected:
   float *m_log_prob;
   int m_num_models;

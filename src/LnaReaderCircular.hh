@@ -9,51 +9,16 @@
 class LnaReaderCircular : public Acoustics {
 public:
   LnaReaderCircular();
-  void open(const char *file, int num_models, int size, bool two_byte = false);
-  void init(std::istream &in, int num_models, int size);
+  void open(const char *filename, int buf_size);
   void close();
   void seek(int frame);
   
   virtual bool go_to(int frame);
 
-  struct NotOpened : public std::exception {
-    virtual const char *what() const throw()
-      { return "LnaReaderCircular: not opened"; }
-  };
-
-  struct OpenError : public std::exception {
-    virtual const char *what() const throw()
-      { return "LnaReaderCircular: open error"; }
-  };
-
-  struct ShortFrame : public std::exception {
-    virtual const char *what() const throw()
-      { return "LnaReaderCircular: short frame"; }
-  };
-
-  struct FrameForgotten : public std::exception {
-    virtual const char *what() const throw()
-      { return "LnaReaderCircular: frame forgotten"; }
-  };
-
-  struct ReadError : public std::exception {
-    virtual const char *what() const throw()
-      { return "LnaReaderCircular: read error"; }
-  };
-
-  struct InvalidFrameId : public std::exception {
-    virtual const char *what() const throw()
-      { return "LnaReaderCircular: invalid frame id"; }
-  };
-
-  struct CannotSeek : public std::exception {
-    virtual const char *what() const throw()
-      { return "LnaReaderCircular: cannot seek"; }
-  };
-
 private:
-  std::ifstream m_fin;
-  std::istream *m_in;
+  int read_int();
+
+  FILE *m_file;
 
   // INVARIANTS
   //
@@ -70,6 +35,7 @@ private:
   // - (m_index-m_num_models)'th position in m_buffer contains frame 
   // (m_frames - 1)
 
+  int m_header_size;  // The size of file header in bytes.
   int m_buffer_size;  // Size of buffer in frames 
   int m_first_index;  // Index of the last value in the last frame
   int m_frames_read;  // Frames read

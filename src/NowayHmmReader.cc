@@ -3,6 +3,12 @@
 
 #include "NowayHmmReader.hh"
 
+NowayHmmReader::NowayHmmReader()
+  : m_num_models(0)
+{
+
+}
+
 void
 NowayHmmReader::read_hmm(std::istream &in, Hmm &hmm)
 {
@@ -16,8 +22,13 @@ NowayHmmReader::read_hmm(std::istream &in, Hmm &hmm)
   states.resize(num_states);
 
   // Real model ids for each state
-  for (int s = 0; s < num_states; s++)
-    in >> states[s].model;
+  for (int s = 0; s < num_states; s++) {
+    int model_index;
+    in >> model_index;
+    if (model_index + 1 > m_num_models)
+      m_num_models = model_index + 1;
+    states[s].model = model_index;
+  }
 
   // Read transitions
   for (int s = 0; s < num_states; s++) {
@@ -48,6 +59,7 @@ NowayHmmReader::read_hmm(std::istream &in, Hmm &hmm)
 void
 NowayHmmReader::read(std::istream &in)
 {
+  m_num_models = 0;
   std::istream::iostate old_state = in.exceptions();
   in.exceptions(in.badbit | in.failbit | in.eofbit);
 
