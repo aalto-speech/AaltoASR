@@ -79,6 +79,7 @@ public:
 
   // Search
   void init(int expand_window, int stacks, int reserved_hypos);
+	void reset(int frame);
   void sort(int frame, int top);
   bool expand_stack(int frame);
 	void expand_words(int frame, const std::string &words);

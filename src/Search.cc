@@ -215,7 +215,7 @@ Search::reset_search(int start_frame)
   m_last_hypo_frame = start_frame;
 
   // Create initial empty hypothesis.
-  Hypo hypo(0, 0, new HypoPath(-1, -1, NULL));
+  Hypo hypo(start_frame, 0, new HypoPath(-1, start_frame, NULL));
   m_last_printed_path = hypo.path;
   stack(m_first_frame).add(hypo);
 
@@ -338,6 +338,7 @@ void
 Search::insert_hypo(int target_frame, const Hypo &hypo)
 {
   assert(hypo.frame == target_frame);
+  assert(hypo.path->frame == target_frame);
 
   ensure_stack(target_frame);
 
@@ -367,16 +368,24 @@ Search::expand_hypo_with_word(const Hypo &hypo, int word, int target_frame,
 {
   // Add the expanded hypothesis
   Hypo new_hypo(target_frame, hypo.log_prob, hypo.path);
+  new_hypo.add_path(word, target_frame);
 
-  // Merge subsequent silences
+  // Merge subsequent silences.  Note, that we have to create a new
+  // path, and remove the previous silence.  We should not modify the
+  // previous silence, because it is still used by other hypotheses.
+  // FIXME: ensure that everything goes fine, there was a nasty bug once
   if (word == m_word_boundary && hypo.path->word_id == m_word_boundary) {
+    HypoPath *prev = new_hypo.path->prev;
+    new_hypo.path->prev = prev->prev;
+    prev->prev->link();
     new_hypo.path->frame = target_frame;
-    new_hypo.path->ac_log_prob += ac_log_prob;
+    new_hypo.path->ac_log_prob = prev->ac_log_prob + ac_log_prob;
+    new_hypo.path->lm_log_prob = prev->lm_log_prob;
     new_hypo.log_prob += ac_log_prob;
+    HypoPath::unlink(prev);
   }
   // else add the new word to the path
   else {
-    new_hypo.add_path(word, target_frame);
     new_hypo.path->ac_log_prob = ac_log_prob;
     new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
     new_hypo.log_prob += ac_log_prob + new_hypo.path->lm_log_prob;
@@ -412,13 +421,14 @@ Search::expand_hypo(const Hypo &hypo)
       continue; 
 
     if (m_multiple_endings > 0) {
-      for (int f = -m_multiple_endings; f < m_multiple_endings; f++) {
+      for (int f = -m_multiple_endings; f <= m_multiple_endings; f++) {
 	// FIXME: is this correct?  Magic number!
 	if (words[w]->frames + f*2 < 1)
 	  continue;
 	expand_hypo_with_word(hypo, words[w]->word_id,
 			      hypo.frame + words[w]->frames + f*2, 
-			      words[w]->log_prob + f*2 * words[w]->avg_log_prob);
+			      words[w]->log_prob + 	// best logprob
+			      f*2 * words[w]->avg_log_prob);
       }
     }
     else {
@@ -465,13 +475,19 @@ Search::initial_prunings(int frame, HypoStack &stack)
     m_limit_prunings += (before - stack.size());
   }
 
+  // FIXME: are these really correct?  Should we make separate
+  // pruning counters?
+  //
   // Beam and global prunings
   float angle = m_global_best / m_global_frame;
   float ref = m_global_best + angle * (frame - m_global_frame);
-  if (stack.best_log_prob() > ref)
-    ref = stack.best_log_prob();
   for (int i = 0; i < stack.size(); i++) {
-    if (stack[i].log_prob + m_hypo_beam < ref) {
+    if (stack[i].log_prob + m_global_beam < ref) {
+      m_beam_prunings += stack.size() - i;
+      stack.prune(i);
+      break;
+    }
+    else if (stack[i].log_prob + m_hypo_beam < stack[0].log_prob) {
       m_beam_prunings += stack.size() - i;
       stack.prune(i);
       break;
