@@ -12,7 +12,7 @@ public:
 };
 
 Main::Main()
-  : v(), r(v), n(r.ngram())
+  : v(), r(), n(r.ngram())
 {
 }
 
@@ -22,7 +22,7 @@ Main::print_raw()
   for (int i = 0; i < n.nodes(); i++) {
     Ngram::Node *node = n.node(i);
     std::cout << i 
-	      << " " << v.word(node->word)
+	      << " " << n.word(node->word)
 	      << " " << node->first
 	      << std::endl;
   }
@@ -36,7 +36,7 @@ Main::print(std::vector<int> &history, int order, int max_order)
     std::cout << node->log_prob;
     for (int i = 0; i < history.size(); i++) {
       Ngram::Node *node = n.node(history[i]);
-      std::cout << " " << v.word(node->word);
+      std::cout << " " << n.word(node->word);
     }
     if (node->back_off != 0)
       std::cout << " " << node->back_off;
@@ -62,7 +62,7 @@ Main::run(int argc, char *argv[])
   r.read(argv[2]);
   std::vector<int> history;
 
-  print_raw();
+//  print_raw();
 
   std::cout << "\\data\\" << std::endl;
 

@@ -194,7 +194,7 @@ HypoStack::sort()
 void
 HypoStack::prune(int top)
 {
-  if (top == 0)
+  if (top <= 0)
     clear();
   else if (top < size())
     resize(top);
@@ -214,6 +214,7 @@ public:
 	 const Ngram &ngram);
 
   // Debug and print
+  void print_prunings();
   void debug_print_hypo(Hypo &hypo);
   void print_sure();
 
@@ -241,6 +242,7 @@ public:
   void set_word_beam(double word_beam) { m_word_beam = word_beam; }
   void set_lm_scale(double lm_scale) { m_lm_scale = lm_scale; }
   void set_lm_offset(double lm_offset) { m_lm_offset = lm_offset; }
+  void set_unk_offset(double unk_offset) { m_unk_offset = unk_offset; }
   void set_prune_similar(int prune_similar) { m_prune_similar = prune_similar; }
   void set_beam(double beam) { m_beam = beam; }
   void set_global_beam(double beam) { m_global_beam = beam; }
@@ -283,6 +285,7 @@ private:
   int m_expand_window;	
   double m_lm_scale;
   double m_lm_offset;
+  double m_unk_offset;
   int m_verbose;
   bool m_print_probs;
   HypoPath *m_last_printed_path;
@@ -298,6 +301,13 @@ private:
   double m_global_best;
   double m_global_beam;
   int m_global_frame;
+
+  // Pruning statistics
+  int m_stack_expansions;
+  int m_hypo_insertions;
+  int m_limit_prunings;
+  int m_beam_prunings;
+  int m_similar_prunings;
 
   // Temporary variables
   std::deque<int> m_history;

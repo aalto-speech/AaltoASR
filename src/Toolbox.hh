@@ -70,6 +70,7 @@ public:
   void set_word_beam(double word_beam) { m_search.set_word_beam(word_beam); }
   void set_lm_scale(double lm_scale) { m_search.set_lm_scale(lm_scale); }
   void set_lm_offset(double lm_offset) { m_search.set_lm_offset(lm_offset); }
+  void set_unk_offset(double unk_offset) { m_search.set_unk_offset(unk_offset); }
   void set_token_limit(int limit) { m_expander.set_token_limit(limit); }
   void set_state_beam(double beam) { m_expander.set_beam(beam); }
   void set_hypo_beam(double beam) { m_search.set_beam(beam); }
@@ -82,6 +83,8 @@ public:
     { m_search.set_print_probs(print_probs); }
 
   // Debug
+  void print_prunings()
+    { m_search.print_prunings(); }
   void print_hypo(Hypo &hypo);
   void print_sure() { m_search.print_sure(); }
 

@@ -54,6 +54,7 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     // Options
     m_lm_scale(1),
     m_lm_offset(0),
+    m_unk_offset(0),
     m_verbose(0),
     m_print_probs(false),
     m_last_printed_path(NULL),
@@ -93,6 +94,16 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
 //      }
 //    }
 //  }
+
+void
+Search::print_prunings()
+{
+  std::cout << "m_stack_expansions: " << m_stack_expansions << std::endl;
+  std::cout << "m_hypo_insertions: " << m_hypo_insertions << std::endl;
+  std::cout << "m_limit_prunings: " << m_limit_prunings << std::endl;
+  std::cout << "m_beam_prunings: " << m_beam_prunings << std::endl;
+  std::cout << "m_similar_prunings: " << m_similar_prunings << std::endl;
+}
 
 void
 Search::debug_print_hypo(Hypo &hypo)
@@ -205,6 +216,13 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
     if (count > 0)
       std::cerr << "there were " << count << " out-of-LM words" << std::endl;
   }
+
+  // Reset pruning statistics
+  m_stack_expansions = 0;
+  m_hypo_insertions = 0;
+  m_limit_prunings = 0;
+  m_beam_prunings = 0;
+  m_similar_prunings = 0;
 }
 
 int
@@ -214,7 +232,11 @@ Search::frame2stack(int frame) const
   if (frame < m_first_frame)
     throw ForgottenFrame();
   if (frame >= m_last_frame) {
-    std::cerr << frame << std::endl;
+    std::cerr << std::endl 
+	      << "m_last_frame = " << m_last_frame << " but " << frame 
+	      << " requested" << std::endl;
+    std::cerr << "eof_frame = " << m_expander.eof_frame() << std::endl;
+    std::cerr << "m_last_hypo_frame = " << m_last_hypo_frame << std::endl;
     throw FutureFrame();
   }
 
@@ -264,18 +286,50 @@ Search::prune_similar(int frame, int length)
 bool
 Search::expand(int frame)
 {
+  // End of input?  
+  if (frame > m_last_hypo_frame) {
+    assert(this->stack(m_last_hypo_frame).size() > 0);
+    debug_print_hypo(this->stack(m_last_hypo_frame).at(0));
+    return false;
+  }
+  
+  // Sort the current stack
   int stack_index = frame2stack(frame);
   HypoStack &stack = m_stacks[stack_index];
-
   stack.sort();
 
   // Prune similar endings
-  if (m_prune_similar > 0)
+  if (m_prune_similar > 0) {
+    int before = stack.size();
     stack.prune_similar(m_prune_similar);
+    m_similar_prunings += (before - stack.size());
+  }
 
-  // Prune stack
-  if (m_hypo_limit > 0)
+  // Keep only the best N hypos
+  if (m_hypo_limit > 0) {
+    int before = stack.size();
     stack.prune(m_hypo_limit);
+    m_limit_prunings += (before - stack.size());
+  }
+
+  // Beam and global prunings
+  double angle = m_global_best / m_global_frame;
+  double ref = m_global_best + angle * (frame - m_global_frame);
+  if (stack.best_log_prob() > ref)
+    ref = stack.best_log_prob();
+  for (int i = 0; i < stack.size(); i++) {
+    if (stack[i].log_prob + m_beam < ref) {
+      m_beam_prunings += stack.size() - i;
+      stack.prune(i);
+      break;
+    }
+  }
+
+  // Reset global pruning if current stack is best
+  if (m_global_frame == frame) {
+    m_global_best = 1e10;
+    m_global_frame = -1;
+  }
 
   // Debug print
   if (m_verbose == 1 && !stack.empty()) {
@@ -290,33 +344,15 @@ Search::expand(int frame)
   if (m_verbose == 2 && !stack.empty())
     debug_print_hypo(stack.at(0));
 
-  // FIXME?!
-  // End of input?  Do not expand stack on the last existing frame?
-  // Is there a stack at the first non-existing frame?
-  if (m_expander.eof_frame() >= 0 &&
-      frame >= m_expander.eof_frame() - 1) // FIXME?! correct?
-  {
-    debug_print_hypo(this->stack(m_last_hypo_frame).at(0));
-    return false;
-  }
       
-  // Reset global pruning if current stack is best
-  if (m_global_frame == frame) {
-    m_global_best = 1e10;
-    m_global_frame = -1;
-  }
-
-  // Expand all hypotheses in the stack, but only if inside the
-  // global_beam
-  double angle = m_global_best / m_global_frame;
-  double ref = m_global_best + angle * (frame - m_global_frame);
-  if (!stack.empty() &&
-      stack.best_log_prob() > ref - m_global_beam) {
+  // Expand the stack
+  if (!stack.empty()) {
     // Fit word lexicon to acoustic data
     m_expander.expand(frame, m_expand_window);
+    m_stack_expansions++;
 
     // Get only the best words
-    // FIXME: perhaps we want to add LM probs here
+    // FIXME: perhaps we want to add LM probs here, perhaps not
     std::vector<Expander::Word*> words = m_expander.words();
     if (m_word_limit > 0 && words.size() > m_word_limit) {
       std::partial_sort(words.begin(), words.begin() + m_word_limit, 
@@ -328,10 +364,6 @@ Search::expand(int frame)
     // Expand all hypotheses in the stack...
     for (int h = 0; h < stack.size(); h++) {
       Hypo &hypo = stack[h];
-
-      // Only hypotheses inside the beam
-      if (hypo.log_prob < stack.best_log_prob() - m_beam)
-	continue;
 
       // ... Using the best words
       for (int w = 0; w < words.size(); w++) {
@@ -345,8 +377,9 @@ Search::expand(int frame)
 	double lm_log_prob = 0;
 	// Calculate language model probabilities
 	if (m_ngram.order() > 0) {
+	  int lm_word_id = m_lex2lm[word->word_id];
 	  m_history.clear();
-	  m_history.push_front(m_lex2lm[word->word_id]);
+	  m_history.push_front(lm_word_id);
 	  HypoPath *path = hypo.path;
 	  for (int i = 0; i < m_ngram.order(); i++) {
 	    if (!path)
@@ -357,7 +390,9 @@ Search::expand(int frame)
 
 	  lm_log_prob = m_lm_offset + m_lm_scale * 
 //	    word->frames * // Do we need this really?!
-	    m_ngram.log_prob(m_history.begin(), m_history.end());
+	    (m_ngram.log_prob(m_history.begin(), m_history.end()) + 
+	     (lm_word_id == 0 ? m_unk_offset : 0));
+
 	  log_prob += lm_log_prob;
 	}
 
@@ -386,7 +421,11 @@ Search::expand(int frame)
 	    m_global_best = log_prob;
 	    m_global_frame = target_frame;
 	  }
+
+	  m_hypo_insertions++;
 	}
+	else
+	  m_beam_prunings++;
       }
     }
   }

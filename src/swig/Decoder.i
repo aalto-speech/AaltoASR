@@ -101,6 +101,7 @@ public:
   void set_word_beam(double word_beam);
   void set_lm_scale(double lm_scale);
   void set_lm_offset(double lm_offset);
+  void set_unk_offset(double unk_offset);
   void set_token_limit(int limit);
   void set_state_beam(double beam);
   void set_hypo_beam(double beam);
@@ -109,6 +110,7 @@ public:
   void set_verbose(int verbose);
   void set_print_probs(bool print_probs);
 
+	void print_prunings();
   void print_hypo(Hypo &hypo);
   void print_sure();
 };

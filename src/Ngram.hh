@@ -63,7 +63,6 @@ public:
     inline bool operator<(int value) const { return word < value; }
     inline bool operator>(int value) const { return word > value; }
     inline bool operator==(int value) const { return word == value; }
-
   };
 
   template<class RandomAccessIterator>
@@ -71,6 +70,8 @@ public:
 
   inline Ngram() : m_order(0) { }
   inline int order() const { return m_order; }
+  inline const std::string &word(unsigned int index) const
+    { return Vocabulary::word(index); }
   inline Node *node(int index) { return &m_nodes[index]; }
   inline const Node *node(int index) const { return &m_nodes[index]; }
   inline int nodes() const { return m_nodes.size(); }

@@ -13,7 +13,7 @@ main(int argc, char *argv[])
   v.read(argv[1]);
 
   // Language model
-  ArpaNgramReader r(v);
+  ArpaNgramReader r;
   try {
     r.read(argv[2]);
   }

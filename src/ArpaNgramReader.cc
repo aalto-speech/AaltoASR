@@ -121,10 +121,10 @@ ArpaNgramReader::read_counts()
     throw ReadError();
 
   m_ngram.m_nodes.clear();
-  m_ngram.m_nodes.reserve(total_ngrams);
+  m_ngram.m_nodes.reserve(total_ngrams + 1); // Room for UNK also
   m_words.reserve(m_ngram.m_order);
-  m_word_stack.resize(m_ngram.m_order);
-  m_index_stack.resize(m_ngram.m_order - 1); // The last index is not used
+  m_word_stack.resize(m_ngram.m_order, -1);
+  m_index_stack.resize(m_ngram.m_order - 1, -1); // The last index is not used
   m_points.reserve(m_ngram.m_order + 2); // Words + log_prob and back_off
 }
 
@@ -151,9 +151,21 @@ ArpaNgramReader::read_ngram(int order)
     m_words.push_back(word_id);
   }
 
-  // Read unigrams
-  if (order == 1)
+  // Read unigrams.  
+  if (order == 1) {
+
+    // UNK must be first if it exists
+    if (m_words[0] == 0) {
+      if (m_ngram.m_nodes.size() != 0)
+	throw InvalidOrder();
+    }
+
+    // Add UNK with zero prob in the beginning if not in LM
+    if (m_ngram.m_nodes.size() == 0)
+      m_ngram.m_nodes.push_back(Ngram::Node(0, -99, 0)); // FIXME: magic num
+
     m_ngram.m_nodes.push_back(Ngram::Node(m_words[0], log_prob, back_off));
+  }
 
   // Find the path to the current n-gram
   else {
