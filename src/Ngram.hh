@@ -98,10 +98,12 @@ public:
 	return NULL;
       return &m_nodes[index];
     }
+  inline int last_order() { return m_last_order; }
 
 private:
   int m_order;
   std::vector<Node> m_nodes;
+  int m_last_order; // Order of the last match
 };
 
 template<class RandomAccessIterator>
@@ -110,11 +112,14 @@ Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end) const
 {
   RandomAccessIterator it;
   float log_prob = 0;
+  m_last_order = end - begin;
+  assert(m_last_order <= m_order);
 
   for (; begin != end; begin++) {
     const Node *node = this->node(*begin);
     assert(node != NULL); // We must have a unigram for each word.
 
+    // Find the longest branch that matches history (starting from node)
     for (it = begin+1; it != end; it++) {
       const Node *next = this->child(*it, node);
       if (!next)
@@ -127,6 +132,8 @@ Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end) const
       log_prob += node->log_prob;
       return log_prob;
     }
+
+    m_last_order--;
 
     // Backoff found
     if (it + 1 == end)
