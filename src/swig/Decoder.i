@@ -86,7 +86,6 @@ public:
 	void go(int frame);
 	bool run();
 	void runto(int frame);
-  void prune_similar(int frame, int length);
 
 	int frame();
   int first_frame();
@@ -97,6 +96,7 @@ public:
 
 	void set_forced_end(bool forced_end);
   void set_hypo_limit(int hypo_limit);
+  void set_prune_similar(int prune_similar);
   void set_word_limit(int word_limit);
   void set_word_beam(double word_beam);
   void set_lm_scale(double lm_scale);
