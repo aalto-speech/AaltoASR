@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "Toolbox.hh"
 
 Toolbox::Toolbox()
@@ -17,6 +18,27 @@ Toolbox::Toolbox()
     m_expander(m_hmms, m_lexicon, m_lna_reader),
     m_search(m_expander, m_vocabulary, m_ngram)
 {
+}
+
+void
+Toolbox::print_words(int words)
+{
+  std::vector<Expander::Word*> &sorted_words = m_expander.words();
+  std::sort(sorted_words.begin(), sorted_words.end(), Expander::WordCompare());
+
+  if (words == 0 && words > sorted_words.size())
+    words = sorted_words.size();
+
+  std::cout.setf(std::cout.fixed, std::cout.floatfield);
+  std::cout.setf(std::cout.right, std::cout.adjustfield);
+  std::cout.precision(2);
+  for (int i = 0; i < words; i++) {
+    std::cout << sorted_words[i]->frames << "\t"
+	      << sorted_words[i]->log_prob << "\t"
+	      << sorted_words[i]->avg_log_prob << "\t"
+	      << m_vocabulary.word(sorted_words[i]->word_id)
+	      << std::endl;
+  }
 }
 
 void

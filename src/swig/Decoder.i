@@ -49,16 +49,27 @@ public:
   void lna_open(const char *file, int models, int size);
   void lna_close();
 
+	// Expander
+	void expand(int frame, int frames);
+	void print_words(int words);
+
 	// Search
   void init(int frames, int hypos);
-  bool expand(int frame);
+  bool expand_stack(int frame);
+	void sort(int frame, int top);
+	void go_to(int frame);
+	bool run();
   int earliest_frame();
   int last_frame();
   HypoStack &stack(int frame);
+
   void set_hypo_limit(int hypo_limit);
   void set_word_limit(int word_limit);
   void set_lm_scale(double lm_scale);
+  void set_lm_offset(double lm_offset);
   void set_token_limit(int limit);
+	void set_state_beam(double beam);
+	void set_hypo_beam(double beam);
   void set_max_state_duration(int duration);
 
   void print_hypo(Hypo &hypo);

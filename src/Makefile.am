@@ -1,4 +1,4 @@
-SUBDIRS = .
+SUBDIRS = . swig
 
 noinst_PROGRAMS = \
 test_search 

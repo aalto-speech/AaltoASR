@@ -50,8 +50,10 @@ public:
 
   // Operate
   void init_search(int frames, int hypos);
+  void sort_stack(int frame, int top = 0);
   bool expand_stack(int frame);
-  void run();
+  void go_to(int frame);
+  bool run();
 
   // Info
   inline int earliest_frame() const { return m_earliest_frame; }
@@ -65,6 +67,8 @@ public:
   void set_hypo_limit(int hypo_limit) { m_hypo_limit = hypo_limit; }
   void set_word_limit(int word_limit) { m_word_limit = word_limit; }
   void set_lm_scale(double lm_scale) { m_lm_scale = lm_scale; }
+  void set_lm_offset(double lm_offset) { m_lm_offset = lm_offset; }
+  void set_beam(double beam) { m_beam = beam; }
 
   // Exceptions
   struct ForgottenFrame : public std::exception {
@@ -83,6 +87,7 @@ private:
   const Ngram &m_ngram;
 
   // State
+  int m_frame;
   int m_earliest_frame;	// Earliest frame
   int m_earliest_stack;	// Earliest stack in the circular buffer
   std::vector<HypoStack> m_stacks;
@@ -90,8 +95,10 @@ private:
   // Options
   int m_frames;		// Size of circular frame buffer
   double m_lm_scale;
+  double m_lm_offset;
   int m_word_limit;	// How many best words are expanded
   int m_hypo_limit;	// How many best hypos in a stack are expanded
+  double m_beam;
 
   // Temporary variables
   std::deque<int> m_history;

@@ -1,6 +1,8 @@
 #include <iostream> // DEBUG
 #include <sstream>
 
+#include <math.h>
+
 #include "NowayLexiconReader.hh"
 
 NowayLexiconReader::NowayLexiconReader(
@@ -154,6 +156,7 @@ NowayLexiconReader::read(std::istream &in)
     // Add word to lexicon
     int word_id = m_vocabulary.add(m_word);
     node->word_id = word_id;
+    node->log_prob = log(prob);
     m_lexicon.update_words(word_id);
   }
 }

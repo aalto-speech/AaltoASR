@@ -13,6 +13,7 @@
 //
 // NOTES:
 //
+// Might assume that words are sorted (adding prob to nodes) FIXME!!
 // Even after exception in reading, the read can be continued.
 //
 // FILE FORMAT:

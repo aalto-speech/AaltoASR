@@ -126,13 +126,16 @@ Main::run()
 //    timer.stop();
 //    std::cout << std::endl << timer.sec() << " seconds" << std::endl;
 
-  ex.set_token_limit(500);
-  ex.set_max_state_duration(16);
 
   Search search(ex, lr.vocabulary(), nr.ngram());
-  search.init_search(125*1, 1024);
-  search.set_word_limit(1000);
+
+  search.init_search(125*2, 1024);
+
+  ex.set_token_limit(500);
+  ex.set_max_state_duration(16);
+  search.set_word_limit(100);
   search.set_hypo_limit(10);
+
   // search.set_lm_scale(10);
 
   search.run();

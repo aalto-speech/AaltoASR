@@ -20,8 +20,10 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     // Options
     m_frames(0),
     m_lm_scale(1),
+    m_lm_offset(1),
     m_word_limit(0),
     m_hypo_limit(0),
+    m_beam(0),
 
     // Temp
     m_history(0)
@@ -47,10 +49,12 @@ Search::debug_print_hypo(Hypo &hypo)
   }
   
   for (int i = debug_paths.size() - 1; i >= 0; i--) {
-    std::cout << " " << m_vocabulary.word(debug_paths[i]->word_id);
+    std::cout << " " 
+	      << "<" << debug_paths[i]->frame << "> "
+	      << m_vocabulary.word(debug_paths[i]->word_id);
   }
 
-  std::cout << std::endl;
+  std::cout << " <" << hypo.frame << ">" << std::endl;
 }
 
 void
@@ -75,6 +79,7 @@ Search::debug_print_history(Hypo &hypo)
 void
 Search::init_search(int frames, int hypos)
 {
+  m_frame = 0;
   m_frames = frames;
   m_stacks.resize(frames);
   m_earliest_stack = 0;
@@ -106,6 +111,20 @@ Search::frame2stack(int frame) const
   return stack_index;
 }
 
+void
+Search::sort_stack(int frame, int top)
+{
+  int stack_index = frame2stack(frame);
+  HypoStack &stack = m_stacks[stack_index];
+  if (top > 0) {
+    if (top > stack.size())
+      top = stack.size();
+    std::partial_sort(stack.begin(), stack.begin() + top, stack.end());
+  }
+  else
+    std::sort(stack.begin(), stack.end());
+}
+
 bool
 Search::expand_stack(int frame)
 {
@@ -117,6 +136,16 @@ Search::expand_stack(int frame)
     std::partial_sort(stack.begin(), stack.begin() + m_hypo_limit, 
 		      stack.end());
     stack.resize(m_hypo_limit);
+  }
+  else {
+    std::sort(stack.begin(), stack.end());
+  }
+
+//  if (frame % 25 == 0)
+//    std::cerr << frame << std::endl;
+
+  if (!stack.empty()) {
+    debug_print_hypo(stack[0]);
   }
 
   // End of input
@@ -142,6 +171,10 @@ Search::expand_stack(int frame)
     for (int s = 0; s < stack.size(); s++) {
       Hypo &hypo = stack[s];
 
+      // Only if inside beam
+      if (hypo.log_prob < stack[0].log_prob - m_beam)
+	continue;
+
       // ... Using the best words
       for (int w = 0; w < words.size(); w++) {
 	Expander::Word *word = words[w];
@@ -159,7 +192,7 @@ Search::expand_stack(int frame)
 	    m_history.push_front(path->word_id);
 	    path = path->prev;
 	  }
-	  log_prob += m_lm_scale * 
+	  log_prob += m_lm_offset + m_lm_scale * word->frames *
 	    m_ngram.log_prob(m_history.begin(), m_history.end());
 	}
 
@@ -169,30 +202,41 @@ Search::expand_stack(int frame)
 	m_stacks[target_stack].push_back(new_hypo);
       }
     }
-  }
 
-  stack.clear();
+    if (words.size() > 0)
+      stack.clear();
+  }
 
   return true;
 }
 
 void
-Search::run()
+Search::go_to(int frame)
 {
-  int frame = 0;
-
-  while (1) {
+  while (m_frame < frame) {
     HypoStack &stack = m_stacks[m_earliest_stack];
-    if (!stack.empty())
-      debug_print_hypo(stack[0]);
-
-    if (!expand_stack(frame))
-      break;
-
-    frame++;
-    m_earliest_frame = frame;
+    stack.clear();
+    m_frame++;
+    m_earliest_frame = m_frame;
     m_earliest_stack++;
     if (m_earliest_stack >= m_frames)
       m_earliest_stack = 0;
   }
+}
+
+bool
+Search::run()
+{
+  HypoStack &stack = m_stacks[m_earliest_stack];
+
+  if (!expand_stack(m_frame))
+    return false;
+
+  m_frame++;
+  m_earliest_frame = m_frame;
+  m_earliest_stack++;
+  if (m_earliest_stack >= m_frames)
+    m_earliest_stack = 0;
+
+  return true;
 }

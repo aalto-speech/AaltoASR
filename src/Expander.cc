@@ -17,6 +17,7 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_acoustics(acoustics),
 
     m_token_limit(0),
+    m_beam(0),
     m_max_state_duration(0x7fff), // FIXME
     m_words(),
     m_sorted_words()
@@ -96,6 +97,11 @@ Expander::token_to_state(const Lexicon::Token *source_token,
   }
 
   new_token->log_prob = new_log_prob;
+
+  // Update beam threshold
+  if (new_log_prob > m_beam_best)
+    m_beam_best = new_log_prob;
+
   return new_token;
 }
 
@@ -155,8 +161,11 @@ Expander::move_all_tokens()
       continue;
 
     assert(source_token == source_state.outgoing_token);
-
     source_state.outgoing_token = NULL;
+
+    // Beam pruning
+    if (source_token->log_prob < m_beam_best - m_beam)
+      goto token_finished;
 
     // ITERATE TRANSITIONS
     for (int r = 0; r < hmm_state.transitions.size(); r++) {
@@ -177,7 +186,11 @@ Expander::move_all_tokens()
 	  // because the current frame is actually already the start
 	  // of the next word.  This also assumes that there can not
 	  // be an empty word in lexicon.
-	  double log_prob = source_token->log_prob + source_node->log_prob;
+
+	  // NOTE: Previously we added pronounciation probability
+	  // (source_node->log_prob) here, but it is LM probability,
+	  // and should be scaled by Search class.
+	  double log_prob = source_token->log_prob;
 	  double avg_log_prob = log_prob / m_frame;
 	  if (!word->active || avg_log_prob > word->avg_log_prob) {
 	    if (!word->active)
@@ -203,8 +216,8 @@ Expander::move_all_tokens()
 	    new_token->state = 0;
 	    new_token->node = target_node;
 	    new_token->state_duration = 0;
-	    new_token->add_path(target_node->hmm_id, new_token->frame + 1,
-				log_prob);
+//	    new_token->add_path(target_node->hmm_id, new_token->frame + 1,
+//				log_prob);
 
 	    // The new token is in source state now.  We want to move
 	    // it again during current token loop.
@@ -239,6 +252,7 @@ Expander::move_all_tokens()
       }
     }
 
+  token_finished:
     // The current token has been cloned according to all transitions.
     // Replace the token by the last token in the vector.
     delete source_token;
@@ -277,7 +291,7 @@ Expander::create_initial_tokens(int start_frame)
     token->state = 0;
     token->node = node->next[next_id];
     token->log_prob = 0;
-    token->add_path(node->next[next_id]->hmm_id, 0, start_frame);
+//    token->add_path(node->next[next_id]->hmm_id, 0, start_frame);
     m_tokens.push_back(token);
   }
 }
@@ -365,6 +379,11 @@ Expander::expand(int start_frame, int frames)
   create_initial_tokens(start_frame);
 
   for (m_frame = 0; frames < 0 || m_frame < frames; m_frame++) {
+    m_beam_best = -1e10; // FIXME
+    double tmp = m_beam_best;
+    m_beam_best = m_beam_best_old;
+    m_beam_best_old = tmp;
+
     if (m_token_limit > 0)
       keep_best_tokens(m_token_limit);
     if (!m_acoustics.go_to(start_frame + m_frame))

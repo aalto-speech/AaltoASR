@@ -39,28 +39,37 @@ public:
   void clear_tokens();
   void create_initial_tokens(int start_frame);
   void expand(int start_frame, int frames);
+
   void set_token_limit(int limit) { m_token_limit = limit; }
+  void set_beam(double beam) { m_beam = beam; }
   void set_max_state_duration(int duration) 
     { m_max_state_duration = duration; }
-  void debug_print_history(Lexicon::Token *token);
-  void debug_print_timit(Lexicon::Token *token);
-  void debug_print_tokens();
+
   std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
   std::vector<Word*> &words() { return m_sorted_words; }
   inline int eof_frame() const { return m_acoustics.eof_frame(); }
+
+  void debug_print_history(Lexicon::Token *token);
+  void debug_print_timit(Lexicon::Token *token);
+  void debug_print_tokens();
 
 private:
   const std::vector<Hmm> &m_hmms;
   Lexicon &m_lexicon;
   Acoustics &m_acoustics;
 
+  // Options
   int m_token_limit;
+  double m_beam;
   int m_max_state_duration;
+
+  // State
   std::vector<Lexicon::Token*> m_tokens;
   std::vector<Word> m_words;
   std::vector<Word*> m_sorted_words;
   int m_frame; // Current frame relative to the start frame.
-
+  double m_beam_best;
+  double m_beam_best_old;
 };
 
 #endif /* EXPANDER_HH */
