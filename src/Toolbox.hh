@@ -77,11 +77,11 @@ public:
     { m_search.set_global_beam(beam); }
   void set_max_state_duration(int duration) 
     { m_expander.set_max_state_duration(duration); }
-  void set_verbose(bool verbose) { m_search.set_verbose(verbose); }
+  void set_verbose(int verbose) { m_search.set_verbose(verbose); }
 
   // Debug
   void print_hypo(Hypo &hypo);
-  void print_sure(Hypo &hypo) { m_search.print_sure(hypo); }
+  void print_sure() { m_search.print_sure(); }
 
   struct OpenError : public std::exception {
     virtual const char *what() const throw()

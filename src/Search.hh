@@ -212,7 +212,7 @@ public:
 
   // Debug and print
   void debug_print_hypo(Hypo &hypo);
-  void print_sure(Hypo &hypo, bool clear = true);
+  void print_sure();
 
   // Operate
   void init_search(int expand_window, int stacks, int reserved_hypos);
@@ -241,7 +241,7 @@ public:
   void set_prune_similar(int prune_similar) { m_prune_similar = prune_similar; }
   void set_beam(double beam) { m_beam = beam; }
   void set_global_beam(double beam) { m_global_beam = beam; }
-  void set_verbose(bool verbose) { m_verbose = verbose; }
+  void set_verbose(int verbose) { m_verbose = verbose; }
 
   // Exceptions
   struct ForgottenFrame : public std::exception {
@@ -270,12 +270,14 @@ private:
   int m_first_stack;
   int m_last_stack;
   std::vector<HypoStack> m_stacks;
+  int m_last_hypo_frame;
 
   // options
   int m_expand_window;	
   double m_lm_scale;
   double m_lm_offset;
-  bool m_verbose;
+  int m_verbose;
+  HypoPath *m_last_printed_path;
 
   // Pruning options
   int m_word_limit;	// How many best words are expanded

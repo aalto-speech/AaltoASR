@@ -49,11 +49,12 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_last_frame(0),
     m_first_stack(0),
     m_last_stack(0),
+    m_last_hypo_frame(0),
 
     // Options
     m_lm_scale(1),
     m_lm_offset(1),
-    m_verbose(false),
+    m_last_printed_path(NULL),
 
     // Pruning options
     m_word_limit(0),
@@ -67,6 +68,29 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_history(0)
 {
 }
+
+//  void
+//  Search::print_paths()
+//  {
+//    std::cout << std::endl << "last hypo frame: " << m_last_hypo_frame << std::endl;
+
+//    for (int f = first_frame(); f < last_frame(); f++) {
+//      HypoStack &stack = this->stack(f);
+//      if (stack.size() > 0)
+//        std::cout << f << std::endl;
+//      for (int h = 0; h < stack.size(); h++) {
+//        Hypo &hypo = stack.at(h);
+//        HypoPath *path = hypo.path;
+//        while (path != NULL) {
+//  	if (path->printed)
+//  	  std::cout << "*";
+//  	std::cout << m_vocabulary.word(path->word_id) << path->count() << " ";
+//  	path = path->prev;
+//        }
+//        std::cout << std::endl;
+//      }
+//    }
+//  }
 
 void
 Search::debug_print_hypo(Hypo &hypo)
@@ -82,47 +106,46 @@ Search::debug_print_hypo(Hypo &hypo)
 
   while (path != NULL) {
     stack.push(path);
+    if (path == m_last_printed_path)
+      break;
     path = path->prev;
   }
 
   while (!stack.empty()) {
     path = stack.top();
     stack.pop();
-    if (path->word_id < 0)
-      continue;
-    std::cout << " " 
+    if (path->word_id > 0 && path != m_last_printed_path) {
+      std::cout << m_vocabulary.word(path->word_id) << " ";
 //	      << "<" << path->frame << "> "
 //	      << "(" << path->word_id << ")"
-	      << m_vocabulary.word(path->word_id);
+    }
   }
-//  std::cout << " <" << hypo.frame << ">" << std::endl;
-  std::cout << std::endl;
+  std::cout << hypo.frame << std::endl;
 }
 
 void
-Search::print_sure(Hypo &hypo, bool clear)
+Search::print_sure()
 {
   std::stack<HypoPath*> stack;
-  HypoPath *path = hypo.path;
+  HypoPath *path = this->stack(m_last_hypo_frame).at(0).path;
   
   while (path != NULL) {
     stack.push(path);
-//    std::cout << path->word_id << " " << path->count() << std::endl;
+    if (path == m_last_printed_path)
+      break;
     path = path->prev;
   }
 
-  while (stack.size() > 0) {
-    HypoPath *path = stack.top();
+  while (!stack.empty()) {
+    path = stack.top();
     stack.pop();
-    if (path->count() != 1) {
-      if (clear) {
-	HypoPath::unlink(path->prev);
-	path->prev = NULL;
-      }
+    if (path->count() != 1)
       break;
-    }
-    if (path->word_id > 0)
+    if (path->word_id > 0 && path != m_last_printed_path) {
+      m_last_printed_path = path;
+//      path->printed = true;
       std::cout << m_vocabulary.word(path->word_id) << " ";
+    }
   }
   std::cout.flush();
 }
@@ -144,6 +167,7 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
   m_last_frame = m_first_frame + stacks;
   m_first_stack = 0;
   m_last_stack = m_first_stack + stacks;
+  m_last_hypo_frame = 0;
 
   // Clear stacks and reserve some space.  Stacks grow dynamically,
   // but if we need space anyway, it is better to have some already.
@@ -151,6 +175,8 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
     m_stacks[i].clear();
     m_stacks[i].reserve(reserved_hypos);
   }
+
+  m_last_printed_path = NULL;
 
   // Create initial empty hypothesis.
   Hypo hypo(0, 0, new HypoPath(0, 0, NULL));
@@ -228,22 +254,27 @@ Search::expand(int frame)
     stack.prune(m_hypo_limit);
 
   // Debug print
-  if (m_verbose && !stack.empty()) {
+  if (m_verbose == 1 && !stack.empty()) {
     static int step = 100;
     static int next = 0;
     if (frame > next) {
-      print_sure(stack[0]);
+      print_sure();
       while (frame > next)
 	next += step;
     }
   }
+  if (m_verbose == 2 && !stack.empty())
+    debug_print_hypo(stack.at(0));
 
   // FIXME?!
   // End of input?  Do not expand stack on the last existing frame?
   // Is there a stack at the first non-existing frame?
   if (m_expander.eof_frame() >= 0 &&
-      frame >= m_expander.eof_frame() - 3)
+      frame >= m_expander.eof_frame() - 1) // FIXME?! correct?
+  {
+    debug_print_hypo(this->stack(m_last_hypo_frame).at(0));
     return false;
+  }
       
   // Reset global pruning if current stack is best
   if (m_global_frame == frame) {
@@ -300,7 +331,8 @@ Search::expand(int frame)
 	    path = path->prev;
 	  }
 
-	  log_prob += m_lm_offset + m_lm_scale * word->frames *
+	  log_prob += m_lm_offset + m_lm_scale * 
+//	    word->frames * // Do we need this really?!
 	    m_ngram.log_prob(m_history.begin(), m_history.end());
 	}
 
@@ -316,6 +348,8 @@ Search::expand(int frame)
 	  Hypo new_hypo(target_frame, log_prob, hypo.path);
 	  new_hypo.add_path(word->word_id, hypo.frame);
 	  target_stack.add(new_hypo);
+	  if (target_frame > m_last_hypo_frame)
+	    m_last_hypo_frame = target_frame;
 
 	  // Update global pruning
 	  double avg_log_prob = log_prob / target_frame;
@@ -349,8 +383,11 @@ Search::go(int frame)
 bool
 Search::run()
 {
-  if (!expand(m_frame))
+  if (!expand(m_frame)) {
     return false;
-  m_frame++;
-  return true;
+  }
+  else {
+    m_frame++;
+    return true;
+  }
 }
