@@ -1,0 +1,69 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title></title>
+</head>
+
+<body>
+<h1>Tree-structured ngram model</h1>
+
+<p>
+The ngram model is stored in a tree-structure.  Each node contains
+<ul>
+  <li> The index of the word
+  <li> Log-probability
+  <li> Back-off weight
+  <li> Index of the first higher-order gram having the current prefix (child)
+</ul>
+
+<h3>Example</h3>
+
+<p> The figure below shows an example structure containing 5 unigrams,
+4 bigrams and 2 trigrams.
+
+<center>
+<img src="tree_gram.png" border=0>
+</center>
+
+<p> Note that UNK is always the first node of the structure, even if
+UNK was not specified in the model.  Note also, that nodes do not
+always have children even if the child field of the node is positive
+(node 2 in the figure, for example).
+
+<h3>Invariants</h3>
+
+<p>
+The important invariants in the structure are
+<ul>
+
+  <li> If node[i] has one child or more, (node[i].child &gt; 0) and
+  the number of children is (node[i+1].child - node[i])
+
+  <li> node[i] does not have children, if and only if, either
+  (node[i].child = -1) or (node[i+1].child = -1).
+
+</ul>
+
+<h3>Correct procedure for adding nodes in the tree</h3>
+
+<ul>
+
+  <li> The order of the unigram is the <i>sorting order</i>
+
+  <li> All grams must be inserted according to the sorting order.
+
+  <li> Just before adding gram (a,b,c,d) to the vector of nodes
+
+  <ul>
+    <li> Let n be the node (a,b,c) and set n.child to (number of
+    nodes) if n.child is -1
+    <li> Let n be the node (a,b,c) and set (n+1).child to (number of
+    nodes plus one)
+  </ul>
+
+</ul>
+
+
+<hr>
+<address></address>
+<!-- hhmts start --> Last modified: Mon Nov 17 14:36:46 EET 2003 <!-- hhmts end -->
+</body> </html>
