@@ -20,6 +20,9 @@ TreeGram::reserve_nodes(int nodes)
   m_nodes.clear();
   m_nodes.reserve(nodes);
   m_nodes.push_back(Node(0, -99, 0, -1));
+  m_order_count.clear();
+  m_order_count.push_back(1);
+  m_order = 1;
 }
 
 void
@@ -213,7 +216,7 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off)
   check_order(gram);
 
   // Update order counts
-  if (gram.size() == m_last_gram.size() + 1) {
+  if (gram.size() > m_order_count.size()) {
     m_order_count.push_back(0);
     m_order++;
   }
@@ -479,10 +482,6 @@ TreeGram::Iterator::next()
     int index = m_index_stack.back();
     TreeGram::Node *node = &m_gram->m_nodes[index];
 
-    // End of the structure?
-    if (index == m_gram->m_nodes.size() - 1)
-      return false;
-
     // If not backtracking, try diving deeper
     if (!backtrack) {
       // Do we have children?
@@ -491,16 +490,25 @@ TreeGram::Iterator::next()
 	return true;
       }
     }
-    backtrack = false;
 
     // No children, try siblings 
+    backtrack = false;
+
+    // Unigrams
     if (m_index_stack.size() == 1) {
-      // Unigram level: we have always siblings
+
+      // If last unigram, there is no siblings, and we are at the end
+      // of the structure?
+      if (index == m_gram->m_order_count[0] - 1)
+	return false;
+
+      // Next unigram
       m_index_stack.back()++;
       return true;
     }
+
+    // Higher order
     else {
-      // Higher order
       m_index_stack.pop_back();
       TreeGram::Node *parent = &m_gram->m_nodes[m_index_stack.back()];
 
