@@ -65,10 +65,11 @@ public:
   int last_order() { return m_last_order; }
   int gram_count(int order) { return m_order_count.at(order-1); }
 
+  /* Don't use this function, unles you really need to*/
+  int find_child(int word, int node_index);
 private:
   int binary_search(int word, int first, int last);
   void print_gram(FILE *file, const Gram &gram);
-  int find_child(int word, int node_index);
   void find_path(const Gram &gram);
   void check_order(const Gram &gram);
   void flip_endian();

@@ -448,10 +448,6 @@ TreeGram::log_prob(const Gram &gram)
       fetch_gram(gram, n);
       assert(m_fetch_stack.size() > 0);
       
-      // FIXME: remove debug
-      fprintf(stderr, "TreeGram::log_prob: %d %d %d\n",
-	      gram.size(), m_fetch_stack.size(), n);
-      
       // Full gram found?
       if (m_fetch_stack.size() == gram.size() - n) {
 	log_prob += m_nodes[m_fetch_stack.back()].log_prob;
