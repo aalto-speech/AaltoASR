@@ -99,8 +99,10 @@ Search::run()
     if (!stack.empty()) {
 
       // FIXME!
-      std::cout << Path::count << "\t";
-      debug_print_hypo(stack[0]);
+      if (frame % 1000 == 0) {
+	std::cout << Path::count << "\t";
+	debug_print_hypo(stack[0]);
+      }
 
       // Expand
       m_expander.expand(frame, m_frames - 2); // FIXME: magic number

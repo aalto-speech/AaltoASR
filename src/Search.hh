@@ -123,8 +123,8 @@ Search::Hypo::operator=(const Hypo &h)
   if (path)
     path->link();
 
-//    if (old_path)
-//      Path::unlink(old_path);
+  if (old_path)
+    Path::unlink(old_path);
 
   return *this;
 }

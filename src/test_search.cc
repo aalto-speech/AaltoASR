@@ -115,7 +115,7 @@ Main::run()
 
   // 16k frames buffer
   // lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76, 1024*16);
-  lna.open("/home/neuro/thirsima/share/synt/tiny.lna", 76, 1024*16);
+  lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76, 1024*16);
 
   std::cout << "recognize" << std::endl;
 
@@ -127,10 +127,10 @@ Main::run()
 //    std::cout << std::endl << timer.sec() << " seconds" << std::endl;
 
   ex.set_token_limit(500);
-  // ex.set_max_state_duration(8);
+  ex.set_max_state_duration(16);
 
-  Search search(ex, lr.vocabulary(), nr.ngram(), 125*2);
-  // search.set_lm_scale(.1);
+  Search search(ex, lr.vocabulary(), nr.ngram(), 125*1);
+  search.set_lm_scale(10);
 
   search.run();
 
@@ -148,6 +148,9 @@ main(int argc, char *argv[])
     cerr << strerror(errno) << std::endl;
     exit(1);
   }
+
+  std::cout << "lexicon paths: " << Lexicon::Path::count << std::endl;
+  std::cout << "hypo paths: " << Search::Path::count << std::endl;
 
   exit(0);
 }
