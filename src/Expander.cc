@@ -223,8 +223,16 @@ Expander::move_all_tokens()
     source_state.outgoing_token = NULL;
 
     // Beam pruning using the beam calculated in the last frame
-    if (source_token->log_prob < m_beam_best - m_beam)
+    if (source_token->log_prob < m_beam_best - m_beam) {
+      // FIXME: this should never happen anymore, because we have
+      // applied the beam pruning already before calling this
+      // function! (24.6.2003 thirsima)
+      // 
+      // Actually this may happen.  Probably because tokens ending in
+      // dummy states are moved again during the same frame, and may
+      // fall outside the beam! (24.6.2003 thirsima)
       goto token_finished;
+    }
 
     // ITERATE TRANSITIONS
     for (int r = 0; r < hmm_state.transitions.size(); r++) {
@@ -498,10 +506,23 @@ Expander::expand(int start_frame, int frames)
     // Beam pruning using the beam calculated in the last frame
     for (int t = 0; t < m_tokens.size(); t++) {
       Lexicon::Token *token = m_tokens[t];
+      Lexicon::Node *node = token->node;
+      Lexicon::State &state = node->states[token->state];
+      assert(state.incoming_token == token);
+      assert(state.outgoing_token == NULL);
+
       if (token->log_prob < m_beam_best - m_beam) {
-	if (m_tokens.size() > t + 1)
+	// Delete the token
+	delete m_tokens[t];
+	state.incoming_token = NULL;
+
+	// Replace the token with the last token in the vector, in
+	// order to avoid unnecessary copying.
+	if (m_tokens.size() > t + 1) {
 	  m_tokens[t] = m_tokens[m_tokens.size() - 1];
+	}
 	m_tokens.pop_back();
+	t--;
       }
     }
 
