@@ -149,7 +149,11 @@ TreeGram::find_child(int word, int node_index)
   if (node_index < 0)
     return word;
 
-  assert(node_index < m_nodes.size() - 1);
+  // Note that (node_index + 1) is used later, so the last node_index
+  // must not pass.  Actually, we could return -1 for all largest
+  // order grams.
+  if (node_index >= m_nodes.size() - 1)
+    return -1;
 
   int first = m_nodes[node_index].child_index;
   int last = m_nodes[node_index + 1].child_index; // not included

@@ -522,10 +522,24 @@ void
 Search::find_best_words(int frame)
 {
   // Do the Viterbi search.
-  if (m_end_frame > 0 && (frame + m_expand_window > m_end_frame))
-    m_expander.expand(frame, m_end_frame - frame);
-  else
-    m_expander.expand(frame, m_expand_window);
+  while (1) {
+    if (m_end_frame > 0 && (frame + m_expand_window > m_end_frame))
+      m_expander.expand(frame, m_end_frame - frame);
+    else
+      m_expander.expand(frame, m_expand_window);
+    
+    if (m_expander.words().empty()) {
+      float beam = m_expander.get_beam();
+      float new_beam = beam + 1;
+      m_expander.set_beam(new_beam);
+      fprintf(stderr, "WARNING: expander did not return words at all!\n");
+      fprintf(stderr, "Increasing expander state beam from %f to %f\n", 
+	      beam, new_beam);
+      continue;
+    }
+    
+    break;
+  }
 
   // Sort the words according to the average log-probability.
   m_expander.sort_words(m_word_limit);

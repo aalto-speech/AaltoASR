@@ -57,6 +57,7 @@ public:
   void set_forced_end(bool forced_end) { m_forced_end = forced_end; }
   void set_token_limit(int limit) { m_token_limit = limit; m_token_pool.reserve(limit); }
   void set_beam(float beam) { m_beam = beam; }
+  float get_beam() { return m_beam; }
   void set_max_state_duration(int duration) { m_max_state_duration = duration;}
   void sort_words(int top = 0);
 

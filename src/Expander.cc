@@ -604,7 +604,7 @@ Expander::expand(int start_frame, int frames)
 
     // FIXME: REMOVE debug
     // fprintf(stderr, "%d\t%.2f\t%d\n", 
-    //    m_frame, m_beam_best, m_tokens.size());
+    //	    m_frame, m_beam_best, m_tokens.size());
 
     // FIXED 24.6.2003: we should apply beam pruning before
     // keep_best_tokens, because after pruning, the sorting may be
