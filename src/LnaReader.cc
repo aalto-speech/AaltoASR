@@ -7,6 +7,7 @@
 
 LnaReader::LnaReader()
   : Acoustics(),
+    m_two_byte(false),
     m_num_models(0),
     m_frame_size(0),
     m_frames(0),
@@ -20,6 +21,7 @@ LnaReader::LnaReader()
 
 LnaReader::LnaReader(std::istream &in, int num_models)
   : Acoustics(num_models),
+    m_two_byte(false),
     m_num_models(num_models),
     m_frame_size(num_models + 1),
     m_frames(0),
@@ -33,6 +35,7 @@ LnaReader::LnaReader(std::istream &in, int num_models)
 
 LnaReader::LnaReader(const char *file, int num_models)
   : Acoustics(num_models),
+    m_two_byte(false),
     m_num_models(num_models),
     m_frame_size(num_models + 1),
     m_frames(0),
@@ -47,10 +50,13 @@ LnaReader::LnaReader(const char *file, int num_models)
 }
 
 void 
-LnaReader::open(const char *file, int num_models)
+LnaReader::open(const char *file, int num_models, book two_byte)
 {
   m_log_prob.resize(num_models);
-  m_frame_size = num_models + 1;
+  if (two_byte) 
+    m_frames = num_models * 2 + 1;
+  else
+    m_frame_size = num_models + 1;
   m_frames = 0;
   m_eof = 0;
   if (m_fin.is_open())
@@ -137,9 +143,21 @@ LnaReader::parse_frame(int frame)
 
   // Got frame, parse it
   //
-  for (int i = 1; i < m_frame_size; i++) {
-    float tmp = (unsigned char)m_read_buffer[i + start] / -24.0;
-    assert(tmp <= 0);
-    m_log_prob[i-1] = tmp;
+  if (m_two_byte) {
+    for (int i = 1; i < m_frame_size; i += 2) {
+      float tmp = (unsigned char)m_read_buffer[i + start] * 256 + 
+	(unsigned char)m_read_buffer[i + start + 1];
+      tmp = tmp / -1820.0;
+
+      assert(tmp <= 0);
+      m_log_prob[i-1] = tmp;
+    }
+  }
+  else {
+    for (int i = 1; i < m_frame_size; i++) {
+      float tmp = (unsigned char)m_read_buffer[i + start] / -24.0;
+      assert(tmp <= 0);
+      m_log_prob[i-1] = tmp;
+    }
   }
 }

@@ -32,6 +32,10 @@ NowayHmmReader::read_hmm(std::istream &in, Hmm &hmm)
 
     for (int t = 0; t < num_transitions; t++) {
       in >> to >> prob;
+      if (to >= num_states || to < 1) {
+	std::cerr << "hmm '" << label << "' has invalid transition" << std::endl;
+	throw InvalidFormat();
+      }
       state.transitions[t].target = to;
       state.transitions[t].log_prob = log10(prob);
     }

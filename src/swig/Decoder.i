@@ -77,6 +77,7 @@ public:
   void ngram_read(const char *file);
 
   // Lna
+	void lna_set_two_byte(bool two_byte);
   void lna_open(const char *file, int models, int size);
   void lna_close();
   void lna_seek(int frame);

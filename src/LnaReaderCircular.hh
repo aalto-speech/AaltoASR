@@ -9,7 +9,7 @@
 class LnaReaderCircular : public Acoustics {
 public:
   LnaReaderCircular();
-  void open(const char *file, int num_models, int size);
+  void open(const char *file, int num_models, int size, bool two_byte = false);
   void init(std::istream &in, int num_models, int size);
   void close();
   void seek(int frame);
@@ -75,9 +75,12 @@ private:
   int m_frames_read;  // Frames read
   std::vector<float> m_log_prob_buffer;
   int m_eof_frame;
+  int m_frame_size;
 
   // Temporary buffers
   std::vector<char> m_read_buffer;
+
+  bool m_two_byte;
 };
 
 #endif /* LNAREADERCIRCULAR_HH */

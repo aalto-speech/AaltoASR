@@ -22,11 +22,13 @@ public:
   void lex_read(const char *file);
   const std::string &lex_word() const { return m_lexicon_reader.word(); }
   const std::string &lex_phone() const { return m_lexicon_reader.phone(); }
+  const std::string &word(int index) const { return m_vocabulary.word(index); }
 
   // Ngram
   void ngram_read(const char *file);
 
   // Lna
+  void lna_set_two_byte(bool two_byte) { m_two_byte_lna = two_byte; }
   void lna_open(const char *file, int models, int size);
   void lna_close();
   void lna_seek(int frame) { m_lna_reader.seek(frame); }
@@ -125,6 +127,8 @@ private:
   Expander m_expander;
 
   Search m_search;
+
+  bool m_two_byte_lna;
 };
 
 #endif /* TOOLBOX_HH */

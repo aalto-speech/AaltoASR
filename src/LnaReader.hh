@@ -19,7 +19,7 @@ public:
   LnaReader(std::istream &in, int num_models);
   LnaReader(const char *file, int num_models);
   
-  void open(const char *file, int num_models);
+  void open(const char *file, int num_models, bool two_byte = false);
   void close();
   bool sentence_end() const { return m_sentence_end; }
 
@@ -49,6 +49,7 @@ protected:
   void read_to(int frame);
   void parse_frame(int frame);
 
+  bool m_two_byte;
   int m_num_models;
   int m_frame_size; // Frame size in the lna file (usually models+1)
   int m_frames;

@@ -352,6 +352,15 @@ Expander::move_all_tokens()
     m_tokens.pop_back();
     t--;
   }
+
+//   // FIXME: REMOVE debug
+//   for (int i = 0; i < m_tokens.size(); i++) {
+//     const Lexicon::Token *token = m_tokens[i];
+//     Lexicon::Node *node = token->node;
+//     Lexicon::State &state = node->states[token->state];
+//     assert(state.outgoing_token == NULL);
+//     assert(state.incoming_token == token);
+//   }
 }
 
 void

@@ -20,7 +20,9 @@ Toolbox::Toolbox()
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
 
-    m_search(m_expander, m_vocabulary, m_ngram)
+    m_search(m_expander, m_vocabulary, m_ngram),
+
+    m_two_byte_lna(false)
 {
 }
 
@@ -135,7 +137,7 @@ Toolbox::ngram_read(const char *file)
 void
 Toolbox::lna_open(const char *file, int models, int size)
 {
-  m_lna_reader.open(file, models, size);
+  m_lna_reader.open(file, models, size, m_two_byte_lna);
 }
 
 void

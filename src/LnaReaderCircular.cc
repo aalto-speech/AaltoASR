@@ -7,13 +7,17 @@ LnaReaderCircular::LnaReaderCircular()
     m_first_index(0),
     m_frames_read(0),
     m_log_prob_buffer(0),
-    m_read_buffer(0)
+    m_frame_size(0),
+    m_read_buffer(0),
+    m_two_byte(false)
 {
 }
 
 void
-LnaReaderCircular::open(const char *file, int num_models, int size)
+LnaReaderCircular::open(const char *file, int num_models, int size, bool two_byte)
 {
+  m_two_byte = two_byte;
+
   // Open file
   if (m_fin.is_open())
     m_fin.close();
@@ -37,12 +41,16 @@ LnaReaderCircular::init(std::istream &in, int num_models, int size)
   m_first_index = 0;
   m_frames_read = 0;
   m_eof_frame = -1;
+  if (m_two_byte)
+    m_frame_size = m_num_models * 2 + 1;
+  else
+    m_frame_size = m_num_models + 1;
 
   // Initialize buffers
   m_log_prob_buffer.clear();
   m_read_buffer.clear();
   m_log_prob_buffer.resize(num_models * size);
-  m_read_buffer.resize(num_models + 1);
+  m_read_buffer.resize(m_frame_size);
 }
     
 void
@@ -59,7 +67,7 @@ LnaReaderCircular::seek(int frame)
   if (m_in == NULL)
     throw NotOpened();
 
-  m_in->seekg((m_num_models + 1) * frame);
+  m_in->seekg((m_frame_size) * frame);
   if (m_in->fail())
     throw CannotSeek();
 
@@ -85,7 +93,7 @@ LnaReaderCircular::go_to(int frame)
   while (m_frames_read <= frame) {
 
     // Read a frame
-    m_in->read(&m_read_buffer[0], m_num_models + 1);
+    m_in->read(&m_read_buffer[0], m_frame_size);
     if (m_in->bad())
       throw ReadError();
 
@@ -96,7 +104,7 @@ LnaReaderCircular::go_to(int frame)
 	m_eof_frame = m_frames_read;
 	return false;
       }
-      if (bytes_read != m_num_models + 1)
+      if (bytes_read != m_frame_size)
 	throw ShortFrame();
       throw ReadError();
     }
@@ -104,14 +112,25 @@ LnaReaderCircular::go_to(int frame)
       throw InvalidFrameId();
 
     // Parse frame to the circular buffer
-    for (int i = 0; i < m_num_models; i++) {
-      float tmp = (unsigned char)m_read_buffer[i + 1] / -24.0;
-      m_log_prob_buffer[m_first_index] = tmp;
-      m_first_index++;
-      if (m_first_index >= m_log_prob_buffer.size())
-	m_first_index = 0;
+    if (m_two_byte) {
+      for (int i = 0; i < m_num_models; i++) {
+	float tmp = ((unsigned char)m_read_buffer[i*2 + 1] * 256 +
+		     (unsigned char)m_read_buffer[i*2 + 2]) / -1820.0;
+	m_log_prob_buffer[m_first_index] = tmp;
+	m_first_index++;
+	if (m_first_index >= m_log_prob_buffer.size())
+	  m_first_index = 0;
+      }
     }
-
+    else {
+      for (int i = 0; i < m_num_models; i++) {
+	float tmp = (unsigned char)m_read_buffer[i + 1] / -24.0;
+	m_log_prob_buffer[m_first_index] = tmp;
+	m_first_index++;
+	if (m_first_index >= m_log_prob_buffer.size())
+	  m_first_index = 0;
+      }
+    }
     m_frames_read++;
   }
 
