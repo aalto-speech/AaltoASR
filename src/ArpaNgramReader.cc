@@ -151,36 +151,55 @@ ArpaNgramReader::read_ngram(int order)
     m_words.push_back(word_id);
   }
 
-  // Read unigrams.  
+  // Read unigrams.  We do it this way, because the order is not sure.
+  // The UNK may be anywhere in the LM (at least SRI does not always
+  // put UNK in the beginning of unigrams).
   if (order == 1) {
 
-    // Check that UNK is first.  The internal vocabulary contains
-    // <UNK> already, so this check makes sense.
-    if (m_words[0] == 0) {
-      if (m_ngram.m_nodes.size() != 0)
-	throw InvalidOrder();
-    }
-
-    // Add UNK with zero prob in the beginning if not in LM
-    if (m_ngram.m_nodes.size() == 0 && m_words[0] != 0)
+    // Ensure the we have UNK.  It may be overwritten by the LM.
+    if (m_ngram.m_nodes.size() == 0)
       m_ngram.m_nodes.push_back(Ngram::Node(0, -99, 0)); // FIXME: magic num
 
-    m_ngram.m_nodes.push_back(Ngram::Node(m_words[0], log_prob, back_off));
+    if (m_words[0] == 0)
+      m_ngram.m_nodes[m_words[0]] = 
+	Ngram::Node(m_words[0], log_prob, back_off);    
+    else
+      m_ngram.m_nodes.push_back(Ngram::Node(m_words[0], log_prob, back_off));
   }
 
-  // Find the path to the current n-gram
+  // 2-grams or larger.  Find the path to the current n-gram.
   else {
 
-    // Handle the first word specially
+    // The reader assumes that words in n-grams (n > 1) are sorted
+    // in the same order as unigrams.
+    if (m_words[0] < m_word_stack[0]) {
+      fprintf(stderr, "%d: invalid sort order: ", m_lineno);
+      for (int i = 0; i < m_words.size(); i++) {
+	fprintf(stderr, "%s ", m_ngram.word(m_words[i]).c_str());
+      }
+      exit(1);
+    }
+
+    // If the first word in the stack changes, reset stacks.
     if (m_word_stack[0] != m_words[0]) {
       m_word_stack[0] = m_words[0];
       m_index_stack[0] = m_words[0];
       reset_stacks(1);
     }
 
-    // Handle the words 2..order-1
+    // Handle the words 2..order-1.
     for (int i = 1; i < order-1; i++) {
       int word = m_words[i];
+      
+      // The reader assumes that words in n-grams (n > 1) are sorted
+      // in the same order as unigrams.
+      if (word < m_word_stack[i]) {
+	fprintf(stderr, "%d: invalid sort order: ", m_lineno);
+	for (int i = 0; i < m_words.size(); i++) {
+	  fprintf(stderr, "%s ", m_ngram.word(m_words[i]).c_str());
+	}
+	exit(1);
+      }
 
       // Path differs
       if (m_word_stack[i] != word) {
@@ -196,8 +215,13 @@ ArpaNgramReader::read_ngram(int order)
 	else
 	  index = m_index_stack[i] + 1; 
 	while (m_ngram.m_nodes[index].word != word) {
-	  if (index == root_next->first)
+	  if (index == root_next->first) {
+	    fprintf(stderr, "%d: ", m_lineno);
+	    for (int i = 0; i < m_words.size(); i++) {
+	      fprintf(stderr, "%s ", m_ngram.word(m_words[i]).c_str());
+	    }
 	    throw UnknownPrefix();
+	  }
 	  m_ngram.m_nodes[index].first = m_ngram.m_nodes.size();
 	  index++;
 	}
@@ -207,13 +231,32 @@ ArpaNgramReader::read_ngram(int order)
       }
     }
 
-    // Handle the last word, we must not have duplicate
+    // Handle the last word.
     int word = m_words.back();
+
+    // Only unigrams can have UNK as last word.
+    if (word == 0) {
+      fprintf(stderr, "%d: only unigrams can contain UNK as last word: ", 
+	      m_lineno);
+      exit(1);
+    }
+
+    // The reader assumes that words in n-grams (n > 1) are sorted
+    // in the same order as unigrams.
+    if (word < m_word_stack[order-1]) {
+      fprintf(stderr, "%d: invalid sort order: ", m_lineno);
+      for (int i = 0; i < m_words.size(); i++) {
+	fprintf(stderr, "%s ", m_ngram.word(m_words[i]).c_str());
+      }
+      exit(1);
+    }
+
+    // No duplicates?
     if (m_word_stack[order - 1] == word)
       throw Duplicate();
-    m_word_stack[order - 1] = word;
 
     // Insert the ngram and update root node
+    m_word_stack[order - 1] = word;
     Ngram::Node *root = &m_ngram.m_nodes[m_index_stack[order - 2]];
     if (root->first < 0)
       root->first = m_ngram.m_nodes.size();

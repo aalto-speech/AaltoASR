@@ -61,7 +61,7 @@ public:
     int first;
     
     inline Node() : word(0), log_prob(0), back_off(0), first(-1) { }
-    inline Node(unsigned short word, float log_prob, float back_off)
+    inline Node(int word, float log_prob, float back_off)
       : word(word), log_prob(log_prob), back_off(back_off), first(-1) { }
     inline bool operator<(int value) const { return word < value; }
     inline bool operator>(int value) const { return word > value; }
