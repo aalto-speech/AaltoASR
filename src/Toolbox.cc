@@ -54,7 +54,7 @@ Toolbox::add_history(int word)
 void
 Toolbox::add_history_word(const std::string &word)
 {
-  add_history(m_vocabulary.index(word));
+  add_history(m_vocabulary.word_index(word));
 }
 
 void

@@ -1,8 +1,8 @@
 #include <string>
-
 #include <cerrno>
 
 #include "ArpaNgramReader.hh"
+#include "tools.hh"
 
 // FIXME: NGram assumes sorted nodes, so check the order when reading
 
@@ -16,33 +16,6 @@ ArpaNgramReader::set_oov(const std::string &word)
   m_ngram.set_oov(word);
 }
 
-bool
-ArpaNgramReader::getline(std::string *str, bool chomp)
-{
-  char *ptr;
-  char buf[4096];
-
-  str->clear();
-  while (1) {
-    ptr = fgets(buf, 4096, m_file);
-    if (!ptr)
-      break;
-
-    str->append(buf);
-    if ((*str)[str->length() - 1] == '\n') {
-      break;
-    }
-  }
-
-  if (ferror(m_file) || str->length() == 0)
-    return false;
-
-  if (chomp && (*str)[str->length() - 1] == '\n')
-    str->resize(str->length() - 1);
-
-  return true;
-}
-
 void
 ArpaNgramReader::regcomp(regex_t *preg, const char *regex, int cflags)
 {
@@ -50,7 +23,7 @@ ArpaNgramReader::regcomp(regex_t *preg, const char *regex, int cflags)
   if (result != 0) {
     char errbuf[4096];
     regerror(result, preg, errbuf, 4096);
-    std::cerr << errbuf << std::endl;
+    fprintf(stderr, "%s\n", errbuf);
     throw RegExpError();
   }
 }
@@ -125,7 +98,8 @@ void
 ArpaNgramReader::read_header()
 {
   // Skip header
-  while (getline(&m_str)) {
+  while (read_line(&m_str, m_file)) {
+    chomp(&m_str);
     m_lineno++;
     if (m_str == "\\data\\")
       break;
@@ -140,7 +114,8 @@ ArpaNgramReader::read_counts()
   int total_ngrams = 0;
 
   m_counts.clear();
-  while (getline(&m_str)) {
+  while (read_line(&m_str, m_file)) {
+    chomp(&m_str);
     m_lineno++;
     if (!regexec(&m_r_count, m_str.c_str()))
       break;
@@ -181,7 +156,7 @@ ArpaNgramReader::read_ngram(int order)
   // so this is safe.
   m_words.clear();
   for (int i = 0; i < order; i++) {
-    int word_id = m_ngram.add(&m_str[m_points[i + 1]]);
+    int word_id = m_ngram.add_word(&m_str[m_points[i + 1]]);
     m_words.push_back(word_id);
   }
 
@@ -318,8 +293,9 @@ ArpaNgramReader::read_ngrams(int order)
   reset_stacks();
 
   for (int ngrams_read = 0; ngrams_read < m_counts[order - 1];) {
-    if (!getline(&m_str))
+    if (!read_line(&m_str, m_file))
       throw ReadError();
+    chomp(&m_str);
     m_lineno++;
 
     // Skip empty lines
@@ -388,8 +364,8 @@ ArpaNgramReader::read(FILE *file)
   read_ngrams(1);
   if (m_ngram.m_nodes.size() != m_counts[0]) {
     fprintf(stderr, "warning: %d unigrams resulted in %d nodes\n",
-	    m_counts[0], m_ngram.size());
-    assert(m_counts[0] + 1 == m_ngram.size());
+	    m_counts[0], m_ngram.num_words());
+    assert(m_counts[0] + 1 == m_ngram.num_words());
     fprintf(stderr, "warning: UNK was not in LM, so we inserted it\n");
     m_counts[0]++;
   }

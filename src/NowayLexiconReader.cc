@@ -40,7 +40,7 @@ skip_while(FILE *file, const char *chars)
 void
 get_until(FILE *file, std::string &str, char *delims)
 {
-  str.clear();
+  str.erase();
 
   while (1) {
     int c;
@@ -160,7 +160,7 @@ NowayLexiconReader::read(FILE *file)
       node = new Lexicon::Node(*node);
       prev_node->next.push_back(node);
     }
-    int word_id = m_vocabulary.add(m_word);
+    int word_id = m_vocabulary.add_word(m_word);
     node->word_id = word_id;
     node->log_prob = log10(prob);
     m_lexicon.update_words(word_id);

@@ -6,10 +6,10 @@
 #include "Vocabulary.hh"
 #include "Endian.hh"
 
-class BinNgramReader{
+class BinNgramReader {
 public:
-  void read(FILE *in, Ngram *ng);
-  void write(FILE *out, Ngram *ng, bool reflip=true);
+  void read(FILE *file, Ngram *ng);
+  void write(FILE *file, Ngram *ng, bool reflip=true);
 private:
   void flip_endian(Ngram *ng);
 };

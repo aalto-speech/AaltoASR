@@ -30,7 +30,7 @@ main(int argc, char *argv[])
   std::cout << "evaluating" << std::endl;
   std::deque<int> history;
   while (std::cin >> str) {
-    int word = n.index(str);
+    int word = n.word_index(str);
 
     while (history.size() >= order)
       history.pop_front();

@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cfloat>
+#include <cstdio>
 
 #include "Expander.hh"
 
@@ -153,7 +154,8 @@ Expander::check_best(int info, bool tmp)
   }
   
   if (best > -1e10 && best_found != best) {
-    fprintf(stderr, "%d best found %f, should be %f\n", info, best_found, best);
+    fprintf(stderr, "%d best found %f, should be %f\n", info, best_found, 
+	    best);
     abort();
   }
 }

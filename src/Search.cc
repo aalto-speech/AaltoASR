@@ -79,9 +79,9 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_unk_offset(0),
     m_verbose(0),
     m_print_probs(false),
+    m_multiple_endings(0),
     m_print_indices(false),
     m_print_frames(false),
-    m_multiple_endings(0),
     m_last_printed_path(NULL),
 
     // Pruning options
@@ -126,7 +126,7 @@ void
 Search::set_word_boundary(const std::string &word)
 {
   // FIXME: currently lexicon must be loaded before calling this.
-  m_word_boundary = m_vocabulary.index(word);
+  m_word_boundary = m_vocabulary.word_index(word);
   if (m_word_boundary == 0) {
     fprintf(stderr, "Search::set_word_boundary(): word boundary not in vocabulary\n");
     exit(1);
@@ -263,9 +263,9 @@ Search::init_search(int expand_window)
   if (m_ngram.order() > 0) {
     int count = 0;
     m_lex2lm.clear();
-    m_lex2lm.resize(m_vocabulary.size());
-    for (int i = 0; i < m_vocabulary.size(); i++) {
-      m_lex2lm[i] = m_ngram.index(m_vocabulary.word(i));
+    m_lex2lm.resize(m_vocabulary.num_words());
+    for (int i = 0; i < m_vocabulary.num_words(); i++) {
+      m_lex2lm[i] = m_ngram.word_index(m_vocabulary.word(i));
 
       // FIXME: We get "UNK is not in LM" messages even if it is.
       if (m_lex2lm[i] == 0 && i != 0) {
@@ -566,13 +566,13 @@ Search::expand_words(int frame, const std::string &words)
 
   while (in >> str) {
     find_best_words(frame);
-    int index = m_vocabulary.index(str);
+    int index = m_vocabulary.word_index(str);
     if (index == 0) {
       fprintf(stderr, "word '%s' not in lexicon\n", str.c_str());
       return;
     }
 
-    Expander::Word *word = m_expander.word(m_vocabulary.index(str));
+    Expander::Word *word = m_expander.word(m_vocabulary.word_index(str));
     if (!word->active) {
       fprintf(stderr, "word '%s' did not survive\n", str.c_str());
       return;

@@ -40,4 +40,7 @@ libdecoder_a_SOURCES = \
 	Search.cc			Search.hh \
 					Timer.hh \
 	Toolbox.cc			Toolbox.hh \
+	TreeGram.cc			TreeGram.hh \
+	TreeGramArpaReader.cc		TreeGramArpaReader.hh \
+	tools.cc			tools.hh \
 	Vocabulary.cc			Vocabulary.hh

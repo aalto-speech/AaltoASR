@@ -78,8 +78,8 @@ public:
   inline Node *node(int index) { return &m_nodes[index]; }
   inline const Node *node(int index) const { return &m_nodes[index]; }
   inline int nodes() const { return m_nodes.size(); }
-  inline int index(const std::string &word) const 
-    { return Vocabulary::index(word); }
+  inline int word_index(const std::string &word) const 
+    { return Vocabulary::word_index(word); }
   inline const Node *child(int word, const Node *node = NULL) const
     {
       if (node == NULL)

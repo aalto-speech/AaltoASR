@@ -1,6 +1,7 @@
-#include <fstream>
+#include <errno.h>
 
 #include "Vocabulary.hh"
+#include "tools.hh"
 
 Vocabulary::Vocabulary()
 {
@@ -9,7 +10,7 @@ Vocabulary::Vocabulary()
 }
 
 int
-Vocabulary::add(const std::string &word)
+Vocabulary::add_word(const std::string &word)
 {
   std::map<std::string,int>::iterator i = m_indices.find(word);
   if (i != m_indices.end())
@@ -31,12 +32,13 @@ Vocabulary::set_oov(const std::string &word)
 }
 
 void
-Vocabulary::read(std::istream &in)
+Vocabulary::read(FILE *file)
 {
   std::string word;
 
-  while (std::getline(in, word)) {
-    
+  while (read_line(&word, file)) {
+    chomp(&word);
+
     // Remove comments
     int comment = word.find('#');
     if (comment >= 0)
@@ -51,22 +53,26 @@ Vocabulary::read(std::istream &in)
     word = word.substr(start, end - start + 1);
 
     // Insert word
-    add(word);
+    add_word(word);
   }
 }
 
 void
-Vocabulary::read(const char *file)
+Vocabulary::read(const char *filename)
 {
-  std::ifstream in(file);
-  if (!in)
-    throw OpenError();
-  read(in);
+  FILE *file = fopen(filename, "r");
+  if (!file) {
+    fprintf(stderr, "Vocabulary::read(): could not open %s: %s\n",
+	    filename, strerror(errno));
+    exit(1);
+  }
+  read(file);
+  fclose(file);
 }
 
 void
-Vocabulary::write(std::ostream &out) const
+Vocabulary::write(FILE *file) const
 {
   for (unsigned int i = 1; i < m_words.size(); i++)
-    out << m_words[i] << std::endl;
+    fprintf(file, "%s\n", m_words[i].c_str());
 }
