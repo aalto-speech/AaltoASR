@@ -75,31 +75,30 @@ get_until(std::istream &in, std::string &str, char *delims)
 void
 NowayLexiconReader::read(std::istream &in)
 {
-  std::string word; 
-  word.reserve(128); // The size is not necessary, just for efficiency
+  m_word.reserve(128); // The size is not necessary, just for efficiency
 
   while (1) {
     // Read first word
     skip_while(in, " \t\n");
-    get_until(in, word, " \t\n");
+    get_until(in, m_word, " \t\n");
     if (in.bad())
       throw ReadError();
     if (!in)
       return;
     
     // Parse possible probability
-    int left = word.find('(');
-    int right = word.rfind(')');
+    int left = m_word.find('(');
+    int right = m_word.rfind(')');
     double prob = 1;
     if (left != -1 || right != -1) {
-      if (left == 1 || right == 1)
+      if (left == -1 || right == -1)
 	throw InvalidProbability();
-      std::string tmp = word.substr(left + 1, right - left - 1);
+      std::string tmp = m_word.substr(left + 1, right - left - 1);
       char *end_ptr;
       prob = strtod(tmp.c_str(), &end_ptr);
       if (*end_ptr != '\0')
 	throw InvalidProbability();
-      word.resize(left);
+      m_word.resize(left);
     }
 
     // Read phones and insert them to lexicon
@@ -154,7 +153,7 @@ NowayLexiconReader::read(std::istream &in)
     }
 
     // Add word to lexicon
-    int word_id = m_vocabulary.add(word);
+    int word_id = m_vocabulary.add(m_word);
     node->word_id = word_id;
   }
 }

@@ -308,7 +308,7 @@ Expander::expand(int start_frame, int frames)
 //      std::cout << "--- " << frame << " ---" << std::endl;
 //      debug_print_tokens();
 
-    if (frame % 125 == 0)
+    if (frame % 10 == 0)
       std::cout << std::setw(8) << frame << ": " 
 		<< m_tokens.size() << std::endl;
 

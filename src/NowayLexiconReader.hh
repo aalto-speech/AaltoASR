@@ -30,8 +30,9 @@ public:
 		     const std::vector<Hmm> &hmms);
 
   void read(std::istream &in);
-  Lexicon &lexicon() { return m_lexicon; }
-  Vocabulary &vocabulary() { return m_vocabulary; }
+  inline Lexicon &lexicon() { return m_lexicon; }
+  inline Vocabulary &vocabulary() { return m_vocabulary; }
+  inline const std::string &word() const { return m_word; }
 
   struct ReadError : public std::exception {
     virtual const char *what() const throw()
@@ -54,6 +55,8 @@ protected:
   Lexicon m_lexicon;
   Vocabulary m_vocabulary;
   int m_line_no;
+
+  std::string m_word;
 };
 
 #endif /* NOWAYLEXICONREADER_HH */
