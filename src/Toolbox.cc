@@ -21,6 +21,14 @@ Toolbox::Toolbox()
 {
 }
 
+Toolbox::~Toolbox()
+{
+  while (!m_ngrams.empty()) {
+    delete m_ngrams.back();
+    m_ngrams.pop_back();
+  }
+}
+
 void
 Toolbox::expand(int frame, int frames)
 { 
@@ -110,10 +118,10 @@ Toolbox::ngram_read(const char *file, float weight)
     exit(1);
   }
 
-  m_ngrams.push_back(Ngram());
+  m_ngrams.push_back(new Ngram());
   BinNgramReader reader;
-  reader.read(f, &m_ngrams.back());
-  m_search.add_ngram(&m_ngrams.back(), weight);
+  reader.read(f, m_ngrams.back());
+  m_search.add_ngram(m_ngrams.back(), weight);
 
   fclose(f);
 }

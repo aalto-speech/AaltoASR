@@ -13,6 +13,7 @@
 class Toolbox {
 public:
   Toolbox();
+  ~Toolbox();
   
   // HMM models
 #ifdef STATE_DURATION_PROBS
@@ -122,7 +123,7 @@ private:
 
   LnaReaderCircular m_lna_reader;
 
-  std::vector<Ngram> m_ngrams;
+  std::vector<Ngram*> m_ngrams;
   std::deque<int> m_history;
 
   Expander m_expander;

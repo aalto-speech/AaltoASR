@@ -72,6 +72,7 @@ public:
   float log_prob(RandomAccessIterator begin, RandomAccessIterator end);
 
   inline Ngram() : m_order(0), m_last_order(0) { }
+  inline Ngram(const Ngram &ngram) { assert(false); } // never copy ngram
   inline int order() const { return m_order; }
   inline const std::string &word(unsigned int index) const
     { return Vocabulary::word(index); }

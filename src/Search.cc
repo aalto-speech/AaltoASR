@@ -64,6 +64,7 @@ HypoStack::sorted_insert(const Hypo &hypo)
 Search::Search(Expander &expander, const Vocabulary &vocabulary)
   : m_expander(expander),
     m_vocabulary(vocabulary),
+    m_max_lm_order(0),
 
     // Stacks states
     m_first_frame(0),
@@ -178,6 +179,7 @@ Search::print_hypo(const Hypo &hypo)
     }
   }
 
+  printf("\n");
 //  printf(": %d %.2f\n", hypo.frame, hypo.log_prob);
   fflush(stdout);
 }
@@ -250,6 +252,8 @@ Search::add_ngram(Ngram *ngram, float weight)
   m_ngrams.back().weight = weight;
   m_ngrams.back().lex2lm.clear();
   m_ngrams.back().lex2lm.resize(m_vocabulary.num_words());
+  if (ngram->order() > m_max_lm_order)
+    m_max_lm_order = ngram->order();
 
   // Create the mapping between lexicon and the model.
   for (int i = 0; i < m_vocabulary.num_words(); i++) {

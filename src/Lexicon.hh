@@ -90,6 +90,7 @@ public:
   };
 
   Lexicon();
+  Lexicon(const Lexicon &lexicon) { assert(false); } // never copy lexicon
   inline Lexicon::Node *root() { return &m_root_node; }
   inline int words() const { return m_words; }
   inline void update_words(int word) 
