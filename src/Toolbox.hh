@@ -68,20 +68,22 @@ public:
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
   void set_prune_similar(int prune_similar) { m_search.set_prune_similar(prune_similar); } 
   void set_word_limit(int word_limit) { m_search.set_word_limit(word_limit); }
-  void set_word_beam(double word_beam) { m_search.set_word_beam(word_beam); }
-  void set_lm_scale(double lm_scale) { m_search.set_lm_scale(lm_scale); }
-  void set_lm_offset(double lm_offset) { m_search.set_lm_offset(lm_offset); }
-  void set_unk_offset(double unk_offset) { m_search.set_unk_offset(unk_offset); }
+  void set_word_beam(float word_beam) { m_search.set_word_beam(word_beam); }
+  void set_lm_scale(float lm_scale) { m_search.set_lm_scale(lm_scale); }
+  void set_lm_offset(float lm_offset) { m_search.set_lm_offset(lm_offset); }
+  void set_unk_offset(float unk_offset) { m_search.set_unk_offset(unk_offset); }
   void set_token_limit(int limit) { m_expander.set_token_limit(limit); }
-  void set_state_beam(double beam) { m_expander.set_beam(beam); }
-  void set_hypo_beam(double beam) { m_search.set_beam(beam); }
-  void set_global_beam(double beam) 
+  void set_state_beam(float beam) { m_expander.set_beam(beam); }
+  void set_hypo_beam(float beam) { m_search.set_beam(beam); }
+  void set_global_beam(float beam) 
     { m_search.set_global_beam(beam); }
   void set_max_state_duration(int duration) 
     { m_expander.set_max_state_duration(duration); }
   void set_verbose(int verbose) { m_search.set_verbose(verbose); }
   void set_print_probs(bool print_probs) 
     { m_search.set_print_probs(print_probs); }
+  void set_print_indices(bool print_indices) 
+    { m_search.set_print_indices(print_indices); }
 
   // Debug
   void print_prunings()

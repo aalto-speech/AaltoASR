@@ -50,7 +50,7 @@ Main::print_token(Lexicon::Token *token)
     int end = token->frame;
     if (i > 0)
       end = paths[i-1]->frame;
-    double log_prob;
+    float log_prob;
     if (i > 0)
       log_prob = paths[i-1]->log_prob - paths[i]->log_prob;
     else

@@ -68,11 +68,11 @@ ArpaNgramReader::~ArpaNgramReader()
   regfree(&m_r_order);
 }
 
-inline double 
-ArpaNgramReader::str2double(const char *str)
+inline float 
+ArpaNgramReader::str2float(const char *str)
 {
   char *endptr;
-  double value = strtod(str, &endptr);
+  float value = strtod(str, &endptr);
   if (endptr == str)
     throw InvalidFloat();
   if (errno == ERANGE)
@@ -137,8 +137,8 @@ ArpaNgramReader::read_ngram(int order)
     throw InvalidNgram();
 
   // Parse log_prob and back_off
-  double log_prob = atof(&m_str[m_points[0]]);
-  double back_off = 0;
+  float log_prob = atof(&m_str[m_points[0]]);
+  float back_off = 0;
   if (m_points.size() == order + 2)
     back_off = atof(&m_str[m_points[order + 1]]);
 

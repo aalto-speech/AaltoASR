@@ -73,7 +73,7 @@ private:
   int m_buffer_size;  // Size of buffer in frames 
   int m_first_index;  // Index of the last value in the last frame
   int m_frames_read;  // Frames read
-  std::vector<double> m_log_prob_buffer;
+  std::vector<float> m_log_prob_buffer;
 
   // Temporary buffers
   std::vector<char> m_read_buffer;

@@ -18,7 +18,7 @@ struct State {
   bool first;
   char label;
   char state;
-  double log_prob;
+  float log_prob;
 };
 
 struct StateCompare {
@@ -38,7 +38,7 @@ LnaReaderCircular lna_reader;
 int start;
 int end;
 int models;
-double log_prob_offset = 6;
+float log_prob_offset = 6;
 
 void
 load_trans(const char *filename)
@@ -142,7 +142,7 @@ display2()
     lna_reader.go_to(frame);
 
     for (int i = 0; i < models; i++) {
-      double tmp = (lna_reader.log_prob(i) + log_prob_offset);
+      float tmp = (lna_reader.log_prob(i) + log_prob_offset);
       tmp = tmp * symbols.length() / log_prob_offset;
       int index = (int)floor(tmp);
       if (index < 0)

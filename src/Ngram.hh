@@ -106,7 +106,7 @@ float
 Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end) const
 {
   RandomAccessIterator it;
-  double log_prob = 0;
+  float log_prob = 0;
 
   for (; begin != end; begin++) {
     const Node *node = this->node(*begin);

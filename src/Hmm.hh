@@ -8,7 +8,7 @@
 
 struct HmmTransition {
   int target;
-  double log_prob;
+  float log_prob;
 };
 
 struct HmmState {

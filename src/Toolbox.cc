@@ -160,7 +160,7 @@ Toolbox::lna_close()
 void
 Toolbox::print_hypo(Hypo &hypo)
 {
-  m_search.debug_print_hypo(hypo);
+  m_search.print_hypo(hypo);
 }
 
 bool

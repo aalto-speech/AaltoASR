@@ -46,7 +46,7 @@ public:
     inline Node(const Node &node) :
       log_prob(node.log_prob), word_id(node.word_id), hmm_id(node.hmm_id),
       states(node.states.size()) { }
-    double log_prob;
+    float log_prob;
     int word_id;
     int hmm_id;
     std::vector<State> states;
@@ -55,7 +55,7 @@ public:
 
   class Path {
   public:
-    inline Path(int hmm_id, int frame, double log_prob, class Path *prev);
+    inline Path(int hmm_id, int frame, float log_prob, class Path *prev);
     inline ~Path();
     inline void link() { m_reference_count++; }
     inline static void unlink(Path *path);
@@ -63,7 +63,7 @@ public:
 
     int hmm_id;
     int frame;
-    double log_prob;
+    float log_prob;
     class Path *prev;
   private:
     int m_reference_count;
@@ -76,13 +76,13 @@ public:
     inline Token(const Token &t);
     inline Token &operator=(const Token &token);
     inline ~Token();
-    inline void add_path(int hmm_id, int frame, double log_prob);
+    inline void add_path(int hmm_id, int frame, float log_prob);
 
     int frame; // FIXME: do we need frame counter in token?
     char state_duration;
     char state;
     Lexicon::Node *node;
-    double log_prob;
+    float log_prob;
     Path *path;
   };
 
@@ -102,7 +102,7 @@ private:
 
 //////////////////////////////////////////////////////////////////////
 
-Lexicon::Path::Path(int hmm_id, int frame, double log_prob, Path *prev)
+Lexicon::Path::Path(int hmm_id, int frame, float log_prob, Path *prev)
   : hmm_id(hmm_id),
     frame(frame),
     log_prob(log_prob),
@@ -184,7 +184,7 @@ Lexicon::Token::~Token()
 }
 
 void
-Lexicon::Token::add_path(int hmm_id, int frame, double log_prob)
+Lexicon::Token::add_path(int hmm_id, int frame, float log_prob)
 {
   Path *old_path = path;
   path = new Path(hmm_id, frame, log_prob, path);

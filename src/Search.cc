@@ -7,6 +7,9 @@
 
 int HypoPath::g_count = 0;
 
+// FIXME: check that every log_prob has the same base!  Now they
+// should be log10 everywhere.
+
 // Assumes sorted
 void
 HypoStack::prune_similar(int length)
@@ -106,7 +109,21 @@ Search::print_prunings()
 }
 
 void
-Search::debug_print_hypo(Hypo &hypo)
+Search::print_path(HypoPath *path)
+{
+  std::cout << m_vocabulary.word(path->word_id);
+  if (m_print_indices)
+    std::cout << "(" << path->word_id << ")";
+  std::cout << " ";
+  if (m_print_probs)
+    std::cout << path->ac_log_prob << " "
+	      << path->lm_log_prob << " ";
+//	      << "<" << path->frame << "> "
+//	      << "(" << path->word_id << ")"
+}
+
+void
+Search::print_hypo(Hypo &hypo)
 {
   std::stack<HypoPath*> stack;
 
@@ -129,12 +146,7 @@ Search::debug_print_hypo(Hypo &hypo)
     stack.pop();
     if (path != m_last_printed_path) {
       assert(!path->guard());
-      std::cout << m_vocabulary.word(path->word_id) << " ";
-      if (m_print_probs)
-	std::cout << path->ac_log_prob << " "
-		  << path->lm_log_prob << " ";
-//	      << "<" << path->frame << "> "
-//	      << "(" << path->word_id << ")"
+      print_path(path);
     }
   }
   std::cout << hypo.frame << std::endl;
@@ -161,12 +173,7 @@ Search::print_sure()
     if (path != m_last_printed_path) {
       assert(!path->guard());
       m_last_printed_path = path;
-//      path->printed = true;
-      std::cout << m_vocabulary.word(path->word_id) << " ";
-//		<< m_lex2lm[path->word_id] << " "
-      if (m_print_probs)
-	std::cout << path->ac_log_prob << " "
-		  << path->lm_log_prob << " ";
+      print_path(path);
     }
   }
   std::cout.flush();
@@ -299,7 +306,7 @@ Search::expand(int frame)
   // End of input?  
   if (frame > m_last_hypo_frame) {
     assert(this->stack(m_last_hypo_frame).size() > 0);
-    debug_print_hypo(this->stack(m_last_hypo_frame).at(0));
+    print_hypo(this->stack(m_last_hypo_frame).at(0));
     return false;
   }
   
@@ -323,8 +330,8 @@ Search::expand(int frame)
   }
 
   // Beam and global prunings
-  double angle = m_global_best / m_global_frame;
-  double ref = m_global_best + angle * (frame - m_global_frame);
+  float angle = m_global_best / m_global_frame;
+  float ref = m_global_best + angle * (frame - m_global_frame);
   if (stack.best_log_prob() > ref)
     ref = stack.best_log_prob();
   for (int i = 0; i < stack.size(); i++) {
@@ -352,7 +359,7 @@ Search::expand(int frame)
     }
   }
   if (m_verbose == 2 && !stack.empty())
-    debug_print_hypo(stack.at(0));
+    print_hypo(stack.at(0));
 
       
   // Expand the stack
@@ -385,10 +392,12 @@ Search::expand(int frame)
 
 	// Prune words much worse than the best words on average
 	if (word->avg_log_prob < words[0]->avg_log_prob * m_word_beam)
-	  continue; // FIXME: could we break here if words are sorted?
+	  // FIXME: could we break here if words are sorted?
+	  // Currently, they are not sorted always!
+	  continue; 
 
-	double log_prob = hypo.log_prob + word->log_prob;
-	double lm_log_prob = 0;
+	float log_prob = hypo.log_prob + word->log_prob;
+	float lm_log_prob = 0;
 
 	// Calculate language model probabilities
 	if (m_ngram.order() > 0 && m_lm_scale > 0) {
@@ -403,7 +412,7 @@ Search::expand(int frame)
 	    path = path->prev;
 	  }
 
-	  double tmp = m_ngram.log_prob(m_history.begin(), m_history.end());
+	  float tmp = m_ngram.log_prob(m_history.begin(), m_history.end());
 	  lm_log_prob = m_lm_offset + m_lm_scale * 
 //	    word->frames * // Do we need this really?!
 	    (tmp + (lm_word_id == 0 ? m_unk_offset : 0));
@@ -432,7 +441,7 @@ Search::expand(int frame)
 	    m_last_hypo_frame = target_frame;
 
 	  // Update global pruning
-	  double avg_log_prob = log_prob / target_frame;
+	  float avg_log_prob = log_prob / target_frame;
 	  if (avg_log_prob > m_global_best / m_global_frame) {
 	    m_global_best = log_prob;
 	    m_global_frame = target_frame;

@@ -38,7 +38,7 @@ class Hypo {
 };
 
 %extend Hypo {
-  double log_prob() { return self->log_prob; }
+  float log_prob() { return self->log_prob; }
   int frame() { return self->frame; }
 }
 
@@ -49,7 +49,7 @@ public:
   bool empty();
   void sort();
   void prune(int top);
-  double best_log_prob();
+  float best_log_prob();
   int best_index(); 
 };
 
@@ -99,17 +99,18 @@ public:
   void set_hypo_limit(int hypo_limit);
   void set_prune_similar(int prune_similar);
   void set_word_limit(int word_limit);
-  void set_word_beam(double word_beam);
-  void set_lm_scale(double lm_scale);
-  void set_lm_offset(double lm_offset);
-  void set_unk_offset(double unk_offset);
+  void set_word_beam(float word_beam);
+  void set_lm_scale(float lm_scale);
+  void set_lm_offset(float lm_offset);
+  void set_unk_offset(float unk_offset);
   void set_token_limit(int limit);
-  void set_state_beam(double beam);
-  void set_hypo_beam(double beam);
-  void set_global_beam(double beam);
+  void set_state_beam(float beam);
+  void set_hypo_beam(float beam);
+  void set_global_beam(float beam);
   void set_max_state_duration(int duration);
   void set_verbose(int verbose);
   void set_print_probs(bool print_probs);
+  void set_print_indices(bool print_indices);
 
 	void print_prunings();
   void print_hypo(Hypo &hypo);

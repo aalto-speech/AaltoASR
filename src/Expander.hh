@@ -14,8 +14,8 @@ public:
   public:
     Word() : 
       avg_log_prob(0), log_prob(0), frames(-1), word_id(-1), active(false) { }
-    double avg_log_prob;
-    double log_prob;
+    float avg_log_prob;
+    float log_prob;
     int frames;
     int word_id;
     bool active;
@@ -47,7 +47,7 @@ public:
   // Options
   inline void set_forced_end(bool forced_end) { m_forced_end = forced_end; }
   inline void set_token_limit(int limit) { m_token_limit = limit; }
-  inline void set_beam(double beam) { m_beam = beam; }
+  inline void set_beam(float beam) { m_beam = beam; }
   inline void set_max_state_duration(int duration) 
     { m_max_state_duration = duration; }
 
@@ -65,7 +65,7 @@ private:
   Lexicon::Token *token_to_state(const Lexicon::Token *source_token,
 				 Lexicon::State &source_state,
 				 Lexicon::State &target_state,
-				 double new_log_prob);
+				 float new_log_prob);
 
   const std::vector<Hmm> &m_hmms;
   Lexicon &m_lexicon;
@@ -74,7 +74,7 @@ private:
   // Options
   bool m_forced_end;
   int m_token_limit;
-  double m_beam;
+  float m_beam;
   int m_max_state_duration;
 
   // State
@@ -83,8 +83,8 @@ private:
   std::vector<Word*> m_sorted_words;
   int m_frame; // Current frame relative to the start frame.
   int m_frames; // Max frames per word
-  double m_beam_best;
-  double m_beam_best_tmp;
+  float m_beam_best;
+  float m_beam_best_tmp;
 };
 
 #endif /* EXPANDER_HH */

@@ -60,7 +60,7 @@ HypoPath::unlink(HypoPath *path)
 class Hypo {
 public:
   inline Hypo();
-  inline Hypo(int frame, double log_prob, HypoPath *path);
+  inline Hypo(int frame, float log_prob, HypoPath *path);
   inline Hypo(const Hypo &t);
   inline Hypo &operator=(const Hypo &hypo);
   inline ~Hypo();
@@ -68,7 +68,7 @@ public:
   bool operator<(const Hypo &h) const { return log_prob > h.log_prob; }
 
   int frame;
-  double log_prob;
+  float log_prob;
   HypoPath *path;
 };
 
@@ -78,7 +78,7 @@ Hypo::Hypo()
 {
 }
 
-Hypo::Hypo(int frame, double log_prob, HypoPath *path)
+Hypo::Hypo(int frame, float log_prob, HypoPath *path)
  : frame(frame), log_prob(log_prob), path(path)
 {
   if (path)
@@ -153,11 +153,11 @@ public:
 
   // Status
   inline void reset_best() { m_best_log_prob = -1e10; m_best_index = -1; }
-  inline double best_log_prob() const { return m_best_log_prob; }
+  inline float best_log_prob() const { return m_best_log_prob; }
   inline int best_index() const { return m_best_index; }
 
 private:
-  double m_best_log_prob;
+  float m_best_log_prob;
   int m_best_index;
 };
 
@@ -216,7 +216,8 @@ public:
 
   // Debug and print
   void print_prunings();
-  void debug_print_hypo(Hypo &hypo);
+  void print_path(HypoPath *path);
+  void print_hypo(Hypo &hypo);
   void print_sure();
 
   // Operate
@@ -244,15 +245,16 @@ public:
 
   void set_hypo_limit(int hypo_limit) { m_hypo_limit = hypo_limit; }
   void set_word_limit(int word_limit) { m_word_limit = word_limit; }
-  void set_word_beam(double word_beam) { m_word_beam = word_beam; }
-  void set_lm_scale(double lm_scale) { m_lm_scale = lm_scale; }
-  void set_lm_offset(double lm_offset) { m_lm_offset = lm_offset; }
-  void set_unk_offset(double unk_offset) { m_unk_offset = unk_offset; }
+  void set_word_beam(float word_beam) { m_word_beam = word_beam; }
+  void set_lm_scale(float lm_scale) { m_lm_scale = lm_scale; }
+  void set_lm_offset(float lm_offset) { m_lm_offset = lm_offset; }
+  void set_unk_offset(float unk_offset) { m_unk_offset = unk_offset; }
   void set_prune_similar(int prune_similar) { m_prune_similar = prune_similar; }
-  void set_beam(double beam) { m_beam = beam; }
-  void set_global_beam(double beam) { m_global_beam = beam; }
+  void set_beam(float beam) { m_beam = beam; }
+  void set_global_beam(float beam) { m_global_beam = beam; }
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_print_probs(bool print_probs) { m_print_probs = print_probs; }
+  void set_print_indices(bool print_indices) { m_print_indices = print_indices; }
 
   // Exceptions
   struct ForgottenFrame : public std::exception {
@@ -288,23 +290,24 @@ private:
   // options
   int m_expand_window;	
   int m_end_frame;
-  double m_lm_scale;
-  double m_lm_offset;
-  double m_unk_offset;
+  float m_lm_scale;
+  float m_lm_offset;
+  float m_unk_offset;
   int m_verbose;
   bool m_print_probs;
+  bool m_print_indices;
   HypoPath *m_last_printed_path;
 
   // Pruning options
   int m_word_limit;	// How many best words are expanded
-  double m_word_beam;   // Do not expand words outside this beam
+  float m_word_beam;   // Do not expand words outside this beam
   int m_prune_similar;  // Prune similar N-word endings 
   int m_hypo_limit;	// How many best hypos in a stack are expanded
-  double m_beam;
+  float m_beam;
 
   // Global pruning
-  double m_global_best;
-  double m_global_beam;
+  float m_global_best;
+  float m_global_beam;
   int m_global_frame;
 
   // Pruning statistics

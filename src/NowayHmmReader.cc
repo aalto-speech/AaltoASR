@@ -25,7 +25,7 @@ NowayHmmReader::read_hmm(std::istream &in, Hmm &hmm)
     int from;
     int to;
     int num_transitions = 0;
-    double prob;
+    float prob;
 
     in >> from >> num_transitions;
     state.transitions.resize(num_transitions);
@@ -33,7 +33,7 @@ NowayHmmReader::read_hmm(std::istream &in, Hmm &hmm)
     for (int t = 0; t < num_transitions; t++) {
       in >> to >> prob;
       state.transitions[t].target = to;
-      state.transitions[t].log_prob = log(prob);
+      state.transitions[t].log_prob = log10(prob);
     }
   }
 

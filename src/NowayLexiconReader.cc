@@ -91,7 +91,7 @@ NowayLexiconReader::read(std::istream &in)
     // Parse possible probability
     int left = m_word.find('(');
     int right = m_word.rfind(')');
-    double prob = 1;
+    float prob = 1;
     if (left != -1 || right != -1) {
       if (left == -1 || right == -1)
 	throw InvalidProbability();
@@ -156,7 +156,7 @@ NowayLexiconReader::read(std::istream &in)
       }
     }
 
-    assert(node != m_lexicon.root());
+    assert(node != m_lexicon.root()); FIXME pronounciation empty!!
 
     // Add word to lexicon
 
@@ -168,7 +168,7 @@ NowayLexiconReader::read(std::istream &in)
     }
     int word_id = m_vocabulary.add(m_word);
     node->word_id = word_id;
-    node->log_prob = log(prob);
+    node->log_prob = log10(prob);
     m_lexicon.update_words(word_id);
   }
 }

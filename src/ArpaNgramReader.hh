@@ -76,7 +76,7 @@ public:
   };
 
 private:
-  double str2double(const char *str);
+  float str2float(const char *str);
   void regcomp(regex_t *preg, const char *regex, int cflags);
   bool regexec(const regex_t *preg, const char *string);
   void split(std::string &str, std::vector<int> &points);

@@ -73,7 +73,7 @@ Lexicon::Token*
 Expander::token_to_state(const Lexicon::Token *source_token, 
 			 Lexicon::State &source_state,
 			 Lexicon::State &target_state,
-			 double new_log_prob)
+			 float new_log_prob)
 {
   Lexicon::Token *new_token;
 
@@ -177,7 +177,7 @@ Expander::move_all_tokens()
     for (int r = 0; r < hmm_state.transitions.size(); r++) {
       const HmmTransition &transition = hmm_state.transitions[r];
       int target_state_id = transition.target;
-      double log_prob = source_token->log_prob + transition.log_prob;
+      float log_prob = source_token->log_prob + transition.log_prob;
 
       // Target state is a sink state.  Clone the token to the next
       // nodes in the lexicon.
@@ -192,13 +192,14 @@ Expander::move_all_tokens()
 	  // because the current frame is actually already the start
 	  // of the next word.  This also assumes that there can not
 	  // be an empty word in lexicon.
-
-	  // NOTE: Previously we added pronounciation probability
-	  // (source_node->log_prob) here, but it is LM probability,
-	  // and should be scaled by Search class.
 	  if (!m_forced_end || m_frame == m_frames - 1) {
-	    double log_prob = source_token->log_prob;
-	    double avg_log_prob = log_prob / m_frame;
+	    float log_prob = source_token->log_prob;
+	    float avg_log_prob = log_prob / m_frame;
+
+	    // FIXME: is this correct?  Do we really want to add this
+	    // only in word ends?
+	    log_prob += source_node->log_prob;
+
 	    if (!word->active || avg_log_prob > word->avg_log_prob) {
 	      if (!word->active)
 		m_sorted_words.push_back(word);
@@ -214,7 +215,8 @@ Expander::move_all_tokens()
 	for (int n = 0; n < source_node->next.size(); n++) {
 	  Lexicon::Node *target_node = source_node->next[n];
 
-	  // FIXME: we do not want to do this here?  Only in word ends.
+	  // FIXME: why we do not want to do this here?  Why only in
+	  // word ends?  
 	  // log_prob += target_node->log_prob;
 
 	  Lexicon::State &target_state = target_node->states[0];
@@ -365,7 +367,7 @@ Expander::debug_print_tokens()
 	      << "(" << (int)token->state_duration << ")\t" 
 	      << std::setprecision(4)
 	      << token->log_prob - m_tokens[0]->log_prob << "\t";
-    double old_log_prob = 0;
+    float old_log_prob = 0;
     for (int i = paths.size() - 1; i >= 0; i--) {
       std::cout << m_hmms[paths[i]->hmm_id].label;
       std::cout	<< paths[i]->frame 

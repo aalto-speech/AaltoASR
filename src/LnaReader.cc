@@ -137,7 +137,7 @@ LnaReader::parse_frame(int frame)
   // Got frame, parse it
   //
   for (int i = 1; i < m_frame_size; i++) {
-    double tmp = (unsigned char)m_read_buffer[i + start] / -24.0;
+    float tmp = (unsigned char)m_read_buffer[i + start] / -24.0;
     assert(tmp <= 0);
     m_log_prob[i-1] = tmp;
   }
