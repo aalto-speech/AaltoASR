@@ -6,6 +6,15 @@
 #include "TreeGram.hh"
 #include "tools.hh"
 
+#define pi_min(a,b) (((a) < (b)) ? (a) : (b))
+
+const double MINLOGPROB=-60;
+const double MINPROB=1e-60;
+inline double safelogprob(double x) {
+  if (x> MINPROB) return(log10(x));
+  return(MINLOGPROB);
+}
+
 static std::string format_str("cis-binlm2\n");
 
 TreeGram::TreeGram()
@@ -36,7 +45,7 @@ void
 TreeGram::print_gram(FILE *file, const Gram &gram)
 {
   for (int i = 0; i < gram.size(); i++) {
-    fprintf(file, "%d ", gram[i]);
+    fprintf(file, "%s(%d) ", word(gram[i]).c_str(), gram[i]);
   }
   fputc('\n', file);
 }
@@ -480,34 +489,31 @@ TreeGram::log_prob(const Gram &gram)
     return log_prob;
   }
   if (m_type==INTERPOLATED) {
-    // Denote by (w(1) w(2) ... w(N)) the ngram that was requested.  The
-    // log-probability of the back-off model is computed as follows:
-
-    //   for ngrams of all order n: 1..N
-    //   - take the probability P(W(N)|W(N-1)..W(N-n)
-    //   - add the corresponding KN-coefficient c(W(N-1)..W(N-n))
-    //   - add the corresponding interpolation coeff i(n)
     float prob=0.0;
-    float oldcoeff=-9999999999.0;
-    for (int n=1;n<=gram.size();n++) {
+    float bo=1.0;
+    m_last_order=0;
+
+    int looptill=pi_min(gram.size(),m_order);
+    for (int n=1;n<=looptill;n++) {
       fetch_gram(gram,gram.size()-n);
-
-      if (m_fetch_stack.size() < n) {
-	m_last_order=n-1;
-	return(log10(prob));
+      if (m_fetch_stack.size() < n-1 || n>m_order) {
+	return(safelogprob(prob)); 
       }
-
-      if (n!=1) {
-	prob=pow(10,m_nodes[m_fetch_stack[n-2]].back_off)*prob;
-	fprintf(stderr,"-> %.4g",prob);
+      
+      if (m_fetch_stack.size()==n-1) {
+	bo = pow(10,m_nodes[m_fetch_stack.back()].back_off);
+	prob*=bo;
+	continue;
       }
-      prob+=pow(10,m_nodes[m_fetch_stack[n-1]].log_prob);
-
-      fprintf(stderr,": %.4g ",prob);
-      oldcoeff=m_nodes[m_fetch_stack.back()].back_off;
+      
+      if (n>1) {
+	bo = pow(10,m_nodes[m_fetch_stack[m_fetch_stack.size()-2]].back_off);
+	prob=bo*prob;
+      }
+      prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob);
+      m_last_order++;
     }
-    m_last_order=gram.size();
-    return(log10(prob));
+    return(safelogprob(prob));
   }
   return(0);
 }
