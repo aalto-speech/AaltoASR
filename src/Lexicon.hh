@@ -38,9 +38,14 @@ public:
 
   class Node {
   public:
+    // Note that NowayLexiconReader assumes that word_id's are
+    // negative by default.
     inline Node() : log_prob(0), word_id(-1), hmm_id(-1) { }
     inline Node(int states) : 
       log_prob(0), word_id(-1), hmm_id(-1), states(states) { }
+    inline Node(const Node &node) :
+      log_prob(node.log_prob), word_id(node.word_id), hmm_id(node.hmm_id),
+      states(node.states.size()) { }
     double log_prob;
     int word_id;
     int hmm_id;

@@ -26,7 +26,7 @@ Toolbox::print_words(int words)
   std::vector<Expander::Word*> &sorted_words = m_expander.words();
   std::sort(sorted_words.begin(), sorted_words.end(), Expander::WordCompare());
 
-  if (words == 0 && words > sorted_words.size())
+  if (words == 0 || words > sorted_words.size())
     words = sorted_words.size();
 
   std::cout.setf(std::cout.fixed, std::cout.floatfield);
@@ -42,9 +42,21 @@ Toolbox::print_words(int words)
 }
 
 void
+Toolbox::prune(int frame, int top)
+{
+  HypoStack &stack = this->stack(frame);
+  std::sort(stack.begin(), stack.end());
+  if (top < stack.size()) {
+    stack.resize(top);
+  }
+}
+
+void
 Toolbox::hmm_read(const char *file)
 {
   std::ifstream in(file);
+  if (!in)
+    throw OpenError();
   m_hmm_reader.read(in);
 }
 
@@ -52,6 +64,8 @@ void
 Toolbox::lex_read(const char *file)
 {
   std::ifstream in(file);
+  if (!in)
+    throw OpenError();
   m_lexicon_reader.read(in);
 }
 
@@ -59,6 +73,8 @@ void
 Toolbox::ngram_read(const char *file)
 {
   std::ifstream in(file);
+  if (!in)
+    throw OpenError();
   m_ngram_reader.read(in);
 }
 
@@ -78,4 +94,16 @@ void
 Toolbox::print_hypo(Hypo &hypo)
 {
   m_search.debug_print_hypo(hypo);
+}
+
+bool
+Toolbox::run_to(int frame)
+{
+  while (frame > m_search.frame()) {
+    bool ok = m_search.run();
+    if (!ok)
+      return false;
+  }
+
+  return true;
 }

@@ -16,7 +16,11 @@ public:
   
   void hmm_read(const char *file);
   void lex_read(const char *file);
+  const std::string &lex_word() const { return m_lexicon_reader.word(); }
+  const std::string &lex_phone() const { return m_lexicon_reader.phone(); }
+
   void ngram_read(const char *file);
+  int ngram_lineno() const { return m_ngram_reader.lineno(); }
 
   void lna_open(const char *file, int models, int size);
   void lna_close();
@@ -32,9 +36,14 @@ public:
   bool expand_stack(int frame) { return m_search.expand_stack(frame); }
   void go_to(int frame) { m_search.go_to(frame); }
   bool run() { return m_search.run(); }
+  bool run_to(int frame);
   int earliest_frame() { return m_search.earliest_frame(); }
   int last_frame() { return m_search.last_frame(); }
   HypoStack &stack(int frame) { return m_search.stack(frame); }
+
+  void prune(int frame, int top);
+
+  int paths() const { return HypoPath::count; }
 
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
   void set_word_limit(int word_limit) { m_search.set_word_limit(word_limit); }
@@ -46,6 +55,11 @@ public:
   void set_max_state_duration(int duration) { m_expander.set_max_state_duration(duration); }
 
   void print_hypo(Hypo &hypo);
+
+  struct OpenError : public std::exception {
+    virtual const char *what() const throw()
+      { return "Toolbox: open error"; }
+  };
 
 private:
   NowayHmmReader m_hmm_reader;

@@ -31,6 +31,14 @@
   $result = Py_BuildValue("s#",$1->c_str(),$1->size());
 }
 
+class Hypo {
+};
+
+%addmethods Hypo {
+  double log_prob() { return self->log_prob; }
+  int frame() { return self->frame; }
+}
+
 class HypoStack {
 public:
   Hypo &at(int index);
@@ -43,7 +51,10 @@ public:
   
   void hmm_read(const char *file);
   void lex_read(const char *file);
+  const std::string &lex_word();
+  const std::string &lex_phone();
   void ngram_read(const char *file);
+	int ngram_lineno();
 
   // Lna
   void lna_open(const char *file, int models, int size);
@@ -59,9 +70,13 @@ public:
 	void sort(int frame, int top);
 	void go_to(int frame);
 	bool run();
+	void run_to(int frame);
   int earliest_frame();
   int last_frame();
   HypoStack &stack(int frame);
+
+	void prune(int frame, int top);
+	int paths();
 
   void set_hypo_limit(int hypo_limit);
   void set_word_limit(int word_limit);

@@ -16,6 +16,12 @@
 // Might assume that words are sorted (adding prob to nodes) FIXME!!
 // Even after exception in reading, the read can be continued.
 //
+// Lexicon may contain different words with identical phoneme
+// sequences.  If a word ends in a node which has already a word end,
+// we create a new node for the new word.  The new node will be
+// inserted further in the branch vector, so all words with the same
+// prefix will end up in the old branch.
+//
 // FILE FORMAT:
 //
 // ^word(prob) phone1 phone2 ...

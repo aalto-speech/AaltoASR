@@ -56,6 +56,7 @@ public:
   bool run();
 
   // Info
+  inline int frame() const { return m_frame; }
   inline int earliest_frame() const { return m_earliest_frame; }
   inline int last_frame() const { return m_earliest_frame + m_frames; }
   int frame2stack(int frame) const;

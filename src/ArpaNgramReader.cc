@@ -151,7 +151,8 @@ ArpaNgramReader::read_ngram(int order)
     m_words.push_back(word_id);
   }
 
-  // Unigram
+  // Read unigram.  The order of words must follow the order in
+  // the vocabulary.
   if (order == 1) {
     if (m_words[0] != m_ngram.m_nodes.size())
       throw UnigramOrder();

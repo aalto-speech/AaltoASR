@@ -145,6 +145,7 @@ Search::expand_stack(int frame)
 //    std::cerr << frame << std::endl;
 
   if (!stack.empty()) {
+    std::cout << HypoPath::count << " " << Lexicon::Path::count << " ";
     debug_print_hypo(stack[0]);
   }
 
@@ -192,6 +193,7 @@ Search::expand_stack(int frame)
 	    m_history.push_front(path->word_id);
 	    path = path->prev;
 	  }
+
 	  log_prob += m_lm_offset + m_lm_scale * word->frames *
 	    m_ngram.log_prob(m_history.begin(), m_history.end());
 	}

@@ -105,6 +105,7 @@ NowayLexiconReader::read(std::istream &in)
 
     // Read phones and insert them to lexicon
     Lexicon::Node *node = m_lexicon.root();
+    Lexicon::Node *prev_node; // Used for duplicating identical word ends
     bool insert_rest = false;
 
     while (1) {
@@ -124,6 +125,8 @@ NowayLexiconReader::read(std::istream &in)
 	throw UnknownHmm();
       int hmm_id = (*it).second;
       
+      prev_node = node;
+
       // Find out if the current node has the corresponding hmm already.
       if (!insert_rest) {
 	int next_id = 0;
@@ -153,7 +156,16 @@ NowayLexiconReader::read(std::istream &in)
       }
     }
 
+    assert(node != m_lexicon.root());
+
     // Add word to lexicon
+
+    // We duplicate word ends if two words have identical phoneme
+    // sequences.  See the header file for more information.
+    if (node->word_id >= 0) {
+      node = new Lexicon::Node(*node);
+      prev_node->next.push_back(node);
+    }
     int word_id = m_vocabulary.add(m_word);
     node->word_id = word_id;
     node->log_prob = log(prob);
