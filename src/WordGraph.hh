@@ -12,7 +12,7 @@
 /** 
  * WordGraph reads Sphinx-3 lattice files
  * @file wordgraph.h
- * @date 19.6.2003
+ * @date 25.6.2003
  */
 class WordGraph {
 
@@ -97,9 +97,9 @@ class WordGraph {
   FILE *m_file;
   Vocabulary *m_vocab;
   ReadMode m_read_mode;
-  WordGraph::Node **m_node_table;
-  std::vector<WordGraph::Node> **m_frame_table;
-  std::vector<WordGraph::Edge *> m_edge_vector;
+  std::vector<WordGraph::Node> m_nodes;
+  std::vector<WordGraph::Edge> m_edges;
+  std::vector<std::vector<WordGraph::Node> > m_frames;
   int m_frame_count;
   int m_node_count;
   int m_edge_count;
