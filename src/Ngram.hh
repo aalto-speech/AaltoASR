@@ -71,7 +71,7 @@ public:
   template<class RandomAccessIterator>
   float log_prob(RandomAccessIterator begin, RandomAccessIterator end);
 
-  inline Ngram() : m_order(0) { }
+  inline Ngram() : m_order(0), m_last_order(0) { }
   inline int order() const { return m_order; }
   inline const std::string &word(unsigned int index) const
     { return Vocabulary::word(index); }
