@@ -58,6 +58,7 @@ public:
   float log_prob(const Gram &gram);
   int order() { return m_order; }
   int last_order() { return m_last_order; }
+  int gram_count(int order) { return m_order_count.at(order-1); }
 
 private:
   int binary_search(int word, int first, int last);
