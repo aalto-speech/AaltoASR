@@ -233,6 +233,7 @@ public:
   void set_lm_scale(double lm_scale) { m_lm_scale = lm_scale; }
   void set_lm_offset(double lm_offset) { m_lm_offset = lm_offset; }
   void set_beam(double beam) { m_beam = beam; }
+  void set_global_beam(double beam) { m_global_beam = beam; }
   void set_verbose(bool verbose) { m_verbose = verbose; }
 
   // Exceptions
@@ -266,14 +267,18 @@ private:
   // options
   int m_expand_window;	
   double m_lm_scale;
+  double m_lm_offset;
   bool m_verbose;
 
   // Pruning options
-  double m_lm_offset;
   int m_word_limit;	// How many best words are expanded
   double m_word_beam;   // Do not expand words outside this beam
   int m_hypo_limit;	// How many best hypos in a stack are expanded
   double m_beam;
+
+  double m_global_beam;
+  double m_global_best;
+  int m_global_frame;
 
   // Temporary variables
   std::deque<int> m_history;

@@ -93,6 +93,7 @@ public:
   void set_token_limit(int limit);
 	void set_state_beam(double beam);
 	void set_hypo_beam(double beam);
+	void set_global_beam(double beam);
   void set_max_state_duration(int duration);
 	void set_verbose(bool verbose);
 

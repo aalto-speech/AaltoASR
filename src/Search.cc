@@ -21,11 +21,14 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     // Options
     m_lm_scale(1),
     m_lm_offset(1),
+    m_verbose(false),
+
+    // Pruning options
     m_word_limit(0),
     m_word_beam(1e10),
     m_hypo_limit(0),
     m_beam(1e10),
-    m_verbose(false),
+    m_global_beam(1e10),
 
     // Temp
     m_history(0)
@@ -84,6 +87,11 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
   m_frame = 0;
   m_expand_window = expand_window;
 
+  // FIXME!  Are all beams reset properly here.  Test reinitializing
+  // the search!
+  m_global_best = -1e10;
+  m_global_frame = -1;
+
   // Initialize stacks
   m_stacks.resize(stacks);
   m_first_frame = 0;
@@ -97,7 +105,7 @@ Search::init_search(int expand_window, int stacks, int reserved_hypos)
     m_stacks[i].clear();
     m_stacks[i].reserve(reserved_hypos);
   }
-  
+
   // Create initial empty hypothesis.
   Hypo hypo;
   m_stacks[0].add(hypo);
@@ -167,9 +175,16 @@ Search::expand(int frame)
   if (frame == m_expander.eof_frame())
     return false;
       
-  // Expand all hypotheses in the stack
-  if (!stack.empty()) {
+  // Reset global pruning if current stack is best
+  if (m_global_frame == frame) {
+    m_global_best = -1e10;
+    m_global_frame = -1;
+  }
 
+  // Expand all hypotheses in the stack, but only if inside the
+  // global_beam
+  if (!stack.empty() &&
+      stack.best_log_prob() > m_global_best * m_global_beam) {
     // Fit word lexicon to acoustic data
     m_expander.expand(frame, m_expand_window);
 
@@ -225,9 +240,17 @@ Search::expand(int frame)
 
 	// Insert hypo to target stack, if inside the beam
 	if (log_prob > target_stack.best_log_prob() - m_beam) {
-	  Hypo new_hypo(frame + word->frames, log_prob, hypo.path);
+	  int target_frame = frame + word->frames;
+	  Hypo new_hypo(target_frame, log_prob, hypo.path);
 	  new_hypo.add_path(word->word_id, hypo.frame);
 	  target_stack.add(new_hypo);
+
+	  // Update global pruning
+	  double avg_log_prob = log_prob / target_frame;
+	  if (avg_log_prob > m_global_best) {
+	    m_global_best = avg_log_prob;
+	    m_global_frame = target_frame;
+	  }
 	}
       }
     }

@@ -51,6 +51,7 @@ public:
   void set_token_limit(int limit) { m_expander.set_token_limit(limit); }
   void set_state_beam(double beam) { m_expander.set_beam(beam); }
   void set_hypo_beam(double beam) { m_search.set_beam(beam); }
+  void set_global_beam(double beam) { m_search.set_global_beam(beam); }
   void set_max_state_duration(int duration) 
     { m_expander.set_max_state_duration(duration); }
   void set_verbose(bool verbose) { m_search.set_verbose(verbose); }
