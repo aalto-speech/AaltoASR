@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <assert.h>
+#include <math.h>
 
 #include "Endian.hh"
 #include "TreeGram.hh"
@@ -412,16 +413,19 @@ TreeGram::flip_endian()
 void
 TreeGram::fetch_gram(const Gram &gram, int first)
 {
+  assert(first >= 0 && first < gram.size());
+
   int prev = -1;
   m_fetch_stack.clear();
   
-  while (m_fetch_stack.size() < gram.size()) {
-    int node = find_child(gram[first], prev);
+  int i = first;
+  while (m_fetch_stack.size() < gram.size() - first) {
+    int node = find_child(gram[i], prev);
     if (node < 0)
       break;
     m_fetch_stack.push_back(node);
-    first++;
-    node = prev;
+    i++;
+    prev = node;
   }
 }
 
@@ -430,35 +434,70 @@ TreeGram::log_prob(const Gram &gram)
 {
   assert(gram.size() > 0);
 
-  float log_prob = 0;
-  
+  if (m_type==BACKOFF) {
+    float log_prob = 0.0;
   // Denote by (w(1) w(2) ... w(N)) the ngram that was requested.  The
   // log-probability of the back-off model is computed as follows:
 
   // Iterate n = 1..N:
   // - If (w(n) ... w(N)) not found, add the possible (w(n) ... w(N-1) backoff
   // - Otherwise, add the log-prob and return.
-  int n = 0;
-  while (1) {
-    assert(n < gram.size());
-    fetch_gram(gram, n);
-    assert(m_fetch_stack.size() > 0);
-
-    // Full gram found?
-    if (m_fetch_stack.size() == gram.size()) {
-      log_prob += m_nodes[m_fetch_stack.back()].log_prob;
-      m_last_order = gram.size() - n;
-      break;
+    int n = 0;
+    while (1) {
+      assert(n < gram.size());
+      fetch_gram(gram, n);
+      assert(m_fetch_stack.size() > 0);
+      
+      // FIXME: remove debug
+      fprintf(stderr, "TreeGram::log_prob: %d %d %d\n",
+	      gram.size(), m_fetch_stack.size(), n);
+      
+      // Full gram found?
+      if (m_fetch_stack.size() == gram.size() - n) {
+	log_prob += m_nodes[m_fetch_stack.back()].log_prob;
+	m_last_order = gram.size() - n;
+	break;
+      }
+      
+      // Back-off found?
+      if (m_fetch_stack.size() == gram.size() - 1)
+	log_prob += m_nodes[m_fetch_stack.back()].back_off;
+      
+      n++;
     }
-    
-    // Back-off found?
-    if (m_fetch_stack.size() == gram.size() - 1)
-      log_prob += m_nodes[m_fetch_stack.back()].back_off;
-
-    n++;
+    return log_prob;
   }
+  if (m_type==INTERPOLATED) {
+    // Denote by (w(1) w(2) ... w(N)) the ngram that was requested.  The
+    // log-probability of the back-off model is computed as follows:
 
-  return log_prob;
+    //   for ngrams of all order n: 1..N
+    //   - take the probability P(W(N)|W(N-1)..W(N-n)
+    //   - add the corresponding KN-coefficient c(W(N-1)..W(N-n))
+    //   - add the corresponding interpolation coeff i(n)
+    float prob=0.0;
+    float oldcoeff=-9999999999;
+    for (int n=1;n<=gram.size();n++) {
+      fetch_gram(gram,gram.size()-n);
+
+      if (m_fetch_stack.size() < n) {
+	m_last_order=n-1;
+	return(log10(prob));
+      }
+
+      if (n!=1) {
+	prob=pow(10,m_nodes[m_fetch_stack[n-2]].back_off)*prob;
+	fprintf(stderr,"-> %.4g",prob);
+      }
+      prob+=pow(10,m_nodes[m_fetch_stack[n-1]].log_prob);
+
+      fprintf(stderr,": %.4g ",prob);
+      oldcoeff=m_nodes[m_fetch_stack.back()].back_off;
+    }
+    m_last_order=gram.size();
+    return(log10(prob));
+  }
+  return(0);
 }
 
 TreeGram::Iterator::Iterator(TreeGram *gram)
