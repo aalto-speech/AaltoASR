@@ -43,12 +43,11 @@ public:
 
   // Search
   void init(int expand_window, int stacks, int reserved_hypos) 
-    { 
-      m_search.init_search(expand_window, stacks, reserved_hypos); 
-    }
+  { 
+    m_search.init_search(expand_window, stacks, reserved_hypos); 
+  }
   void sort(int frame, int top = 0) { m_search.sort_stack(frame, top); }
-  bool expand_stack(int frame) { return m_search.expand(frame); }
-  void move_buffer(int frame) { m_search.move_buffer(frame); }
+  bool expand_stack(int frame) { return m_search.expand_stack(frame); }
   void go(int frame) { m_search.go(frame); }
   bool run() { return m_search.run(); }
   bool runto(int frame);
@@ -64,7 +63,7 @@ public:
 
   // Options
   void set_forced_end(bool forced_end) 
-    { m_expander.set_forced_end(forced_end); }
+  { m_expander.set_forced_end(forced_end); }
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
   void set_prune_similar(int prune_similar) { m_search.set_prune_similar(prune_similar); } 
   void set_word_limit(int word_limit) { m_search.set_word_limit(word_limit); }
@@ -74,26 +73,28 @@ public:
   void set_unk_offset(float unk_offset) { m_search.set_unk_offset(unk_offset); }
   void set_token_limit(int limit) { m_expander.set_token_limit(limit); }
   void set_state_beam(float beam) { m_expander.set_beam(beam); }
-  void set_hypo_beam(float beam) { m_search.set_beam(beam); }
+  void set_hypo_beam(float beam) { m_search.set_hypo_beam(beam); }
   void set_global_beam(float beam) 
-    { m_search.set_global_beam(beam); }
+  { m_search.set_global_beam(beam); }
   void set_max_state_duration(int duration) 
-    { m_expander.set_max_state_duration(duration); }
+  { m_expander.set_max_state_duration(duration); }
   void set_verbose(int verbose) { m_search.set_verbose(verbose); }
   void set_print_probs(bool print_probs) 
-    { m_search.set_print_probs(print_probs); }
+  { m_search.set_print_probs(print_probs); }
   void set_print_indices(bool print_indices) 
-    { m_search.set_print_indices(print_indices); }
+  { m_search.set_print_indices(print_indices); }
+  void set_word_boundary(const std::string &word)
+  { m_search.set_word_boundary(word); }
 
   // Debug
   void print_prunings()
-    { m_search.print_prunings(); }
+  { m_search.print_prunings(); }
   void print_hypo(Hypo &hypo);
   void print_sure() { m_search.print_sure(); }
 
   struct OpenError : public std::exception {
     virtual const char *what() const throw()
-      { return "Toolbox: open error"; }
+    { return "Toolbox: open error"; }
   };
 
 private:

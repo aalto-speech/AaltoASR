@@ -82,7 +82,6 @@ public:
   void init(int expand_window, int stacks, int reserved_hypos);
   void sort(int frame, int top);
   bool expand_stack(int frame);
-  void move_buffer(int frame);
   void go(int frame);
   bool run();
   bool runto(int frame);
@@ -111,6 +110,7 @@ public:
   void set_verbose(int verbose);
   void set_print_probs(bool print_probs);
   void set_print_indices(bool print_indices);
+  void set_word_boundary(const std::string &word);
 
 	void print_prunings();
   void print_hypo(Hypo &hypo);

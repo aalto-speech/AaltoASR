@@ -156,7 +156,7 @@ NowayLexiconReader::read(std::istream &in)
       }
     }
 
-    assert(node != m_lexicon.root()); FIXME pronounciation empty!!
+    assert(node != m_lexicon.root()); // FIXME: can pronounciation be empty?
 
     // Add word to lexicon
 

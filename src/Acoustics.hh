@@ -5,7 +5,7 @@
 
 class Acoustics {
 public:
-  inline Acoustics() : m_log_prob(NULL), m_eof_frame(-1), m_num_models(0) { }
+  inline Acoustics() : m_log_prob(NULL), m_num_models(0) { }
   virtual ~Acoustics() { }
 
   /** Go to specified frame.  Returns false if frame is past end of file.

@@ -53,8 +53,14 @@ public:
 
   // Info
   inline std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
-  inline std::vector<Word*> &words() { return m_sorted_words; }
-  inline int eof_frame() const { return m_acoustics.eof_frame(); }
+
+  /**
+   * Returns the list of the best words.
+   *
+   * It is ok to modify this vector freely.  The vector will be
+   * cleared anyway when expand() is called.
+   **/
+  inline std::vector<Word*> &words() { return m_found_words; }
 
   // Debug
   void debug_print_history(Lexicon::Token *token);
@@ -80,7 +86,7 @@ private:
   // State
   std::vector<Lexicon::Token*> m_tokens;
   std::vector<Word> m_words;
-  std::vector<Word*> m_sorted_words;
+  std::vector<Word*> m_found_words;
   int m_frame; // Current frame relative to the start frame.
   int m_frames; // Max frames per word
   float m_beam_best;

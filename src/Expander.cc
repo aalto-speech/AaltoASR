@@ -23,7 +23,7 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_beam(1e10),
     m_max_state_duration(0x7fff), // FIXME
     m_words(),
-    m_sorted_words()
+    m_found_words()
 {
 }
 
@@ -202,7 +202,7 @@ Expander::move_all_tokens()
 
 	    if (!word->active || avg_log_prob > word->avg_log_prob) {
 	      if (!word->active)
-		m_sorted_words.push_back(word);
+		m_found_words.push_back(word);
 	      word->avg_log_prob = avg_log_prob;
 	      word->log_prob = log_prob;
 	      word->frames = m_frame;
@@ -382,8 +382,8 @@ void
 Expander::expand(int start_frame, int frames)
 {
   if (m_words.size() != m_lexicon.words()) {
-    m_sorted_words.clear();
-    m_sorted_words.reserve(m_lexicon.words());
+    m_found_words.clear();
+    m_found_words.reserve(m_lexicon.words());
     m_words.resize(m_lexicon.words());
     for (int i = 0; i < m_words.size(); i++)
       m_words[i].word_id = i;
@@ -392,7 +392,7 @@ Expander::expand(int start_frame, int frames)
   // Clear best words list
   for (int i = 0; i < m_words.size(); i++)
     m_words[i].active = false;
-  m_sorted_words.clear();    
+  m_found_words.clear();    
 
   create_initial_tokens(start_frame);
 
