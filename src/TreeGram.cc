@@ -452,7 +452,7 @@ TreeGram::Iterator::reset(TreeGram *gram)
   assert(gram);
   m_gram = gram;
   m_index_stack.clear();
-  m_index_stack.resize(gram->m_order);
+  m_index_stack.reserve(gram->m_order);
 }
 
 bool
@@ -489,8 +489,7 @@ TreeGram::Iterator::next()
     // No children, try siblings 
     if (m_index_stack.size() == 1) {
       // Unigram level: we have always siblings
-      index++;
-      assert(index < m_gram->m_order_count[0]);
+      m_index_stack.back()++;
       return true;
     }
     else {
@@ -530,10 +529,15 @@ TreeGram::Iterator::next_order(int order)
 }
 
 const TreeGram::Node&
-TreeGram::Iterator::node()
+TreeGram::Iterator::node(int order)
 {
   assert(m_gram);
   assert(!m_index_stack.empty());
-  
-  return m_gram->m_nodes[m_index_stack.back()];
+  assert(order <= m_index_stack.size());
+  assert(order >= 0);
+
+  if (order == 0)
+    return m_gram->m_nodes[m_index_stack.back()];
+  else
+    return m_gram->m_nodes[m_index_stack[order-1]];
 }

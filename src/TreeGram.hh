@@ -32,7 +32,11 @@ public:
     // Move to the next node on the given order
     bool next_order(int order);
 
-    const Node &node();
+    // Return the node from the index stack. (default: the last one)
+    const Node &node(int order = 0);
+
+    // Order of the current node (1 ... n)
+    int order() { return m_index_stack.size(); }
 
   private:
     TreeGram *m_gram;
