@@ -217,7 +217,7 @@ public:
   // Debug and print
   void print_prunings();
   void print_path(HypoPath *path);
-  void print_hypo(Hypo &hypo);
+  void print_hypo(const Hypo &hypo);
   void print_sure();
 
   // Operate
@@ -267,13 +267,14 @@ public:
   };
 
 private:
+  void check_stacks();
   void ensure_stack(int frame);
-  float compute_lm_log_prob(Hypo &hypo);
+  float compute_lm_log_prob(const Hypo &hypo);
   void update_global_pruning(int frame, float log_prob);
-  void insert_hypo(int target_frame, Hypo &hypo);
-  void expand_hypo_with_word(Hypo &hypo, int word, int target_frame, 
+  void insert_hypo(int target_frame, const Hypo &hypo);
+  void expand_hypo_with_word(const Hypo &hypo, int word, int target_frame, 
 			     float ac_log_prob);
-  void expand_hypo(Hypo &hypo);
+  void expand_hypo(const Hypo &hypo);
   void find_best_words(int frame);
   void initial_prunings(int frame, HypoStack &stack);
 

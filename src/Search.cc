@@ -7,6 +7,8 @@
 
 int HypoPath::g_count = 0;
 
+// FIXME: remove frame2stack
+
 // FIXME: check that every log_prob has the same base!  Now they
 // should be log10 everywhere.
 
@@ -57,7 +59,6 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     // Stacks states
     m_first_frame(0),
     m_last_frame(0),
-    m_first_stack(0),
     m_last_hypo_frame(0),
 
     // Options
@@ -93,7 +94,7 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
 //      if (stack.size() > 0)
 //        std::cout << f << std::endl;
 //      for (int h = 0; h < stack.size(); h++) {
-//        Hypo &hypo = stack.at(h);
+//        const Hypo &hypo = stack.at(h);
 //        HypoPath *path = hypo.path;
 //        while (path != NULL) {
 //  	if (path->printed)
@@ -129,6 +130,7 @@ Search::print_path(HypoPath *path)
   if (m_print_indices)
     std::cout << "(" << path->word_id << ")";
   std::cout << " ";
+
   if (m_print_probs)
     std::cout << path->ac_log_prob << " "
 	      << path->lm_log_prob << " ";
@@ -137,7 +139,7 @@ Search::print_path(HypoPath *path)
 }
 
 void
-Search::print_hypo(Hypo &hypo)
+Search::print_hypo(const Hypo &hypo)
 {
   std::stack<HypoPath*> stack;
 
@@ -163,7 +165,7 @@ Search::print_hypo(Hypo &hypo)
       print_path(path);
     }
   }
-  std::cout << hypo.frame << std::endl;
+  std::cout << ": " << hypo.frame << " " << hypo.log_prob << std::endl;
 }
 
 void
@@ -207,13 +209,12 @@ Search::reset_search(int start_frame)
   m_frame = start_frame;
   m_first_frame = start_frame;
   m_last_frame = m_first_frame + m_stacks.size();
-  m_first_stack = frame2stack(start_frame);
   m_last_hypo_frame = start_frame;
 
   // Create initial empty hypothesis.
   Hypo hypo(0, 0, new HypoPath(-1, -1, NULL));
   m_last_printed_path = hypo.path;
-  m_stacks[m_first_stack].add(hypo);
+  stack(m_first_frame).add(hypo);
 
   // Reset pruning statistics
   m_stack_expansions = 0;
@@ -270,18 +271,13 @@ Search::frame2stack(int frame) const
     throw FutureFrame();
   }
 
-  // Find the stack corresponding to the given frame
-  int index = frame - m_first_frame;
-  index = (m_first_stack + index) % m_stacks.size();
-
-  return index;
+  return frame % m_stacks.size();
 }
 
 void
 Search::sort_stack(int frame, int top)
 {
-  int stack_index = frame2stack(frame);
-  HypoStack &stack = m_stacks[stack_index];
+  HypoStack &stack = this->stack(frame);
   stack.partial_sort(top);
 }
 
@@ -289,15 +285,14 @@ void
 Search::ensure_stack(int frame)
 {
   while (m_last_frame <= frame) {
-    m_stacks[m_first_stack].clear();
+    stack(m_first_frame).clear();
     m_first_frame++;
     m_last_frame++;
-    m_first_stack = frame2stack(m_first_frame);
   }
 }
 
 float
-Search::compute_lm_log_prob(Hypo &hypo)
+Search::compute_lm_log_prob(const Hypo &hypo)
 {
   float lm_log_prob = 0;
 
@@ -337,8 +332,10 @@ Search::update_global_pruning(int frame, float log_prob)
 }
 
 void
-Search::insert_hypo(int target_frame, Hypo &hypo)
+Search::insert_hypo(int target_frame, const Hypo &hypo)
 {
+  assert(hypo.frame == target_frame);
+
   ensure_stack(target_frame);
 
   // Check hypo beam
@@ -351,15 +348,18 @@ Search::insert_hypo(int target_frame, Hypo &hypo)
     
   // Insert hypothesis in the stack
   target_stack.add(hypo);
-  if (target_frame > m_last_hypo_frame)
+  if (target_frame > m_last_hypo_frame) {
     m_last_hypo_frame = target_frame;
+    if (m_verbose == 1)
+      print_sure();
+  }
   m_hypo_insertions++;
 
   update_global_pruning(target_frame, hypo.log_prob);
 }
 
 void
-Search::expand_hypo_with_word(Hypo &hypo, int word, int target_frame, 
+Search::expand_hypo_with_word(const Hypo &hypo, int word, int target_frame, 
 			      float ac_log_prob)
 {
   // Add the expanded hypothesis
@@ -367,7 +367,7 @@ Search::expand_hypo_with_word(Hypo &hypo, int word, int target_frame,
   new_hypo.add_path(word, target_frame);
   new_hypo.path->ac_log_prob = ac_log_prob;
   new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
-  new_hypo.log_prob = ac_log_prob + new_hypo.path->lm_log_prob;
+  new_hypo.log_prob = hypo.log_prob + ac_log_prob + new_hypo.path->lm_log_prob;
   insert_hypo(target_frame, new_hypo);
 
   // Add also the hypothesis with word boundary
@@ -376,13 +376,14 @@ Search::expand_hypo_with_word(Hypo &hypo, int word, int target_frame,
     new_hypo.add_path(m_word_boundary, target_frame);
     new_hypo.path->ac_log_prob = 0;
     new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
-    new_hypo.log_prob = ac_log_prob + new_hypo.path->lm_log_prob;
+    new_hypo.log_prob = hypo.log_prob + ac_log_prob + 
+      new_hypo.path->lm_log_prob;
     insert_hypo(target_frame, new_hypo);
   }
 }
 
 void
-Search::expand_hypo(Hypo &hypo)
+Search::expand_hypo(const Hypo &hypo)
 {
   std::vector<Expander::Word*> &words = m_expander.words();
 
@@ -456,30 +457,51 @@ Search::initial_prunings(int frame, HypoStack &stack)
   }
 }
 
+void
+Search::check_stacks()
+{
+  for (int f = m_first_frame; f < m_last_frame; f++) {
+    HypoStack &stack = this->stack(f);
+    if (stack.empty())
+      continue;
+    for (int h = 0; h < stack.size(); h++) {
+      assert(stack[h].frame == f);
+    }
+  }
+}
+
 bool
 Search::expand_stack(int frame)
 {
-  int stack_index = frame2stack(frame);
-  HypoStack &stack = m_stacks[stack_index];
+  HypoStack &stack = this->stack(frame);
   stack.sort();
 
   // Check if the end of speech has been reached.
-  if (frame > m_last_hypo_frame)
+  if (frame > m_last_hypo_frame) {
+    std::cerr << "no more hypos after frame " 
+	      << m_last_hypo_frame << std::endl;
+    print_sure();
     return false;
+  }
 
   initial_prunings(frame, stack);
 
   // Find the acoustically best words and expand all hypos in the stack.
   if (!stack.empty()) {
+    if (m_verbose == 2) {
+      std::cout << frame << "\t";
+      print_hypo(stack.at(0));
+    }
+
     m_stack_expansions++;
     find_best_words(frame);
 
-    for (int h = 0; h < stack.size(); h++)
+    for (int h = 0; h < stack.size(); h++) {
+      assert(stack[h].frame == frame);
       expand_hypo(stack[h]);
+    }
     stack.clear();
   }
-
-  print_sure();
 
   return true;
 }
@@ -488,8 +510,7 @@ void
 Search::go(int frame)
 {
   while (m_frame < frame) {
-    int index = frame2stack(m_frame);
-    HypoStack &stack = m_stacks[index];
+    HypoStack &stack = this->stack(frame);
     stack.clear();
     m_frame++;
   }
