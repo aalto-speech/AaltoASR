@@ -148,8 +148,8 @@ public:
   inline void partial_sort(int top);
   inline void sort();
   inline void prune(int top); // does not sort if not necessary
+  inline void prune_similar(int length); // does not sort if not necessary
   inline void clear();
-  void prune_similar(int length);
 
   // Status
   inline void reset_best() { m_best_log_prob = -1e10; m_best_index = -1; }
@@ -224,12 +224,10 @@ public:
   void reset_search(int start_frame);
   void init_search(int expand_window, int stacks, int reserved_hypos);
   void sort_stack(int frame, int top = 0);
-  bool expand(int frame);
-  void move_buffer(int frame);
+  bool expand_stack(int frame);
   void go(int frame);
   bool run();
   bool recognize_segment(int start_frame, int end_frame);
-  void prune_similar(int frame, int length);
 
   // Info
   inline int frame() const { return m_frame; }
@@ -250,11 +248,12 @@ public:
   void set_lm_offset(float lm_offset) { m_lm_offset = lm_offset; }
   void set_unk_offset(float unk_offset) { m_unk_offset = unk_offset; }
   void set_prune_similar(int prune_similar) { m_prune_similar = prune_similar; }
-  void set_beam(float beam) { m_beam = beam; }
+  void set_hypo_beam(float hypo_beam) { m_hypo_beam = hypo_beam; }
   void set_global_beam(float beam) { m_global_beam = beam; }
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_print_probs(bool print_probs) { m_print_probs = print_probs; }
   void set_print_indices(bool print_indices) { m_print_indices = print_indices; }
+  void set_word_boundary(const std::string &word);
 
   // Exceptions
   struct ForgottenFrame : public std::exception {
@@ -268,10 +267,18 @@ public:
   };
 
 private:
-  void circulate(int &stack);
+  void ensure_stack(int frame);
+  float compute_lm_log_prob(Hypo &hypo);
+  void update_global_pruning(int frame, float log_prob);
+  void insert_hypo(int target_frame, Hypo &hypo);
+  void expand_hypo_with_word(Hypo &hypo, int word, int target_frame, 
+			     float ac_log_prob);
+  void expand_hypo(Hypo &hypo);
+  void find_best_words(int frame);
+  void initial_prunings(int frame, HypoStack &stack);
 
   Expander &m_expander;
-  const Vocabulary &m_vocabulary;
+  const Vocabulary &m_vocabulary; // Words in lexicon (not the words in lm)
   const Ngram &m_ngram;
 
   // Mapping between lexicon and language model
@@ -287,7 +294,11 @@ private:
   std::vector<HypoStack> m_stacks;
   int m_last_hypo_frame;
 
-  // options
+  // Options
+
+  /**
+   * Size of the window (in frames) used in Viterbi expansion.
+   **/
   int m_expand_window;	
   int m_end_frame;
   float m_lm_scale;
@@ -298,12 +309,18 @@ private:
   bool m_print_indices;
   HypoPath *m_last_printed_path;
 
+  /** Index of the word boundary in LM context (negative if not used)
+   * Currently, when a hypothesis is expanded with word W, it is also
+   * expanded with a word bounadry and W.
+   **/
+  int m_word_boundary;
+
   // Pruning options
   int m_word_limit;	// How many best words are expanded
   float m_word_beam;   // Do not expand words outside this beam
   int m_prune_similar;  // Prune similar N-word endings 
   int m_hypo_limit;	// How many best hypos in a stack are expanded
-  float m_beam;
+  float m_hypo_beam;
 
   // Global pruning
   float m_global_best;

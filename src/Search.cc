@@ -10,7 +10,14 @@ int HypoPath::g_count = 0;
 // FIXME: check that every log_prob has the same base!  Now they
 // should be log10 everywhere.
 
-// Assumes sorted
+// Prunes hypotheses with the same last N words in LM sense.  Only the
+// best hypothesis is retained.
+//
+// FIXME: currently path->word_id is an index in lexicon, not in LM!
+// Search class has lex2lm mapping, which maps lexicon words to LM
+// words.  Currently, this is relevant only for UNK words.  So now the
+// implementation below does not prune different UNK words. 
+// Tue Nov 26 11:50:16 EET 2002
 void
 HypoStack::prune_similar(int length)
 {
@@ -63,11 +70,12 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_last_printed_path(NULL),
 
     // Pruning options
+    m_word_boundary(-1),
     m_word_limit(0),
     m_word_beam(1e10),
     m_hypo_limit(0),
     m_prune_similar(0),
-    m_beam(1e10),
+    m_hypo_beam(1e10),
     m_global_beam(1e10),
 
     // Temp
@@ -97,6 +105,12 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
 //      }
 //    }
 //  }
+
+void
+Search::set_word_boundary(const std::string &word)
+{
+  m_word_boundary = m_vocabulary.index(word);
+}
 
 void
 Search::print_prunings()
@@ -253,7 +267,6 @@ Search::frame2stack(int frame) const
     std::cerr << std::endl 
 	      << "m_last_frame = " << m_last_frame << " but " << frame 
 	      << " requested" << std::endl;
-    std::cerr << "eof_frame = " << m_expander.eof_frame() << std::endl;
     std::cerr << "m_last_hypo_frame = " << m_last_hypo_frame << std::endl;
     throw FutureFrame();
   }
@@ -274,47 +287,142 @@ Search::sort_stack(int frame, int top)
 }
 
 void
-Search::circulate(int &stack)
-{
-  stack++;
-  if (stack >= m_stacks.size())
-    stack = 0;
-}
-
-void
-Search::move_buffer(int frame)
+Search::ensure_stack(int frame)
 {
   while (m_last_frame <= frame) {
     m_stacks[m_first_stack].clear();
-    circulate(m_first_stack);
     m_first_frame++;
     m_last_frame++;
+    m_first_stack = frame2stack(m_first_frame);
+  }
+}
+
+float
+Search::compute_lm_log_prob(Hypo &hypo)
+{
+  float lm_log_prob = 0;
+
+  if (m_ngram.order() > 0 && m_lm_scale > 0) {
+    m_history.clear();
+    HypoPath *path = hypo.path;
+    int last_word = path->word_id;
+    for (int i = 0; i < m_ngram.order(); i++) {
+      if (path->guard())
+	break;
+      m_history.push_front(m_lex2lm[path->word_id]);
+      path = path->prev;
+    }
+
+    float ngram_log_prob = m_ngram.log_prob(m_history.begin(), m_history.end());
+
+    // With m_unk_offset it is possible to distribute the
+    // log-probability of the single UNK word of the LM over several
+    // imaginary UNK words.
+    float unk_offset = (last_word == 0) ? m_unk_offset : 0;
+
+    lm_log_prob = m_lm_offset + m_lm_scale * (ngram_log_prob + unk_offset);
+    // FIXME: we could also use the length to normalize the LM probability.
+  }
+
+  return lm_log_prob;
+}
+
+void
+Search::update_global_pruning(int frame, float log_prob)
+{
+  float avg_log_prob = log_prob / frame;
+  if (avg_log_prob > m_global_best / m_global_frame) {
+    m_global_best = log_prob;
+    m_global_frame = frame;
   }
 }
 
 void
-Search::prune_similar(int frame, int length)
+Search::insert_hypo(int target_frame, Hypo &hypo)
 {
-  int stack_index = frame2stack(frame);
-  HypoStack &stack = m_stacks[stack_index];
-  stack.prune_similar(length);
+  ensure_stack(target_frame);
+
+  // Check hypo beam
+  // FIXME: we could check global beam here too!
+  HypoStack &target_stack = stack(target_frame);
+  if (hypo.log_prob < target_stack.best_log_prob() - m_hypo_beam) {
+    m_beam_prunings++;
+    return;
+  }
+    
+  // Insert hypothesis in the stack
+  target_stack.add(hypo);
+  if (target_frame > m_last_hypo_frame)
+    m_last_hypo_frame = target_frame;
+  m_hypo_insertions++;
+
+  update_global_pruning(target_frame, hypo.log_prob);
 }
 
-bool
-Search::expand(int frame)
+void
+Search::expand_hypo_with_word(Hypo &hypo, int word, int target_frame, 
+			      float ac_log_prob)
 {
-  // End of input?  
-  if (frame > m_last_hypo_frame) {
-    assert(this->stack(m_last_hypo_frame).size() > 0);
-    print_hypo(this->stack(m_last_hypo_frame).at(0));
-    return false;
-  }
-  
-  // Sort the current stack
-  int stack_index = frame2stack(frame);
-  HypoStack &stack = m_stacks[stack_index];
-  stack.sort();
+  // Add the expanded hypothesis
+  Hypo new_hypo(target_frame, 0, hypo.path);
+  new_hypo.add_path(word, target_frame);
+  new_hypo.path->ac_log_prob = ac_log_prob;
+  new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
+  new_hypo.log_prob = ac_log_prob + new_hypo.path->lm_log_prob;
+  insert_hypo(target_frame, new_hypo);
 
+  // Add also the hypothesis with word boundary
+  // FIXME: it is useless to do this if no LM is used!
+  if (m_word_boundary > 0) {
+    new_hypo.add_path(m_word_boundary, target_frame);
+    new_hypo.path->ac_log_prob = 0;
+    new_hypo.path->lm_log_prob = compute_lm_log_prob(new_hypo);
+    new_hypo.log_prob = ac_log_prob + new_hypo.path->lm_log_prob;
+    insert_hypo(target_frame, new_hypo);
+  }
+}
+
+void
+Search::expand_hypo(Hypo &hypo)
+{
+  std::vector<Expander::Word*> &words = m_expander.words();
+
+  for (int w = 0; w < words.size(); w++) {
+    if (w >= m_word_limit)
+      break;
+
+    // FIXME: We could break here if words were always sorted.  Are they?
+    if (words[w]->avg_log_prob < words[0]->avg_log_prob * m_word_beam)
+      continue; 
+
+    expand_hypo_with_word(hypo, words[w]->word_id,
+			  hypo.frame + words[w]->frames, 
+			  words[w]->log_prob);
+  }
+}
+
+void
+Search::find_best_words(int frame)
+{
+  // Do the Viterbi search.
+  if (m_end_frame > 0 && (frame + m_expand_window > m_end_frame))
+    m_expander.expand(frame, m_end_frame - frame);
+  else
+    m_expander.expand(frame, m_expand_window);
+
+  // Sort the words according to the average log-probability.
+  std::vector<Expander::Word*> &words = m_expander.words();
+  if (m_word_limit > 0 && words.size() > m_word_limit) {
+    std::partial_sort(words.begin(), words.begin() + m_word_limit, 
+		      words.end(),
+		      Expander::WordCompare());
+    words.resize(m_word_limit);
+  }
+}
+
+void
+Search::initial_prunings(int frame, HypoStack &stack)
+{
   // Prune similar endings
   if (m_prune_similar > 0) {
     int before = stack.size();
@@ -335,129 +443,42 @@ Search::expand(int frame)
   if (stack.best_log_prob() > ref)
     ref = stack.best_log_prob();
   for (int i = 0; i < stack.size(); i++) {
-    if (stack[i].log_prob + m_beam < ref) {
+    if (stack[i].log_prob + m_hypo_beam < ref) {
       m_beam_prunings += stack.size() - i;
       stack.prune(i);
       break;
     }
   }
 
-  // Reset global pruning if current stack is best
+  // Reset global pruning if current stack was the best
   if (m_global_frame == frame) {
     m_global_best = 1e10;
     m_global_frame = -1;
   }
+}
 
-  // Debug print
-  if (m_verbose == 1 && !stack.empty()) {
-    static int step = 100;
-    static int next = 0;
-    if (frame > next) {
-      print_sure();
-      while (frame > next)
-	next += step;
-    }
-  }
-  if (m_verbose == 2 && !stack.empty())
-    print_hypo(stack.at(0));
+bool
+Search::expand_stack(int frame)
+{
+  int stack_index = frame2stack(frame);
+  HypoStack &stack = m_stacks[stack_index];
+  stack.sort();
 
-      
-  // Expand the stack
+  // Check if the end of speech has been reached.
+  if (frame > m_last_hypo_frame)
+    return false;
+
+  initial_prunings(frame, stack);
+
+  // Find the acoustically best words and expand all hypos in the stack.
   if (!stack.empty()) {
-    // Fit word lexicon to acoustic data
-    if (m_end_frame > 0 && (frame + m_expand_window > m_end_frame))
-      m_expander.expand(frame, m_end_frame - frame);
-    else
-      m_expander.expand(frame, m_expand_window);
-
     m_stack_expansions++;
+    find_best_words(frame);
 
-    // Get only the best words
-    // FIXME: perhaps we want to add LM probs here, perhaps not
-    std::vector<Expander::Word*> words = m_expander.words();
-    if (m_word_limit > 0 && words.size() > m_word_limit) {
-      std::partial_sort(words.begin(), words.begin() + m_word_limit, 
-			words.end(),
-			Expander::WordCompare());
-      words.resize(m_word_limit);
-    }
-
-    // Expand all hypotheses in the stack...
-    for (int h = 0; h < stack.size(); h++) {
-      Hypo &hypo = stack[h];
-
-      // ... Using the best words
-      for (int w = 0; w < words.size(); w++) {
-	Expander::Word *word = words[w];
-
-	// Prune words much worse than the best words on average
-	if (word->avg_log_prob < words[0]->avg_log_prob * m_word_beam)
-	  // FIXME: could we break here if words are sorted?
-	  // Currently, they are not sorted always!
-	  continue; 
-
-	float log_prob = hypo.log_prob + word->log_prob;
-	float lm_log_prob = 0;
-
-	// Calculate language model probabilities
-	if (m_ngram.order() > 0 && m_lm_scale > 0) {
-	  int lm_word_id = m_lex2lm[word->word_id];
-	  m_history.clear();
-	  m_history.push_front(lm_word_id);
-	  HypoPath *path = hypo.path;
-	  for (int i = 0; i < m_ngram.order()-1; i++) {
-	    if (path->guard())
-	      break;
-	    m_history.push_front(m_lex2lm[path->word_id]);
-	    path = path->prev;
-	  }
-
-	  float tmp = m_ngram.log_prob(m_history.begin(), m_history.end());
-	  lm_log_prob = m_lm_offset + m_lm_scale * 
-//	    word->frames * // Do we need this really?!
-	    (tmp + (lm_word_id == 0 ? m_unk_offset : 0));
-
-	  log_prob += lm_log_prob;
-	}
-
-	// Ensure stack space
-	move_buffer(frame + word->frames);
-	assert(frame >= m_first_frame);
-	int index = frame2stack(frame + word->frames);
-	HypoStack &target_stack = m_stacks[index];
-
-	// Insert hypo to target stack, if inside the beam
-	if (log_prob > target_stack.best_log_prob() - m_beam) {
-	  int target_frame = frame + word->frames;
-	  Hypo new_hypo(target_frame, log_prob, hypo.path);
-	  new_hypo.add_path(word->word_id, hypo.frame);
-	  
-	  new_hypo.path->lm_log_prob = lm_log_prob;
-
-	  new_hypo.path->ac_log_prob = word->log_prob;
-
-	  target_stack.add(new_hypo);
-	  if (target_frame > m_last_hypo_frame)
-	    m_last_hypo_frame = target_frame;
-
-	  // Update global pruning
-	  float avg_log_prob = log_prob / target_frame;
-	  if (avg_log_prob > m_global_best / m_global_frame) {
-	    m_global_best = log_prob;
-	    m_global_frame = target_frame;
-	  }
-
-	  m_hypo_insertions++;
-	}
-	else
-	  m_beam_prunings++;
-      }
-    }
-  }
-
-  // FIXME REALLY: is this good idea?!  
-  if (m_expander.words().size() > 0)
+    for (int h = 0; h < stack.size(); h++)
+      expand_hypo(stack[h]);
     stack.clear();
+  }
 
   return true;
 }
@@ -476,7 +497,7 @@ Search::go(int frame)
 bool
 Search::run()
 {
-  if (!expand(m_frame)) {
+  if (!expand_stack(m_frame)) {
     return false;
   }
   else {
@@ -491,7 +512,7 @@ Search::recognize_segment(int start_frame, int end_frame)
   reset_search(start_frame);
   set_end_frame(end_frame);
   while (m_frame <= end_frame) {
-    if (!expand(m_frame))
+    if (!expand_stack(m_frame))
       return false;
     m_frame++;
   }
