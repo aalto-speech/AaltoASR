@@ -8,4 +8,6 @@ Decoder_wrap.cc Decoder.py: Decoder.i ../libdecoder.a
 Decodercmodule.so: Decoder_wrap.cc ../libdecoder.a
 	$(CXX) $(CXXFLAGS) -shared $(PYTHONINC) -I../ Decoder_wrap.cc ../libdecoder.a -o Decodercmodule.so
 
+EXTRA_DIST = Decoder.i
+
 CLEANFILES = Decoder_wrap.cc Decoder.py Decodercmodule.so

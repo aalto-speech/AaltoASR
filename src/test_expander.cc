@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <fstream>
 
-#include <errno.h>
+#include <cerrno>
 
 #include "Timer.hh"
 #include "LnaReaderCircular.hh"

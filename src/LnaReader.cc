@@ -1,6 +1,7 @@
 #include <memory>
 
-#include <math.h>
+#include <cassert>
+#include <cmath>
 
 #include "LnaReader.hh"
 

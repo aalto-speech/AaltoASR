@@ -1,7 +1,8 @@
-#include <math.h>
 #include <fstream>
 #include <iostream>
 #include <deque>
+
+#include <cmath>
 
 #include "ArpaNgramReader.hh"
 

@@ -1,7 +1,7 @@
 #include <fstream>
 #include <string>
 
-#include <errno.h>
+#include <cerrno>
 
 #include "ArpaNgramReader.hh"
 

@@ -4,7 +4,7 @@
 #include <vector>
 #include <deque>
 
-#include <float.h>
+#include <cfloat>
 
 #include "Ngram.hh"
 #include "Expander.hh"
@@ -136,77 +136,25 @@ public:
   inline HypoStack() : m_best_log_prob(-1e10) { }
 
   // Inherited from vector
-  inline Hypo &operator[](int index) 
-    { return std::vector<Hypo>::operator[](index); }
-  inline Hypo &at(int index) { return std::vector<Hypo>::operator[](index); }
-  inline size_type size() const { return std::vector<Hypo>::size(); }
-  inline void reserve(int size) { std::vector<Hypo>::reserve(size); }
-  inline bool empty() const { return std::vector<Hypo>::empty(); }
+  Hypo &operator[](int index) { return std::vector<Hypo>::operator[](index); }
+  Hypo &at(int index) { return std::vector<Hypo>::operator[](index); }
+  Hypo &front() { return std::vector<Hypo>::front(); }
+  Hypo &back() { return std::vector<Hypo>::back(); }
+  void clear() { std::vector<Hypo>::clear(); }
+  void reserve(int size) { std::vector<Hypo>::reserve(size); }
+  size_type size() const { return std::vector<Hypo>::size(); }
+  bool empty() const { return std::vector<Hypo>::empty(); }
+  void pop_back() { std::vector<Hypo>::pop_back(); }
+  void remove(int index) { std::vector<Hypo>::erase(begin() + index); }
 
   // New functions
-  inline void add(const Hypo &hypo);
-  inline void partial_sort(int top);
-  inline void sort();
-  inline void prune(int top); // does not sort if not necessary
-  inline void prune_similar(int length); // does not sort if not necessary
-  inline void clear();
-
-  // Status
-  inline void reset_best() { m_best_log_prob = -1e10; m_best_index = -1; }
-  inline float best_log_prob() const { return m_best_log_prob; }
-  inline int best_index() const { return m_best_index; }
+  int find_similar(const Hypo &hypo, int words);
+  void sorted_insert(const Hypo &hypo);
 
 private:
   float m_best_log_prob;
   int m_best_index;
 };
-
-void
-HypoStack::add(const Hypo &hypo)
-{ 
-  if (hypo.log_prob > m_best_log_prob) {
-    m_best_log_prob = hypo.log_prob;
-    m_best_index = size();
-  }
-  std::vector<Hypo>::push_back(hypo);
-}
-
-void
-HypoStack::partial_sort(int top)
-{
-  if (top == 0 || top >= size()) {
-    top = size();
-    sort();
-  }
-  else {
-    std::partial_sort(begin(), begin() + top, end());
-    m_best_index = 0;
-  }
-}
-
-void
-HypoStack::sort()
-{
-  std::sort(begin(), end());
-  m_best_index = 0;
-}
-
-// Assumes sort
-void
-HypoStack::prune(int top)
-{
-  if (top <= 0)
-    clear();
-  else if (top < size())
-    resize(top);
-}
-
-void
-HypoStack::clear()
-{ 
-  std::vector<Hypo>::clear(); 
-  reset_best();
-}
 
 class Search {
 public:
@@ -222,8 +170,7 @@ public:
 
   // Operate
   void reset_search(int start_frame);
-  void init_search(int expand_window, int stacks, int reserved_hypos);
-  void sort_stack(int frame, int top = 0);
+  void init_search(int expand_window);
   bool expand_stack(int frame);
   void expand_words(int frame, const std::string &words);
   void go(int frame);
@@ -231,13 +178,11 @@ public:
   bool recognize_segment(int start_frame, int end_frame);
 
   // Info
-  inline int frame() const { return m_frame; }
-  inline int first_frame() const { return m_first_frame; }
-  inline int last_frame() const { return m_last_frame; }
-  int frame2stack(int frame) const;
-  inline HypoStack &stack(int frame) { return m_stacks[frame2stack(frame)]; }
-  inline const HypoStack &stack(int frame) const
-    { return m_stacks[frame2stack(frame)]; }
+  int frame() const { return m_frame; }
+  int first_frame() const { return m_first_frame; }
+  int last_frame() const { return m_last_frame; }
+  HypoStack &stack(int frame);
+  const HypoStack &stack(int frame) const;
 
   // Options
   void set_end_frame(int end_frame) { m_end_frame = end_frame; }
@@ -261,14 +206,9 @@ public:
   void set_word_boundary(const std::string &word);
 
   // Exceptions
-  struct ForgottenFrame : public std::exception {
+  struct InvalidFrame : public std::exception {
     virtual const char *what() const throw()
-      { return "Search: forgotten frame"; }
-  };
-
-  struct FutureFrame : public std::exception {
-    virtual const char *what() const throw()
-      { return "Search: future frame"; }
+      { return "Search: invalid frame"; }
   };
 
 private:
@@ -282,6 +222,7 @@ private:
   void expand_hypo(const Hypo &hypo);
   void find_best_words(int frame);
   void initial_prunings(int frame, HypoStack &stack);
+  int frame2stack(int frame) const;
 
   Expander &m_expander;
   const Vocabulary &m_vocabulary; // Words in lexicon (not the words in lm)
@@ -318,8 +259,12 @@ private:
   HypoPath *m_last_printed_path;
 
   /** Index of the word boundary in LM context (negative if not used)
+   *
    * Currently, when a hypothesis is expanded with word W, it is also
    * expanded with a word bounadry and W.
+   *
+   * Also subsequent word boundary words are combined into a single
+   * word boundary word, because language model does not have doubles.
    **/
   int m_word_boundary;
 

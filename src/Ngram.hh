@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <vector>
 
+#include <cassert>
+
 #include "Vocabulary.hh"
 
 // Binary search

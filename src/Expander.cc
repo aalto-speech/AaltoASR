@@ -2,7 +2,8 @@
 #include <iostream>
 #include <algorithm>
 
-#include <float.h>
+#include <cassert>
+#include <cfloat>
 
 #include "Expander.hh"
 

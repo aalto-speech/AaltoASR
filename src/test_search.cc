@@ -1,7 +1,7 @@
 #include <iomanip>
 #include <fstream>
 
-#include <errno.h>
+#include <cerrno>
 
 #include "Timer.hh"
 #include "LnaReaderCircular.hh"
@@ -129,7 +129,7 @@ Main::run()
 
   Search search(ex, lr.vocabulary(), nr.ngram());
 
-  search.init_search(250, 512, 1024);
+  search.init_search(250);
 
   ex.set_max_state_duration(16);
   ex.set_token_limit(1000);

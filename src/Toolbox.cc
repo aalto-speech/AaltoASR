@@ -1,4 +1,7 @@
 #include <algorithm>
+
+#include <cassert>
+
 #include "Toolbox.hh"
 
 Toolbox::Toolbox()
@@ -99,12 +102,6 @@ Toolbox::find_word(const std::string &word)
       return i + 1;
   }
   return -1;
-}
-
-void
-Toolbox::prune(int frame, int top)
-{
-  this->stack(frame).prune(top);
 }
 
 void

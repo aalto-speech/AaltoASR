@@ -45,12 +45,12 @@ class Hypo {
 class HypoStack {
 public:
   Hypo &at(int index);
+  Hypo &front();
+  Hypo &back();
   int size();
   bool empty();
-  void sort();
-  void prune(int top);
-  float best_log_prob();
-  int best_index(); 
+  int find_similar(const Hypo &hypo, int words);
+  void sorted_insert(const Hypo &hypo);
 };
 
 class Toolbox {
@@ -78,10 +78,9 @@ public:
   void add_ngram_probs();
 
   // Search
-  void init(int expand_window, int stacks, int reserved_hypos);
+  void init(int expand_window);
 	void reset(int frame);
 	void set_end(int frame);
-  void sort(int frame, int top);
   bool expand_stack(int frame);
 	void expand_words(int frame, const std::string &words);
   void go(int frame);
@@ -93,7 +92,6 @@ public:
   int first_frame();
   int last_frame();
   HypoStack &stack(int frame);
-  void prune(int frame, int top);
   int paths();
 
   void set_forced_end(bool forced_end);

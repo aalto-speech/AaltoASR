@@ -40,13 +40,9 @@ public:
   void add_ngram_probs();
 
   // Search
-  void init(int expand_window, int stacks, int reserved_hypos) 
-  { 
-    m_search.init_search(expand_window, stacks, reserved_hypos); 
-  }
+  void init(int expand_window) { m_search.init_search(expand_window); }
   void reset(int frame) { m_search.reset_search(frame); }
   void set_end(int frame) { m_search.set_end_frame(frame); }
-  void sort(int frame, int top = 0) { m_search.sort_stack(frame, top); }
   bool expand_stack(int frame) { return m_search.expand_stack(frame); }
   void expand_words(int frame, const std::string &words) 
   { m_search.expand_words(frame, words); }

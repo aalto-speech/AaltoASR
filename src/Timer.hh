@@ -1,7 +1,7 @@
 #ifndef TIMER_HH
 #define TIMER_HH
 
-#include <time.h>
+#include <ctime>
 #include <sys/times.h>
 
 class Timer {
