@@ -391,21 +391,22 @@ Search::expand(int frame)
 	double log_prob = hypo.log_prob + word->log_prob;
 	double lm_log_prob = 0;
 	// Calculate language model probabilities
-	if (m_ngram.order() > 0) {
+	if (m_ngram.order() > 0 && m_lm_scale > 0) {
 	  int lm_word_id = m_lex2lm[word->word_id];
 	  m_history.clear();
 	  m_history.push_front(lm_word_id);
 	  HypoPath *path = hypo.path;
-	  for (int i = 0; i < m_ngram.order(); i++) {
+	  for (int i = 0; i < m_ngram.order()-1; i++) {
 	    if (!path)
 	      break;
-	    m_history.push_front(path->word_id);
+	    m_history.push_front(m_lex2lm[path->word_id]);
 	    path = path->prev;
 	  }
 
+	  double tmp = m_ngram.log_prob(m_history.begin(), m_history.end());
 	  lm_log_prob = m_lm_offset + m_lm_scale * 
 //	    word->frames * // Do we need this really?!
-	    (m_ngram.log_prob(m_history.begin(), m_history.end()) + 
+	    (tmp + 
 	     (lm_word_id == 0 ? m_unk_offset : 0));
 
 	  log_prob += lm_log_prob;
@@ -424,6 +425,7 @@ Search::expand(int frame)
 	  new_hypo.add_path(word->word_id, hypo.frame);
 	  
 	  new_hypo.path->lm_log_prob = lm_log_prob;
+
 	  new_hypo.path->ac_log_prob = word->log_prob;
 
 	  target_stack.add(new_hypo);

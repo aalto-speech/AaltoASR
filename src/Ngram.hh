@@ -70,6 +70,7 @@ public:
 
   inline Ngram() : m_order(0) { }
   inline int order() const { return m_order; }
+  inline int size() const { return Vocabulary::size(); }
   inline const std::string &word(unsigned int index) const
     { return Vocabulary::word(index); }
   inline Node *node(int index) { return &m_nodes[index]; }

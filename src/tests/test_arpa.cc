@@ -6,13 +6,12 @@ public:
   void print_raw();
   void print(std::vector<int> &history, int order, int max_order);
   void run(int argc, char *argv[]);
-  Vocabulary v;
   ArpaNgramReader r;
   Ngram &n;
 };
 
 Main::Main()
-  : v(), r(), n(r.ngram())
+  : r(), n(r.ngram())
 {
 }
 
@@ -58,22 +57,19 @@ Main::print(std::vector<int> &history, int order, int max_order)
 void
 Main::run(int argc, char *argv[])
 {
-  v.read(argv[1]);
-  r.read(argv[2]);
+  r.read(argv[1]);
   std::vector<int> history;
+
+  std::cerr << "nodes: " << n.nodes() << std::endl;
 
 //  print_raw();
 
   std::cout << "\\data\\" << std::endl;
 
-  for (int max_order = 1; max_order <= n.order(); max_order++) {
-    std::cout << "\\" << max_order << "-grams:" << std::endl;
-    for (int j = 0; j < v.size() + 1; j++) {
-      history.clear();
-      history.push_back(j);
-      print(history, 1, max_order);
-    }
-    std::cout << std::endl;
+  for (int j = 0; j < n.size() + 1; j++) {
+    history.clear();
+    history.push_back(j);
+    print(history, 1, n.order());
   }
 
   std::cout << "\\end\\" << std::endl;

@@ -154,14 +154,15 @@ ArpaNgramReader::read_ngram(int order)
   // Read unigrams.  
   if (order == 1) {
 
-    // UNK must be first if it exists
+    // Check that UNK is first.  The internal vocabulary contains
+    // <UNK> already, so this check makes sense.
     if (m_words[0] == 0) {
       if (m_ngram.m_nodes.size() != 0)
 	throw InvalidOrder();
     }
 
     // Add UNK with zero prob in the beginning if not in LM
-    if (m_ngram.m_nodes.size() == 0)
+    if (m_ngram.m_nodes.size() == 0 && m_words[0] != 0)
       m_ngram.m_nodes.push_back(Ngram::Node(0, -99, 0)); // FIXME: magic num
 
     m_ngram.m_nodes.push_back(Ngram::Node(m_words[0], log_prob, back_off));

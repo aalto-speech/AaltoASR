@@ -5,6 +5,7 @@
 Vocabulary::Vocabulary()
 {
   m_words.push_back("<UNK>");
+  m_indices["<UNK>"] = 0;
 }
 
 int
