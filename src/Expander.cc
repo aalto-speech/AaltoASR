@@ -2,6 +2,8 @@
 #include <iostream>
 #include <algorithm>
 
+#include <float.h>
+
 #include "Expander.hh"
 
 struct TokenCompare {
@@ -17,7 +19,7 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_acoustics(acoustics),
 
     m_token_limit(0),
-    m_beam(0),
+    m_beam(1e10),
     m_max_state_duration(0x7fff), // FIXME
     m_words(),
     m_sorted_words()
@@ -85,6 +87,9 @@ Expander::token_to_state(const Lexicon::Token *source_token,
     // with the new token.
     else {
       new_token = target_state.incoming_token;
+
+      assert(new_token != source_token);
+
       *new_token = *source_token;
     }
   }
@@ -99,8 +104,8 @@ Expander::token_to_state(const Lexicon::Token *source_token,
   new_token->log_prob = new_log_prob;
 
   // Update beam threshold
-  if (new_log_prob > m_beam_best)
-    m_beam_best = new_log_prob;
+  if (new_log_prob > m_beam_best_tmp)
+    m_beam_best_tmp = new_log_prob;
 
   return new_token;
 }
@@ -163,7 +168,7 @@ Expander::move_all_tokens()
     assert(source_token == source_state.outgoing_token);
     source_state.outgoing_token = NULL;
 
-    // Beam pruning
+    // Beam pruning using the beam calculated in the last frame
     if (source_token->log_prob < m_beam_best - m_beam)
       goto token_finished;
 
@@ -242,6 +247,13 @@ Expander::move_all_tokens()
 	}
 
 	log_prob += m_acoustics.log_prob(hmm.states[target_state_id].model); 
+
+	// Beam pruning using already the temporary beam_best, which
+	// is under calculation for the next frame.
+	// FIXME: this might be quite unnecessary
+  	if (source_token->log_prob < m_beam_best_tmp - m_beam)
+  	  continue;
+
 	Lexicon::State &target_state = source_node->states[target_state_id];
 	Lexicon::Token *new_token = 
 	  token_to_state(source_token, source_state, target_state, log_prob);
@@ -253,8 +265,9 @@ Expander::move_all_tokens()
     }
 
   token_finished:
-    // The current token has been cloned according to all transitions.
-    // Replace the token by the last token in the vector.
+    // The current token has been cloned (or pruned) according to all
+    // transitions.  Replace the token by the last token in the
+    // vector.
     delete source_token;
     if (m_tokens.size() > t + 1)
       m_tokens[t] = m_tokens[m_tokens.size() - 1];
@@ -378,17 +391,19 @@ Expander::expand(int start_frame, int frames)
 
   create_initial_tokens(start_frame);
 
+  m_beam_best_tmp = -1e10;
   for (m_frame = 0; frames < 0 || m_frame < frames; m_frame++) {
-    m_beam_best = -1e10; // FIXME
-    double tmp = m_beam_best;
-    m_beam_best = m_beam_best_old;
-    m_beam_best_old = tmp;
+    m_beam_best = m_beam_best_tmp;
+    m_beam_best_tmp = -1e10;
 
     if (m_token_limit > 0)
       keep_best_tokens(m_token_limit);
     if (!m_acoustics.go_to(start_frame + m_frame))
       break;
     move_all_tokens();
+
+    if (m_tokens.empty())
+      break;
 
 //      std::cout << m_frame << ": ";
 //      debug_print_history(m_tokens[0]);

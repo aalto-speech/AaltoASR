@@ -69,7 +69,7 @@ private:
   std::vector<Word*> m_sorted_words;
   int m_frame; // Current frame relative to the start frame.
   double m_beam_best;
-  double m_beam_best_old;
+  double m_beam_best_tmp;
 };
 
 #endif /* EXPANDER_HH */

@@ -5,7 +5,7 @@
 
 class Acoustics {
 public:
-  inline Acoustics() : m_log_prob(NULL), m_eof_frame(-1) { }
+  inline Acoustics() : m_log_prob(NULL), m_eof_frame(-1), m_num_models(0) { }
   virtual ~Acoustics() { }
   virtual bool go_to(int frame) = 0;
   inline double log_prob(int model) const { return m_log_prob[model]; }
@@ -13,6 +13,7 @@ public:
 protected:
   double *m_log_prob;
   int m_eof_frame;
+  int m_num_models;
 };
 
 #endif /* ACOUSTICS_HH */

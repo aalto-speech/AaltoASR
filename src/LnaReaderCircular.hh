@@ -48,7 +48,6 @@ public:
 private:
   std::ifstream m_fin;
   std::istream *m_in;
-  int m_num_models;
 
   // INVARIANTS
   //

@@ -8,8 +8,6 @@
 #include "Expander.hh"
 #include "Search.hh"
 
-typedef HypoStack HypoStack;
-
 class Toolbox {
 public:
   Toolbox();
@@ -28,31 +26,34 @@ public:
   void expand(int frame, int frames) { m_expander.expand(frame, frames); }
   void print_words(int words);
 
-  void init(int frames, int hypos) 
+  void init(int expand_window, int stacks, int reserved_hypos) 
     { 
-      m_search.init_search(frames, hypos); 
+      m_search.init_search(expand_window, stacks, reserved_hypos); 
     }
   void sort(int frame, int top = 0) { m_search.sort_stack(frame, top); }
-  bool expand_stack(int frame) { return m_search.expand_stack(frame); }
-  void go_to(int frame) { m_search.go_to(frame); }
+  bool expand_stack(int frame) { return m_search.expand(frame); }
+  void move_buffer(int frame) { m_search.move_buffer(frame); }
+  void go(int frame) { m_search.go(frame); }
   bool run() { return m_search.run(); }
-  bool run_to(int frame);
-  int earliest_frame() { return m_search.earliest_frame(); }
+  bool runto(int frame);
+
+  int first_frame() { return m_search.first_frame(); }
   int last_frame() { return m_search.last_frame(); }
   HypoStack &stack(int frame) { return m_search.stack(frame); }
-
   void prune(int frame, int top);
-
   int paths() const { return HypoPath::count; }
 
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
   void set_word_limit(int word_limit) { m_search.set_word_limit(word_limit); }
+  void set_word_beam(double word_beam) { m_search.set_word_beam(word_beam); }
   void set_lm_scale(double lm_scale) { m_search.set_lm_scale(lm_scale); }
   void set_lm_offset(double lm_offset) { m_search.set_lm_offset(lm_offset); }
   void set_token_limit(int limit) { m_expander.set_token_limit(limit); }
   void set_state_beam(double beam) { m_expander.set_beam(beam); }
   void set_hypo_beam(double beam) { m_search.set_beam(beam); }
-  void set_max_state_duration(int duration) { m_expander.set_max_state_duration(duration); }
+  void set_max_state_duration(int duration) 
+    { m_expander.set_max_state_duration(duration); }
+  void set_verbose(bool verbose) { m_search.set_verbose(verbose); }
 
   void print_hypo(Hypo &hypo);
 

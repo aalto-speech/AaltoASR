@@ -3,7 +3,6 @@
 LnaReaderCircular::LnaReaderCircular()
   : m_fin(),
     m_in(NULL),
-    m_num_models(0),
     m_buffer_size(0),
     m_first_index(0),
     m_frames_read(0),

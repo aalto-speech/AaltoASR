@@ -44,11 +44,7 @@ Toolbox::print_words(int words)
 void
 Toolbox::prune(int frame, int top)
 {
-  HypoStack &stack = this->stack(frame);
-  std::sort(stack.begin(), stack.end());
-  if (top < stack.size()) {
-    stack.resize(top);
-  }
+  this->stack(frame).prune(top);
 }
 
 void
@@ -97,7 +93,7 @@ Toolbox::print_hypo(Hypo &hypo)
 }
 
 bool
-Toolbox::run_to(int frame)
+Toolbox::runto(int frame)
 {
   while (frame > m_search.frame()) {
     bool ok = m_search.run();

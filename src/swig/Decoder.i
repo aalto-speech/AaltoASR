@@ -11,6 +11,7 @@
 	}
 	catch (std::exception &e) {
 		std::cerr << e.what() << std::endl;
+		exit(1);
 	}
 }
 
@@ -43,6 +44,11 @@ class HypoStack {
 public:
   Hypo &at(int index);
 	int size();
+	bool empty();
+	void sort();
+	void prune(int top);
+	double best_log_prob();
+	int best_index();	
 };
 
 class Toolbox {
@@ -65,27 +71,30 @@ public:
 	void print_words(int words);
 
 	// Search
-  void init(int frames, int hypos);
-  bool expand_stack(int frame);
+  void init(int expand_window, int stacks, int reserved_hypos);
 	void sort(int frame, int top);
-	void go_to(int frame);
+  bool expand_stack(int frame);
+	void move_buffer(int frame);
+	void go(int frame);
 	bool run();
-	void run_to(int frame);
-  int earliest_frame();
+	void runto(int frame);
+
+  int first_frame();
   int last_frame();
   HypoStack &stack(int frame);
-
 	void prune(int frame, int top);
 	int paths();
 
   void set_hypo_limit(int hypo_limit);
   void set_word_limit(int word_limit);
+  void set_word_beam(double word_beam);
   void set_lm_scale(double lm_scale);
   void set_lm_offset(double lm_offset);
   void set_token_limit(int limit);
 	void set_state_beam(double beam);
 	void set_hypo_beam(double beam);
   void set_max_state_duration(int duration);
+	void set_verbose(bool verbose);
 
   void print_hypo(Hypo &hypo);
 };

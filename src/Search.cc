@@ -12,18 +12,20 @@ Search::Search(Expander &expander, const Vocabulary &vocabulary,
     m_vocabulary(vocabulary),
     m_ngram(ngram),
 
-    // State
-    m_earliest_frame(0),
-    m_earliest_stack(0),
-    m_stacks(),
+    // Stacks states
+    m_first_frame(0),
+    m_last_frame(0),
+    m_first_stack(0),
+    m_last_stack(0),
 
     // Options
-    m_frames(0),
     m_lm_scale(1),
     m_lm_offset(1),
     m_word_limit(0),
+    m_word_beam(1e10),
     m_hypo_limit(0),
-    m_beam(0),
+    m_beam(1e10),
+    m_verbose(false),
 
     // Temp
     m_history(0)
@@ -77,38 +79,44 @@ Search::debug_print_history(Hypo &hypo)
 }
 
 void
-Search::init_search(int frames, int hypos)
+Search::init_search(int expand_window, int stacks, int reserved_hypos)
 {
   m_frame = 0;
-  m_frames = frames;
-  m_stacks.resize(frames);
-  m_earliest_stack = 0;
-  m_earliest_frame = 0;
+  m_expand_window = expand_window;
+
+  // Initialize stacks
+  m_stacks.resize(stacks);
+  m_first_frame = 0;
+  m_last_frame = m_first_frame + stacks - 1;
+  m_first_stack = 0;
+  m_last_stack = m_first_stack + stacks - 1;
 
   // Clear stacks and reserve some space.  Stacks grow dynamically,
   // but if we need space anyway, it is better to have some already.
   for (int i = 0; i < m_stacks.size(); i++) {
     m_stacks[i].clear();
-    m_stacks[i].reserve(hypos);
+    m_stacks[i].reserve(reserved_hypos);
   }
   
   // Create initial empty hypothesis.
   Hypo hypo;
-  m_stacks[0].push_back(hypo);
+  m_stacks[0].add(hypo);
 }
 
 int
 Search::frame2stack(int frame) const
 {
-  // Calculate the position of the corresponding stack
-  if (frame < m_earliest_frame)
+  // Check that we have the frame in buffer
+  if (frame < m_first_frame)
     throw ForgottenFrame();
-  if (frame - m_earliest_frame >= m_frames)
+  if (frame > m_last_frame)
     throw FutureFrame();
-  int stack_index = frame - m_earliest_frame;
-  stack_index = (m_earliest_stack + stack_index) % m_frames;
 
-  return stack_index;
+  // Find the stack corresponding to the given frame
+  int index = frame - m_first_frame;
+  index = (m_first_stack + index) % m_stacks.size();
+
+  return index;
 }
 
 void
@@ -116,47 +124,54 @@ Search::sort_stack(int frame, int top)
 {
   int stack_index = frame2stack(frame);
   HypoStack &stack = m_stacks[stack_index];
-  if (top > 0) {
-    if (top > stack.size())
-      top = stack.size();
-    std::partial_sort(stack.begin(), stack.begin() + top, stack.end());
+  stack.partial_sort(top);
+}
+
+void
+Search::circulate(int &stack)
+{
+  stack++;
+  if (stack >= m_stacks.size())
+    stack = 0;
+}
+
+void
+Search::move_buffer(int frame)
+{
+  while (m_last_frame < frame) {
+    m_stacks[m_first_stack].clear();
+    circulate(m_first_stack);
+    circulate(m_last_stack);
+    m_first_frame++;
+    m_last_frame++;
   }
-  else
-    std::sort(stack.begin(), stack.end());
 }
 
 bool
-Search::expand_stack(int frame)
+Search::expand(int frame)
 {
   int stack_index = frame2stack(frame);
   HypoStack &stack = m_stacks[stack_index];
 
   // Prune stack
-  if (m_hypo_limit > 0 && stack.size() > m_hypo_limit) {
-    std::partial_sort(stack.begin(), stack.begin() + m_hypo_limit, 
-		      stack.end());
-    stack.resize(m_hypo_limit);
-  }
-  else {
-    std::sort(stack.begin(), stack.end());
-  }
+  if (m_hypo_limit > 0)
+    stack.prune(m_hypo_limit);
 
-//  if (frame % 25 == 0)
-//    std::cerr << frame << std::endl;
-
-  if (!stack.empty()) {
+  // Debug print
+  if (m_verbose && !stack.empty()) {
     std::cout << HypoPath::count << " " << Lexicon::Path::count << " ";
-    debug_print_hypo(stack[0]);
+    debug_print_hypo(stack[stack.best_index()]);
   }
 
-  // End of input
+  // End of input?
   if (frame == m_expander.eof_frame())
     return false;
       
+  // Expand all hypotheses in the stack
   if (!stack.empty()) {
 
     // Fit word lexicon to acoustic data
-    m_expander.expand(frame, m_frames - 2); // FIXME: magic number
+    m_expander.expand(frame, m_expand_window);
 
     // Get only the best words
     // FIXME: perhaps we want to add LM probs here
@@ -169,17 +184,21 @@ Search::expand_stack(int frame)
     }
 
     // Expand all hypotheses in the stack...
-    for (int s = 0; s < stack.size(); s++) {
-      Hypo &hypo = stack[s];
+    for (int h = 0; h < stack.size(); h++) {
+      Hypo &hypo = stack[h];
 
-      // Only if inside beam
-      if (hypo.log_prob < stack[0].log_prob - m_beam)
+      // Only hypotheses inside the beam
+      if (hypo.log_prob < stack.best_log_prob() - m_beam)
 	continue;
 
       // ... Using the best words
       for (int w = 0; w < words.size(); w++) {
 	Expander::Word *word = words[w];
-	int target_stack = (stack_index + word->frames) % m_frames;
+
+	// Prune words much worse than the best words on average
+	if (word->avg_log_prob < words[0]->avg_log_prob * m_word_beam)
+	  continue;
+
 	double log_prob = hypo.log_prob + word->log_prob;
 	  
 	// Calculate language model probabilities
@@ -198,47 +217,43 @@ Search::expand_stack(int frame)
 	    m_ngram.log_prob(m_history.begin(), m_history.end());
 	}
 
-	// Insert hypo to target stack
-	Hypo new_hypo(frame + word->frames, log_prob, hypo.path);
-	new_hypo.add_path(word->word_id, hypo.frame);
-	m_stacks[target_stack].push_back(new_hypo);
+	// Ensure stack space
+	move_buffer(frame + word->frames);
+	assert(frame >= m_first_frame);
+	int index = frame2stack(frame + word->frames);
+	HypoStack &target_stack = m_stacks[index];
+
+	// Insert hypo to target stack, if inside the beam
+	if (log_prob > target_stack.best_log_prob() - m_beam) {
+	  Hypo new_hypo(frame + word->frames, log_prob, hypo.path);
+	  new_hypo.add_path(word->word_id, hypo.frame);
+	  target_stack.add(new_hypo);
+	}
       }
     }
-
-    if (words.size() > 0)
-      stack.clear();
   }
+
+  stack.clear();
 
   return true;
 }
 
 void
-Search::go_to(int frame)
+Search::go(int frame)
 {
   while (m_frame < frame) {
-    HypoStack &stack = m_stacks[m_earliest_stack];
+    int index = frame2stack(m_frame);
+    HypoStack &stack = m_stacks[index];
     stack.clear();
     m_frame++;
-    m_earliest_frame = m_frame;
-    m_earliest_stack++;
-    if (m_earliest_stack >= m_frames)
-      m_earliest_stack = 0;
   }
 }
 
 bool
 Search::run()
 {
-  HypoStack &stack = m_stacks[m_earliest_stack];
-
-  if (!expand_stack(m_frame))
+  if (!expand(m_frame))
     return false;
-
   m_frame++;
-  m_earliest_frame = m_frame;
-  m_earliest_stack++;
-  if (m_earliest_stack >= m_frames)
-    m_earliest_stack = 0;
-
   return true;
 }

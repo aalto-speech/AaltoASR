@@ -85,7 +85,7 @@ Main::run()
 //    std::ifstream in("synt.lex");
 //    std::ifstream in("tavu.lex");
 //    std::ifstream in("synt.lex");
-    std::ifstream in("/home/neuro/thirsima/share/synt/lexicon");
+    std::ifstream in("/home/neuro/thirsima/share/synt/lexicon.orig");
     if (!in) {
       std::cerr << "could not open lex file" << std::endl;
       exit(1);
@@ -104,7 +104,7 @@ Main::run()
   {
     std::cout << "load ngram" << std::endl;
     try {
-      nr.read("/home/neuro/thirsima/share/synt/arpa");
+      nr.read("/home/neuro/thirsima/share/synt/arpa.orig");
     }
     catch (std::exception &e) {
       std::cerr << e.what() << std::endl
@@ -115,7 +115,7 @@ Main::run()
 
   // 16k frames buffer
   // lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76, 1024*16);
-  lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76, 1024*16);
+  lna.open("/home/neuro/thirsima/share/synt/9000-15400.lna", 76, 1024*16);
 
   std::cout << "recognize" << std::endl;
 
@@ -129,16 +129,18 @@ Main::run()
 
   Search search(ex, lr.vocabulary(), nr.ngram());
 
-  search.init_search(125*2, 1024);
+  search.init_search(250, 512, 1024);
 
-  ex.set_token_limit(500);
   ex.set_max_state_duration(16);
-  search.set_word_limit(100);
+  ex.set_token_limit(1000);
+  ex.set_beam(20);
+  search.set_word_limit(10);
+  search.set_word_beam(2);
   search.set_hypo_limit(10);
+  search.set_beam(50);
+  search.set_lm_scale(0.1);
 
-  // search.set_lm_scale(10);
-
-  search.run();
+  while (search.run());
 
 }
 
