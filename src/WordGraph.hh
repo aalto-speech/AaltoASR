@@ -1,10 +1,9 @@
-#ifndef WORDGRAPH_H
-#define WORDGRAPH_H
+#ifndef WORDGRAPH_HH
+#define WORDGRAPH_HH
 
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
 #include <vector>
 #include "Vocabulary.hh"
 
@@ -13,7 +12,7 @@ typedef enum { NODES, EDGES } ReadMode;
 /** 
  * WordGraph imports lattice files
  * @file wordgraph.h
- * @date 6.6.2003
+ * @date 10.6.2003
  */
 class WordGraph {
 
@@ -23,7 +22,6 @@ class WordGraph {
   public:
     int frame;
     int word_id;
-    int pronunciation;
     std::vector<int> edges;
   };
   
@@ -35,6 +33,7 @@ class WordGraph {
   
   /**
    * @param file stream to read lattice from
+   * @param vocab vocabulary to convert words->int
    */
   WordGraph(FILE *file, Vocabulary *vocab);
 
@@ -44,7 +43,7 @@ class WordGraph {
   ~WordGraph();
   
   /**
-   * constructs word graph from a file
+   * reads word graph from a file
    * @return 1 if read succesful, 0 otherwise
    */
   int read();
@@ -54,14 +53,20 @@ class WordGraph {
    * @return Node& with corresponding index
    * if index out of range, result undefined
    */
-  Node &node(int index);
+  WordGraph::Node & node(int index);
   
   /**
    * @param index edge number to get
    * @return Edge& with corresponding index
    * if index out of range, result undefined
    */
-  Edge &edge(int index);
+  WordGraph::Edge & edge(int index);
+
+  /**
+   * @param frame frame starting time
+   * @return vector of node*s that start from the given frame
+   */
+  std::vector<WordGraph::Node *> & frame(int frame);
 
   /**
    * @return number of nodes in lattice
@@ -74,10 +79,9 @@ class WordGraph {
   int edges();
 
   /**
-   * @param frame frame starting time
-   * @return vector of node*s that start from the given frame
+   * @return number of frames
    */
-  std::vector<Node*> frame_nodes(int frame);
+  int frames();
 
  private:
 
@@ -86,6 +90,7 @@ class WordGraph {
   bool ok_flag;
   ReadMode read_mode;
   WordGraph::Node **node_table;
+  std::vector<WordGraph::Node *> **frame_table;
   std::vector<WordGraph::Edge *> edge_vector;
   int frame_count;
   int node_count;
@@ -93,7 +98,7 @@ class WordGraph {
   int best_seg_ascr; // ?
 };
 
-#endif /* WORDGRAPH_H */
+#endif /* WORDGRAPH_HH */
 
 
 

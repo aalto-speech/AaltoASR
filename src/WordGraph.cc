@@ -5,22 +5,33 @@
 
 WordGraph::WordGraph(FILE *file, Vocabulary *vocab) {
   this->file = file;
-  if (this->file == NULL) (this->ok_flag = false);
-  else (this->ok_flag = true);
+  this->vocab = vocab;
+  if (this->file == NULL || this->vocab == NULL) 
+    this->ok_flag = false;
+  else this->ok_flag = true;
   this->read_mode = NODES;
   this->node_table = NULL;
-  this->vocab = vocab;
+  this->frame_table = NULL;
+  this->node_count=0;
+  this->edge_count=0;
 }
 
 WordGraph::~WordGraph() {
 
-  for (int i = 0; i < this->node_count; i++)
-    delete this->node_table[i];
+  if (this->frame_table != NULL) {
+    for (int i = 0; i <= this->frame_count; i++)
+      delete this->frame_table[i];
+    delete this->frame_table;
+  }
+  
+  if (this->node_table != NULL) {
+    for (int j = 0; j < this->node_count; j++)
+      delete this->node_table[j];
+    delete this->node_table;
+  }
 
-  delete this->node_table;
-
-  for (int j = 0; j < this->edge_count; j++)
-    delete edge_vector[j];
+  for (int k = 0; k < this->edge_count; k++)
+    delete this->edge_vector[k];
 }
 
 int WordGraph::read() {
@@ -34,8 +45,7 @@ int WordGraph::read() {
   while(this->ok_flag && !feof(this->file) && fgets(line, LINE_SIZE, this->file) != NULL) {
 
     // discard comment & empty lines
-    if (line[0] == '#' || line[0] == '\n');
-
+    if (line[0] == '#' || line[0] == '\n' || line[0] == ' ');
 
     // node/edge parsing
     else if (isdigit(line[0])) {
@@ -46,11 +56,13 @@ int WordGraph::read() {
 	temp_node = new WordGraph::Node;
 	
 	if (sscanf(line, "%i%*[ ]%[^ ]%*[ ]%u%*u%*u", 
-		   &index, word, &temp_node->frame) != 3) 
-	  this->ok_flag = false;
-	
-	temp_node->word_id = this->vocab->index(word);
-	this->node_table[index] = temp_node;
+		   &index, word, &temp_node->frame) == 3) 
+	  {
+	    temp_node->word_id = this->vocab->index(word);
+	    this->node_table[index] = temp_node;
+	    this->frame_table[temp_node->frame]->push_back(temp_node);
+	  }
+	else this->ok_flag = false;	
       }
       
       // edge parsing
@@ -59,12 +71,13 @@ int WordGraph::read() {
 	temp_edge = new WordGraph::Edge;
 	
 	if (sscanf(line, "%u%*[ ]%u%*[ ]%f",
-		   &index, &temp_edge->target_node, &temp_edge->ac_log_prob) != 3)
-	  this->ok_flag = false;
-	
-	this->node_table[index]->edges.push_back(this->edge_count);
-	this->edge_vector.push_back(temp_edge);
-	this->edge_count++;	
+		   &index, &temp_edge->target_node, &temp_edge->ac_log_prob) == 3) 
+	  {
+	    this->node_table[index]->edges.push_back(this->edge_count);
+	    this->edge_vector.push_back(temp_edge);
+	    this->edge_count++;
+	  }
+	else this->ok_flag = false;	
       }      
     }
 
@@ -73,12 +86,15 @@ int WordGraph::read() {
 
       // 'Frames <frame_count>' keyword
       if (strncmp(line, "Frames", 6) == 0) {
-	sscanf(line, "%*[^ ] %u", &this->frame_count);
+	sscanf(line, "%*[^ ]%*[ ]%u", &this->frame_count);
+	this->frame_table = new std::vector<WordGraph::Node *>*[this->frame_count+1];
+	for (int i = 0; i <= this->frame_count; i++)
+	  this->frame_table[i] = new std::vector<WordGraph::Node *>;
       }
 
       // 'Nodes <node_count>' keyword
       else if (strncmp(line, "Nodes", 5) == 0) {
-	sscanf(line, "%*[^ ] %u", &this->node_count);
+	sscanf(line, "%*[^ ]%*[ ]%u", &this->node_count);
 	this->read_mode = NODES;
 	this->node_table = new WordGraph::Node*[this->node_count];
       }
@@ -117,14 +133,20 @@ int WordGraph::read() {
 
 WordGraph::Node & WordGraph::node(int index) {
   if (index < this->node_count)
-    return (*this->node_table[index]);
+    return *this->node_table[index];
   else return *(new WordGraph::Node);
 }
 
 WordGraph::Edge & WordGraph::edge(int index) {
   if (index < this->edge_count)
-    return (*this->edge_vector[index]);
+    return *this->edge_vector[index];
   else return *(new WordGraph::Edge);
+}
+
+std::vector<WordGraph::Node *> & WordGraph::frame(int frame) {
+  if (frame <= this->frame_count)
+    return *this->frame_table[frame];
+  else return *(new std::vector<WordGraph::Node *>);
 }
 
 int WordGraph::nodes() {
@@ -135,13 +157,6 @@ int WordGraph::edges() {
   return this->edge_count;
 }
 
-std::vector<WordGraph::Node*> WordGraph::frame_nodes(int frame) {
-
-  std::vector<WordGraph::Node*> node_vector = *(new std::vector<WordGraph::Node*>);
-
-  for (int i = 0; i < this->node_count; i++) {
-    if (this->node_table[i]->frame == frame) 
-      node_vector.push_back(this->node_table[i]);
-  }
-  return node_vector;
+int WordGraph::frames() {
+  return this->frame_count;
 }
