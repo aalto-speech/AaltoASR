@@ -6,7 +6,7 @@
 
 #include <float.h>
 
-#include "Ngram.hh"
+#include "TreeGram.hh"
 #include "Expander.hh"
 #include "Vocabulary.hh"
 
@@ -168,7 +168,7 @@ public:
   void print_sure();
 
   // Operate
-  void add_ngram(Ngram *ngram, float weight);
+  void add_ngram(TreeGram *ngram, float weight);
   void reset_search(int start_frame);
   void init_search(int expand_window);
   bool expand_stack(int frame);
@@ -230,7 +230,7 @@ private:
 
   struct LanguageModel {
     LanguageModel() : ngram(NULL), weight(0) {}
-    Ngram *ngram;
+    TreeGram *ngram;
     float weight;
     std::vector<int> lex2lm;
   };
@@ -300,8 +300,8 @@ private:
   int m_similar_prunings;
 
   // Temporary variables
-  std::deque<int> m_history_lex;
-  std::deque<int> m_history_lm;
+  TreeGram::Gram m_history_lex;
+  TreeGram::Gram m_history_lm;
 };
 
 #endif /* SEARCH_HH */

@@ -1,12 +1,18 @@
 SUBDIRS = . swig
 
-noinst_PROGRAMS = lna arpa2bin test_arpa
+noinst_PROGRAMS = arpasort perplexity test_arpa lna arpa2bin 
 # test_expander 
 # test_lexicon 
 #	test_arpa
 
 test_arpa_SOURCES = test_arpa.cc
 test_arpa_LDADD = libdecoder.a
+
+arpasort_SOURCES = arpasort.cc
+arpasort_LDADD = libdecoder.a
+
+perplexity_SOURCES = perplexity.cc
+perplexity_LDADD = libdecoder.a
 
 #test_lexicon_SOURCES = test_lexicon.cc
 #test_lexicon_LDADD = libdecoder.a

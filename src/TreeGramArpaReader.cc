@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <cassert>
+#include <assert.h>
 
 #include "GramSorter.hh"
 #include "TreeGramArpaReader.hh"
@@ -181,31 +181,34 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 }
 
 void
-TreeGramArpaReader::write(FILE *out, TreeGram *tree_gram) {
+TreeGramArpaReader::write(FILE *out, TreeGram *tree_gram) 
+{
   TreeGram::Iterator iter;
 
-  //fprintf(stderr,"Headers\n");
-  fprintf(out,"\\data\\\n");
-  for (int i=1;i<=tree_gram->order();i++) {
-    fprintf(out,"ngram %d=%d\n",i,tree_gram->gram_count(i));
-  }
+  // Header containing counts for each order
+  fprintf(out, "\\data\\\n");
+  for (int i = 1; i <= tree_gram->order(); i++)
+    fprintf(out, "ngram %d=%d\n", i, tree_gram->gram_count(i));
 
-  //fprintf(stderr,"n-grams\n");
-  for (int i=1;i<=tree_gram->order();i++) {
+  // Ngrams for each order
+  for (int order = 1; order <= tree_gram->order(); order++) {
     iter.reset(tree_gram);
-    fprintf(out,"\\%d-grams:\n",i);
-    while (iter.next_order(i)) {
-      fprintf(out,"%.4f",iter.node().log_prob);
-      for (int j=1;j<=i;j++) {
-	//fprintf(stderr,"j %d\n",j);
-	//fprintf(stderr,"%d\n",iter.node(j).word);
-	fprintf(out," %s",tree_gram->word(iter.node(j).word).c_str());
-      }
-      if (i!=tree_gram->order())
-	fprintf(out,"\t%.4f\n", iter.node().back_off);
+    fprintf(out, "\n\\%d-grams:\n",order);
+    while (iter.next_order(order)) {
+      
+      // Log-probability
+      fprintf(out, "%g", iter.node().log_prob);
+
+      // Word indices in the ngram
+      for (int j = 1; j <= order; j++)
+	fprintf(out, " %s", tree_gram->word(iter.node(j).word).c_str());
+
+      // Possible backoff
+      if (order != tree_gram->order())
+	fprintf(out, " %g\n", iter.node().back_off);
       else
-	fprintf(out,"\n");
+	fprintf(out, "\n");
     }
   }
-  fprintf(out,"\\end\\\n");
+  fprintf(out, "\n\\end\\\n");
 }

@@ -456,7 +456,7 @@ TreeGram::log_prob(const Gram &gram)
       }
       
       // Back-off found?
-      if (m_fetch_stack.size() == gram.size() - 1)
+      if (m_fetch_stack.size() == gram.size() - n - 1)
 	log_prob += m_nodes[m_fetch_stack.back()].back_off;
       
       n++;
@@ -532,7 +532,7 @@ TreeGram::Iterator::next()
     // If not backtracking, try diving deeper
     if (!backtrack) {
       // Do we have children?
-      if (node->child_index > 0 && (node+1)->child_index > 0) {
+      if (node->child_index > 0 && (node+1)->child_index > node->child_index) {
 	m_index_stack.push_back(node->child_index);
 	return true;
       }

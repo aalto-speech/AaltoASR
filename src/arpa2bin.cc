@@ -1,23 +1,15 @@
-#include "Ngram.hh"
-#include "ArpaNgramReader.hh"
-#include "BinNgramReader.hh"
+#include <stdio.h>
 
-int main(int argc, char *argv[]) {
-  try {
-    ArpaNgramReader reader;
-    BinNgramReader writer;
-    FILE *out;
+#include "TreeGram.hh"
+#include "TreeGramArpaReader.hh"
 
-    if ((out=fopen(argv[2],"w"))==NULL) {
-      fprintf(stderr,"Can't write bin %s\n",argv[2]);
-      exit(-1);
-    }
+int main(int argc, char *argv[]) 
+{
+  TreeGramArpaReader reader;
+  TreeGram gram;
 
-    reader.read(argv[1]);
-    writer.write(out,&reader.ngram(),false);
-    fclose(out);
-  }
-  catch (std::exception &e) {
-    fprintf(stderr, "%s\n", e.what());
-  }
+  fputs("reading arpa from stdin, writing binary to stdout\n", stderr);
+
+  reader.read(stdin, &gram);
+  gram.write(stdout, false);
 }

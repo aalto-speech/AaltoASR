@@ -28,6 +28,14 @@ GramSorter::reset(int order, int grams)
   fprintf(stderr, "done\n");
 }
 
+static void
+pg(const GramSorter::Gram *gram)
+{
+  for (int i = 0; i < gram->size(); i++)
+    printf("%d ", (*gram)[i]);
+  printf("\n");
+}
+
 void 
 GramSorter::add_gram(const Gram &gram, float log_prob, float back_off)
 {
@@ -51,8 +59,8 @@ GramSorter::add_gram(const Gram &gram, float log_prob, float back_off)
 
   // Check if the grams have been inserted in sorted order so far.
   if (m_indices.size() > 1 && m_sorted) {
-    int i1 = (m_indices.size() - 1) * m_order;
-    int i2 = (m_indices.size() - 2) * m_order;
+    int i1 = (m_indices.size() - 2) * m_order;
+    int i2 = (m_indices.size() - 1) * m_order;
     if (lessthan(&m_grams[i2], &m_grams[i1], m_order)) {
       fprintf(stderr, "GramSorter: %d-grams not sorted, sorting soon\n", 
 	      m_order);

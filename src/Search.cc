@@ -243,7 +243,7 @@ Search::reset_search(int start_frame)
 }
 
 void
-Search::add_ngram(Ngram *ngram, float weight)
+Search::add_ngram(TreeGram *ngram, float weight)
 {
   int count = 0;
 
@@ -349,7 +349,7 @@ Search::compute_lm_log_prob(const Hypo &hypo)
 
       // Add the current LM probability with weight
       ngram_log_prob += m_ngrams[lm].weight *
-	m_ngrams[lm].ngram->log_prob(m_history_lm.begin(), m_history_lm.end());
+	m_ngrams[lm].ngram->log_prob(m_history_lm);
     }
 
     // With m_unk_offset it is possible to distribute the

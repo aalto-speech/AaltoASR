@@ -118,9 +118,8 @@ Toolbox::ngram_read(const char *file, float weight)
     exit(1);
   }
 
-  m_ngrams.push_back(new Ngram());
-  BinNgramReader reader;
-  reader.read(f, m_ngrams.back());
+  m_ngrams.push_back(new TreeGram());
+  m_ngrams.back()->read(f);
   m_search.add_ngram(m_ngrams.back(), weight);
 
   fclose(f);

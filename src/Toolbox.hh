@@ -5,7 +5,6 @@
 
 #include "NowayHmmReader.hh"
 #include "NowayLexiconReader.hh"
-#include "BinNgramReader.hh"
 #include "LnaReaderCircular.hh"
 #include "Expander.hh"
 #include "Search.hh"
@@ -123,7 +122,7 @@ private:
 
   LnaReaderCircular m_lna_reader;
 
-  std::vector<Ngram*> m_ngrams;
+  std::vector<TreeGram*> m_ngrams;
   std::deque<int> m_history;
 
   Expander m_expander;
