@@ -110,8 +110,9 @@ Main::run()
 //    std::cout << std::endl << timer.sec() << " seconds" << std::endl;
 
   ex.set_token_limit(1000);
+  ex.set_max_state_duration(8);
 
-  Search search(ex, lr.vocabulary(), 125);
+  Search search(ex, lr.vocabulary(), 125*10);
 
   search.run();
 

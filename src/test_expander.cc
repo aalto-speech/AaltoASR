@@ -4,7 +4,7 @@
 #include <errno.h>
 
 #include "Timer.hh"
-#include "LnaReader.hh"
+#include "LnaReaderCircular.hh"
 #include "NowayHmmReader.hh"
 #include "NowayLexiconReader.hh"
 #include "Expander.hh"
@@ -18,7 +18,7 @@ public:
   void print_token(Lexicon::Token *token);
   NowayHmmReader hr;
   NowayLexiconReader lr;
-  LnaReader lna;
+  LnaReaderCircular lna;
 };
 
 Main::Main()
@@ -78,8 +78,8 @@ Main::run()
     std::cout << "load lexicon" << std::endl;
 //    std::ifstream in("/home/neuro/thirsima/share/synt/iso64000.lex");
 //    std::ifstream in("/home/neuro/thirsima/share/synt/words20000.lex");
-    std::ifstream in("tavu.lex");
-//    std::ifstream in("/home/neuro/thirsima/share/synt/pk_synt5.lex");
+//    std::ifstream in("synt.lex");
+    std::ifstream in("/home/neuro/thirsima/share/synt/pk_synt5.lex");
     if (!in) {
       std::cerr << "could not open lex file" << std::endl;
       exit(1);
@@ -94,7 +94,7 @@ Main::run()
     }
   }
 
-  lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76);
+  lna.open("/home/neuro/thirsima/share/synt/pk_synt5.lna", 76, 1024*1024);
 
   std::cout << "expand" << std::endl;
 
@@ -105,26 +105,31 @@ Main::run()
 //    timer.stop();
 //    std::cout << std::endl << timer.sec() << " seconds" << std::endl;
 
-  ex.set_token_limit(2000);
-  std::vector<Expander::Word*> &words = ex.words();
 
-  int start = 0;
-  int length = 125 * 2;
-  std::cout.setf(std::cout.left, std::cout.adjustfield);
-  for (int i = 0; i < 100; i++) {
-    ex.expand(start, length);
-    std::sort(words.begin(), words.end(), Expander::WordCompare());
-    Expander::Word *word = words[0];
+//  std::vector<Expander::Word*> &words = ex.words();
 
-    int old = start;
-    start += word->frames;
+//    int start = 0;
+//    int length = 125 * 2;
+//    std::cout.setf(std::cout.left, std::cout.adjustfield);
+//    for (int i = 0; i < 100; i++) {
+//      ex.expand(start, length);
+//      std::sort(words.begin(), words.end(), Expander::WordCompare());
+//      Expander::Word *word = words[0];
+
+//      int old = start;
+//      start += word->frames;
     
-    std::cout << setw(8) << old << setw(8) << start
-	      << lr.vocabulary().word(word->word_id) << std::endl;
-  }
-//  ex.expand(0, 125 * 60 * 10); // minutes
+//      std::cout << setw(8) << old << setw(8) << start
+//  	      << lr.vocabulary().word(word->word_id) << std::endl;
+//    }
+  ex.set_max_state_duration(8);
+  ex.set_token_limit(300);
+  ex.expand(0, 125 * 60 * 1); // minutes
+  ex.sort_best_tokens(1);
 
-//    std::vector<Lexicon::Token*> &tokens = ex.tokens();
+  std::vector<Lexicon::Token*> &tokens = ex.tokens();
+  ex.debug_print_timit(tokens[0]);
+
 //    std::vector<Expander::Word*> &words = ex.words();
 
 //    std::cout << tokens.size() << " tokens\n" << std::endl;

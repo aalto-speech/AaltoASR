@@ -17,6 +17,7 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_acoustics(acoustics),
 
     m_token_limit(0),
+    m_max_state_duration(0x7fff), // FIXME
     m_words(lexicon.words()),
     m_sorted_words()
 {
@@ -201,6 +202,7 @@ Expander::move_all_tokens()
 	  if (new_token != NULL) {
 	    new_token->state = 0;
 	    new_token->node = target_node;
+	    new_token->state_duration = 0;
 	    new_token->add_path(target_node->hmm_id, new_token->frame + 1,
 				log_prob);
 
@@ -214,6 +216,18 @@ Expander::move_all_tokens()
 
       // Target state is not a sink state.  Just clone the token.
       else {
+
+	// FIXME: Maximum state duration test
+	if (target_state_id == source_token->state 
+	    && hmm.label[0] != '_') {
+	  source_token->state_duration++;
+	  if (source_token->state_duration >= m_max_state_duration)
+	    continue;
+	}
+	else {
+	  source_token->state_duration = 0;
+	}
+
 	log_prob += m_acoustics.log_prob(hmm.states[target_state_id].model); 
 	Lexicon::State &target_state = source_node->states[target_state_id];
 	Lexicon::Token *new_token = 
@@ -282,9 +296,26 @@ Expander::debug_print_history(Lexicon::Token *token)
 }
 
 void
+Expander::debug_print_timit(Lexicon::Token *token)
+{
+  std::vector<Lexicon::Path*> paths;
+  for (Lexicon::Path *path = token->path; path != NULL; path = path->prev)
+    paths.push_back(path);
+  for (int i = paths.size() - 1; i >= 0; i--) {
+    Lexicon::Path *path = paths[i];
+    std::cout << path->frame << " ";
+    if (i > 0)
+      std::cout << paths[i-1]->frame;
+    else
+      std::cout << token->frame;
+    std::cout << " " << m_hmms[path->hmm_id].label << std::endl;
+  }
+}
+
+void
 Expander::debug_print_tokens()
 {
-  int tokens = 5;
+  int tokens = 20;
   
   if (tokens > m_tokens.size())
     tokens = m_tokens.size();
@@ -300,7 +331,8 @@ Expander::debug_print_tokens()
     for (Lexicon::Path *path = token->path; path != NULL; path = path->prev)
       paths.push_back(path);
     std::cout << t << "\t" 
-	      << m_hmms[node->hmm_id].label << token->state << "\t" 
+	      << m_hmms[node->hmm_id].label << (int)token->state
+	      << "(" << (int)token->state_duration << ")\t" 
 	      << std::setprecision(4)
 	      << token->log_prob - m_tokens[0]->log_prob << "\t";
     double old_log_prob = 0;
@@ -336,10 +368,10 @@ Expander::expand(int start_frame, int frames)
 //      debug_print_history(m_tokens[0]);
 //      std::cout << std::endl;
 
-//      std::cout << "--- " << m_frame << " ---" << std::endl;
-//      debug_print_tokens();
+//     std::cout << "--- " << m_frame << " ---" << std::endl;
+//     debug_print_tokens();
 
-//      if (m_frame % 10 == 0)
+//      if (m_frame % 125 == 0)
 //        std::cout << std::setw(8) << m_frame << ": " 
 //  		<< m_tokens.size() << std::endl;
 

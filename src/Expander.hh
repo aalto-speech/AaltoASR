@@ -40,7 +40,10 @@ public:
   void create_initial_tokens(int start_frame);
   void expand(int start_frame, int frames);
   void set_token_limit(int limit) { m_token_limit = limit; }
+  void set_max_state_duration(int duration) 
+    { m_max_state_duration = duration; }
   void debug_print_history(Lexicon::Token *token);
+  void debug_print_timit(Lexicon::Token *token);
   void debug_print_tokens();
   std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
   std::vector<Word*> &words() { return m_sorted_words; }
@@ -51,6 +54,7 @@ private:
   Acoustics &m_acoustics;
 
   int m_token_limit;
+  int m_max_state_duration;
   std::vector<Lexicon::Token*> m_tokens;
   std::vector<Word> m_words;
   std::vector<Word*> m_sorted_words;
