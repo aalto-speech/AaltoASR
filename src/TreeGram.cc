@@ -434,3 +434,102 @@ TreeGram::log_prob(const Gram &gram)
 
   return log_prob;
 }
+
+TreeGram::Iterator::Iterator(TreeGram *gram)
+  : m_gram(gram)
+{
+  if (gram)
+    reset(gram);
+}
+
+void
+TreeGram::Iterator::reset(TreeGram *gram)
+{
+  assert(gram);
+  m_gram = gram;
+  m_index_stack.clear();
+  m_index_stack.resize(gram->m_order);
+}
+
+bool
+TreeGram::Iterator::next()
+{
+  bool backtrack = false;
+
+  // Start the search
+  if (m_index_stack.empty()) {
+    m_index_stack.push_back(0);
+    return true;
+  }
+
+  // Go to the next node.  Backtrack if necessary.
+  while (1) {
+    assert(!m_index_stack.empty());
+    int index = m_index_stack.back();
+    TreeGram::Node *node = &m_gram->m_nodes[index];
+
+    // End of the structure?
+    if (index == m_gram->m_nodes.size() - 1)
+      return false;
+
+    // If not backtracking, try diving deeper
+    if (!backtrack) {
+      // Do we have children?
+      if (node->child_index > 0 && (node+1)->child_index > 0) {
+	m_index_stack.push_back(node->child_index);
+	return true;
+      }
+    }
+    backtrack = false;
+
+    // No children, try siblings 
+    if (m_index_stack.size() == 1) {
+      // Unigram level: we have always siblings
+      index++;
+      assert(index < m_gram->m_order_count[0]);
+      return true;
+    }
+    else {
+      // Higher order
+      m_index_stack.pop_back();
+      TreeGram::Node *parent = &m_gram->m_nodes[m_index_stack.back()];
+
+      // Do we have more siblings?
+      index++;
+      if (index < (parent+1)->child_index) {
+	m_index_stack.push_back(index);
+	return true;
+      }
+
+      // No more siblings, backtrack.
+      backtrack = true;
+    }
+  }
+}
+
+bool
+TreeGram::Iterator::next_order(int order)
+{
+  if (order < 1 || order > m_gram->m_order) {
+    fprintf(stderr, "TreeGram::Iterator::next_order(): invalid order %d\n", 
+	    order);
+    exit(1);
+  }
+
+  while (1) {
+    if (!next())
+      return false;
+
+    if (m_index_stack.size() == order)
+      return true;
+  }
+}
+
+const TreeGram::Node&
+TreeGram::Iterator::node()
+{
+  assert(m_gram);
+  assert(!m_index_stack.empty());
+  
+  return m_gram->m_nodes[m_index_stack.back()];
+}

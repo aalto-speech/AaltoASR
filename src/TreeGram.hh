@@ -21,6 +21,24 @@ public:
     int child_index;
   };
 
+  class Iterator {
+  public:
+    Iterator(TreeGram *gram = NULL);
+    void reset(TreeGram *gram);
+
+    // Move to the next node in depth-first order
+    bool next();
+
+    // Move to the next node on the given order
+    bool next_order(int order);
+
+    const Node &node();
+
+  private:
+    TreeGram *m_gram;
+    std::vector<int> m_index_stack;
+  };
+
   enum Type { BACKOFF=0, INTERPOLATED=1 };
 
   TreeGram();
