@@ -40,6 +40,7 @@ public:
   bool run() { return m_search.run(); }
   bool runto(int frame);
 
+  int frame() { return m_search.frame(); }
   int first_frame() { return m_search.first_frame(); }
   int last_frame() { return m_search.last_frame(); }
   HypoStack &stack(int frame) { return m_search.stack(frame); }

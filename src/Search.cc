@@ -183,7 +183,8 @@ Search::expand(int frame)
 
   // Expand all hypotheses in the stack, but only if inside the
   // global_beam
-  double ref = m_global_best + m_global_angle * (frame - m_global_frame);
+  double angle = m_global_best / m_global_frame;
+  double ref = m_global_best + angle * (frame - m_global_frame);
   if (!stack.empty() &&
       stack.best_log_prob() > ref - m_global_beam) {
     // Fit word lexicon to acoustic data

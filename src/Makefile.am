@@ -1,7 +1,8 @@
 SUBDIRS = . swig
 
 noinst_PROGRAMS = \
-test_search 
+test_search \
+lna
 # test_expander 
 # test_lexicon 
 #	test_arpa
@@ -14,6 +15,9 @@ test_search
 
 # test_expander_SOURCES = test_expander.cc
 # test_expander_LDADD = libdecoder.a
+
+lna_SOURCES = lna.cc
+lna_LDADD = libdecoder.a
 
 test_search_SOURCES = test_search.cc
 test_search_LDADD = libdecoder.a

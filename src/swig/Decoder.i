@@ -82,6 +82,7 @@ public:
 	bool run();
 	void runto(int frame);
 
+	int frame();
   int first_frame();
   int last_frame();
   HypoStack &stack(int frame);

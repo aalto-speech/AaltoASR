@@ -278,7 +278,6 @@ private:
 
   // Global pruning
   double m_global_best;
-  double m_global_angle;
   double m_global_beam;
   int m_global_frame;
 
