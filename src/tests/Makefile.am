@@ -1,7 +1,10 @@
-noinst_PROGRAMS = test_tree lnareader test_arpa test_arpa2 endian_test
+noinst_PROGRAMS = test_tree test_iterator lnareader test_arpa test_arpa2 endian_test
 
 test_tree_SOURCES = test_tree.cc
 test_tree_LDADD = ../libdecoder.a
+
+test_iterator_SOURCES = test_iterator.cc
+test_iterator_LDADD = ../libdecoder.a
 
 lnareader_SOURCES = lnareader.cc
 lnareader_LDADD = ../libdecoder.a

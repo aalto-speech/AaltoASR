@@ -163,6 +163,18 @@ TreeGram::find_child(int word, int node_index)
   return binary_search(word, first, last);
 }
 
+TreeGram::Iterator
+TreeGram::iterator(const Gram &gram)
+{
+  Iterator iterator;
+
+  fetch_gram(gram, 0);
+  iterator.m_index_stack = m_fetch_stack;
+  iterator.m_gram = this;
+
+  return iterator;
+}
+
 /// Finds the path to the current gram.
 //
 // PRECONDITIONS:
@@ -476,7 +488,7 @@ TreeGram::log_prob(const Gram &gram)
     //   - add the corresponding KN-coefficient c(W(N-1)..W(N-n))
     //   - add the corresponding interpolation coeff i(n)
     float prob=0.0;
-    float oldcoeff=-9999999999;
+    float oldcoeff=-9999999999.0;
     for (int n=1;n<=gram.size();n++) {
       fetch_gram(gram,gram.size()-n);
 
@@ -606,4 +618,52 @@ TreeGram::Iterator::node(int order)
     return m_gram->m_nodes[m_index_stack.back()];
   else
     return m_gram->m_nodes[m_index_stack[order-1]];
+}
+
+bool
+TreeGram::Iterator::move_in_context(int delta)
+{
+  // First order
+  if (m_index_stack.size() == 1) {
+    assert(m_index_stack.back() < m_gram->m_order_count[0]);
+    if (m_index_stack.back() + delta < 0 ||
+	m_index_stack.back() + delta >= m_gram->m_order_count[0])
+      return false;
+    m_index_stack.back() += delta;
+    return true;
+  }
+
+  // Higher orders
+  Node &parent = m_gram->m_nodes[m_index_stack[m_index_stack.size() - 2]];
+  Node &next_parent = m_gram->m_nodes[m_index_stack[m_index_stack.size() - 2] 
+				      + 1];
+  assert(parent.child_index > 0);
+  assert(next_parent.child_index > 0);
+  assert(m_index_stack.back() >= parent.child_index);
+  assert(m_index_stack.back() < next_parent.child_index);
+
+  if (m_index_stack.back() + delta < parent.child_index ||
+      m_index_stack.back() + delta >= next_parent.child_index)
+    return false;
+  m_index_stack.back() += delta;
+  return true;
+}
+
+bool
+TreeGram::Iterator::up()
+{
+  if (m_index_stack.size() == 1)
+    return false;
+  m_index_stack.pop_back();
+  return true;
+}
+
+bool
+TreeGram::Iterator::down()
+{
+  Node &node = m_gram->m_nodes[m_index_stack.back()];
+  if (node.child_index < 0)
+    return false;
+  m_index_stack.push_back(node.child_index);
+  return true;
 }

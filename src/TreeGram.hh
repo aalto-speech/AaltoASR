@@ -39,6 +39,16 @@ public:
     // Order of the current node (1 ... n)
     int order() { return m_index_stack.size(); }
 
+    // Move to within current context (default: to the next word)
+    bool move_in_context(int delta = 1);
+
+    // Come back up to previous order
+    bool up();
+
+    // Dive down to first child
+    bool down();
+
+    friend class TreeGram;
   private:
     TreeGram *m_gram;
     std::vector<int> m_index_stack;
@@ -67,6 +77,10 @@ public:
 
   /* Don't use this function, unles you really need to*/
   int find_child(int word, int node_index);
+
+  // Returns an iterator for given gram.
+  Iterator iterator(const Gram &gram);
+
 private:
   int binary_search(int word, int first, int last);
   void print_gram(FILE *file, const Gram &gram);

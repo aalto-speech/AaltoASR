@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <deque>
+#include <assert.h>
 
 #include "Lexicon.hh"
 

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <assert.h>
 #include "GramSorter.hh"
 
 GramSorter::GramSorter(int order, int grams)
