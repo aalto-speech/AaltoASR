@@ -53,6 +53,9 @@ public:
     inline bool operator<(int value) const { return word < value; }
     inline bool operator>(int value) const { return word > value; }
     inline bool operator==(int value) const { return word == value; }
+
+    template<class RandomAccessIterator>
+    inline float log_prob(RandomAccessIterator begin, RandomAccessIterator end);
   };
 
   inline Node *node(int word, Node *node = NULL)
@@ -73,5 +76,29 @@ public:
 private:
   std::vector<Node> m_nodes;
 };
+
+Ngram::Node*
+Ngram::find(RandomAccessIterator begin, RandomAccessIterator end)
+{
+  
+}
+
+template<class RandomAccessIterator>
+float
+Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end)
+{
+  int length = distance(begin, end);
+
+  std::vector<Node*> grams(length);
+  std::vector<Node*> back_offs(length);
+
+  Node *n = NULL;
+  for (RandomAccessIterator it = begin; it != end; it++) {
+    int word = *it;
+    n = node(n, word);
+  }
+
+  
+}
 
 #endif /* NGRAM_HH */
