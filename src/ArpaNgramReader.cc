@@ -312,8 +312,14 @@ ArpaNgramReader::read_ngrams(int order)
 	header = true;
       }
 
-      else
-	throw InvalidCommand();
+      else {
+	fprintf(stderr, "ArpaNgramReader::read_ngrams(): "
+		"invalid command %s on line %d\n", m_str.c_str(), m_lineno);
+	fprintf(stderr, "%d ngrams read out of %d\n", ngrams_read, 
+		m_counts[order-1]);
+	// FIXME: ugly hack
+	ngrams_read++;
+      }
     }
 
     // Ngram
@@ -406,15 +412,17 @@ ArpaNgramReader::debug_sanity_check()
     for (int i = 0; i < m_counts[o-1]; i++) {
       int first = m_ngram.m_nodes[n].first;
       if (first < prev_first || first <= 0) {
-	fprintf(stderr, "invalid first field (%d) in node %d (order %d)\n", 
-		first, n, o);
-	exit(1);
+	fprintf(stderr, "invalid first field (%d) in node %d "
+		"(%d of order %d)\n", 
+		first, n, n-m_counts[o-1], o);
+	fprintf(stderr, "trying to fix\n");
+	// FIXME: ugly hack
+	m_ngram.m_nodes[n].first = first = n;
       }
 
       if (first < starts[o] || first > starts[o + 1]) {
 	fprintf(stderr, "first (%d) out of range (%d-%d) in node %d "
 		"(order %d)\n", first, starts[o], starts[o + 1], n, o);
-	exit(1);
       }
       prev_first = first;
       n++;
@@ -425,14 +433,12 @@ ArpaNgramReader::debug_sanity_check()
     if (m_ngram.m_nodes[n].first != -1) {
       fprintf(stderr, "first not -1 (was %d) in node %d (order %d)\n", 
 	      m_ngram.m_nodes[n].first, n, m_ngram.order());
-      exit(1);
     }
     n++;
   }
 
   if (n != m_ngram.m_nodes.size()) {
     fprintf(stderr, "size mismatch: %d vs %d\n", n, m_ngram.m_nodes.size());
-    exit(1);
   }
 }
 
