@@ -240,6 +240,11 @@ Expander::move_all_tokens()
       // Actually this may happen.  Probably because tokens ending in
       // dummy states are moved again during the same frame, and may
       // fall outside the beam! (24.6.2003 thirsima)
+      //
+      // But why are we using the beam calculated in the last frame?
+      // Reason: Even if it is not correct, the previous best is a
+      // good estimate before we have found the best token in this
+      // frame. (28.10.2003 thirsima)
       goto token_finished;
     }
 
