@@ -10,12 +10,10 @@ Toolbox::Toolbox()
     m_lexicon(m_lexicon_reader.lexicon()),
     m_vocabulary(m_lexicon_reader.vocabulary()),
 
-    m_lna_reader(),
-
     m_ngram_reader(),
     m_ngram(m_ngram_reader.ngram()),
 
-    m_expander(m_hmms, m_lexicon, m_lna_reader),
+    m_expander(m_hmms, m_lexicon, m_sps_reader),
     m_best_words(m_expander.words()),
 
     m_search(m_expander, m_vocabulary, m_ngram)
@@ -146,9 +144,9 @@ Toolbox::ngram_read(const char *file)
 }
 
 void
-Toolbox::lna_open(const char *file, int models, int size)
+Toolbox::sps_open(FILE *file)
 {
-  m_lna_reader.open(file, models, size);
+  m_sps_reader.init(file);
 }
 
 void
