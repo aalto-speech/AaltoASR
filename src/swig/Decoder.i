@@ -74,6 +74,9 @@ public:
 	const std::string &best_word();
 	void print_words(int words);
 	int find_word(const std::string &word);
+  void add_history(int word);
+  void add_history_word(const std::string &word);
+  void add_ngram_probs();
 
 	// Search
   void init(int expand_window, int stacks, int reserved_hypos);
@@ -83,6 +86,7 @@ public:
 	void go(int frame);
 	bool run();
 	void runto(int frame);
+  void prune_similar(int frame, int length);
 
 	int frame();
   int first_frame();

@@ -40,6 +40,46 @@ Toolbox::best_word()
     return noword;
 }
 
+int
+Toolbox::best_index()
+{
+  if (m_best_words.size() > 0)
+    return m_best_words[0]->word_id;
+  else
+    return -1;
+}
+
+void
+Toolbox::add_history(int word)
+{
+  while (m_history.size() >= m_ngram.order())
+    m_history.pop_front();
+
+  m_history.push_back(word);
+}
+
+void
+Toolbox::add_history_word(const std::string &word)
+{
+  add_history(m_vocabulary.index(word));
+}
+
+void
+Toolbox::add_ngram_probs()
+{
+  for (int i = 0; i < m_best_words.size(); i++) {
+    m_history.push_back(m_best_words[i]->word_id);
+    m_best_words[i]->log_prob = 0; // REMOVE THIS DEBUG!!
+    m_best_words[i]->log_prob += 
+      m_ngram.log_prob(m_history.begin(), m_history.end()) * 
+      m_best_words[i]->frames;
+    m_best_words[i]->avg_log_prob = m_best_words[i]->log_prob / 
+      m_best_words[i]->frames;
+    m_history.pop_back();
+  }
+  std::sort(m_best_words.begin(), m_best_words.end(), Expander::WordCompare());
+}
+
 void
 Toolbox::print_words(int words)
 {

@@ -1,6 +1,8 @@
 #ifndef TOOLBOX_HH
 #define TOOLBOX_HH
 
+#include <deque>
+
 #include "NowayHmmReader.hh"
 #include "NowayLexiconReader.hh"
 #include "LnaReaderCircular.hh"
@@ -32,8 +34,12 @@ public:
   // Expander
   void expand(int frame, int frames);
   const std::string &best_word();
+  int best_index();
   void print_words(int words);
   int find_word(const std::string &word);
+  void add_history(int word);
+  void add_history_word(const std::string &word);
+  void add_ngram_probs();
 
   // Search
   void init(int expand_window, int stacks, int reserved_hypos) 
@@ -46,6 +52,9 @@ public:
   void go(int frame) { m_search.go(frame); }
   bool run() { return m_search.run(); }
   bool runto(int frame);
+  void prune_similar(int frame, int length) { 
+    m_search.prune_similar(frame, length);
+  }
 
   // Info
   int frame() { return m_search.frame(); }
@@ -93,6 +102,7 @@ private:
 
   ArpaNgramReader m_ngram_reader;
   const Ngram &m_ngram;
+  std::deque<int> m_history;
 
   Expander m_expander;
   std::vector<Expander::Word*> &m_best_words;

@@ -142,6 +142,7 @@ public:
   inline void sort();
   inline void prune(int top); // does not sort if not necessary
   inline void clear();
+  void prune_similar(int length);
 
   // Status
   inline void reset_best() { m_best_log_prob = -1e10; m_best_index = -1; }
@@ -216,6 +217,7 @@ public:
   void move_buffer(int frame);
   void go(int frame);
   bool run();
+  void prune_similar(int frame, int length);
 
   // Info
   inline int frame() const { return m_frame; }

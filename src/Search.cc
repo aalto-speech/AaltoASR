@@ -6,6 +6,36 @@
 
 int HypoPath::count = 0;
 
+void
+HypoStack::prune_similar(int length)
+{
+  for (int h1 = 0; h1 + 1 < size(); h1++) {
+    for (int h2 = h1 + 1; h2 < size(); h2++) {
+      bool match = true;
+      HypoPath *p1 = at(h1).path;
+      HypoPath *p2 = at(h2).path;
+      for (int i = 0; i < length; i++) {
+	if (!p1 || !p2) {
+	  match = false;
+	  break;
+	}
+
+	if (p1->word_id != p2->word_id) {
+	  match = false;
+	  break;
+	}
+	p1 = p1->prev;
+	p2 = p2->prev;
+      }
+
+      if (match) {
+	erase(begin() + h2);
+	h2--;
+      }
+    }
+  }
+}
+
 Search::Search(Expander &expander, const Vocabulary &vocabulary, 
 	       const Ngram &ngram)
   : m_expander(expander),
@@ -155,6 +185,14 @@ Search::move_buffer(int frame)
   }
 }
 
+void
+Search::prune_similar(int frame, int length)
+{
+  int stack_index = frame2stack(frame);
+  HypoStack &stack = m_stacks[stack_index];
+  stack.prune_similar(length);
+}
+
 bool
 Search::expand(int frame)
 {
@@ -171,8 +209,11 @@ Search::expand(int frame)
     debug_print_hypo(stack[stack.best_index()]);
   }
 
-  // End of input?
-  if (frame == m_expander.eof_frame())
+  // FIXME?!
+  // End of input?  Do not expand stack on the last existing frame?
+  // Is there a stack at the first non-existing frame?
+  if (m_expander.eof_frame() >= 0 &&
+      frame >= m_expander.eof_frame() - 3)
     return false;
       
   // Reset global pruning if current stack is best
@@ -258,7 +299,9 @@ Search::expand(int frame)
     }
   }
 
-  stack.clear();
+  // FIXME REALLY: is this good idea?!  
+  if (m_expander.words().size() > 0)
+    stack.clear();
 
   return true;
 }
