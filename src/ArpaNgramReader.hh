@@ -75,6 +75,8 @@ public:
   };
 
 private:
+  bool getline(std::string *str, bool chomp = true);
+
   float str2float(const char *str);
   void regcomp(regex_t *preg, const char *regex, int cflags);
   bool regexec(const regex_t *preg, const char *string);

@@ -125,13 +125,13 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       // Check the number of columns on the line
       if (vec.size() < order + 1 || vec.size() > order + 2) {
 	fprintf(stderr, "TreeGramArpaReader::read(): "
-		"%d columns on line %d", vec.size(), m_lineno);
+		"%d columns on line %d\n", vec.size(), m_lineno);
 	exit(1);
       }
       if ((order < m_counts.size() && vec.size() != order + 2) ||
 	  (order == m_counts.size() && vec.size() != order + 1))
       {
-	fprintf(stderr, "WARNING: %d columns on line %d", vec.size(), 
+	fprintf(stderr, "WARNING: %d columns on line %d\n", vec.size(), 
 		m_lineno);
       }
 

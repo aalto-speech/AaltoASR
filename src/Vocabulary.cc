@@ -25,8 +25,7 @@ Vocabulary::add_word(const std::string &word)
 void
 Vocabulary::set_oov(const std::string &word)
 {
-  m_words.clear();
-  m_indices.clear();
+  clear_words();
   m_words.push_back(word);
   m_indices[word] = 0;
 }
@@ -75,4 +74,11 @@ Vocabulary::write(FILE *file) const
 {
   for (unsigned int i = 1; i < m_words.size(); i++)
     fprintf(file, "%s\n", m_words[i].c_str());
+}
+
+void
+Vocabulary::clear_words()
+{
+  m_indices.clear();
+  m_words.clear();
 }

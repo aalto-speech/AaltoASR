@@ -1,9 +1,8 @@
 #include <string>
-#include <errno.h>
-#include <assert.h>
+#include <cerrno>
+#include <iostream>
 
 #include "ArpaNgramReader.hh"
-#include "tools.hh"
 
 // FIXME: NGram assumes sorted nodes, so check the order when reading
 
@@ -17,6 +16,33 @@ ArpaNgramReader::set_oov(const std::string &word)
   m_ngram.set_oov(word);
 }
 
+bool
+ArpaNgramReader::getline(std::string *str, bool chomp)
+{
+  char *ptr;
+  char buf[4096];
+
+  str->clear();
+  while (1) {
+    ptr = fgets(buf, 4096, m_file);
+    if (!ptr)
+      break;
+
+    str->append(buf);
+    if ((*str)[str->length() - 1] == '\n') {
+      break;
+    }
+  }
+
+  if (ferror(m_file) || str->length() == 0)
+    return false;
+
+  if (chomp && (*str)[str->length() - 1] == '\n')
+    str->resize(str->length() - 1);
+
+  return true;
+}
+
 void
 ArpaNgramReader::regcomp(regex_t *preg, const char *regex, int cflags)
 {
@@ -24,7 +50,7 @@ ArpaNgramReader::regcomp(regex_t *preg, const char *regex, int cflags)
   if (result != 0) {
     char errbuf[4096];
     regerror(result, preg, errbuf, 4096);
-    fprintf(stderr, "%s\n", errbuf);
+    std::cerr << errbuf << std::endl;
     throw RegExpError();
   }
 }
@@ -99,8 +125,7 @@ void
 ArpaNgramReader::read_header()
 {
   // Skip header
-  while (read_line(&m_str, m_file)) {
-    chomp(&m_str);
+  while (getline(&m_str)) {
     m_lineno++;
     if (m_str == "\\data\\")
       break;
@@ -115,8 +140,7 @@ ArpaNgramReader::read_counts()
   int total_ngrams = 0;
 
   m_counts.clear();
-  while (read_line(&m_str, m_file)) {
-    chomp(&m_str);
+  while (getline(&m_str)) {
     m_lineno++;
     if (!regexec(&m_r_count, m_str.c_str()))
       break;
@@ -153,7 +177,7 @@ ArpaNgramReader::read_ngram(int order)
     back_off = atof(&m_str[m_points[order + 1]]);
 
   // Parse words using vocabulary and build the internal LM
-  // vocabulary.  Note, that Ngram::add() does not insert duplicates,
+  // vocabulary.  Note, that Ngram::add_word() does not insert duplicates,
   // so this is safe.
   m_words.clear();
   for (int i = 0; i < order; i++) {
@@ -294,9 +318,8 @@ ArpaNgramReader::read_ngrams(int order)
   reset_stacks();
 
   for (int ngrams_read = 0; ngrams_read < m_counts[order - 1];) {
-    if (!read_line(&m_str, m_file))
+    if (!getline(&m_str))
       throw ReadError();
-    chomp(&m_str);
     m_lineno++;
 
     // Skip empty lines
@@ -312,14 +335,8 @@ ArpaNgramReader::read_ngrams(int order)
 	header = true;
       }
 
-      else {
-	fprintf(stderr, "ArpaNgramReader::read_ngrams(): "
-		"invalid command %s on line %d\n", m_str.c_str(), m_lineno);
-	fprintf(stderr, "%d ngrams read out of %d\n", ngrams_read, 
-		m_counts[order-1]);
-	// FIXME: ugly hack
-	ngrams_read++;
-      }
+      else
+	throw InvalidCommand();
     }
 
     // Ngram
@@ -412,17 +429,15 @@ ArpaNgramReader::debug_sanity_check()
     for (int i = 0; i < m_counts[o-1]; i++) {
       int first = m_ngram.m_nodes[n].first;
       if (first < prev_first || first <= 0) {
-	fprintf(stderr, "invalid first field (%d) in node %d "
-		"(%d of order %d)\n", 
-		first, n, n-m_counts[o-1], o);
-	fprintf(stderr, "trying to fix\n");
-	// FIXME: ugly hack
-	m_ngram.m_nodes[n].first = first = n;
+	fprintf(stderr, "invalid first field (%d) in node %d (order %d)\n", 
+		first, n, o);
+	exit(1);
       }
 
       if (first < starts[o] || first > starts[o + 1]) {
 	fprintf(stderr, "first (%d) out of range (%d-%d) in node %d "
 		"(order %d)\n", first, starts[o], starts[o + 1], n, o);
+	exit(1);
       }
       prev_first = first;
       n++;
@@ -433,12 +448,14 @@ ArpaNgramReader::debug_sanity_check()
     if (m_ngram.m_nodes[n].first != -1) {
       fprintf(stderr, "first not -1 (was %d) in node %d (order %d)\n", 
 	      m_ngram.m_nodes[n].first, n, m_ngram.order());
+      exit(1);
     }
     n++;
   }
 
   if (n != m_ngram.m_nodes.size()) {
     fprintf(stderr, "size mismatch: %d vs %d\n", n, m_ngram.m_nodes.size());
+    exit(1);
   }
 }
 

@@ -340,6 +340,7 @@ TreeGram::read(FILE *file)
   }
   
   // Read the vocabulary
+  clear_words();
   for (int i=0; i < words; i++) {
     if (!read_line(&line, file)) {
       fprintf(stderr, "TreeGram::read(): "

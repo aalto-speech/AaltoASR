@@ -7,9 +7,12 @@ main(int argc, char *argv[])
   TreeGram g;
 
   // Read the model
-  {
+  if (argc > 1) {
     TreeGramArpaReader r;
     r.read(stdin, &g);
+  }
+  else {
+    g.read(stdin);
   }
 
   // Print the model
@@ -22,4 +25,6 @@ main(int argc, char *argv[])
       printf(") %g %g\n", i.node().log_prob, i.node().back_off);
     }
   }
+
+  g.write(stdout, false);
 }

@@ -24,8 +24,8 @@ public:
   // Duplicates are detected and not inserted again.
   int add_word(const std::string &word);
 
-  // Return the number of words in the vocabulary.  Does not include OOV.
-  inline int num_words() const { return m_indices.size() - 1; }
+  // Return the number of words in the vocabulary.  Includes OOV.
+  inline int num_words() const { return m_indices.size(); }
 
   // Set the string for OOV word.  Warning: clears the vocabulary.
   void set_oov(const std::string &word);
@@ -39,6 +39,9 @@ public:
   void write(FILE *file) const;
 
 protected:
+  // Clears the vocabulary without adding the oov.
+  void clear_words();
+
   std::map<std::string,int> m_indices;
   std::vector<std::string> m_words;
 };
@@ -46,7 +49,7 @@ protected:
 const std::string&
 Vocabulary::word(int index) const
 {
-  if (index < 0 || index >= m_words.size()) {
+  if ((unsigned int)index >= (unsigned int)m_words.size()) {
     fprintf(stderr, "Vocabulary::word(): index %d out of range\n", index);
     exit(1);
   }
