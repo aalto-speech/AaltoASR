@@ -173,8 +173,7 @@ TreeGram::find_path(const Gram &gram)
 
   // The beginning of the path can be found quickly by using the index
   // stack.
-  while (1) {
-    assert(order < gram.size() - 1); // Otherwise we have a duplicate!
+  while (order < gram.size() - 1) {
     if (gram[order] != m_last_gram[order])
       break;
     order++;
@@ -185,7 +184,7 @@ TreeGram::find_path(const Gram &gram)
   if (order == 0)
     prev = -1;
   else
-    prev = m_insert_stack[order];
+    prev = m_insert_stack[order-1];
 
   while (order < gram.size()-1) {
     index = find_child(gram[order], prev);
@@ -219,7 +218,7 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off)
     m_order++;
   }
   assert(m_order_count.size() == gram.size());
-  m_order_count[gram.size()]++;
+  m_order_count[gram.size()-1]++;
 
   // Handle unigrams separately
   if (gram.size() == 1) {
@@ -237,14 +236,23 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off)
 
   // 2-grams or higher
   else {
-    // Update the path
+    // Fill the insert_stack with the indices of the current gram up
+    // to n-1 words.
     find_path(gram);
 
+    // Update the child range start of the parent node.
     if (m_nodes[m_insert_stack.back()].child_index < 0)
       m_nodes[m_insert_stack.back()].child_index = m_nodes.size();
 
+    // Insert the new node.
     m_nodes.push_back(Node(gram.back(), log_prob, back_off, -1));
+
+    // Update the child range end of the parent node.  Note, that this
+    // must be done after insertion, because in extreme case, we might
+    // update the inserted node.
     m_nodes[m_insert_stack.back() + 1].child_index = m_nodes.size();
+
+    m_insert_stack.push_back(m_nodes.size() - 1);
   }
 
   m_last_gram = gram;
