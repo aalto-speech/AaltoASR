@@ -102,7 +102,7 @@ Ngram::log_prob(RandomAccessIterator begin, RandomAccessIterator end) const
   double log_prob = 0;
 
   for (; begin != end; begin++) {
-    const Node *node = node(*begin);
+    const Node *node = this->node(*begin);
     assert(node != NULL); // We must have a unigram for each word.
 
     for (it = begin+1; it != end; it++) {
