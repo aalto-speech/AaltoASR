@@ -32,6 +32,7 @@ public:
 
   // Ngram
   void ngram_read(const char *file, float weight);
+  void read_lookahead_ngram(const char *file);
 
   // Lna
   void lna_open(const char *file, int size);
@@ -97,7 +98,7 @@ public:
   void set_eq_word_count_beam(float beam) { m_tp_search.set_eq_word_count_beam(beam); }
   void set_max_state_duration(int duration) 
   { m_expander.set_max_state_duration(duration); }
-  void set_lm_lookahead(int lmlh) { m_tp_lexicon.set_lm_lookahead(lmlh); m_tp_search.set_lm_bigram_lookahead(lmlh); }
+  void set_lm_lookahead(int lmlh) { m_tp_lexicon.set_lm_lookahead(lmlh); m_tp_search.set_lm_lookahead(lmlh); }
   void set_insertion_penalty(float ip) { m_tp_search.set_insertion_penalty(ip); }
   void set_verbose(int verbose) { m_search.set_verbose(verbose); m_tp_lexicon.set_verbose(verbose); m_tp_search.set_verbose(verbose);}
   void set_print_probs(bool print_probs) 
@@ -113,7 +114,7 @@ public:
   void set_dummy_word_boundaries(bool value)
   { m_search.set_dummy_word_boundaries(value); }
 
-  void set_avg_ac_alpha(float alpha) { m_tp_search.set_avg_ac_alpha(alpha); }
+  void prune_lm_lookahead_buffers(int min_delta, int max_depth) { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
 
   // Debug
   void print_prunings()
@@ -149,6 +150,7 @@ private:
 
   std::vector<TreeGram*> m_ngrams;
   std::deque<int> m_history;
+  TreeGram *m_lookahead_ngram;
 
   Expander m_expander;
 

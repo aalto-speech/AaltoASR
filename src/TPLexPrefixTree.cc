@@ -14,6 +14,7 @@ TPLexPrefixTree::TPLexPrefixTree()
   m_end_node = new Node(-1);
   m_end_node->node_id = 1;
   node_list.push_back(m_end_node);
+  m_lm_buf_count = 0;
 }
 
 
@@ -29,7 +30,7 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
   Arc end_arc;
 
   // NOTE! HMM states are indexed with respect to their mixture model.
-  // This is a quick solution to allow tied hmm states. The right way
+  // This is a quick solution to allow tied HMM states. The right way
   // to do this would be to load HMMs so that different HMMs would
   // really share the same states. Now it is merely assumed that the
   // (local) transitions in the states with the same mixtures are the same.
@@ -66,12 +67,6 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
                             hmm_state_nodes,
                             sink_nodes, sink_trans_log_probs);
       }
-    }
-
-    if (m_lm_lookahead == 1 && i == 0)
-    {
-      // Language model lookahead in first subtree nodes only
-      hmm_state_nodes[0]->possible_word_id_list.push_back(word_id);
     }
 
     // Expand other states, from left to right
@@ -177,22 +172,246 @@ TPLexPrefixTree::expand_lexical_tree(Node *source, Hmm *hmm,
 void
 TPLexPrefixTree::finish_tree(void)
 {
+  // Propagate word ID:s towards the root node and add LM lookahead
+  // list to every branch (if this option is used)
+  for (int i = 0; i < m_root_node->arcs.size(); i++)
+    post_process_lex_branch(m_root_node->arcs[i].next, NULL);
+
   // Replace arcs to the end node in the word ends to the root to make the
   // tree re-entrant
   if (m_verbose > 1)
     printf("%d words in the lexicon\n", word_end_list.size());
   
-  for (int i = 0; i < word_end_list.size(); i++)
+  for (int i = 0; i < node_list.size(); i++)
   {
-    for (int j = 0; j < word_end_list[i]->arcs.size(); j++)
+    for (int j = 0; j < node_list[i]->arcs.size(); j++)
     {
-      if (word_end_list[i]->arcs[j].next == m_end_node)
-        word_end_list[i]->arcs[j].next = m_root_node;
+      if (node_list[i]->arcs[j].next == m_end_node)
+        node_list[i]->arcs[j].next = m_root_node;
     }
   }
 
   // FIXME! Should the word id lists for lm lookahead be sorted to increase
-  // cache utility?
+  // processor cache utility?
+}
+
+
+void
+TPLexPrefixTree::post_process_lex_branch(Node *node,
+                                         std::vector<int> *lm_la_list)
+{
+  int out_trans_count;
+  Node *original_node = node, *real_next, *prev_node;
+  int i;
+
+  // Skip nodes without branches
+  prev_node = NULL;
+  for (;;)
+  {
+    if (node->word_id != -1)
+    {
+      // Final node
+      int word_id = node->word_id;
+      if (prev_node != NULL)
+      {
+        original_node->word_id = word_id;
+        node->word_id = -1;
+        if (node->state == NULL)
+        {
+          // Final node was a NULL node, we don't need it anymore
+          assert( node->arcs.size() == 1 );
+          if (prev_node->arcs[0].next != prev_node)
+          {
+            prev_node->arcs[0].next = node->arcs[0].next;
+            prev_node->arcs[0].log_prob += node->arcs[0].log_prob;
+          }
+          else
+          {
+            prev_node->arcs[1].next = node->arcs[0].next;
+            prev_node->arcs[1].log_prob += node->arcs[0].log_prob;
+          }
+        }
+      }
+      if (m_lm_lookahead && lm_la_list != NULL)
+      {
+        // Add word to LM lookahead list
+        lm_la_list->push_back(word_id);
+      }
+      return;
+    }
+
+    out_trans_count = 0;
+    for (i = 0; i < node->arcs.size(); i++)
+    {
+      if (node->arcs[i].next != node) // Skip self transitions
+      {
+        real_next = node->arcs[i].next;
+        if (++out_trans_count > 1)
+          break;
+      }
+    }
+    prev_node = node;
+    if (out_trans_count < 2)
+    {
+      node = real_next; // Only one transition to another node, skip
+    }
+    else
+      break;
+  }
+  for (i = 0; i < node->arcs.size(); i++)
+  {
+    if (node->arcs[i].next != node)
+    {
+      post_process_lex_branch(node->arcs[i].next,
+                              &original_node->possible_word_id_list);
+    }
+  }
+  if (m_lm_lookahead)
+  {
+    if (original_node->possible_word_id_list.size() > 0)
+      m_lm_buf_count++;
+    if (lm_la_list != NULL)
+    {
+      for (i = 0; i < original_node->possible_word_id_list.size(); i++)
+        lm_la_list->push_back(original_node->possible_word_id_list[i]);
+    }
+  }
+}
+
+
+void
+TPLexPrefixTree::prune_lookahead_buffers(int min_delta, int max_depth)
+{
+  if (m_verbose > 0)
+    printf("LM lookahead buffers before pruning: %d\n", m_lm_buf_count);
+  m_lm_buf_count = 0;
+  for (int i = 0; i < m_root_node->arcs.size(); i++)
+    prune_lm_la_buffer(min_delta, max_depth, m_root_node->arcs[i].next,
+                       -1, 0);
+  if (m_verbose > 0)
+    printf("LM lookahead buffers after pruning: %d\n", m_lm_buf_count);
+}
+
+void
+TPLexPrefixTree::prune_lm_la_buffer(int delta_thr, int depth_thr,
+                                    Node *node,
+                                    int last_size, int cur_depth)
+{
+  int out_trans_count;
+  Node *original_node = node, *real_next;
+  int i;
+  int cur_size = last_size;
+
+  if (node->possible_word_id_list.size() > 0)
+  {
+    // Determine if we want to remove this buffer
+    if (last_size > 0 &&
+        last_size - node->possible_word_id_list.size() <= delta_thr)
+    {
+      // Not enough change from last lookahead node, remove
+      node->possible_word_id_list.clear();
+    }
+    else if (cur_depth >= depth_thr)
+    {
+      // Gone past the maximum depth
+      node->possible_word_id_list.clear();
+    }
+    else
+    {
+      cur_depth++;
+      cur_size = node->possible_word_id_list.size();
+      m_lm_buf_count++;
+    }
+  }
+  
+  for (;;)
+  {
+    if (node->word_id != -1)
+      return; // No more LM lookahead
+    out_trans_count = 0;
+    for (i = 0; i < node->arcs.size(); i++)
+    {
+      if (node->arcs[i].next != node) // Skip self transitions
+      {
+        real_next = node->arcs[i].next;
+        if (++out_trans_count > 1)
+          break;
+      }
+    }
+    if (out_trans_count < 2)
+    {
+      node = real_next; // Only one transition to another node, skip
+      assert( node->possible_word_id_list.size() == 0 );
+    }
+    else
+      break;
+  }
+  for (i = 0; i < node->arcs.size(); i++)
+  {
+    if (node->arcs[i].next != node)
+    {
+      prune_lm_la_buffer(delta_thr, depth_thr,
+                         node->arcs[i].next,
+                         cur_size, cur_depth);
+    }
+  }
+}
+
+
+void
+TPLexPrefixTree::set_lm_lookahead_cache_sizes(int root_size)
+{
+  for (int i = 0; i < m_root_node->arcs.size(); i++)
+    set_node_lm_lookahead_cache_size(m_root_node->arcs[i].next, root_size,
+                                     m_root_node->arcs.size());
+}
+
+
+void
+TPLexPrefixTree::set_node_lm_lookahead_cache_size(Node *node, int cache_size,
+                                                  int last_branches)
+{
+  int out_trans_count;
+  Node *real_next;
+  int i;
+
+  // Skip nodes without branches
+  for (;;)
+  {
+    if (node->possible_word_id_list.size() > 0)
+      node->lm_lookahead_buffer.set_max_items(cache_size);
+    if (node->word_id != -1)
+    {
+      // Final node
+      return;
+    }
+    
+    out_trans_count = 0;
+    for (i = 0; i < node->arcs.size(); i++)
+    {
+      if (node->arcs[i].next != node) // Skip self transitions
+      {
+        real_next = node->arcs[i].next;
+        if (++out_trans_count > 1)
+          break;
+      }
+    }
+    if (out_trans_count < 2)
+    {
+      node = real_next; // Only one transition to another node, skip
+    }
+    else
+      break;
+  }
+  int next_size = cache_size;
+  for (i = 0; i < node->arcs.size(); i++)
+  {
+    if (node->arcs[i].next != node)
+    {
+      set_node_lm_lookahead_cache_size(node->arcs[i].next, next_size,
+                                       node->arcs.size());
+    }
+  }
 }
 
 

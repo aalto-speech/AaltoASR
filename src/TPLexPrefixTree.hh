@@ -63,7 +63,7 @@ public:
     float am_log_prob;
     float lm_log_prob;
     float cur_am_log_prob; // Used inside nodes
-    float cur_lm_log_prob; // Used during one tree traversal
+    float cur_lm_log_prob; // Used for LM lookahead
     float total_log_prob;
     WordHistory *prev_word;
 
@@ -73,11 +73,13 @@ public:
     float meas[6];
 #endif
 
+    int word_count;
+    
     //PathHistory *token_path;
     unsigned char depth;
     unsigned char dur;
 
-    int word_count;
+    unsigned char mode; // 0 = root, 1 = normal, 2 = after word_id
   };
 
   class Arc {
@@ -111,6 +113,8 @@ public:
 
   void add_word(std::vector<Hmm*> &hmm_list, int word_id);
   void finish_tree(void);
+  void prune_lookahead_buffers(int min_delta, int max_depth);
+  void set_lm_lookahead_cache_sizes(int root_size);
 
   void clear_node_token_lists(void);
 
@@ -118,13 +122,18 @@ public:
   void print_lookahead_info(int node, const Vocabulary &voc);
   
 private:
-  bool is_hmm_plosiv(Hmm *hmm);
   void expand_lexical_tree(Node *source, Hmm *hmm, HmmTransition &t,
                            float cur_trans_log_prob,
                            int word_end,
                            std::vector<Node*> &hmm_state_nodes,
                            std::vector<Node*> &sink_nodes,
                            std::vector<float> &sink_trans_log_probs);
+  void post_process_lex_branch(Node *node, std::vector<int> *lm_la_list);
+  void prune_lm_la_buffer(int delta_thr, int depth_thr,
+                          Node *node, int last_size, int cur_depth);
+  void set_node_lm_lookahead_cache_size(Node *node, int cache_size,
+                                        int last_branches);
+  
 private:
   int m_words; // Largest word_id in the nodes plus one
   Node *m_root_node;
@@ -133,7 +142,8 @@ private:
   std::vector<Node*> node_list;
   int m_verbose;
   int m_lm_lookahead; // 0=None, 1=Only in first subtree nodes,
-                      // 2=Full (Not yet implemented!)
+                      // 2=Full
+  int m_lm_buf_count;
 };
 
 //////////////////////////////////////////////////////////////////////

@@ -143,6 +143,29 @@ Toolbox::ngram_read(const char *file, float weight)
 }
 
 void
+Toolbox::read_lookahead_ngram(const char *file)
+{
+  if (strlen(file) == 0)
+  {
+    if (m_ngrams.size() > 0)
+      m_tp_search.set_lookahead_ngram(m_ngrams.back());
+  }
+  else
+  {
+    FILE *f = fopen(file, "r");
+    if (!f) {
+      fprintf(stderr, "ngram_read(): could not open %s: %s\n", 
+              file, strerror(errno));
+      exit(1);
+    }
+    m_lookahead_ngram = new TreeGram();
+    m_lookahead_ngram->read(f);
+    m_tp_search.set_lookahead_ngram(m_lookahead_ngram);
+  }
+}
+
+
+void
 Toolbox::lna_open(const char *file, int size)
 {
   m_lna_reader.open(file, size);

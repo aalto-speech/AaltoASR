@@ -72,6 +72,8 @@ public:
 
   void fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
                          std::vector<float> &result_buffer);
+  void fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
+                          std::vector<float> &result_buffer);
   
   float log_prob(const Gram &gram);
   int order() { return m_order; }

@@ -6,14 +6,17 @@
 #define TOKEN_RESERVE_BLOCK 1024
 
 #define DEFAULT_MAX_LOOKAHEAD_SCORE_LIST_SIZE 512
+//1031
 #define DEFAULT_MAX_NODE_LOOKAHEAD_BUFFER_SIZE 512
 
 #define MAX_TREE_DEPTH 60
 
 #define MAX_STATE_DURATION 80
 
-#define EQ_DEPTH_PRUNING
-#define EQ_WC_PRUNING
+//#define EQ_DEPTH_PRUNING
+//#define EQ_WC_PRUNING
+
+//#define COUNT_LM_LA_CACHE_MISS
 
 
 TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
@@ -36,15 +39,16 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
   m_new_token_list = new std::vector<TPLexPrefixTree::Token*>;
   m_word_end_token_list = new std::vector<TPLexPrefixTree::Token*>;
   m_ngram = NULL;
+  m_lookahead_ngram = NULL;
   m_word_boundary_id = 0;
   m_duration_scale = 0;
   m_transition_scale = 1;
-  m_lm_bigram_lookahead = false;
+  m_lm_lookahead = 0;
   m_max_lookahead_score_list_size = DEFAULT_MAX_LOOKAHEAD_SCORE_LIST_SIZE;
   m_max_node_lookahead_buffer_size = DEFAULT_MAX_NODE_LOOKAHEAD_BUFFER_SIZE;
   m_insertion_penalty = 0;
-  m_avg_ac_log_prob_alpha = 0.2;
   filecount = 0;
+  m_lm_lookahead_initialized = false;
 }
 
 
@@ -89,6 +93,7 @@ TokenPassSearch::reset_search(int start_frame)
   t->prev_word->link();
   t->dur = 0;
   t->avg_ac_log_prob = 0;
+  t->mode = 0; // In root node
 
 #ifdef PRUNING_MEASUREMENT
   for (int i = 0; i < 6; i++)
@@ -99,6 +104,16 @@ TokenPassSearch::reset_search(int start_frame)
   for (int i = 0; i < MAX_WC_COUNT; i++)
     m_wc_llh[i] = 0;
   m_min_word_count = 0;
+#endif
+
+#ifdef COUNT_LM_LA_CACHE_MISS
+  for (int i = 0; i < MAX_LEX_TREE_DEPTH; i++)
+  {
+    lm_la_cache_count[i] = 0;
+    lm_la_cache_miss[i] = 0;
+  }
+  lm_la_word_cache_count = 0;
+  lm_la_word_cache_miss = 0;
 #endif
   
   t->depth = 0;
@@ -111,11 +126,22 @@ TokenPassSearch::reset_search(int start_frame)
   if (lm_lookahead_score_list.get_num_items() > 0)
   {
     // Delete the LM lookahead cache
-    LM2GLookaheadScoreList *score_list;
+    LMLookaheadScoreList *score_list;
     while (lm_lookahead_score_list.remove_last_item(&score_list))
       delete score_list;
   }
-  lm_lookahead_score_list.set_max_items(DEFAULT_MAX_LOOKAHEAD_SCORE_LIST_SIZE);
+
+  if (!m_lm_lookahead_initialized)
+  {
+    lm_lookahead_score_list.set_max_items(m_max_lookahead_score_list_size);
+    m_lexicon.set_lm_lookahead_cache_sizes(m_max_node_lookahead_buffer_size);
+    m_lm_lookahead_initialized = true;
+  }
+
+  if (m_lm_lookahead)
+  {
+    assert( m_lookahead_ngram != NULL );
+  }
 
   m_current_glob_beam = m_global_beam;
   m_current_we_beam = m_word_end_beam;
@@ -257,6 +283,20 @@ TokenPassSearch::print_best_path(bool only_not_printed)
   for (i = 0; i < 6; i++)
     printf("meas%i: %.3g\n", i, (*m_active_token_list)[best_token]->meas[i]);
 #endif
+  
+#ifdef COUNT_LM_LA_CACHE_MISS
+  printf("Count: ");
+  for (i = 0; i < MAX_LEX_TREE_DEPTH; i++)
+    printf("%i ", lm_la_cache_count[i]);
+  printf("\n");
+  printf("Miss: ");
+  for (i = 0; i < MAX_LEX_TREE_DEPTH; i++)
+    printf("%i ", lm_la_cache_miss[i]);
+  printf("\n");
+  printf("WordCount: %d\n", lm_la_word_cache_count);
+  printf("WordMiss: %d\n", lm_la_word_cache_miss);
+#endif
+
 }
 
 
@@ -300,9 +340,41 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
 {
   TPLexPrefixTree::Node *source_node = token->node;
   int i;
-  bool we_flag = false;
+  
+  // Iterate all the arcs leaving the token's node.
+  for (i = 0; i < source_node->arcs.size(); i++)
+  {
+    move_token_to_node(token, source_node->arcs[i].next,
+                       source_node->arcs[i].log_prob);
+  }
 
-  if (token->node == m_root) // New word start, use tighter beam
+  if (token->mode == 0) // In root node
+  {
+    assert(token->node == m_root);
+    assert(token->depth == 0);
+    if (token->prev_word->word_id != m_word_boundary_id)
+    {
+      TPLexPrefixTree::WordHistory *temp_prev_word;
+      // Add word_boundary and propagate the token with new word history
+      temp_prev_word = token->prev_word;
+      token->prev_word = new TPLexPrefixTree::WordHistory(
+        m_word_boundary_id, m_word_boundary_lm_id, token->prev_word);
+      token->prev_word->link();
+      token->lm_log_prob += compute_lm_log_prob(token->prev_word) +
+        m_insertion_penalty;
+      token->cur_lm_log_prob = token->lm_log_prob;
+      // Iterate all the arcs leaving the token's node.
+      for (i = 0; i < source_node->arcs.size(); i++)
+      {
+        move_token_to_node(token, source_node->arcs[i].next,
+                           source_node->arcs[i].log_prob);
+      }
+      TPLexPrefixTree::WordHistory::unlink(token->prev_word);
+      token->prev_word = temp_prev_word;
+    }
+  }
+
+  /*if (token->node == m_root) // New word start, use tighter beam
     we_flag = true;
 
   // Iterate all the arcs leaving the token's node
@@ -360,7 +432,7 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
       }
       else
       {
-        // Self loop, no  word end.
+        // Self loop, no word end.
         move_token_to_node(token, source_node->arcs[i].next,
                            source_node->arcs[i].log_prob,
                            0, token->prev_word,
@@ -379,49 +451,73 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
                          0, token->prev_word,
                          we_flag);
     }
-  }
+    }*/
 }
 
 
 void
 TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
                                     TPLexPrefixTree::Node *node,
-                                    float transition_score,
-                                    float lm_score,
-                                    TPLexPrefixTree::WordHistory *word_hist,
-                                    bool word_end_flag)
+                                    float transition_score)
 {
   int new_dur;
   int depth;
   float new_cur_am_log_prob;
   float new_cur_lm_log_prob;
-  float real_am_log_prob = token->am_log_prob + transition_score;
-  float real_lm_log_prob = token->lm_log_prob + lm_score;
+  float new_real_am_log_prob = token->am_log_prob + transition_score;
+  float new_real_lm_log_prob = token->lm_log_prob;
   float total_token_log_prob;
-
+  int new_word_count = token->word_count;
+  unsigned char new_token_mode = token->mode;
+  TPLexPrefixTree::WordHistory *new_prev_word = token->prev_word;
+  bool new_word_linked = false;
   int i;
 
   if (node != token->node)
   {
-    // Changing node
+    // Moving to another node
+    
+    if (new_token_mode != 2)
+    {
+      if (node->word_id != -1) // Is word ID unique?
+      {
+        // Add LM probability
+        new_prev_word =  new TPLexPrefixTree::WordHistory(
+          node->word_id, m_lex2lm[node->word_id], token->prev_word);
+        new_prev_word->link();
+        new_word_linked = true;
+        new_real_lm_log_prob += compute_lm_log_prob(new_prev_word) +
+          m_insertion_penalty;
+        new_word_count++;
+        new_token_mode = 2; // LM probability has been added
+      }
+    }
+      
+    // Update duration probability
     new_dur = 0;
     depth = token->depth + 1;
     if (token->node->state != NULL)
     {
       // Add duration probability
       int temp_dur = token->dur+1;
-      real_am_log_prob += m_duration_scale*
+      new_real_am_log_prob += m_duration_scale*
         token->node->state->duration.get_log_prob(temp_dur);
     }
-    new_cur_am_log_prob = real_am_log_prob;
-    new_cur_lm_log_prob = token->cur_lm_log_prob;
-
-    if (word_end_flag)
-      new_cur_lm_log_prob = real_lm_log_prob;
-    if (node->possible_word_id_list.size() > 0 && m_lm_bigram_lookahead)
+    
+    new_cur_am_log_prob = new_real_am_log_prob;
+    if (new_token_mode == 2)
+      new_cur_lm_log_prob = new_real_lm_log_prob;
+    else
     {
-      // Add language model lookahead
-      new_cur_lm_log_prob += get_lm_bigram_lookahead(word_hist, node);
+      // LM probability not added yet, use previous LM (lookahead) value
+      new_cur_lm_log_prob = token->cur_lm_log_prob;
+      
+      if (node->possible_word_id_list.size() > 0 && m_lm_lookahead)
+      {
+        // Add language model lookahead
+        new_cur_lm_log_prob = new_real_lm_log_prob +
+          get_lm_lookahead_score(token->prev_word, node, depth);
+      }
     }
   }
   else
@@ -437,10 +533,15 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     new_cur_lm_log_prob = token->cur_lm_log_prob;
   }
 
+  // Update token's mode. Mode 2 was selected above if word ID was unique.
   if (node == m_root)
   {
     depth = 0;
+    new_token_mode = 0;
   }
+  else if (new_token_mode == 0)
+    new_token_mode = 1;
+
   if (node->state == NULL)
   {
     // Moving to a node without HMM state, pass through immediately.
@@ -448,22 +549,32 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     // Try beam pruning
     total_token_log_prob =
       get_token_log_prob(new_cur_am_log_prob, new_cur_lm_log_prob);
-    if (total_token_log_prob+token->avg_ac_log_prob <
-        m_best_log_prob - m_current_glob_beam)
+    if (new_token_mode != 1)
+    {
+      if ((new_token_mode != 1 &&
+           total_token_log_prob < m_best_we_log_prob - m_current_we_beam) ||
+          total_token_log_prob+token->avg_ac_log_prob <
+          m_best_log_prob - m_current_glob_beam)
+      {
+        if (new_word_linked)
+          TPLexPrefixTree::WordHistory::unlink(new_prev_word);
         return;
+      }
+    }
     
     // Create temporary token for propagation.
     TPLexPrefixTree::Token temp_token;
     temp_token.node = node;
     temp_token.next_node_token = NULL;
-    temp_token.am_log_prob = real_am_log_prob;
-    temp_token.lm_log_prob = real_lm_log_prob;
+    temp_token.am_log_prob = new_real_am_log_prob;
+    temp_token.lm_log_prob = new_real_lm_log_prob;
     temp_token.cur_am_log_prob = new_cur_am_log_prob;
     temp_token.cur_lm_log_prob = new_cur_lm_log_prob;
-    temp_token.total_log_prob = token->total_log_prob;
-    temp_token.prev_word = word_hist;
+    temp_token.total_log_prob = total_token_log_prob;
+    temp_token.prev_word = new_prev_word;
     temp_token.dur = 0;
-    temp_token.word_count = token->word_count;
+    temp_token.word_count = new_word_count;
+    temp_token.mode = new_token_mode;
 
 #ifdef PRUNING_MEASUREMENT
     for (i = 0; i < 6; i++)
@@ -487,32 +598,39 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     float ac_log_prob = m_acoustics.log_prob(node->state->model);
     float new_avg_ac_log_prob;
 
-    real_am_log_prob += ac_log_prob;
+    new_real_am_log_prob += ac_log_prob;
     new_cur_am_log_prob += ac_log_prob;
     total_token_log_prob =
       get_token_log_prob(new_cur_am_log_prob, new_cur_lm_log_prob);
     
-    // Apply beam pruning once more
-    if (word_end_flag)
+    // Apply beam pruning
+    if (new_token_mode != 1)
     {
       if (total_token_log_prob < m_best_we_log_prob - m_current_we_beam)
+      {
+        if (new_word_linked)
+          TPLexPrefixTree::WordHistory::unlink(new_prev_word);
         return;
+      }
     }
-    if (total_token_log_prob < m_best_log_prob - m_current_glob_beam)
-      return;
+    if (total_token_log_prob < m_best_log_prob - m_current_glob_beam
 #ifdef EQ_DEPTH_PRUNING
-    if (total_token_log_prob < m_depth_llh[depth/2] - m_eq_depth_beam)
-      return;
+        || total_token_log_prob < m_depth_llh[depth/2] - m_eq_depth_beam
 #endif
 #ifdef EQ_WC_PRUNING
-    if (total_token_log_prob < m_wc_llh[token->word_count-m_min_word_count] -
-        m_eq_wc_beam)
-      return;
+        || total_token_log_prob < m_wc_llh[token->word_count-m_min_word_count]-
+           m_eq_wc_beam
 #endif
+      )  
+    {
+      if (new_word_linked)
+        TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+      return;
+    }
 
     // Apply "acoustic lookahead"
-    new_avg_ac_log_prob = m_avg_ac_log_prob_alpha * ac_log_prob +
-      (1-m_avg_ac_log_prob_alpha) * token->avg_ac_log_prob;
+    new_avg_ac_log_prob = 0.22 * ac_log_prob +
+      (1-0.22) * token->avg_ac_log_prob;
 
     if (node->token_list == NULL)
     {
@@ -523,14 +641,14 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       new_token->next_node_token = node->token_list;
       node->token_list = new_token;
       // Add to the list of propagated tokens
-      if (word_end_flag)
+      if (new_token_mode != 1)
         m_word_end_token_list->push_back(new_token);
       else
         m_new_token_list->push_back(new_token);
     }
     else
     {
-      similar_word_hist = find_similar_word_history(word_hist,
+      similar_word_hist = find_similar_word_history(new_prev_word,
                                                     node->token_list);
       if (similar_word_hist == NULL)
       {
@@ -540,7 +658,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
         new_token->next_node_token = node->token_list;
         node->token_list = new_token;
         // Add to the list of propagated tokens
-        if (word_end_flag)
+        if (new_token_mode != 1)
           m_word_end_token_list->push_back(new_token);
         else
           m_new_token_list->push_back(new_token);
@@ -559,21 +677,19 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
         else
         {
           // Discard this token
+          if (new_word_linked)
+            TPLexPrefixTree::WordHistory::unlink(new_prev_word);
           return;
         }
       }
     }
-    if (word_end_flag)
+    if (new_token_mode != 1)
     {
       if (total_token_log_prob > m_best_we_log_prob)
-      {
         m_best_we_log_prob = total_token_log_prob;
-      }
     }
     if (total_token_log_prob > m_best_log_prob)
-    {
       m_best_log_prob = total_token_log_prob;
-    }
 
 #ifdef EQ_DEPTH_PRUNING
     if (total_token_log_prob > m_depth_llh[depth/2])
@@ -587,16 +703,17 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
         
     if (total_token_log_prob < m_worst_log_prob)
       m_worst_log_prob = total_token_log_prob;
-    new_token->prev_word = word_hist;
-    if (word_hist != NULL)
-      word_hist->link();
-    new_token->am_log_prob = real_am_log_prob;
+    new_token->prev_word = new_prev_word;
+    if (new_token->prev_word != NULL)
+       new_token->prev_word->link();
+    new_token->am_log_prob = new_real_am_log_prob;
     new_token->cur_am_log_prob = new_cur_am_log_prob;
-    new_token->lm_log_prob = real_lm_log_prob;
+    new_token->lm_log_prob = new_real_lm_log_prob;
     new_token->cur_lm_log_prob = new_cur_lm_log_prob;
     new_token->total_log_prob = total_token_log_prob;
     new_token->dur = new_dur;
-    new_token->word_count = token->word_count;
+    new_token->word_count = new_word_count;
+    new_token->mode = new_token_mode;
 
 #ifdef PRUNING_MEASUREMENT
     for (i = 0; i < 6; i++)
@@ -614,6 +731,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     /*new_token->token_path = token->token_path;
       new_token->token_path->link();*/
   }
+  if (new_word_linked)
+    TPLexPrefixTree::WordHistory::unlink(new_prev_word);
 }
 
 
@@ -841,7 +960,7 @@ TokenPassSearch::set_ngram(TreeGram *ngram)
   m_lex2lm.clear();
   m_lex2lm.resize(m_vocabulary.num_words());
 
-  // Create the mapping between lexicon and the model.
+  // Create a mapping between the lexicon and the model.
   for (int i = 0; i < m_vocabulary.num_words(); i++) {
     m_lex2lm[i] = m_ngram->word_index(m_vocabulary.word(i));
 
@@ -855,6 +974,33 @@ TokenPassSearch::set_ngram(TreeGram *ngram)
   if (count > 0)
     fprintf(stderr, "there were %d out-of-LM words in total in LM\n", 
 	    count);
+}
+
+
+void
+TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
+{
+  int count = 0;
+
+  assert( m_ngram != NULL );
+  
+  m_lookahead_ngram = ngram;
+
+  // Create a mapping between the lexicon and the model.
+  for (int i = 0; i < m_vocabulary.num_words(); i++) {
+    if (m_lex2lm[i] != m_lookahead_ngram->word_index(m_vocabulary.word(i)))
+      assert( 0 );
+
+    // Warn about words not in lm.
+    /*if (m_lex2lm[i] == 0 && i != 0) {
+      fprintf(stderr, "%s not in LM\n", m_vocabulary.word(i).c_str());
+      count++;
+      }*/
+  }
+
+  /*if (count > 0)
+    fprintf(stderr, "there were %d out-of-LM words in total in LM\n", 
+    count);*/
 }
 
 float
@@ -883,47 +1029,74 @@ TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::WordHistory *word_hist)
 
 
 float
-TokenPassSearch::get_lm_bigram_lookahead(TPLexPrefixTree::WordHistory *prev_word,
-                                         TPLexPrefixTree::Node *node)
+TokenPassSearch::get_lm_lookahead_score(
+  TPLexPrefixTree::WordHistory *word_hist,TPLexPrefixTree::Node *node,
+  int depth)
+{
+  int w1,w2;
+
+  w2 = word_hist->word_id;
+  if (w2 == -1)
+    return 0;
+  if (m_lm_lookahead == 1)
+    return get_lm_bigram_lookahead(w2, node, depth);
+
+  if (word_hist->prev_word == NULL)
+    return 0;
+  w1 = word_hist->prev_word->word_id;
+  if (w1 == -1)
+    return 0;
+
+  return get_lm_trigram_lookahead(w1, w2, node, depth);
+}
+
+
+float
+TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
+                                         TPLexPrefixTree::Node *node,
+                                         int depth)
 {
   int i;
-  int prev_word_id = prev_word->word_id;
-  int real_word_id = prev_word_id;
-  LM2GLookaheadScoreList *score_list, *old_score_list;
+  LMLookaheadScoreList *score_list, *old_score_list;
   float score;
 
-  if (prev_word_id == -1)
-    prev_word_id = m_lexicon.words();
+#ifdef COUNT_LM_LA_CACHE_MISS
+  lm_la_cache_count[depth]++;
+#endif
+
+  if (node->lm_lookahead_buffer.find(prev_word_id, &score))
+    return score;
   
-  if (node->lm_lookahead_buffer.get_num_items() == 0)
-  {
-    node->lm_lookahead_buffer.set_max_items(DEFAULT_MAX_NODE_LOOKAHEAD_BUFFER_SIZE);
-  }
-  else
-  {
-    if (node->lm_lookahead_buffer.find(prev_word_id, &score))
-      return score;
-  }
+#ifdef COUNT_LM_LA_CACHE_MISS
+  lm_la_cache_miss[depth]++;
+#endif
 
   // Not found, compute the LM bigram lookahead scores.
   // At first, determine if the LM scores have been computed already.
 
+#ifdef COUNT_LM_LA_CACHE_MISS
+  lm_la_word_cache_count++;
+#endif
+  
   if (!lm_lookahead_score_list.find(prev_word_id, &score_list))
   {
+#ifdef COUNT_LM_LA_CACHE_MISS
+  lm_la_word_cache_miss++;
+#endif
     // Not found, compute the scores.
     // FIXME! Is it necessary to compute the scores for all the words?
     if (m_verbose > 2)
       printf("Compute lm lookahead scores for \'%s'\n",
-             real_word_id==-1?"NULL":m_vocabulary.word(prev_word_id).c_str());
-    score_list = new LM2GLookaheadScoreList;
+             m_vocabulary.word(prev_word_id).c_str());
+    score_list = new LMLookaheadScoreList;
     if (lm_lookahead_score_list.insert(prev_word_id, score_list,
                                        &old_score_list))
       delete old_score_list; // Old list was removed
-    score_list->prev_word_id = prev_word_id;
+    score_list->index = prev_word_id;
     score_list->lm_scores.insert(score_list->lm_scores.end(),
                                  m_lexicon.words(), 0);    
-    m_ngram->fetch_bigram_list(prev_word->lm_id, m_lex2lm,
-                               score_list->lm_scores);
+    m_lookahead_ngram->fetch_bigram_list(m_lex2lm[prev_word_id], m_lex2lm,
+                                         score_list->lm_scores);
   }
   
   // Compute the lookahead score by selecting the maximum LM score of
@@ -936,6 +1109,71 @@ TokenPassSearch::get_lm_bigram_lookahead(TPLexPrefixTree::WordHistory *prev_word
   }
   // Add the score to the node's buffer
   node->lm_lookahead_buffer.insert(prev_word_id, score, NULL);
+  return score;
+}
+
+
+float
+TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
+                                          TPLexPrefixTree::Node *node,
+                                          int depth)
+{
+  int i;
+  int index;
+  LMLookaheadScoreList *score_list, *old_score_list;
+  float score;
+
+  index = w1*m_lexicon.words() + w2;
+
+#ifdef COUNT_LM_LA_CACHE_MISS
+  lm_la_cache_count[depth]++;
+#endif
+
+  if (node->lm_lookahead_buffer.find(index, &score))
+    return score;
+  
+#ifdef COUNT_LM_LA_CACHE_MISS
+  lm_la_cache_miss[depth]++;
+#endif 
+
+  // Not found, compute the LM trigram lookahead scores.
+  // At first, determine if the LM scores have been computed already.
+
+#ifdef COUNT_LM_LA_CACHE_MISS
+  lm_la_word_cache_count++;
+#endif
+  
+  if (!lm_lookahead_score_list.find(index, &score_list))
+  {
+#ifdef COUNT_LM_LA_CACHE_MISS
+  lm_la_word_cache_miss++;
+#endif
+    // Not found, compute the scores.
+    // FIXME! Is it necessary to compute the scores for all the words?
+    if (m_verbose > 2)
+      printf("Compute lm lookahead scores for (%s,%s)\n",
+             m_vocabulary.word(w1).c_str(), m_vocabulary.word(w2).c_str());
+    score_list = new LMLookaheadScoreList;
+    if (lm_lookahead_score_list.insert(index, score_list,
+                                       &old_score_list))
+      delete old_score_list; // Old list was removed
+    score_list->index = index;
+    score_list->lm_scores.insert(score_list->lm_scores.end(),
+                                 m_lexicon.words(), 0);    
+    m_lookahead_ngram->fetch_trigram_list(m_lex2lm[w1], m_lex2lm[w2],
+                                          m_lex2lm, score_list->lm_scores);
+  }
+  
+  // Compute the lookahead score by selecting the maximum LM score of
+  // possible word ends.
+  score = -1e10;
+  for (i = 0; i < node->possible_word_id_list.size(); i++)
+  {
+    if (score_list->lm_scores[node->possible_word_id_list[i]] > score)
+      score = score_list->lm_scores[node->possible_word_id_list[i]];
+  }
+  // Add the score to the node's buffer
+  node->lm_lookahead_buffer.insert(index, score, NULL);
   return score;
 }
 

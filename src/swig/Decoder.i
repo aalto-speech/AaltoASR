@@ -76,6 +76,7 @@ public:
   const std::string &lex_word();
   const std::string &lex_phone();
   void ngram_read(const char *file, float weight);
+  void read_lookahead_ngram(const char *file);
 
   // Lna
   void lna_open(const char *file, int size);
@@ -138,8 +139,8 @@ public:
   void set_multiple_endings(int multiple_endings);
   void set_word_boundary(const std::string &word);
   void set_dummy_word_boundaries(bool value);
-  
-  void set_avg_ac_alpha(float alpha);
+
+  void prune_lm_lookahead_buffers(int min_delta, int max_depth);
 
 	void print_prunings();
   void print_hypo(Hypo &hypo);

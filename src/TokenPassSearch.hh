@@ -36,22 +36,18 @@ public:
   void set_max_num_tokens(int tokens) { m_max_num_tokens = tokens; }
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_word_boundary(const std::string &word);
-  void set_lm_bigram_lookahead(bool la) { m_lm_bigram_lookahead = la; }
+  void set_lm_lookahead(int order) { m_lm_lookahead = order; }
   void set_insertion_penalty(float ip) { m_insertion_penalty = ip; }
 
-  void set_avg_ac_alpha(float alpha) { m_avg_ac_log_prob_alpha = alpha; }
-
   void set_ngram(TreeGram *ngram);
+  void set_lookahead_ngram(TreeGram *ngram);
 
 private:
   void propagate_tokens(void);
   void propagate_token(TPLexPrefixTree::Token *token);
   void move_token_to_node(TPLexPrefixTree::Token *token,
                           TPLexPrefixTree::Node *node,
-                          float transition_score,
-                          float lm_score,
-                          TPLexPrefixTree::WordHistory *word_hist,
-                          bool word_end_flag); //float node_beam);
+                          float transition_score);
   void prune_tokens(void);
 
 #ifdef PRUNING_MEASUREMENT
@@ -64,8 +60,12 @@ private:
                                       TPLexPrefixTree::WordHistory *wh2);
   float compute_lm_log_prob(TPLexPrefixTree::WordHistory *word_hist);
 
-  float get_lm_bigram_lookahead(TPLexPrefixTree::WordHistory *prev_word,
-                                TPLexPrefixTree::Node *node);
+  float get_lm_lookahead_score(TPLexPrefixTree::WordHistory *word_hist,
+                                TPLexPrefixTree::Node *node, int depth);
+  float get_lm_bigram_lookahead(int prev_word_id,
+                                TPLexPrefixTree::Node *node, int depth);
+  float get_lm_trigram_lookahead(int w1, int w2,
+                                 TPLexPrefixTree::Node *node, int depth);
 
   void clear_active_node_token_lists(void);
 
@@ -93,13 +93,13 @@ private:
 
   std::vector<TPLexPrefixTree::Node*> m_active_node_list;
 
-  class LM2GLookaheadScoreList {
+  class LMLookaheadScoreList {
   public:
-    int prev_word_id;
+    int index;
     std::vector<float> lm_scores;
   };
-  HashCache<LM2GLookaheadScoreList*> lm_lookahead_score_list;
-
+  HashCache<LMLookaheadScoreList*> lm_lookahead_score_list;
+  
   int m_end_frame;
   int m_frame; // Current frame
 
@@ -111,6 +111,7 @@ private:
   TreeGram *m_ngram;
   std::vector<int> m_lex2lm;
   TreeGram::Gram m_history_lm; // Temporary variable
+  TreeGram *m_lookahead_ngram;
 
   // Options
   float m_global_beam;
@@ -123,7 +124,7 @@ private:
   int m_verbose;
   int m_word_boundary_id;
   int m_word_boundary_lm_id;
-  bool m_lm_bigram_lookahead;
+  int m_lm_lookahead; // 0=none, 1=bigram, 2=trigram
   int m_max_lookahead_score_list_size;
   int m_max_node_lookahead_buffer_size;
   float m_insertion_penalty;
@@ -133,14 +134,18 @@ private:
   float m_eq_depth_beam;
   float m_eq_wc_beam;
   
-  float m_avg_ac_log_prob_alpha;
-  float m_cur_ac_beam;
-
   int filecount;
 
   float m_wc_llh[MAX_WC_COUNT];
   float m_depth_llh[MAX_LEX_TREE_DEPTH/2];
   int m_min_word_count;
+
+  bool m_lm_lookahead_initialized;
+
+  int lm_la_cache_count[MAX_LEX_TREE_DEPTH];
+  int lm_la_cache_miss[MAX_LEX_TREE_DEPTH];
+  int lm_la_word_cache_count;
+  int lm_la_word_cache_miss;
 };
 
 #endif // TOKENPASSSEARCH_HH
