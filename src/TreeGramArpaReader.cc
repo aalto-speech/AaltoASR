@@ -186,7 +186,10 @@ TreeGramArpaReader::write(FILE *out, TreeGram *tree_gram) {
 	//fprintf(stderr,"%d\n",iter.node(j).word);
 	fprintf(out," %s",tree_gram->word(iter.node(j).word).c_str());
       }
-      fprintf(out,"\t%.4f\n", iter.node().back_off);
+      if (i!=tree_gram->order())
+	fprintf(out,"\t%.4f\n", iter.node().back_off);
+      else
+	fprintf(out,"\n");
     }
   }
   fprintf(out,"\\end\\\n");
