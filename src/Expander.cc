@@ -23,7 +23,7 @@ Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
     m_beam(1e10),
     m_max_state_duration(0x7fff), // FIXME
     m_words(),
-    m_found_words()
+    m_active_words()
 {
 }
 
@@ -111,6 +111,27 @@ Expander::token_to_state(const Lexicon::Token *source_token,
   return new_token;
 }
 
+// Only for sanity debug checks
+void
+Expander::check_words()
+{
+  for (int i = 0; i < m_words.size(); i++) {
+    
+    if (std::find(m_active_words.begin(), m_active_words.end(), &m_words[i]) ==
+		  m_active_words.end())
+    {
+      assert(!m_words[i].active);
+      assert(m_words[i].first_length == -1);
+      assert(m_words[i].last_length == -1);
+    }
+    else {
+      assert(m_words[i].active);
+      assert(m_words[i].first_length >= 0);
+      assert(m_words[i].last_length > m_words[i].first_length);
+    }
+  }
+}
+
 // PRECONDITIONS:
 //
 // - Tokens are in incoming_token slots.
@@ -142,9 +163,14 @@ Expander::token_to_state(const Lexicon::Token *source_token,
 // 3) Add new tokens in the end of the vector so that they will be
 // processed in the same round.
 
+// ASSUMPTIONS:
+// 
+// - Lexicon tree may contain the same word id in several nodes.
 void
 Expander::move_all_tokens()
 {
+  // FIXME: remove stupid asserts
+
   for (int i = 0; i < m_tokens.size(); i++) {
     const Lexicon::Token *token = m_tokens[i];
     Lexicon::Node *node = token->node;
@@ -188,26 +214,36 @@ Expander::move_all_tokens()
 	if (word_id >= 0) {
 	  Word *word = &m_words[word_id];
 
+	  assert(word->first_length <= m_frame);
+	  assert(word->last_length <= m_frame + 1);
+
 	  // Note that we use (m_frame) instead of (m_frame + 1),
 	  // because the current frame is actually already the start
 	  // of the next word.  This also assumes that there can not
 	  // be an empty word in lexicon.
 	  if (!m_forced_end || m_frame == m_frames - 1) {
 	    float log_prob = source_token->log_prob;
-	    float avg_log_prob = log_prob / m_frame;
-
-	    // FIXME: is this correct?  Do we really want to add this
-	    // only in word ends?
+	    // FIXME: is this correct?  Do we really want to add the
+	    // lexicon node probabilities only at word ends?
 	    log_prob += source_node->log_prob;
+	    assert(log_prob < 0);
 
-	    if (!word->active || avg_log_prob > word->avg_log_prob) {
-	      if (!word->active)
-		m_found_words.push_back(word);
-	      word->avg_log_prob = avg_log_prob;
-	      word->log_prob = log_prob;
-	      word->frames = m_frame;
+	    // Update the best
+	    float avg_log_prob = log_prob / m_frame;
+	    if (!word->active || avg_log_prob > word->best_avg_log_prob) {
+	      word->best_avg_log_prob = avg_log_prob;
+	      word->best_length = m_frame;
+	    }
+
+	    // Store word end probabilities for each frame
+	    word->log_probs[m_frame] = log_prob;
+	    word->last_length = m_frame + 1;
+	    if (!word->active) {
+	      word->first_length = m_frame;
+	      m_active_words.push_back(word);
 	      word->active = true;
 	    }
+	    assert(word->first_length < word->last_length);
 	  }
 	}
 
@@ -382,17 +418,37 @@ void
 Expander::expand(int start_frame, int frames)
 {
   if (m_words.size() != m_lexicon.words()) {
-    m_found_words.clear();
-    m_found_words.reserve(m_lexicon.words());
+    // Changing lexicon size is not supported at the moment
+    assert(m_words.size() == 0);
+    m_active_words.clear();
+    m_active_words.reserve(m_lexicon.words());
     m_words.resize(m_lexicon.words());
     for (int i = 0; i < m_words.size(); i++)
       m_words[i].word_id = i;
   }
 
+  // Resize and clear log-prob vectors, if number of frames grows.
+  if (m_words[0].log_probs.size() < frames) {
+    for (int w = 0; w < m_words.size(); w++) {
+      m_words[w].log_probs.resize(frames);
+      for (int l = 0; l < frames; l++)
+	m_words[w].clear_length(l);
+    }
+  }
+
+  // FIXME: it is enough to iterate over m_active_words only, right?!
   // Clear best words list
-  for (int i = 0; i < m_words.size(); i++)
-    m_words[i].active = false;
-  m_found_words.clear();    
+  for (int w = 0; w < m_active_words.size(); w++) {
+    Word *word = m_active_words[w];
+    word->active = false;
+
+    // Clear also the log-probability storage area for each modified frame
+    for (int l = word->first_length; l < word->last_length; l++)
+      word->clear_length(l);
+    word->first_length = -1;
+    word->last_length = -1;
+  }
+  m_active_words.clear();    
 
   create_initial_tokens(start_frame);
 
@@ -424,4 +480,15 @@ Expander::expand(int start_frame, int frames)
 
   }
   clear_tokens();
+}
+
+void
+Expander::sort_words(int top)
+{
+  if (top > 0 && top < m_active_words.size())
+    std::partial_sort(m_active_words.begin(), m_active_words.begin() + top, 
+		      m_active_words.end(), Expander::WordCompare());
+  else 
+    std::sort(m_active_words.begin(), m_active_words.end(), 
+	      Expander::WordCompare());
 }

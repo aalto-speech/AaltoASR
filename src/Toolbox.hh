@@ -33,7 +33,6 @@ public:
   // Expander
   void expand(int frame, int frames);
   const std::string &best_word();
-  int best_index();
   void print_words(int words);
   int find_word(const std::string &word);
   void add_history(int word);
@@ -120,7 +119,6 @@ private:
   std::deque<int> m_history;
 
   Expander m_expander;
-  std::vector<Expander::Word*> &m_best_words;
 
   Search m_search;
 };

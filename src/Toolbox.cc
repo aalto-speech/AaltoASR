@@ -16,7 +16,6 @@ Toolbox::Toolbox()
     m_ngram_reader(),
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
-    m_best_words(m_expander.words()),
 
     m_search(m_expander, m_vocabulary, m_ngram)
 {
@@ -26,7 +25,7 @@ void
 Toolbox::expand(int frame, int frames)
 { 
   m_expander.expand(frame, frames);
-  std::sort(m_best_words.begin(), m_best_words.end(), Expander::WordCompare());
+  m_expander.sort_words();
 }
 
 const std::string&
@@ -34,19 +33,10 @@ Toolbox::best_word()
 {
   static const std::string noword("*");
 
-  if (m_best_words.size() > 0)
-    return m_vocabulary.word(m_best_words[0]->word_id);
+  if (m_expander.words().size() > 0)
+    return m_vocabulary.word(m_expander.words()[0]->word_id);
   else
     return noword;
-}
-
-int
-Toolbox::best_index()
-{
-  if (m_best_words.size() > 0)
-    return m_best_words[0]->word_id;
-  else
-    return -1;
 }
 
 void
@@ -67,33 +57,35 @@ Toolbox::add_history_word(const std::string &word)
 void
 Toolbox::add_ngram_probs()
 {
-  for (int i = 0; i < m_best_words.size(); i++) {
-    m_history.push_back(m_best_words[i]->word_id);
-    m_best_words[i]->log_prob = 0; // REMOVE THIS DEBUG!!
-    m_best_words[i]->log_prob += 
-      m_ngram.log_prob(m_history.begin(), m_history.end()) * 
-      m_best_words[i]->frames;
-    m_best_words[i]->avg_log_prob = m_best_words[i]->log_prob / 
-      m_best_words[i]->frames;
-    m_history.pop_back();
-  }
-  std::sort(m_best_words.begin(), m_best_words.end(), Expander::WordCompare());
+  // Not supported at the moment, because structure of Word has changed.
+  assert(false);
+
+//   for (int i = 0; i < m_best_words.size(); i++) {
+//     m_history.push_back(m_best_words[i]->word_id);
+//     m_best_words[i]->log_prob += 
+//       m_ngram.log_prob(m_history.begin(), m_history.end()) * 
+//       m_best_words[i]->frames;
+//     m_best_words[i]->avg_log_prob = m_best_words[i]->log_prob / 
+//       m_best_words[i]->frames;
+//     m_history.pop_back();
+//   }
+//   std::sort(m_best_words.begin(), m_best_words.end(), Expander::WordCompare());
 }
 
 void
 Toolbox::print_words(int words)
 {
-  std::vector<Expander::Word*> &sorted_words = m_expander.words();
-  std::sort(sorted_words.begin(), sorted_words.end(), Expander::WordCompare());
+  m_expander.sort_words(words);
+  const std::vector<Expander::Word*> &sorted_words = m_expander.words();
 
   if (words == 0 || words > sorted_words.size())
     words = sorted_words.size();
 
   for (int i = 0; i < words; i++) {
     std::cout << m_vocabulary.word(sorted_words[i]->word_id) << " "
-	      << sorted_words[i]->frames << " "
-	      << sorted_words[i]->log_prob << " "
-	      << sorted_words[i]->avg_log_prob << " "
+	      << sorted_words[i]->best_length << " "
+	      << sorted_words[i]->best_log_prob() << " "
+	      << sorted_words[i]->best_avg_log_prob << " "
 	      << std::endl;
   }
 }
@@ -101,7 +93,7 @@ Toolbox::print_words(int words)
 int
 Toolbox::find_word(const std::string &word)
 {
-  std::vector<Expander::Word*> &sorted_words = m_expander.words();
+  const std::vector<Expander::Word*> &sorted_words = m_expander.words();
   for (int i = 0; i < sorted_words.size(); i++) {
     if (m_vocabulary.word(sorted_words[i]->word_id) == word)
       return i + 1;

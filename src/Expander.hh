@@ -13,23 +13,42 @@ public:
   class Word {
   public:
     Word() : 
-      avg_log_prob(0), log_prob(0), frames(-1), word_id(-1), active(false) { }
-    float avg_log_prob;
-    float log_prob;
-    int frames;
+      word_id(-1), 
+      best_length(-1), 
+      best_avg_log_prob(0), 
+      active(false),
+      first_length(-1),
+      last_length(-1) { }
     int word_id;
+    int best_length;
+    float best_avg_log_prob;
     bool active;
+
+    // Log-probs for each length [first..last] are stored in log_probs
+    int first_length;
+    int last_length;
+    std::vector<float> log_probs; // positive elements are unused
+
+    inline bool active_length(int length) { return log_probs[length] < 0; }
+    inline void clear_length(int length) { log_probs[length] = 1; }
+    inline float best_log_prob() { return log_probs[best_length]; }
   };
 
   struct WordCompare {
     inline bool operator()(const Word *a, const Word *b) {
-      return a->avg_log_prob > b->avg_log_prob;
+      return a->best_avg_log_prob > b->best_avg_log_prob;
     }
   };
 
   // Actions
   Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
 	   Acoustics &m_acoustics);
+
+  /** Search the best words.  FIXME: the name should be better
+   *
+   * If the number of frames has changed since the last call, the
+   * initialization might be quite slow.  FIXME
+   */
   void expand(int start_frame, int frames);
 
   // Options
@@ -37,8 +56,7 @@ public:
   void set_token_limit(int limit) { m_token_limit = limit; }
   void set_beam(float beam) { m_beam = beam; }
   void set_max_state_duration(int duration) { m_max_state_duration = duration;}
-  void sort_words() { std::sort(m_found_words.begin(), m_found_words.end(), 
-				Expander::WordCompare()); }
+  void sort_words(int top = 0);
 
   // Info
   inline std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
@@ -46,10 +64,11 @@ public:
   /**
    * Returns the list of the best words.
    *
-   * It is ok to modify this vector freely.  The vector will be
-   * cleared anyway when expand() is called.
+   * It is ok to reorder this vector freely, as long as all words are
+   * preserved.  Expander uses this vector for cleaning in the
+   * beginning of the next expand.
    **/
-  inline std::vector<Word*> &words() { return m_found_words; }
+  inline const std::vector<Word*> &words() { return m_active_words; }
 
   inline Word* word(int index) { return &m_words[index]; }
 
@@ -59,6 +78,8 @@ public:
   void debug_print_tokens();
 
 private:
+  void check_words(); // FIXME: remove
+
   void sort_best_tokens(int tokens);
   void keep_best_tokens(int tokens);
   void move_all_tokens();
@@ -82,7 +103,7 @@ private:
   // State
   std::vector<Lexicon::Token*> m_tokens;
   std::vector<Word> m_words;
-  std::vector<Word*> m_found_words;
+  std::vector<Word*> m_active_words;
   int m_frame; // Current frame relative to the start frame.
   int m_frames; // Max frames per word
   float m_beam_best;

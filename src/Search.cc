@@ -116,6 +116,7 @@ Search::set_word_boundary(const std::string &word)
 {
   // FIXME: currently lexicon must be loaded before calling this.
   m_word_boundary = m_vocabulary.index(word);
+  assert(m_word_boundary > 0);
 }
 
 void
@@ -175,6 +176,7 @@ Search::print_hypo(const Hypo &hypo)
     }
   }
   std::cout << ": " << hypo.frame << " " << hypo.log_prob << std::endl;
+  std::cout.flush();
 }
 
 void
@@ -373,6 +375,9 @@ void
 Search::expand_hypo_with_word(const Hypo &hypo, int word, int target_frame, 
 			      float ac_log_prob)
 {
+  // Should not be possible!
+  assert(ac_log_prob < 0);
+
   // Add the expanded hypothesis
   Hypo new_hypo(target_frame, hypo.log_prob, hypo.path);
   new_hypo.add_path(word, target_frame);
@@ -417,46 +422,44 @@ Search::expand_hypo_with_word(const Hypo &hypo, int word, int target_frame,
 void
 Search::expand_hypo(const Hypo &hypo)
 {
-  std::vector<Expander::Word*> &words = m_expander.words();
+  const std::vector<Expander::Word*> &words = m_expander.words();
 
   for (int w = 0; w < words.size(); w++) {
     if (w >= m_word_limit)
       break;
 
     // FIXME: We could break here if words were always sorted.  Are they?
-    if (words[w]->avg_log_prob < words[0]->avg_log_prob * m_word_beam)
+    if (words[w]->best_avg_log_prob < words[0]->best_avg_log_prob * m_word_beam)
       continue; 
 
     // In addition to the best ending time, expand also to
     // neighbouring frames.  The change in log_prob is approximated.
-    // FIXME: magic numbers *2 and 0.1!!
     if (m_multiple_endings > 0) {
       for (int i = -m_multiple_endings; i <= m_multiple_endings; i++) {
-	int df = i * 2;
-	int absdf = (df > 0) ? df : -df;
+	int df = i;
 
-	if (words[w]->frames + df < 1)
+	int length = words[w]->best_length + df;
+	if (length < words[w]->first_length || length >= words[w]->last_length)
 	  continue;
-	if (m_end_frame > 0 && 
-	    hypo.frame + words[w]->frames + df >= m_end_frame)
+	
+	// Ending in the current frame may be pruned
+	if (!words[w]->active_length(length))
 	  continue;
 
-	// Update log_prob starting from the best log_prob
-	float log_prob = words[w] -> log_prob;
-	log_prob += df * words[w]->avg_log_prob;
-	//log_prob *= (1.0 + 0.1 * absdf);
+	// Expander should not go to m_end_frame or further!
+	assert(m_end_frame < 0 || hypo.frame + length < m_end_frame);
 
 	expand_hypo_with_word(hypo, words[w]->word_id,
-			      hypo.frame + words[w]->frames + df, 
-			      log_prob);
+			      hypo.frame + length, 
+			      words[w]->log_probs[length]);
       }
     }
 
     // Expand only to the best ending time.
     else {
       expand_hypo_with_word(hypo, words[w]->word_id,
-			    hypo.frame + words[w]->frames, 
-			    words[w]->log_prob);
+			    hypo.frame + words[w]->best_length, 
+			    words[w]->best_log_prob());
     }
   }
 }
@@ -471,13 +474,7 @@ Search::find_best_words(int frame)
     m_expander.expand(frame, m_expand_window);
 
   // Sort the words according to the average log-probability.
-  std::vector<Expander::Word*> &words = m_expander.words();
-  if (m_word_limit > 0 && words.size() > m_word_limit) {
-    std::partial_sort(words.begin(), words.begin() + m_word_limit, 
-		      words.end(),
-		      Expander::WordCompare());
-    words.resize(m_word_limit);
-  }
+  m_expander.sort_words(m_word_limit);
 }
 
 void
@@ -599,9 +596,10 @@ Search::expand_words(int frame, const std::string &words)
       return;
     }
 
-    expand_hypo_with_word(stack(frame)[0], word->word_id, frame + word->frames,
-			  word->log_prob);
-    frame += word->frames;
+    expand_hypo_with_word(stack(frame)[0], 
+			  word->word_id, frame + word->best_length,
+			  word->best_log_prob());
+    frame += word->best_length;
     fprintf(stderr, "%d\t%s\n", frame, str.c_str());
   }
 }
