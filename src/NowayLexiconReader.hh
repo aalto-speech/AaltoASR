@@ -28,12 +28,14 @@ class NowayLexiconReader {
 public:
   NowayLexiconReader(const std::map<std::string,int> &hmm_map, 
 		     const std::vector<Hmm> &hmms);
-
   void read(std::istream &in);
-  inline Lexicon &lexicon() { return m_lexicon; }
-  inline Vocabulary &vocabulary() { return m_vocabulary; }
-  inline const std::string &word() const { return m_word; }
 
+  // Data
+  inline Lexicon &lexicon() { return m_lexicon; }
+  inline const Vocabulary &vocabulary() { return m_vocabulary; }
+
+  // Current state for error diagnosis
+  inline const std::string &word() const { return m_word; }
   inline const std::string &phone() const { return m_phone; }
 
   struct ReadError : public std::exception {

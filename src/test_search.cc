@@ -129,8 +129,11 @@ Main::run()
   ex.set_token_limit(500);
   ex.set_max_state_duration(16);
 
-  Search search(ex, lr.vocabulary(), nr.ngram(), 125*1);
-  search.set_lm_scale(10);
+  Search search(ex, lr.vocabulary(), nr.ngram());
+  search.init_search(125*1, 1024);
+  search.set_word_limit(1000);
+  search.set_hypo_limit(10);
+  // search.set_lm_scale(10);
 
   search.run();
 
@@ -150,7 +153,7 @@ main(int argc, char *argv[])
   }
 
   std::cout << "lexicon paths: " << Lexicon::Path::count << std::endl;
-  std::cout << "hypo paths: " << Search::Path::count << std::endl;
+  std::cout << "hypo paths: " << HypoPath::count << std::endl;
 
   exit(0);
 }

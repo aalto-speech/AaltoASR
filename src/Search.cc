@@ -1,30 +1,39 @@
 #include <algorithm>
 #include <iomanip>
-#include <deque>
 
 #include <math.h>
 #include "Search.hh"
 
-int Search::Path::count = 0;
+int HypoPath::count = 0;
 
 Search::Search(Expander &expander, const Vocabulary &vocabulary, 
-	       const Ngram &ngram, int frames)
+	       const Ngram &ngram)
   : m_expander(expander),
     m_vocabulary(vocabulary),
     m_ngram(ngram),
-    m_frames(frames),
-    m_first_stack(0),
-    m_stacks(frames),
-    m_lm_scale(1)
+
+    // State
+    m_earliest_frame(0),
+    m_earliest_stack(0),
+    m_stacks(),
+
+    // Options
+    m_frames(0),
+    m_lm_scale(1),
+    m_word_limit(0),
+    m_hypo_limit(0),
+
+    // Temp
+    m_history(0)
 {
 }
 
 void
 Search::debug_print_hypo(Hypo &hypo)
 {
-  static std::vector<Search::Path*> debug_paths(128);
+  static std::vector<HypoPath*> debug_paths(128);
 
-  Path *path = hypo.path;
+  HypoPath *path = hypo.path;
   std::cout.setf(std::cout.fixed, std::cout.floatfield);
   std::cout.setf(std::cout.right, std::cout.adjustfield);
   std::cout.precision(2);
@@ -47,9 +56,9 @@ Search::debug_print_hypo(Hypo &hypo)
 void
 Search::debug_print_history(Hypo &hypo)
 {
-  static std::vector<Search::Path*> paths(128);
+  static std::vector<HypoPath*> paths(128);
 
-  Path *path = hypo.path;
+  HypoPath *path = hypo.path;
 
   paths.clear();
   while (path != NULL) {
@@ -64,93 +73,126 @@ Search::debug_print_history(Hypo &hypo)
 }
 
 void
+Search::init_search(int frames, int hypos)
+{
+  m_frames = frames;
+  m_stacks.resize(frames);
+  m_earliest_stack = 0;
+  m_earliest_frame = 0;
+
+  // Clear stacks and reserve some space.  Stacks grow dynamically,
+  // but if we need space anyway, it is better to have some already.
+  for (int i = 0; i < m_stacks.size(); i++) {
+    m_stacks[i].clear();
+    m_stacks[i].reserve(hypos);
+  }
+  
+  // Create initial empty hypothesis.
+  Hypo hypo;
+  m_stacks[0].push_back(hypo);
+}
+
+int
+Search::frame2stack(int frame) const
+{
+  // Calculate the position of the corresponding stack
+  if (frame < m_earliest_frame)
+    throw ForgottenFrame();
+  if (frame - m_earliest_frame >= m_frames)
+    throw FutureFrame();
+  int stack_index = frame - m_earliest_frame;
+  stack_index = (m_earliest_stack + stack_index) % m_frames;
+
+  return stack_index;
+}
+
+bool
+Search::expand_stack(int frame)
+{
+  int stack_index = frame2stack(frame);
+  HypoStack &stack = m_stacks[stack_index];
+
+  // Prune stack
+  if (m_hypo_limit > 0 && stack.size() > m_hypo_limit) {
+    std::partial_sort(stack.begin(), stack.begin() + m_hypo_limit, 
+		      stack.end());
+    stack.resize(m_hypo_limit);
+  }
+
+  // End of input
+  if (frame == m_expander.eof_frame())
+    return false;
+      
+  if (!stack.empty()) {
+
+    // Fit word lexicon to acoustic data
+    m_expander.expand(frame, m_frames - 2); // FIXME: magic number
+
+    // Get only the best words
+    // FIXME: perhaps we want to add LM probs here
+    std::vector<Expander::Word*> words = m_expander.words();
+    if (m_word_limit > 0 && words.size() > m_word_limit) {
+      std::partial_sort(words.begin(), words.begin() + m_word_limit, 
+			words.end(),
+			Expander::WordCompare());
+      words.resize(m_word_limit);
+    }
+
+    // Expand all hypotheses in the stack...
+    for (int s = 0; s < stack.size(); s++) {
+      Hypo &hypo = stack[s];
+
+      // ... Using the best words
+      for (int w = 0; w < words.size(); w++) {
+	Expander::Word *word = words[w];
+	int target_stack = (stack_index + word->frames) % m_frames;
+	double log_prob = hypo.log_prob + word->log_prob;
+	  
+	// Calculate language model probabilities
+	if (m_ngram.order() > 0) {
+	  m_history.clear();
+	  m_history.push_front(word->word_id);
+	  HypoPath *path = hypo.path;
+	  for (int i = 0; i < m_ngram.order(); i++) {
+	    if (!path)
+	      break;
+	    m_history.push_front(path->word_id);
+	    path = path->prev;
+	  }
+	  log_prob += m_lm_scale * 
+	    m_ngram.log_prob(m_history.begin(), m_history.end());
+	}
+
+	// Insert hypo to target stack
+	Hypo new_hypo(frame + word->frames, log_prob, hypo.path);
+	new_hypo.add_path(word->word_id, hypo.frame);
+	m_stacks[target_stack].push_back(new_hypo);
+      }
+    }
+  }
+
+  stack.clear();
+
+  return true;
+}
+
+void
 Search::run()
 {
   int frame = 0;
-  int word_limit = 10;
-  int hypo_limit = 10;
-
-  Hypo hypo;
-  m_stacks[0].push_back(hypo);
-  std::deque<int> history;
 
   while (1) {
+    HypoStack &stack = m_stacks[m_earliest_stack];
+    if (!stack.empty())
+      debug_print_hypo(stack[0]);
 
-//      for (int j = 0; j < m_stacks.size(); j++) {
-//        HypoStack &stack = m_stacks[j];
-//        for (int i = 0; i < stack.size(); i++) {
-//  	debug_print_hypo(stack[i]);
-//        }
-//      }
-
-//    std::cout << "--- " << frame << " ---" << std::endl;
-
-    // Prune stack
-    HypoStack &stack = m_stacks[m_first_stack];
-    if (stack.size() > hypo_limit) {
-	std::partial_sort(stack.begin(), stack.begin() + hypo_limit, 
-			  stack.end());
-	stack.resize(hypo_limit);
-    }
-
-    if (frame == m_expander.eof_frame())
+    if (!expand_stack(frame))
       break;
-      
-    if (!stack.empty()) {
 
-      // FIXME!
-      if (frame % 1000 == 0) {
-	std::cout << Path::count << "\t";
-	debug_print_hypo(stack[0]);
-      }
-
-      // Expand
-      m_expander.expand(frame, m_frames - 2); // FIXME: magic number
-      std::vector<Expander::Word*> words = m_expander.words();
-      if (words.size() > word_limit) {
-	std::partial_sort(words.begin(), words.begin() + word_limit, 
-			  words.end(),
-			  Expander::WordCompare());
-	words.resize(word_limit);
-      }
-
-      // Expand hypotheses in stack
-      for (int s = 0; s < stack.size(); s++) {
-	Hypo &hypo = stack[s];
-//	debug_print_hypo(hypo);
-	for (int w = 0; w < words.size(); w++) {
-	  Expander::Word *word = words[w];
-	  int target_stack = (m_first_stack + word->frames) % m_frames;
-	  double log_prob = hypo.log_prob + word->log_prob;
-	  
-	  // Language model
-	  // FIX THE HISTORY!!
-	  if (m_ngram.order() > 0) {
-	    history.clear();
-	    history.push_front(word->word_id);
-	    Path *path = hypo.path;
-	    for (int i = 0; i < m_ngram.order(); i++) {
-	      if (!path)
-		break;
-	      history.push_front(path->word_id);
-	      path = path->prev;
-	    }
-	    log_prob += m_lm_scale * 
-	      m_ngram.log_prob(history.begin(), history.end());
-	  }
-
-	  // Insert hypo to correct stack
-	  Hypo new_hypo(frame + word->frames, log_prob, hypo.path);
-	  new_hypo.add_path(word->word_id, hypo.frame);
-	  m_stacks[target_stack].push_back(new_hypo);
-
-//	  std::cout << "  ";
-//	  debug_print_hypo(new_hypo);
-	}
-      }
-    }
-    stack.clear();
-    m_first_stack = (m_first_stack + 1) % m_frames;
     frame++;
+    m_earliest_frame = frame;
+    m_earliest_stack++;
+    if (m_earliest_stack >= m_frames)
+      m_earliest_stack = 0;
   }
 }

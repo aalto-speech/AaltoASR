@@ -32,4 +32,5 @@ libdecoder_a_SOURCES = \
 	NowayHmmReader.cc		NowayHmmReader.hh \
 	Search.cc			Search.hh \
 					Timer.hh \
+	Toolbox.cc			Toolbox.hh \
 	Vocabulary.cc			Vocabulary.hh
