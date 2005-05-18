@@ -23,6 +23,10 @@ public:
     virtual const char *what() const throw()
       { return "NowayHmmReader: invalid format"; }
   };
+  struct StateOutOfRange : public std::exception {
+    virtual const char *what() const throw()
+    { return "NowayHmmReader: state number of our range"; }
+  };
 
 private:
   void read_hmm(std::istream &in, Hmm &hmm);

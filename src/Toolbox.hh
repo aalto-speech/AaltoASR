@@ -96,9 +96,13 @@ public:
   void set_word_end_beam(float beam) { m_tp_search.set_word_end_beam(beam); }
   void set_eq_depth_beam(float beam) { m_tp_search.set_eq_depth_beam(beam); }
   void set_eq_word_count_beam(float beam) { m_tp_search.set_eq_word_count_beam(beam); }
+  void set_fan_in_beam(float beam) { m_tp_search.set_fan_in_beam(beam); }
+  void set_fan_out_beam(float beam) { m_tp_search.set_fan_out_beam(beam); }
+  void set_tp_state_beam(float beam) { m_tp_search.set_state_beam(beam); }
   void set_max_state_duration(int duration) 
   { m_expander.set_max_state_duration(duration); }
   void set_lm_lookahead(int lmlh) { m_tp_lexicon.set_lm_lookahead(lmlh); m_tp_search.set_lm_lookahead(lmlh); }
+  void set_cross_word_triphones(bool cw_triphones) { m_tp_lexicon.set_cross_word_triphones(cw_triphones); }
   void set_insertion_penalty(float ip) { m_tp_search.set_insertion_penalty(ip); }
   void set_verbose(int verbose) { m_search.set_verbose(verbose); m_tp_lexicon.set_verbose(verbose); m_tp_search.set_verbose(verbose);}
   void set_print_probs(bool print_probs) 

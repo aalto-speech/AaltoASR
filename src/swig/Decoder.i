@@ -129,7 +129,11 @@ public:
 	void set_word_end_beam(float beam);
 	void set_eq_depth_beam(float beam);
   void set_eq_word_count_beam(float beam);
+	void set_fan_in_beam(float beam);
+	void set_fan_out_beam(float beam);
+	void set_tp_state_beam(float beam);
   void set_max_state_duration(int duration);
+  void set_cross_word_triphones(bool cw_triphones);
   void set_lm_lookahead(int lmlh);
 	void set_insertion_penalty(float ip);
   void set_verbose(int verbose);

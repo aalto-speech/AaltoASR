@@ -10,6 +10,7 @@ public:
   void set_max_items(int max);
   int get_num_items(void) { return num_items; }
   bool remove_last_item(T *removed);
+  bool remove_item(int key, T *removed);
 
 private:
   void rehash(int new_max);
@@ -130,6 +131,41 @@ HashCache<T>::remove_last_item(T *removed)
       first = NULL;
     num_items--;
     return true;
+  }
+  return false;
+}
+
+template<typename T>
+bool
+HashCache<T>::remove_item(int key, T *removed)
+{
+  int index = get_hash_index(key);
+  StoreType *temp;
+
+  temp = (*hash_table)[index];
+  while (temp != NULL)
+  {
+    if (temp->key == key)
+    {
+      if (removed != NULL)
+        *removed = temp->value;
+      if (temp->hash_list_next != NULL)
+        temp->hash_list_next->hash_list_prev = temp->hash_list_prev;
+      *(temp->hash_list_prev) = temp->hash_list_next;
+      if (temp->priority_list_next != NULL)
+        temp->priority_list_next->priority_list_prev=temp->priority_list_prev;
+      else
+        last = temp->priority_list_prev; // temp was last
+      if (temp->priority_list_prev != NULL)
+        temp->priority_list_prev->priority_list_next=temp->priority_list_next;
+      else
+        first = temp->priority_list_next; // temp was first
+      delete temp;
+      num_items--;
+      
+      return true;
+    }
+    temp = temp->hash_list_next;
   }
   return false;
 }
