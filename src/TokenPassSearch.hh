@@ -29,6 +29,10 @@ public:
   void set_word_end_beam(float beam) { m_word_end_beam = beam; }
   void set_eq_depth_beam(float beam) { m_eq_depth_beam = beam; }
   void set_eq_word_count_beam(float beam) { m_eq_wc_beam = beam; }
+  void set_fan_in_beam(float beam) { m_fan_in_beam = beam; }
+  void set_fan_out_beam(float beam) { m_fan_out_beam = beam; }
+  void set_state_beam(float beam) { m_state_beam = beam; }
+  
   void set_similar_word_history_span(int n) { m_similar_word_hist_span = n; }
   void set_lm_scale(float lm_scale) { m_lm_scale = lm_scale; }
   void set_duration_scale(float dur_scale) { m_duration_scale = dur_scale; }
@@ -57,11 +61,14 @@ private:
 #endif
   
   TPLexPrefixTree::Token* find_similar_word_history(
-    TPLexPrefixTree::WordHistory *wh, TPLexPrefixTree::Token *token_list);
-  inline bool is_similar_word_history(TPLexPrefixTree::WordHistory *wh1,
-                                      TPLexPrefixTree::WordHistory *wh2);
+    TPLexPrefixTree::WordHistory *wh, int word_hist_code,
+    TPLexPrefixTree::Token *token_list);
+  bool is_similar_word_history(TPLexPrefixTree::WordHistory *wh1,
+                               TPLexPrefixTree::WordHistory *wh2);
+  int compute_word_hist_hash_code(TPLexPrefixTree::WordHistory *wh);
   float compute_lm_log_prob(TPLexPrefixTree::WordHistory *word_hist);
-
+  float get_lm_score(TPLexPrefixTree::WordHistory *word_hist,
+                     int word_hist_code);
   float get_lm_lookahead_score(TPLexPrefixTree::WordHistory *word_hist,
                                 TPLexPrefixTree::Node *node, int depth);
   float get_lm_bigram_lookahead(int prev_word_id,
@@ -82,7 +89,7 @@ private:
   
 private:
   TPLexPrefixTree &m_lexicon;
-  TPLexPrefixTree::Node *m_root;
+  TPLexPrefixTree::Node *m_root, *m_start_node;
   Vocabulary &m_vocabulary;
   Acoustics &m_acoustics;
 
@@ -101,6 +108,13 @@ private:
     std::vector<float> lm_scores;
   };
   HashCache<LMLookaheadScoreList*> lm_lookahead_score_list;
+
+  class LMScoreInfo {
+  public:
+    float lm_score;
+    std::vector<int> word_hist;
+  };
+  HashCache<LMScoreInfo*> m_lm_score_cache;
   
   int m_end_frame;
   int m_frame; // Current frame
@@ -135,12 +149,19 @@ private:
   float m_current_we_beam;
   float m_eq_depth_beam;
   float m_eq_wc_beam;
+  float m_fan_in_beam;
+  float m_fan_out_beam;
+  float m_state_beam;
   
   int filecount;
 
   float m_wc_llh[MAX_WC_COUNT];
   float m_depth_llh[MAX_LEX_TREE_DEPTH/2];
   int m_min_word_count;
+
+  float m_fan_in_log_prob;
+  float m_fan_out_log_prob;
+  float m_fan_out_last_log_prob;
 
   bool m_lm_lookahead_initialized;
 

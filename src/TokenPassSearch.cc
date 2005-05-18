@@ -9,12 +9,19 @@
 //1031
 #define DEFAULT_MAX_NODE_LOOKAHEAD_BUFFER_SIZE 512
 
+#define DEFAULT_MAX_LM_CACHE_SIZE 15000
+
 #define MAX_TREE_DEPTH 60
 
 #define MAX_STATE_DURATION 80
 
-//#define EQ_DEPTH_PRUNING
+//#define PRUNING_EXTENSIONS
+//#define FAN_IN_PRUNING
 //#define EQ_WC_PRUNING
+//#define EQ_DEPTH_PRUNING
+//#define STATE_PRUNING
+//#define FAN_OUT_PRUNING
+
 
 //#define COUNT_LM_LA_CACHE_MISS
 
@@ -26,11 +33,15 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
   m_acoustics(acoustics)
 {
   m_root = lex.root();
+  m_start_node = lex.start_node();
   m_end_frame  = -1;
   m_global_beam = 1e10;
   m_word_end_beam = 1e10;
   m_eq_depth_beam = 1e10;
   m_eq_wc_beam = 1e10;
+  m_fan_in_beam = 1e10;
+  m_fan_out_beam = 1e10;
+  m_state_beam = 1e10;
 
   m_similar_word_hist_span = 0;
   m_lm_scale = 1;
@@ -83,7 +94,7 @@ TokenPassSearch::reset_search(int start_frame)
   m_lexicon.clear_node_token_lists();
 
   t = acquire_token();
-  t->node = m_root;
+  t->node = m_start_node;
   t->next_node_token = NULL;
   t->am_log_prob = 0;
   t->lm_log_prob = 0;
@@ -91,15 +102,15 @@ TokenPassSearch::reset_search(int start_frame)
   t->cur_lm_log_prob = 0;
   t->prev_word = new TPLexPrefixTree::WordHistory(-1, -1, NULL);
   t->prev_word->link();
+  t->word_hist_code = 0;
   t->dur = 0;
-  t->avg_ac_log_prob = 0;
 
 #ifdef PRUNING_MEASUREMENT
   for (int i = 0; i < 6; i++)
     t->meas[i] = 0;
 #endif
 
-#ifdef EQ_WC_PRUNING
+#if (defined PRUNING_EXTENSIONS || defined PRUNING_MEASUREMENT || defined EQ_WC_PRUNING)
   for (int i = 0; i < MAX_WC_COUNT; i++)
     m_wc_llh[i] = 0;
   m_min_word_count = 0;
@@ -142,6 +153,14 @@ TokenPassSearch::reset_search(int start_frame)
     assert( m_lookahead_ngram != NULL );
   }
 
+  if (m_lm_score_cache.get_num_items() > 0)
+  {
+    LMScoreInfo *info;
+    while (m_lm_score_cache.remove_last_item(&info))
+      delete info;
+  }
+  m_lm_score_cache.set_max_items(DEFAULT_MAX_LM_CACHE_SIZE);
+
   m_current_glob_beam = m_global_beam;
   m_current_we_beam = m_word_end_beam;
 }
@@ -175,7 +194,7 @@ TokenPassSearch::run(void)
   return true;
 }
 
-#ifdef PRUNING_MEASUREMEMT
+#ifdef PRUNING_MEASUREMENT
 void
 TokenPassSearch::analyze_tokens(void)
 {
@@ -191,11 +210,99 @@ TokenPassSearch::analyze_tokens(void)
   {
     if ((*m_active_token_list)[i] != NULL)
     {
-      temp = (*m_active_token_list)[i]->total_log_prob -
-        m_depth_llh[(*m_active_token_list)[i]->depth/2];
-      if (temp < (*m_active_token_list)[i]->meas[0])
-        (*m_active_token_list)[i]->meas[0] = temp;
-    }
+      // Equal depth pruning
+      if (!((*m_active_token_list)[i]->node->flags&
+            (NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)))
+      {
+        temp = (*m_active_token_list)[i]->total_log_prob -
+          m_depth_llh[(*m_active_token_list)[i]->depth/2];
+        if (temp < (*m_active_token_list)[i]->meas[0])
+          (*m_active_token_list)[i]->meas[0] = temp;
+      }
+
+      if (!((*m_active_token_list)[i]->node->flags&(NODE_FAN_IN|NODE_FAN_OUT)))
+      {
+        // Equal word count
+        temp = (*m_active_token_list)[i]->total_log_prob -
+          m_wc_llh[(*m_active_token_list)[i]->word_count-m_min_word_count];
+        if (temp < (*m_active_token_list)[i]->meas[1])
+          (*m_active_token_list)[i]->meas[1] = temp;
+      }
+
+      // Fan-in
+      if ((*m_active_token_list)[i]->node->flags&NODE_FAN_IN)
+      {
+        temp = (*m_active_token_list)[i]->total_log_prob -
+          m_fan_in_log_prob;
+        if (temp < (*m_active_token_list)[i]->meas[2])
+          (*m_active_token_list)[i]->meas[2] = temp;
+      }
+
+      if ((*m_active_token_list)[i]->node->flags&NODE_FAN_OUT)
+      {
+        // Fan-out
+        temp = (*m_active_token_list)[i]->total_log_prob -
+          m_fan_out_log_prob;
+        if (temp < (*m_active_token_list)[i]->meas[3])
+          (*m_active_token_list)[i]->meas[3] = temp;
+      }
+
+      // Normal state beam
+      /*if (!((*m_active_token_list)[i]->node->flags&(NODE_FAN_IN|NODE_FAN_OUT)))
+      {
+        float log_prob = (*m_active_token_list)[i]->total_log_prob;
+        TPLexPrefixTree::Token *cur_token = (*m_active_token_list)[i]->node->token_list;
+        temp = 0;
+        while (cur_token != NULL)
+        {
+          if (log_prob - cur_token->total_log_prob < temp)
+            temp = log_prob - cur_token->total_log_prob;
+          cur_token = cur_token->next_node_token;
+        }
+        if (temp < (*m_active_token_list)[i]->meas[3])
+          (*m_active_token_list)[i]->meas[3] = temp;
+      }
+
+      // Fan-out state beam
+      if ((*m_active_token_list)[i]->node->flags&NODE_FAN_OUT)
+      {
+        float log_prob = (*m_active_token_list)[i]->total_log_prob;
+        TPLexPrefixTree::Token *cur_token = (*m_active_token_list)[i]->node->token_list;
+        temp = 0;
+        while (cur_token != NULL)
+        {
+          if (log_prob - cur_token->total_log_prob < temp)
+            temp = log_prob - cur_token->total_log_prob;
+          cur_token = cur_token->next_node_token;
+        }
+        if (temp < (*m_active_token_list)[i]->meas[4])
+          (*m_active_token_list)[i]->meas[4] = temp;
+      }
+
+      // Fan-in state beam
+      if ((*m_active_token_list)[i]->node->flags&NODE_FAN_IN)
+      {
+        float log_prob = (*m_active_token_list)[i]->total_log_prob;
+        TPLexPrefixTree::Token *cur_token = (*m_active_token_list)[i]->node->token_list;
+        temp = 0;
+        while (cur_token != NULL)
+        {
+          if (log_prob - cur_token->total_log_prob < temp)
+            temp = log_prob - cur_token->total_log_prob;
+          cur_token = cur_token->next_node_token;
+        }
+        if (temp < (*m_active_token_list)[i]->meas[5])
+          (*m_active_token_list)[i]->meas[5] = temp;
+      }*/
+
+      if ((*m_active_token_list)[i]->node->flags&NODE_USE_WORD_END_BEAM)
+      {
+        // Word end
+        temp = (*m_active_token_list)[i]->total_log_prob - m_best_we_log_prob;
+        if (temp < (*m_active_token_list)[i]->meas[5])
+          (*m_active_token_list)[i]->meas[5] = temp;
+      }
+    }   
   }
 }
 #endif
@@ -214,7 +321,7 @@ TokenPassSearch::print_guaranteed_path(void)
   for (i = 0; i < m_active_token_list->size(); i++)
     if ((*m_active_token_list)[i] != NULL)
       break;
-  assert( i < m_active_token_list->size() );
+  assert( i < m_active_token_list->size() ); // Must find one token
   word_hist = (*m_active_token_list)[i]->prev_word;
   while (word_hist->prev_word != NULL &&
          word_hist->printed == 0)
@@ -298,7 +405,6 @@ TokenPassSearch::print_best_path(bool only_not_printed)
   printf("WordCount: %d\n", lm_la_word_cache_count);
   printf("WordMiss: %d\n", lm_la_word_cache_miss);
 #endif
-
 }
 
 
@@ -307,20 +413,23 @@ TokenPassSearch::propagate_tokens(void)
 {
   int i;
 
-#ifdef EQ_DEPTH_PRUNING
+#if (defined PRUNING_EXTENSIONS || defined PRUNING_MEASUREMENT || defined FAN_IN_PRUNING || defined EQ_WC_PRUNING || defined EQ_DEPTH_PRUNING)
   for (i = 0; i < MAX_LEX_TREE_DEPTH/2; i++)
   {
     m_depth_llh[i] = -1e20;
   }
-#endif
-#ifdef EQ_WC_PRUNING
   int j;
   i = 0;
   while (i < MAX_WC_COUNT && m_wc_llh[i++] < -9e19)
     m_min_word_count++;
   for (i = 0; i < MAX_WC_COUNT; i++)
     m_wc_llh[i] = -1e20;
+
+  m_fan_in_log_prob = -1e20;
+
 #endif
+  
+  m_fan_out_log_prob = -1e20;
   
   m_best_log_prob = -1e20;
   m_best_we_log_prob = -1e20;
@@ -355,14 +464,20 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
     if (token->prev_word->word_id != m_word_boundary_id)
     {
       TPLexPrefixTree::WordHistory *temp_prev_word;
+      float lm_score;
       // Add word_boundary and propagate the token with new word history
       temp_prev_word = token->prev_word;
       token->prev_word = new TPLexPrefixTree::WordHistory(
         m_word_boundary_id, m_word_boundary_lm_id, token->prev_word);
+      token->word_hist_code = compute_word_hist_hash_code(token->prev_word);
       token->prev_word->link();
-      token->lm_log_prob += compute_lm_log_prob(token->prev_word) +
-        m_insertion_penalty;
+      lm_score = get_lm_score(token->prev_word, token->word_hist_code);
+      token->lm_log_prob += lm_score + m_insertion_penalty;
       token->cur_lm_log_prob = token->lm_log_prob;
+#ifdef PRUNING_MEASUREMENT
+      if (token->meas[4] > lm_score)
+        token->meas[4] = lm_score;
+#endif
       // Iterate all the arcs leaving the token's node.
       for (i = 0; i < source_node->arcs.size(); i++)
       {
@@ -391,6 +506,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
   float total_token_log_prob;
   int new_word_count = token->word_count;
   TPLexPrefixTree::WordHistory *new_prev_word = token->prev_word;
+  int new_word_hist_code = token->word_hist_code;
   bool new_word_linked = false;
   int i;
 
@@ -406,8 +522,9 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
         new_prev_word =  new TPLexPrefixTree::WordHistory(
           node->word_id, m_lex2lm[node->word_id], token->prev_word);
         new_prev_word->link();
+        new_word_hist_code = compute_word_hist_hash_code(new_prev_word);
         new_word_linked = true;
-        new_real_lm_log_prob += compute_lm_log_prob(new_prev_word) +
+        new_real_lm_log_prob += get_lm_score(new_prev_word,new_word_hist_code)+
           m_insertion_penalty;
         new_cur_lm_log_prob = new_real_lm_log_prob;
         new_word_count++;
@@ -454,7 +571,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     new_cur_lm_log_prob = token->cur_lm_log_prob;
   }
 
-  if (node->flags&NODE_FAN_IN_FIRST || node == m_root)
+  if ((node->flags&NODE_FAN_IN_FIRST) ||
+      node == m_root || (node->flags&NODE_SILENCE_FIRST))
   {
     depth = 0;
   }
@@ -468,8 +586,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       get_token_log_prob(new_cur_am_log_prob, new_cur_lm_log_prob);
     if (((node->flags&NODE_USE_WORD_END_BEAM) &&
          total_token_log_prob < m_best_we_log_prob - m_current_we_beam) ||
-        total_token_log_prob+token->avg_ac_log_prob <
-        m_best_log_prob - m_current_glob_beam)
+        total_token_log_prob < m_best_log_prob - m_current_glob_beam)
     {
       if (new_word_linked)
         TPLexPrefixTree::WordHistory::unlink(new_prev_word);
@@ -486,6 +603,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     temp_token.cur_lm_log_prob = new_cur_lm_log_prob;
     temp_token.total_log_prob = total_token_log_prob;
     temp_token.prev_word = new_prev_word;
+    temp_token.word_hist_code = new_word_hist_code;
     temp_token.dur = 0;
     temp_token.word_count = new_word_count;
 
@@ -493,8 +611,6 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     for (i = 0; i < 6; i++)
       temp_token.meas[i] = token->meas[i];
 #endif
-
-    temp_token.avg_ac_log_prob = token->avg_ac_log_prob;
 
     temp_token.depth = depth;
     //temp_token.token_path = token->token_path;
@@ -509,7 +625,6 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     TPLexPrefixTree::Token *new_token;
     TPLexPrefixTree::Token *similar_word_hist;
     float ac_log_prob = m_acoustics.log_prob(node->state->model);
-    float new_avg_ac_log_prob;
 
     new_real_am_log_prob += ac_log_prob;
     new_cur_am_log_prob += ac_log_prob;
@@ -527,12 +642,31 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       }
     }
     if (total_token_log_prob < m_best_log_prob - m_current_glob_beam
-#ifdef EQ_DEPTH_PRUNING
-        || total_token_log_prob < m_depth_llh[depth/2] - m_eq_depth_beam
+#ifdef PRUNING_EXTENSIONS
+        || ((node->flags&NODE_FAN_IN)?
+            (total_token_log_prob < m_fan_in_log_prob - m_fan_in_beam) :
+            ((!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
+              (total_token_log_prob<m_wc_llh[new_word_count-m_min_word_count]-
+               m_eq_wc_beam ||
+               (!(node->flags&(NODE_AFTER_WORD_ID)) &&
+                total_token_log_prob<m_depth_llh[depth/2]-m_eq_depth_beam)))))
+#endif
+#ifdef FAN_IN_PRUNING
+        || ((node->flags&NODE_FAN_IN) &&
+            total_token_log_prob < m_fan_in_log_prob - m_fan_in_beam)
 #endif
 #ifdef EQ_WC_PRUNING
-        || total_token_log_prob < m_wc_llh[token->word_count-m_min_word_count]-
-           m_eq_wc_beam
+        || (!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
+            (total_token_log_prob<m_wc_llh[new_word_count-m_min_word_count]-
+             m_eq_wc_beam))
+#endif
+#ifdef EQ_DEPTH_PRUNING
+        || ((!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)) &&
+             total_token_log_prob<m_depth_llh[depth/2]-m_eq_depth_beam))
+#endif
+#ifdef FAN_OUT_PRUNING
+        || ((node->flags&NODE_FAN_OUT) &&
+            total_token_log_prob < m_fan_out_log_prob - m_fan_out_beam)
 #endif
       )  
     {
@@ -541,9 +675,22 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       return;
     }
 
-    // Apply "acoustic lookahead"
-    new_avg_ac_log_prob = 0.22 * ac_log_prob +
-      (1-0.22) * token->avg_ac_log_prob;
+#ifdef STATE_PRUNING
+    if (node->flags&(NODE_FAN_OUT|NODE_FAN_IN))
+    {
+      TPLexPrefixTree::Token *cur_token = node->token_list;
+      while (cur_token != NULL)
+      {
+        if (total_token_log_prob < cur_token->total_log_prob - m_state_beam)
+        {
+          if (new_word_linked)
+            TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+          return;
+        }
+        cur_token = cur_token->next_node_token;
+      }
+    }
+#endif
 
     if (node->token_list == NULL)
     {
@@ -562,6 +709,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     else
     {
       similar_word_hist = find_similar_word_history(new_prev_word,
+                                                    new_word_hist_code,
                                                     node->token_list);
       if (similar_word_hist == NULL)
       {
@@ -604,21 +752,63 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     if (total_token_log_prob > m_best_log_prob)
       m_best_log_prob = total_token_log_prob;
 
+#if (defined PRUNING_EXTENSIONS || defined PRUNING_MEASUREMENT)
+    if (node->flags&NODE_FAN_IN)
+    {
+      if (total_token_log_prob > m_fan_in_log_prob)
+        m_fan_in_log_prob = total_token_log_prob;
+      if (m_wc_llh[new_word_count-m_min_word_count] < -1e19)
+        m_wc_llh[new_word_count-m_min_word_count] = -1e18;
+    }
+    else if (!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT)))
+    {
+      if (!(node->flags&NODE_AFTER_WORD_ID) &&
+          total_token_log_prob > m_depth_llh[depth/2])
+        m_depth_llh[depth/2] = total_token_log_prob;
+      if (total_token_log_prob > m_wc_llh[new_word_count-m_min_word_count])
+        m_wc_llh[new_word_count-m_min_word_count] = total_token_log_prob;
+    }
+    else if (m_wc_llh[new_word_count-m_min_word_count] < -1e19)
+      m_wc_llh[new_word_count-m_min_word_count] = -1e18;
+#endif
+#ifdef FAN_IN_PRUNING
+    if (node->flags&NODE_FAN_IN)
+    {
+      if (total_token_log_prob > m_fan_in_log_prob)
+        m_fan_in_log_prob = total_token_log_prob;
+    }
+#endif
+#ifdef EQ_WC_PRUNING
+    if (!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT)))
+    {
+      if (total_token_log_prob > m_wc_llh[new_word_count-m_min_word_count])
+        m_wc_llh[new_word_count-m_min_word_count] = total_token_log_prob;
+    }
+    else if (m_wc_llh[new_word_count-m_min_word_count] < -1e19)
+      m_wc_llh[new_word_count-m_min_word_count] = -1e18;
+#endif
 #ifdef EQ_DEPTH_PRUNING
-    if (total_token_log_prob > m_depth_llh[depth/2])
-      m_depth_llh[depth/2] = total_token_log_prob;
+    if (!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)))
+    {
+      if (total_token_log_prob > m_depth_llh[depth/2])
+        m_depth_llh[depth/2] = total_token_log_prob;
+    }
 #endif
 
-#ifdef EQ_WC_PRUNING
-    if (total_token_log_prob > m_wc_llh[token->word_count-m_min_word_count])
-      m_wc_llh[token->word_count-m_min_word_count] = total_token_log_prob;
+#if (defined FAN_OUT_PRUNING || defined PRUNING_MEASUREMENT)
+    if (node->flags&NODE_FAN_OUT)
+    {
+      if (total_token_log_prob > m_fan_out_log_prob)
+        m_fan_out_log_prob = total_token_log_prob;
+    }
 #endif
-        
+    
     if (total_token_log_prob < m_worst_log_prob)
       m_worst_log_prob = total_token_log_prob;
     new_token->prev_word = new_prev_word;
     if (new_token->prev_word != NULL)
        new_token->prev_word->link();
+    new_token->word_hist_code = new_word_hist_code;
     new_token->am_log_prob = new_real_am_log_prob;
     new_token->cur_am_log_prob = new_cur_am_log_prob;
     new_token->lm_log_prob = new_real_lm_log_prob;
@@ -633,7 +823,6 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 #endif
 
     new_token->depth = depth;
-    new_token->avg_ac_log_prob = new_avg_ac_log_prob;
     //assert(token->token_path != NULL);
     /*new_token->token_path = new TPLexPrefixTree::PathHistory(
       total_token_log_prob,
@@ -650,20 +839,41 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 
 TPLexPrefixTree::Token*
 TokenPassSearch::find_similar_word_history(TPLexPrefixTree::WordHistory *wh,
+                                           int word_hist_code,
                                            TPLexPrefixTree::Token *token_list)
 {
   TPLexPrefixTree::Token *cur_token = token_list;
-  int i;
+  int i, j;
   while (cur_token != NULL)
   {
-    if (is_similar_word_history(wh, cur_token->prev_word))
-      break;
+    if (word_hist_code == cur_token->word_hist_code)
+    {
+      TPLexPrefixTree::WordHistory *wh1 = wh;
+      TPLexPrefixTree::WordHistory *wh2 = cur_token->prev_word;
+      for (int j = 0; j < m_similar_word_hist_span; j++)
+      {
+        if (wh1->word_id == -1)
+        {
+          if (wh2->word_id == -1)
+            return cur_token;
+          goto find_similar_skip;
+        }
+        if (wh1->word_id != wh2->word_id)
+          goto find_similar_skip;
+        wh1 = wh1->prev_word;
+      wh2 = wh2->prev_word;
+      }
+      return cur_token;
+      //if (is_similar_word_history(wh, cur_token->prev_word))
+      //  break;
+    }
+  find_similar_skip:
     cur_token = cur_token->next_node_token;
   }
   return cur_token;
 }
 
-bool
+inline bool
 TokenPassSearch::is_similar_word_history(TPLexPrefixTree::WordHistory *wh1,
                                          TPLexPrefixTree::WordHistory *wh2)
 {
@@ -682,6 +892,28 @@ TokenPassSearch::is_similar_word_history(TPLexPrefixTree::WordHistory *wh1,
   }
   return true; // Similar word histories up to m_similar_word_hist_span words
 }
+
+
+int
+TokenPassSearch::compute_word_hist_hash_code(TPLexPrefixTree::WordHistory *wh)
+{
+  unsigned int code = 0;
+  
+  for (int i = 0; i < m_similar_word_hist_span; i++)
+  {
+    if (wh->word_id == -1)
+      break;
+    code += wh->word_id;
+    code += (code << 10);
+    code ^= (code >> 6);
+    wh = wh->prev_word;
+  }
+  code += (code << 3);
+  code ^= (code >> 11);
+  code += (code << 15);
+  return code&0x7fffffff;
+}
+
 
 void
 TokenPassSearch::prune_tokens(void)
@@ -755,16 +987,32 @@ TokenPassSearch::prune_tokens(void)
     
     for (i = 0; i < m_active_token_list->size(); i++)
     {
-      if ((*m_active_token_list)[i]->total_log_prob < beam_limit
-#ifdef EQ_DEPTH_PRUNING
-          || (*m_active_token_list)[i]->total_log_prob <
-          m_depth_llh[(*m_active_token_list)[i]->depth/2] -
-          m_eq_depth_beam
+      float total_log_prob = (*m_active_token_list)[i]->total_log_prob;
+      unsigned short flags = (*m_active_token_list)[i]->node->flags;
+      if (total_log_prob < beam_limit
+#ifdef PRUNING_EXTENSIONS
+          || ((flags&NODE_FAN_IN)?
+              (total_log_prob < m_fan_in_log_prob - m_fan_in_beam) :
+              ((!(flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
+                (total_log_prob < m_wc_llh[(*m_active_token_list)[i]->word_count-m_min_word_count] - m_eq_wc_beam ||
+                 (!(flags&(NODE_AFTER_WORD_ID)) &&
+                  total_log_prob < m_depth_llh[(*m_active_token_list)[i]->depth/2]-m_eq_depth_beam)))))
+#endif
+#ifdef FAN_IN_PRUNING
+          || ((flags&NODE_FAN_IN) &&
+              total_log_prob < m_fan_in_log_prob - m_fan_in_beam)
 #endif
 #ifdef EQ_WC_PRUNING
-          || (*m_active_token_list)[i]->total_log_prob <
-          m_wc_llh[(*m_active_token_list)[i]->word_count-m_min_word_count] -
-          m_eq_wc_beam
+          || (!(flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
+              (total_log_prob < m_wc_llh[(*m_active_token_list)[i]->word_count-m_min_word_count] - m_eq_wc_beam))
+#endif
+#ifdef EQ_DEPTH_PRUNING
+          || (!(flags&(NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)) &&
+              total_log_prob < m_depth_llh[(*m_active_token_list)[i]->depth/2]-m_eq_depth_beam)
+#endif
+#ifdef FAN_OUT_PRUNING
+          || ((flags&NODE_FAN_OUT) &&
+              total_log_prob < m_fan_out_log_prob - m_fan_out_beam)
 #endif
         )
       {
@@ -772,7 +1020,7 @@ TokenPassSearch::prune_tokens(void)
       }
       else
       {
-        bins[(int)floorf(((*m_active_token_list)[i]->total_log_prob-
+        bins[(int)floorf((total_log_prob-
                           m_worst_log_prob)/bin_adv)]++;
         m_new_token_list->push_back((*m_active_token_list)[i]);
       }
@@ -815,16 +1063,32 @@ TokenPassSearch::prune_tokens(void)
     // Only do the beam pruning
     for (i = 0; i < m_active_token_list->size(); i++)
     {
+      float total_log_prob = (*m_active_token_list)[i]->total_log_prob;
+      unsigned short flags = (*m_active_token_list)[i]->node->flags;
       if ((*m_active_token_list)[i]->total_log_prob < beam_limit
-#ifdef EQ_DEPTH_PRUNING
-          || (*m_active_token_list)[i]->total_log_prob <
-          m_depth_llh[(*m_active_token_list)[i]->depth/2] -
-          m_eq_depth_beam
+#ifdef PRUNING_EXTENSIONS
+          || ((flags&NODE_FAN_IN)?
+              (total_log_prob < m_fan_in_log_prob - m_fan_in_beam) :
+              ((!(flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
+                (total_log_prob < m_wc_llh[(*m_active_token_list)[i]->word_count-m_min_word_count] - m_eq_wc_beam ||
+                 (!(flags&(NODE_AFTER_WORD_ID)) &&
+                  total_log_prob < m_depth_llh[(*m_active_token_list)[i]->depth/2]-m_eq_depth_beam)))))
+#endif
+#ifdef FAN_IN_PRUNING
+          || ((flags&NODE_FAN_IN) &&
+              total_log_prob < m_fan_in_log_prob - m_fan_in_beam)
 #endif
 #ifdef EQ_WC_PRUNING
-          || (*m_active_token_list)[i]->total_log_prob <
-          m_wc_llh[(*m_active_token_list)[i]->word_count-m_min_word_count] -
-          m_eq_wc_beam
+          || (!(flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
+              (total_log_prob < m_wc_llh[(*m_active_token_list)[i]->word_count-m_min_word_count] - m_eq_wc_beam))
+#endif
+#ifdef EQ_DEPTH_PRUNING
+          || (!(flags&(NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)) &&
+              total_log_prob < m_depth_llh[(*m_active_token_list)[i]->depth/2]-m_eq_depth_beam)
+#endif
+#ifdef FAN_OUT_PRUNING
+          || ((flags&NODE_FAN_OUT) &&
+              total_log_prob < m_fan_out_log_prob - m_fan_out_beam)
 #endif
         )
       {
@@ -937,6 +1201,63 @@ TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::WordHistory *word_hist)
   }
 
   return lm_log_prob;
+}
+
+
+float
+TokenPassSearch::get_lm_score(TPLexPrefixTree::WordHistory *word_hist,
+                              int word_hist_code)
+{
+  float score;
+  LMScoreInfo *info, *old;
+  bool collision = false;
+  int i;
+
+  if (m_lm_score_cache.find(word_hist_code, &info))
+  {
+    // Check this is correct word history
+    TPLexPrefixTree::WordHistory *wh = word_hist;
+    for (int i = 0; i < info->word_hist.size(); i++)
+    {
+      if (wh->word_id != info->word_hist[i]) // Also handles 'word_id==-1' case
+      {
+        collision = true;
+        goto get_lm_score_no_cached;
+      }
+      wh = wh->prev_word;
+    }
+    if (info->word_hist.size() <= m_similar_word_hist_span)
+    {
+      if (wh->word_id != -1)
+      {
+        collision = true;
+        goto get_lm_score_no_cached;
+      }
+    }
+    return info->lm_score;
+  }
+  get_lm_score_no_cached:
+  if (collision)
+  {
+    // In case of collision remove the old item
+    if (!m_lm_score_cache.remove_item(word_hist_code, &old))
+      assert( 0 );
+    delete old;
+  }
+  score = compute_lm_log_prob(word_hist);
+
+  info = new LMScoreInfo;
+  info->lm_score = score;
+  TPLexPrefixTree::WordHistory *wh = word_hist;
+  for (i = 0; i <= m_similar_word_hist_span && wh->word_id != -1; i++)
+  {
+    info->word_hist.push_back(wh->word_id);
+    wh = wh->prev_word;
+  }
+  if (m_lm_score_cache.insert(word_hist_code, info, &old))
+    delete old;
+
+  return score;
 }
 
 
