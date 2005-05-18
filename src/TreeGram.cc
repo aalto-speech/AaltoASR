@@ -481,7 +481,7 @@ TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
   // Map to result_buffer
   for (i = 0; i < next_word_id.size(); i++)
     result_buffer[i] = lm_buf[next_word_id[i]];
-  delete lm_buf;
+  delete [] lm_buf;
 }
 
 void
