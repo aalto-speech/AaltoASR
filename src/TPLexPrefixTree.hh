@@ -33,6 +33,7 @@
 #define NODE_INSERT_WORD_BOUNDARY 0x40
 #define NODE_FAN_IN_CONNECTION    0x80
 #define NODE_LINKED               0x0100
+#define NODE_SILENCE_FIRST        0x0200
 
 
 class TPLexPrefixTree {
@@ -80,8 +81,7 @@ public:
     float cur_lm_log_prob; // Used for LM lookahead
     float total_log_prob;
     WordHistory *prev_word;
-
-    float avg_ac_log_prob;
+    int word_hist_code; // Hash code for word history (up to LM order)
 
 #ifdef PRUNING_MEASUREMENT
     float meas[6];
@@ -124,10 +124,12 @@ public:
 
   TPLexPrefixTree(std::map<std::string,int> &hmm_map, std::vector<Hmm> &hmms);
   inline TPLexPrefixTree::Node *root() { return m_root_node; }
+  inline TPLexPrefixTree::Node *start_node() { return m_start_node; }
   inline int words() const { return m_words; }
 
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_lm_lookahead(int lm_lookahead) { m_lm_lookahead = lm_lookahead; }
+  void set_cross_word_triphones(bool cw_triphones) { m_cross_word_triphones = cw_triphones; }
 
   void initialize_lex_tree(void);
   void add_word(std::vector<Hmm*> &hmm_list, int word_id);
@@ -150,7 +152,8 @@ private:
                            std::vector<float> &sink_trans_log_probs,
                            unsigned short flags);
   void post_process_lex_branch(Node *node, std::vector<int> *lm_la_list);
-  bool post_process_fan_in(Node *node, std::vector<int> *lm_la_list);
+  bool post_process_fan_triphone(Node *node, std::vector<int> *lm_la_list,
+                                 bool fan_in);
 
   void create_cross_word_network(void);
   void add_hmm_to_fan_network(int hmm_id,
@@ -189,6 +192,7 @@ private:
   int m_words; // Largest word_id in the nodes plus one
   Node *m_root_node;
   Node *m_end_node;
+  Node *m_start_node;
   Node *m_silence_node;
   std::vector<Node*> node_list;
   int m_verbose;

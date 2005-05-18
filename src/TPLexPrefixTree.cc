@@ -40,8 +40,11 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
   node_list.push_back(m_root_node);
   m_end_node = new Node(-1);
   m_end_node->node_id = 1;
-  m_silence_node = NULL;
   node_list.push_back(m_end_node);
+  m_start_node = new Node(-1);
+  m_start_node->node_id = 2;
+  node_list.push_back(m_start_node);
+  m_silence_node = NULL;
   m_lm_buf_count = 0;
   m_cross_word_triphones = true;
 }
@@ -159,7 +162,10 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
       add_fan_in_connection_node(hmm_state_nodes[0], hmm_list[0]->label);
     }
     if (silence && i == 0)
+    {
       m_silence_node = hmm_state_nodes[0];
+      m_silence_node->flags |= NODE_SILENCE_FIRST;
+    }
 
     // Expand other states, from left to right
     for (j = 2; j < hmm_list[i]->states.size(); j++)
@@ -317,6 +323,12 @@ TPLexPrefixTree::finish_tree(void)
   }
   m_silence_arcs.clear();
 
+  // Link start node to silence node
+  Arc arc;
+  arc.next = m_silence_node;
+  arc.log_prob = 0;
+  m_start_node->arcs.push_back(arc);
+
   // Propagate word ID:s towards the root node and add LM lookahead
   // list to every branch (if this option is used)
   for (int i = 0; i < m_root_node->arcs.size(); i++)
@@ -333,12 +345,24 @@ TPLexPrefixTree::finish_tree(void)
       nlist = (*it).second;
       for (i = 0; i < nlist->size(); i++)
       {
-        if (!post_process_fan_in((*nlist)[i], NULL))
+        if (!post_process_fan_triphone((*nlist)[i], NULL, true))
           fprintf(stderr, "Removed a fan-in node from key %s\n",
                   (*it).first.c_str());
       }
       ++it;
     }
+    /*it = m_fan_out_last_nodes.begin(); // NOTE: Only last nodes!
+    while (it != m_fan_out_last_nodes.end())
+    {
+      nlist = (*it).second;
+      for (i = 0; i < nlist->size(); i++)
+      {
+        if (!post_process_fan_triphone((*nlist)[i], NULL, false))
+          fprintf(stderr, "Removed a fan-out node from key %s\n",
+                  (*it).first.c_str());
+      }
+      ++it;
+      }*/
   }
   
   // FIXME! Should the word id lists for LM lookahead be sorted to increase
@@ -448,7 +472,9 @@ TPLexPrefixTree::post_process_lex_branch(Node *node,
 
 // Returns false if the node should be removed (no links from there).
 bool
-TPLexPrefixTree::post_process_fan_in(Node *node, std::vector<int> *lm_la_list)
+TPLexPrefixTree::post_process_fan_triphone(Node *node,
+                                           std::vector<int> *lm_la_list,
+                                           bool fan_in)
 {
   int out_trans_count, arc_count;
   std::vector<Arc>::iterator arc_it;
@@ -466,10 +492,11 @@ TPLexPrefixTree::post_process_fan_in(Node *node, std::vector<int> *lm_la_list)
     }
     return true;
   }
-  if (!m_lm_lookahead && !(node->flags&NODE_FAN_IN))
+  if (!m_lm_lookahead && ((fan_in && !(node->flags&NODE_FAN_IN)) ||
+                          (!fan_in && !(node->flags&NODE_FAN_OUT))))
   {
-    // No longer in a fan-in node. We don't use this if we have LM lookahead,
-    // as we want to reach possible word ends.
+    // No longer in a fan-in/out node. We don't use this if we have
+    // LM lookahead, as we want to reach possible word ends.
     return true;
   }
   if (m_lm_lookahead && node->possible_word_id_list.size() > 0)
@@ -516,7 +543,7 @@ TPLexPrefixTree::post_process_fan_in(Node *node, std::vector<int> *lm_la_list)
   {
     if ((*arc_it).next != node)
     {
-      if (post_process_fan_in((*arc_it).next, new_lm_la_list))
+      if (post_process_fan_triphone((*arc_it).next, new_lm_la_list, fan_in))
       {
         arc_count++;
         ++arc_it;
@@ -1032,7 +1059,7 @@ TPLexPrefixTree::get_fan_in_entry_node(HmmState *state,
   int i;
 
   node = get_fan_state_node(state, nlist);
-  node->flags = NODE_FAN_IN;//|NODE_USE_WORD_END_BEAM; //|NODE_AFTER_WORD_ID;
+  node->flags = NODE_FAN_IN;
   return node;
 }
 
@@ -1049,7 +1076,7 @@ TPLexPrefixTree::get_fan_in_last_node(HmmState *state,
   int i;
 
   node = get_fan_state_node(state, nlist);
-  node->flags = NODE_FAN_IN;//|NODE_USE_WORD_END_BEAM; //|NODE_AFTER_WORD_ID;
+  node->flags = NODE_FAN_IN;
   return node;
 }
 
