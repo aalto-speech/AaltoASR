@@ -56,6 +56,21 @@ public:
     int m_reference_count;
   };
 
+  class StateHistory {
+  public:
+    inline StateHistory(int hmm_model, int start_time,
+                        class StateHistory *prev);
+
+    inline void link() { m_reference_count++; }
+    inline static void unlink(class StateHistory *hist);
+    
+    int hmm_model;
+    int start_time;
+    StateHistory *prev;
+  private:
+    int m_reference_count;
+  };
+
   class PathHistory {
   public:
     inline PathHistory(float ll, float dll, int depth, class PathHistory *p);
@@ -88,6 +103,7 @@ public:
 #endif
 
     int word_count;
+    StateHistory *state_history;
     
     //PathHistory *token_path;
     unsigned char depth;
@@ -262,6 +278,33 @@ TPLexPrefixTree::PathHistory::unlink(class PathHistory *hist)
   {
     while (hist->m_reference_count == 1) {
       PathHistory *prev = hist->prev;
+      delete hist;
+      hist = prev;
+      if (hist == NULL)
+        return;
+    }
+    hist->m_reference_count--;
+  }
+}
+
+TPLexPrefixTree::StateHistory::StateHistory(int hmm_model, int start_time,
+                                            class StateHistory *prev)
+  : hmm_model(hmm_model),
+    start_time(start_time),
+    prev(prev),
+    m_reference_count(0)
+{
+  if (prev)
+    prev->link();
+}
+
+void
+TPLexPrefixTree::StateHistory::unlink(class StateHistory *hist)
+{
+  if (hist != NULL)
+  {
+    while (hist->m_reference_count == 1) {
+      StateHistory *prev = hist->prev;
       delete hist;
       hist = prev;
       if (hist == NULL)
