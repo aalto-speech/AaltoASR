@@ -76,6 +76,7 @@ public:
   const std::string &lex_word();
   const std::string &lex_phone();
   void ngram_read(const char *file, float weight, const bool binary);
+  void ngram_read(const char *file, float weight);
   void read_lookahead_ngram(const char *file);
 
   // Lna
