@@ -43,6 +43,18 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       exit(1);
     }
 
+#ifdef USE_CL
+    if (line.substr(0,11) == "\\clustermap") {
+      int ord;
+      sscanf(line.c_str(),"\\clustermap %d",&ord);
+      tree_gram->clmap=new ClusterMap<int, int>;
+      m_lineno=tree_gram->clmap->read(file,ord,m_lineno);
+      for (int i=0;i<tree_gram->clmap->num_words();i++) {
+        tree_gram->add_word(tree_gram->clmap->word(i));
+      }
+    } 
+#endif
+
     if (line == "\\interpolated")
       tree_gram->set_type(TreeGram::INTERPOLATED);
 
@@ -76,8 +88,9 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
     // All non-empty header lines must be ngram counts
     if (line.substr(0, 6) != "ngram ")
       read_error();
+    
+    split(line.substr(6), "=", false, &vec); // FIXME:: is this correct?
 
-    split(line.substr(6), "=", false, &vec);
     if (vec.size() != 2)
       read_error();
 
@@ -151,8 +164,13 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 	back_off = strtod(vec[order + 1].c_str(), NULL);
 
       // Add the gram to sorter
-      for (int i = 0; i < order; i++)
+      for (int i = 0; i < order; i++) {
+#ifdef USE_CL
+        if (tree_gram->clmap) gram[i]=atoi(vec[i+1].c_str());
+        else
+#endif
 	gram[i] = tree_gram->add_word(vec[i + 1]);
+      }
       sorter.add_gram(gram, log_prob, back_off);
     }
 
@@ -186,6 +204,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 void
 TreeGramArpaReader::write(FILE *out, TreeGram *tree_gram) 
 {
+  assert(tree_gram->get_type()==TreeGram::BACKOFF);
   TreeGram::Iterator iter;
 
   // Header containing counts for each order

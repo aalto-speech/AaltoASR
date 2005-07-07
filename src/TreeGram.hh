@@ -7,6 +7,11 @@
 
 #include "Vocabulary.hh"
 
+#define USE_CL
+#ifdef USE_CL
+template <typename KT, typename CT> class ClusterMap;
+#endif
+
 class TreeGram : public Vocabulary {
 public:
   typedef std::deque<int> Gram;
@@ -58,6 +63,7 @@ public:
 
   TreeGram();
   void set_type(Type type) { m_type = type; }
+  Type get_type() { return(m_type); }
   void reserve_nodes(int nodes); 
   void set_interpolation(const std::vector<float> &interpolation);
 
@@ -85,6 +91,10 @@ public:
 
   // Returns an iterator for given gram.
   Iterator iterator(const Gram &gram);
+
+#ifdef USE_CL
+  ClusterMap<int, int> *clmap;
+#endif
 
 private:
   int binary_search(int word, int first, int last);

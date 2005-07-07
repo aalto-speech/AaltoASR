@@ -1,0 +1,10 @@
+To compile the decoder ou need to
+
+1) Run the automake stuff. Teemu has a nice script to do everything:
+# ~thirsima/bin/auto -a
+
+2) run configure
+# ./configure
+
+3) Compile. For cluster machines, some flags need to be set
+# make CXXFLAGS="-O2 -fPIC" clean all

@@ -31,7 +31,7 @@ public:
   const std::string &word(int index) const { return m_vocabulary.word(index); }
 
   // Ngram
-  void ngram_read(const char *file, float weight);
+  void ngram_read(const char *file, float weight, const bool binary=true);
   void read_lookahead_ngram(const char *file);
 
   // Lna

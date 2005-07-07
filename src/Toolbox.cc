@@ -3,6 +3,8 @@
 #include <errno.h>
 
 #include "Toolbox.hh"
+#include "TreeGramArpaReader.hh"
+#include "io.hh"
 
 Toolbox::Toolbox()
   : m_use_stack_decoder(1),
@@ -114,34 +116,30 @@ Toolbox::lex_read(const char *filename)
 }
 
 void
-Toolbox::ngram_read(const char *file, float weight)
+Toolbox::ngram_read(const char *file, float weight, const bool binary)
 {
-  FILE *f = fopen(file, "r");
-  if (!f) {
+  io::Stream in(file,"r");
+  
+  if (!in.file) {
     fprintf(stderr, "ngram_read(): could not open %s: %s\n", 
 	    file, strerror(errno));
     exit(1);
   }
 
-  if (m_use_stack_decoder)
-  {
-    m_ngrams.push_back(new TreeGram());
-    m_ngrams.back()->read(f);
-    m_search.add_ngram(m_ngrams.back(), weight);
-  }
-  else
-  {
-    if (m_ngrams.size() > 0)
-    {
-      delete m_ngrams[0];
-      m_ngrams.clear();
-    }
-    m_ngrams.push_back(new TreeGram());
-    m_ngrams.back()->read(f);
-    m_tp_search.set_ngram(m_ngrams.back());
+  if (!m_use_stack_decoder && (m_ngrams.size() > 0)) {
+    delete m_ngrams[0];
+    m_ngrams.clear();
   }
 
-  fclose(f);
+  m_ngrams.push_back(new TreeGram());
+  if (binary) m_ngrams.back()->read(in.file);
+  else {
+    TreeGramArpaReader areader;
+    areader.read(in.file,m_ngrams.back());
+  }
+
+  if (m_use_stack_decoder) m_search.add_ngram(m_ngrams.back(), weight);
+  else m_tp_search.set_ngram(m_ngrams.back());
 }
 
 void

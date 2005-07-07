@@ -56,4 +56,7 @@ libdecoder_a_SOURCES = \
 	Vocabulary.cc			Vocabulary.hh \
 	TPNowayLexReader.cc		TPNowayLexReader.hh \
 	TPLexPrefixTree.cc		TPLexPrefixTree.hh \
-	TokenPassSearch.cc		TokenPassSearch.hh
+	TokenPassSearch.cc		TokenPassSearch.hh \
+					Clustermap.hh \
+					Clustermap_tmpl.hh \
+	io.cc				io.hh

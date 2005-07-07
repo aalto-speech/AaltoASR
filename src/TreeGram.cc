@@ -6,7 +6,10 @@
 #include "TreeGram.hh"
 #include "tools.hh"
 
-#define pi_min(a,b) (((a) < (b)) ? (a) : (b))
+#ifdef USE_CL
+#include <memory>
+#include "ClusterMap.hh"
+#endif
 
 const double MINLOGPROB=-60;
 const double MINPROB=1e-60;
@@ -18,7 +21,11 @@ inline double safelogprob(double x) {
 static std::string format_str("cis-binlm2\n");
 
 TreeGram::TreeGram()
-  : m_type(BACKOFF),
+  :
+#ifdef USE_CL
+    clmap(NULL),
+#endif
+    m_type(BACKOFF),
     m_order(0),
     m_last_order(0)
 {
@@ -539,9 +546,23 @@ TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
 }
 
 float
-TreeGram::log_prob(const Gram &gram)
+TreeGram::log_prob(const Gram &gram_in)
 {
-  assert(gram.size() > 0);
+  assert(gram_in.size() > 0);
+
+#ifdef USE_CL
+  // Ugliness available here 
+  std::auto_ptr<Gram> tmp(NULL);
+  //Gram *tmp=NULL;
+  if (clmap) {
+    tmp.reset(new Gram(gram_in));
+    clmap->wg2cg(*tmp);
+  }
+  const Gram &gram=clmap?*tmp:gram_in;
+#else
+  Gram &gram=gram_in;
+#endif
+
 
   if (m_type==BACKOFF) {
     float log_prob = 0.0;
@@ -574,10 +595,10 @@ TreeGram::log_prob(const Gram &gram)
   }
   if (m_type==INTERPOLATED) {
     float prob=0.0;
-    float bo=1.0;
+    float bo;
     m_last_order=0;
 
-    int looptill=pi_min(gram.size(),m_order);
+    const int looptill=std::min(gram.size(),(size_t) m_order);
     for (int n=1;n<=looptill;n++) {
       fetch_gram(gram,gram.size()-n);
       if (m_fetch_stack.size() < n-1 || n>m_order) {

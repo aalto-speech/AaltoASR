@@ -5,6 +5,10 @@
 #include "TreeGram.hh"
 #include <map>
 
+#ifdef USE_CL
+#include "ClusterMap.hh"
+#endif
+
 class TreeGramArpaReader {
 public:
   TreeGramArpaReader();
