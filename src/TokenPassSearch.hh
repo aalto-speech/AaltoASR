@@ -23,6 +23,7 @@ public:
   // Print the best path
   void print_guaranteed_path(void);
   void print_best_path(bool only_not_printed);
+  void print_state_history(void);
 
   // Options
   void set_global_beam(float beam) { m_global_beam = beam; if (m_word_end_beam > m_global_beam) m_word_end_beam = beam; }
@@ -38,6 +39,8 @@ public:
   void set_duration_scale(float dur_scale) { m_duration_scale = dur_scale; }
   void set_transition_scale(float trans_scale) { m_transition_scale = trans_scale; }
   void set_max_num_tokens(int tokens) { m_max_num_tokens = tokens; }
+  void set_print_text_result(int print) { m_print_text_result = print; }
+  void set_print_state_segmentation(int print) { m_print_state_segmentation = print; }
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_word_boundary(const std::string &word);
   void set_lm_lookahead(int order) { m_lm_lookahead = order; }
@@ -126,10 +129,13 @@ private:
   // Ngram
   TreeGram *m_ngram;
   std::vector<int> m_lex2lm;
+  std::vector<int> m_lex2lookaheadlm;
   TreeGram::Gram m_history_lm; // Temporary variable
   TreeGram *m_lookahead_ngram;
 
   // Options
+  int m_print_text_result;
+  int m_print_state_segmentation;
   float m_global_beam;
   float m_word_end_beam;
   int m_similar_word_hist_span;

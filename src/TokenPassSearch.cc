@@ -43,6 +43,9 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
   m_fan_out_beam = 1e10;
   m_state_beam = 1e10;
 
+  m_print_text_result = 1;
+  m_print_state_segmentation = 0;
+
   m_similar_word_hist_span = 0;
   m_lm_scale = 1;
   m_max_num_tokens = 0;
@@ -131,6 +134,17 @@ TokenPassSearch::reset_search(int start_frame)
   //t->token_path->link();
   t->word_count = 0;
 
+  if (m_print_state_segmentation)
+  {
+    t->state_history = new TPLexPrefixTree::StateHistory(
+      0, 0, NULL);
+    t->state_history->link();
+  }
+  else
+  {
+    t->state_history = NULL;
+  }
+
   m_active_token_list->push_back(t);
 
   if (lm_lookahead_score_list.get_num_items() > 0)
@@ -173,12 +187,19 @@ TokenPassSearch::run(void)
     printf("run() in frame %d\n", m_frame);
   if (m_end_frame != -1 && m_frame >= m_end_frame)
   {
-    print_best_path(true);
+    if (m_print_text_result)
+      print_best_path(true);
+    if (m_print_state_segmentation)
+      print_state_history();
+
     return false;
   }
   if (!m_acoustics.go_to(m_frame))
   {
-    print_best_path(true);
+    if (m_print_text_result)
+      print_best_path(true);
+    if (m_print_state_segmentation)
+      print_state_history();
     return false;
   }
 
@@ -190,7 +211,8 @@ TokenPassSearch::run(void)
   /*if ((m_frame%5) == 0)
     save_token_statistics(filecount++);*/
   m_frame++;
-  print_guaranteed_path();
+  if (m_print_text_result)
+    print_guaranteed_path();
   return true;
 }
 
@@ -409,6 +431,45 @@ TokenPassSearch::print_best_path(bool only_not_printed)
 
 
 void
+TokenPassSearch::print_state_history(void)
+{
+  std::vector<int> state_num;
+  std::vector<int> state_start_time;
+  TPLexPrefixTree::StateHistory *cur_state;
+  float max_log_prob = -1e20;
+  int i, best_token;
+
+  // Find the best token
+  for (i = 0; i < m_active_token_list->size(); i++)
+  {
+    if ((*m_active_token_list)[i] != NULL)
+    {
+      if ((*m_active_token_list)[i]->total_log_prob > max_log_prob)
+      {
+        best_token = i;
+        max_log_prob = (*m_active_token_list)[i]->total_log_prob;
+      }
+    }
+  }
+  state_start_time.push_back(m_frame); // End frame
+  // Determine the state sequence
+  cur_state = (*m_active_token_list)[best_token]->state_history;
+  while (cur_state != NULL && cur_state->prev != NULL)
+  {
+    state_num.push_back(cur_state->hmm_model);
+    state_start_time.push_back(cur_state->start_time);
+    cur_state = cur_state->prev;
+  }
+  // Print the best path
+  for (i = state_num.size()-1; i >= 0; i--)
+  {
+    printf("%i %i %i\n", state_start_time[i+1], state_start_time[i],
+           state_num[i]);
+  }
+}
+
+
+void
 TokenPassSearch::propagate_tokens(void)
 {
   int i;
@@ -509,6 +570,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
   int new_word_hist_code = token->word_hist_code;
   bool new_word_linked = false;
   int i;
+  bool new_state_history_linked = false;
+  TPLexPrefixTree::StateHistory *new_state_history = token->state_history;
 
   if (node != token->node)
   {
@@ -544,6 +607,14 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     }
     else
       new_cur_lm_log_prob = new_real_lm_log_prob;
+
+    if (m_print_state_segmentation && node->state != NULL)
+    {
+      new_state_history = new TPLexPrefixTree::StateHistory(
+        node->state->model, m_frame, token->state_history);
+      new_state_history->link();
+      new_state_history_linked = true;
+    }
       
     // Update duration probability
     new_dur = 0;
@@ -590,6 +661,9 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     {
       if (new_word_linked)
         TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+      if (new_state_history_linked)
+        TPLexPrefixTree::StateHistory::unlink(new_state_history);
+
       return;
     }
     
@@ -606,6 +680,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     temp_token.word_hist_code = new_word_hist_code;
     temp_token.dur = 0;
     temp_token.word_count = new_word_count;
+    temp_token.state_history = new_state_history;
 
 #ifdef PRUNING_MEASUREMENT
     for (i = 0; i < 6; i++)
@@ -638,6 +713,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       {
         if (new_word_linked)
           TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+        if (new_state_history_linked)
+          TPLexPrefixTree::StateHistory::unlink(new_state_history);
         return;
       }
     }
@@ -672,6 +749,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     {
       if (new_word_linked)
         TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+      if (new_state_history_linked)
+        TPLexPrefixTree::StateHistory::unlink(new_state_history);
       return;
     }
 
@@ -685,6 +764,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
         {
           if (new_word_linked)
             TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+          if (new_state_history_linked)
+            TPLexPrefixTree::StateHistory::unlink(new_state_history);
           return;
         }
         cur_token = cur_token->next_node_token;
@@ -740,6 +821,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
           // Discard this token
           if (new_word_linked)
             TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+          if (new_state_history_linked)
+            TPLexPrefixTree::StateHistory::unlink(new_state_history);
           return;
         }
       }
@@ -816,6 +899,9 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     new_token->total_log_prob = total_token_log_prob;
     new_token->dur = new_dur;
     new_token->word_count = new_word_count;
+    new_token->state_history = new_state_history;
+    if (new_state_history != NULL)
+      new_token->state_history->link();
 
 #ifdef PRUNING_MEASUREMENT
     for (i = 0; i < 6; i++)
@@ -834,6 +920,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
   }
   if (new_word_linked)
     TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+  if (new_state_history_linked)
+    TPLexPrefixTree::StateHistory::unlink(new_state_history);
 }
 
 
@@ -861,7 +949,7 @@ TokenPassSearch::find_similar_word_history(TPLexPrefixTree::WordHistory *wh,
         if (wh1->word_id != wh2->word_id)
           goto find_similar_skip;
         wh1 = wh1->prev_word;
-      wh2 = wh2->prev_word;
+        wh2 = wh2->prev_word;
       }
       return cur_token;
       //if (is_similar_word_history(wh, cur_token->prev_word))
@@ -1161,22 +1249,25 @@ TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
   assert( m_ngram != NULL );
   
   m_lookahead_ngram = ngram;
+  m_lex2lookaheadlm.clear();
+  m_lex2lookaheadlm.resize(m_vocabulary.num_words());
 
   // Create a mapping between the lexicon and the model.
   for (int i = 0; i < m_vocabulary.num_words(); i++) {
-    if (m_lex2lm[i] != m_lookahead_ngram->word_index(m_vocabulary.word(i)))
-      assert( 0 );
+    m_lex2lookaheadlm[i] = m_ngram->word_index(m_vocabulary.word(i));
+    //if (m_lex2lm[i] != m_lookahead_ngram->word_index(m_vocabulary.word(i)))
+    //  assert( 0 );
 
     // Warn about words not in lm.
-    /*if (m_lex2lm[i] == 0 && i != 0) {
-      fprintf(stderr, "%s not in LM\n", m_vocabulary.word(i).c_str());
+    if (m_lex2lookaheadlm[i] == 0 && i != 0) {
+      fprintf(stderr, "%s not in lookahead LM\n", m_vocabulary.word(i).c_str());
       count++;
-      }*/
+    }
   }
 
-  /*if (count > 0)
-    fprintf(stderr, "there were %d out-of-LM words in total in LM\n", 
-    count);*/
+  if (count > 0)
+    fprintf(stderr,"there were %d out-of-LM words in total in lookahead LM\n",
+    count);
 }
 
 float
@@ -1328,7 +1419,8 @@ TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
     score_list->index = prev_word_id;
     score_list->lm_scores.insert(score_list->lm_scores.end(),
                                  m_lexicon.words(), 0);    
-    m_lookahead_ngram->fetch_bigram_list(m_lex2lm[prev_word_id], m_lex2lm,
+    m_lookahead_ngram->fetch_bigram_list(m_lex2lookaheadlm[prev_word_id],
+                                         m_lex2lookaheadlm,
                                          score_list->lm_scores);
   }
   
@@ -1393,8 +1485,10 @@ TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
     score_list->index = index;
     score_list->lm_scores.insert(score_list->lm_scores.end(),
                                  m_lexicon.words(), 0);    
-    m_lookahead_ngram->fetch_trigram_list(m_lex2lm[w1], m_lex2lm[w2],
-                                          m_lex2lm, score_list->lm_scores);
+    m_lookahead_ngram->fetch_trigram_list(m_lex2lookaheadlm[w1],
+                                          m_lex2lookaheadlm[w2],
+                                          m_lex2lookaheadlm,
+                                          score_list->lm_scores);
   }
   
   // Compute the lookahead score by selecting the maximum LM score of
@@ -1432,6 +1526,7 @@ void
 TokenPassSearch::release_token(TPLexPrefixTree::Token *token)
 {
   TPLexPrefixTree::WordHistory::unlink(token->prev_word);
+  TPLexPrefixTree::StateHistory::unlink(token->state_history);
   //TPLexPrefixTree::PathHistory::unlink(token->token_path);
   m_token_pool.push_back(token);
 }
