@@ -178,7 +178,8 @@ private:
   void link_node_to_fan_network(const std::string &key,
                                 std::vector<Arc> &source_arcs,
                                 bool fan_out,
-                                bool ignore_length);
+                                bool ignore_length,
+                                float out_transition_log_prob);
   void add_single_hmm_word_for_cross_word_modeling(Hmm *hmm, int word_id);
   void link_fan_in_nodes(void);
   void create_lex_tree_links_from_fan_in(Node *fan_in_node,
@@ -200,6 +201,8 @@ private:
     const std::string &key,
     std::map< std::string, std::vector<Node*>* > &nmap);
   void add_fan_in_connection_node(Node *node, const std::string &prev_label);
+
+  float get_out_transition_log_prob(Node *node);
   
   void prune_lm_la_buffer(int delta_thr, int depth_thr,
                           Node *node, int last_size, int cur_depth);

@@ -112,7 +112,7 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
         std::string temp1(hmm_list[i]->label, 0, 1);
         std::string temp2(hmm_list[i]->label, 2, 1);
         std::string key = temp1+temp2;
-        link_node_to_fan_network(key, new_arcs, true, false);
+        link_node_to_fan_network(key, new_arcs, true, false, 0);
         for (j = 0; j < new_arcs.size(); j++)
           wid_node->arcs.push_back(new_arcs[j]);
         if (i == 0)
@@ -294,10 +294,8 @@ TPLexPrefixTree::finish_tree(void)
         link_fan_out_node_to_fan_in((*nlist)[i], (*fan_out_it).first);
       ++fan_out_it;
     }
-    fprintf(stderr, "fan points linked\n");
 
     link_fan_in_nodes();
-    fprintf(stderr, "fan in linked\n");
     // FIXME: LM lookahead for one phoneme morphemes inside the
     // cross word network is missing!
   }
@@ -346,8 +344,11 @@ TPLexPrefixTree::finish_tree(void)
       for (i = 0; i < nlist->size(); i++)
       {
         if (!post_process_fan_triphone((*nlist)[i], NULL, true))
-          fprintf(stderr, "Removed a fan-in node from key %s\n",
-                  (*it).first.c_str());
+        {
+          if (m_verbose > 1)
+            fprintf(stderr, "Removed a fan-in node from key %s\n",
+                    (*it).first.c_str());
+        }
       }
       ++it;
     }
@@ -372,7 +373,10 @@ TPLexPrefixTree::finish_tree(void)
 
   int nodes = 0, arcs = 0;
   count_prefix_tree_size(m_root_node, &nodes, &arcs);
-  fprintf(stderr, "Prefix tree: %d nodes, %d arcs\n", nodes, arcs);
+  if (m_verbose > 1)
+  {
+    fprintf(stderr, "Prefix tree: %d nodes, %d arcs\n", nodes, arcs);
+  }
 
   free_cross_word_network_connection_points();
 }
@@ -601,7 +605,6 @@ TPLexPrefixTree::create_cross_word_network(void)
     }
     ++it;
   }
-  fprintf(stderr, "fan_in created\n");
 }
 
 
@@ -682,7 +685,7 @@ TPLexPrefixTree::link_fan_out_node_to_fan_in(Node *node,
       Arc temp_arc;
       NodeArcId temp_id;
       temp_arc.next = NULL;
-      temp_arc.log_prob = 0;
+      temp_arc.log_prob = get_out_transition_log_prob(node);
       node->arcs.push_back(temp_arc);
       temp_id.node = node;
       temp_id.arc_index = node->arcs.size()-1;
@@ -691,7 +694,8 @@ TPLexPrefixTree::link_fan_out_node_to_fan_in(Node *node,
   }
   else
   {
-    link_node_to_fan_network(key, node->arcs, false, true);
+    link_node_to_fan_network(key, node->arcs, false, true,
+                             get_out_transition_log_prob(node));
   }
 }
 
@@ -700,7 +704,8 @@ void
 TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
                                           std::vector<Arc> &source_arcs,
                                           bool fan_out,
-                                          bool ignore_length)
+                                          bool ignore_length,
+                                          float out_transition_log_prob)
 {
   std::vector<Node*> *target_nodes;
   std::string new_key;
@@ -753,7 +758,7 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
     {
       // Link
       temp_arc.next = (*target_nodes)[i];
-      temp_arc.log_prob = 0;
+      temp_arc.log_prob = out_transition_log_prob;
       source_arcs.push_back(temp_arc);
     }
   }
@@ -774,7 +779,7 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
       {
         // Link
         temp_arc.next = (*target_nodes)[i];
-        temp_arc.log_prob = 0;
+        temp_arc.log_prob = out_transition_log_prob;
         source_arcs.push_back(temp_arc);
       }
     }
@@ -812,10 +817,12 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
       wid_node->flags = NODE_USE_WORD_END_BEAM;
       node_list.push_back(wid_node);
       temp_arc.next = wid_node;
-      temp_arc.log_prob = 0;
       nlist = (*it).second;
       for (i = 0; i < nlist->size(); i++)
+      {
+        temp_arc.log_prob = get_out_transition_log_prob((*nlist)[i]);
         (*nlist)[i]->arcs.push_back(temp_arc);
+      }
       if (right == "_")
       {
         temp_arc.next = NULL;
@@ -830,7 +837,7 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
         // last state of the fan out branch.
         if (m_lm_lookahead)
           wid_node->flags |= NODE_INSERT_WORD_BOUNDARY;
-        link_node_to_fan_network(in_key, wid_node->arcs, false, true);
+        link_node_to_fan_network(in_key, wid_node->arcs, false, true, 0);
       }
     }
     ++it;
@@ -885,7 +892,7 @@ TPLexPrefixTree::create_lex_tree_links_from_fan_in(Node *fan_in_node,
         {
           // Link
           temp_arc.next = (*(*it).second)[j];
-          temp_arc.log_prob = 0;
+          temp_arc.log_prob = get_out_transition_log_prob(fan_in_node);
           fan_in_node->arcs.push_back(temp_arc);
         }
       }
@@ -924,8 +931,11 @@ TPLexPrefixTree::analyze_cross_word_network(void)
     num_in_arcs += temp_arcs;
     ++it;
   }
-  fprintf(stderr, "FAN OUT: %d nodes, %d arcs\n", num_out_nodes, num_out_arcs);
-  fprintf(stderr, "FAN IN:  %d nodes, %d arcs\n", num_in_nodes, num_in_arcs);
+  if (m_verbose > 1)
+  {
+    fprintf(stderr, "FAN OUT: %d nodes, %d arcs\n",num_out_nodes,num_out_arcs);
+    fprintf(stderr, "FAN IN:  %d nodes, %d arcs\n",num_in_nodes,num_in_arcs);
+  }
 }
 
 
@@ -1138,17 +1148,29 @@ TPLexPrefixTree::add_fan_in_connection_node(Node *node,
 }
 
 
+float
+TPLexPrefixTree::get_out_transition_log_prob(Node *node)
+{
+  for (int i = 0; i < node->arcs.size(); i++)
+    if (node->arcs[i].next == node)
+    {
+      // Self transition, compute the out transition
+      return log10(1-pow(10, node->arcs[i].log_prob));
+    }
+  return 0;
+}
+
 
 void
 TPLexPrefixTree::prune_lookahead_buffers(int min_delta, int max_depth)
 {
-  if (m_verbose > 0)
+  if (m_verbose > 1)
     printf("LM lookahead buffers before pruning: %d\n", m_lm_buf_count);
   m_lm_buf_count = 0;
   for (int i = 0; i < m_root_node->arcs.size(); i++)
     prune_lm_la_buffer(min_delta, max_depth, m_root_node->arcs[i].next,
                        -1, 0);
-  if (m_verbose > 0)
+  if (m_verbose > 1)
     printf("LM lookahead buffers after pruning: %d\n", m_lm_buf_count);
 }
 
