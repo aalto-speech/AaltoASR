@@ -17,9 +17,11 @@ namespace str {
    * \param str = the string to read to
    * \param length = the bytes to read
    * \param file = the file to read from
-   * \return false if could not read length bytes
+   * \param append = append to the string instead of replacing the contents
+   * \return false if error or no more data
    */
-  bool read_string(std::string *str, size_t length, FILE *file = stdin);
+  bool read_string(std::string *str, size_t length, FILE *file = stdin,
+		   bool append = false);
 
   /** Read a file to string.
    * \param str = the string to read to

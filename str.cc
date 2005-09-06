@@ -33,28 +33,40 @@ namespace str {
   }
 
   bool
-  read_string(std::string *str, size_t length, FILE *file)
+  read_string(std::string *str, size_t length, FILE *file, bool append)
   {
-    assert(length >= 0);
-
-    str->erase();
+    if (!append)
+      str->erase();
     if (length == 0)
       return true;
-    str->reserve(length);
+    str->reserve(str->length() + length);
 
-    // Read the string
+    // Read the string one bufferful at time
     char buf[4096];
     size_t buf_size = 4096;
+    size_t bytes_read = 0;
     while (length > 0) {
+
+      // Read the buffer full
       if (length < buf_size)
 	buf_size = length;
-      size_t ret = fread(buf, buf_size, 1, file);
-      if (ret != 1)
+      size_t ret = fread(buf, 1, buf_size, file);
+      assert(ret <= length);
+
+      // Error or end of file?
+      if (ret < buf_size && ferror(file))
 	return false;
+      if (ret == 0)
+	break;
     
-      str->append(buf, buf_size);
-      length -= buf_size;
+      str->append(buf, ret);
+      bytes_read += ret;
+      length -= ret;
     }
+
+    // Got anything from the file?
+    if (bytes_read == 0)
+      return false;
 
     return true;
   }

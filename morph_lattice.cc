@@ -31,5 +31,5 @@ main(int argc, char *argv[])
     morph_set.read(morph_stream.file);
   }
 
-  morph_set.show(stdout);
+  morph_set.write(stdout);
 }

@@ -6,12 +6,14 @@
 /** A structure containing a set of morphs in a letter-tree format.
  * Input letters and output morphs are stored in arcs.  Nodes are just
  * placeholders for arcs. */
-struct MorphSet {
+class MorphSet {
+public:
 
-  struct Node;
+  class Node;
 
   /** Arc of a morph tree. */
-  struct Arc {
+  class Arc {
+  public:
     Arc(char letter, std::string morph, Node *target_node, Arc *sibling_arc)
       : letter(letter), morph(morph), target_node(target_node), 
 	sibling_arc(sibling_arc) { }
@@ -23,7 +25,8 @@ struct MorphSet {
   };
 
   /** Node of a morph tree. */
-  struct Node {
+  class Node {
+  public:
     Node() : first_arc(NULL) { }
     Node(Arc *first_arc) : first_arc(first_arc) { }
     Arc *first_arc; //!< The first arc of a list of arcs
@@ -40,12 +43,20 @@ struct MorphSet {
    */
   Node *insert(char letter, const std::string &morph, Node *node);
 
+  /** Find an arc with the given letter from the given node. 
+   * \param letter = the letter to search
+   * \param node = the source node 
+   * \return the arc containing the letter or NULL if no such arc exists
+   */
+  Arc *find_arc(char letter, const Node *node);
+
   /** Read a morph set (one morph per line) */
   void read(FILE *file);
 
   /** Print the contents of the tree. */
-  void show(FILE *file);
+  void write(FILE *file);
 
+  int max_morph_length; //!< The length of the longest morph in the set
 };
 
 #endif /* MORPHSET_HH */
