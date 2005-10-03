@@ -46,6 +46,9 @@ public:
   void set_lm_lookahead(int order) { m_lm_lookahead = order; }
   void set_insertion_penalty(float ip) { m_insertion_penalty = ip; }
 
+  void set_sentence_boundary(const std::string &start,
+                             const std::string &end);
+
   void set_ngram(TreeGram *ngram);
   void set_lookahead_ngram(TreeGram *ngram);
 
@@ -150,6 +153,12 @@ private:
   int m_max_lookahead_score_list_size;
   int m_max_node_lookahead_buffer_size;
   float m_insertion_penalty;
+
+  int m_sentence_start_id;
+  int m_sentence_start_lm_id;
+  int m_sentence_end_id;
+  int m_sentence_end_lm_id;
+  bool m_use_sentence_boundary;
 
   float m_current_glob_beam;
   float m_current_we_beam;

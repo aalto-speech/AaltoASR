@@ -154,6 +154,10 @@ public:
   void prune_lookahead_buffers(int min_delta, int max_depth);
   void set_lm_lookahead_cache_sizes(int cache_size);
 
+  void set_word_boundary_id(int id) { m_word_boundary_id = id; }
+  void set_optional_short_silence(bool state) { m_optional_short_silence = state; }
+  void set_sentence_boundary(int sentence_end_id);
+
   void clear_node_token_lists(void);
 
   void print_node_info(int node);
@@ -192,6 +196,7 @@ private:
                               int *num_arcs);
   
   void free_cross_word_network_connection_points(void);
+  Node* get_short_silence_node(void);
   Node* get_fan_out_entry_node(HmmState *state, const std::string &label);
   Node* get_fan_out_last_node(HmmState *state, const std::string &label);
   Node* get_fan_in_entry_node(HmmState *state, const std::string &label);
@@ -213,12 +218,17 @@ private:
   Node *m_end_node;
   Node *m_start_node;
   Node *m_silence_node;
+  Node *m_last_silence_node;
   std::vector<Node*> node_list;
   int m_verbose;
   int m_lm_lookahead; // 0=None, 1=Only in first subtree nodes,
                       // 2=Full
   bool m_cross_word_triphones;
   int m_lm_buf_count;
+
+  bool m_optional_short_silence;
+  HmmState *m_short_silence_state;
+  int m_word_boundary_id;
 
   std::map<std::string,int> &m_hmm_map;
   std::vector<Hmm> &m_hmms;

@@ -111,7 +111,10 @@ Toolbox::lex_read(const char *filename)
   if (m_use_stack_decoder)
     m_lexicon_reader.read(file);
   else
-    m_tp_lexicon_reader.read(file);
+  {
+    m_tp_lexicon_reader.read(file, m_word_boundary);
+    m_tp_search.set_word_boundary(m_word_boundary);
+  }
   fclose(file);
 }
 

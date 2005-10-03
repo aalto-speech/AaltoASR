@@ -137,13 +137,18 @@ public:
   void set_cross_word_triphones(bool cw_triphones);
   void set_lm_lookahead(int lmlh);
 	void set_insertion_penalty(float ip);
+  void set_print_text_result(int print);
+  void set_print_state_segmentation(int print);
   void set_verbose(int verbose);
   void set_print_probs(bool print_probs);
   void set_print_indices(bool print_indices);
   void set_print_frames(bool print_frames);
   void set_multiple_endings(int multiple_endings);
   void set_word_boundary(const std::string &word);
+  void set_sentence_boundary(const std::string &start, const std::string &end);
   void set_dummy_word_boundaries(bool value);
+
+  void set_optional_short_silence(bool state);
 
   void prune_lm_lookahead_buffers(int min_delta, int max_depth);
 

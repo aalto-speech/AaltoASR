@@ -105,6 +105,8 @@ public:
   void set_cross_word_triphones(bool cw_triphones) { m_tp_lexicon.set_cross_word_triphones(cw_triphones); }
   void set_insertion_penalty(float ip) { m_tp_search.set_insertion_penalty(ip); }
   void set_verbose(int verbose) { m_search.set_verbose(verbose); m_tp_lexicon.set_verbose(verbose); m_tp_search.set_verbose(verbose);}
+  void set_print_text_result(int print) { m_tp_search.set_print_text_result(print); }
+  void set_print_state_segmentation(int print) { m_tp_search.set_print_state_segmentation(print); }
   void set_print_probs(bool print_probs) 
   { m_search.set_print_probs(print_probs); }
   void set_multiple_endings(int multiple_endings) 
@@ -114,9 +116,12 @@ public:
   void set_print_frames(bool print_frames) 
   { m_search.set_print_frames(print_frames); }
   void set_word_boundary(const std::string &word)
-  { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_tp_search.set_word_boundary(word); }
+  { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_word_boundary = word; }
+  void set_sentence_boundary(const std::string &start, const std::string &end) { m_tp_search.set_sentence_boundary(start, end); }
   void set_dummy_word_boundaries(bool value)
   { m_search.set_dummy_word_boundaries(value); }
+
+  void set_optional_short_silence(bool state) { m_tp_lexicon.set_optional_short_silence(state); }
 
   void prune_lm_lookahead_buffers(int min_delta, int max_depth) { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
 
@@ -151,6 +156,8 @@ private:
   TokenPassSearch m_tp_search;
   
   LnaReaderCircular m_lna_reader;
+
+  std::string m_word_boundary;
 
   std::vector<TreeGram*> m_ngrams;
   std::deque<int> m_history;

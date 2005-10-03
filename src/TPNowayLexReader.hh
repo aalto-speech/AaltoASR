@@ -24,7 +24,7 @@ public:
                    std::vector<Hmm> &hmms,
                    TPLexPrefixTree &lex_tree,
                    Vocabulary &vocab);
-  void read(FILE *file);
+  void read(FILE *file, const std::string &word_boundary);
 
   void skip_while(FILE *file, const char *chars);
   void get_until(FILE *file, std::string &str, char *delims);

@@ -67,8 +67,9 @@ TPNowayLexReader::get_until(FILE *file, std::string &str, char *delims)
 }
 
 void
-TPNowayLexReader::read(FILE *file)
+TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
 {
+  int word_id;
   std::vector<Hmm*> hmm_list;
   m_word.reserve(128); // The size is not necessary, just for efficiency
 
@@ -130,10 +131,20 @@ TPNowayLexReader::read(FILE *file)
 
     // Add word to lexicon
 
-    // FIXME! Deal with duplicate word ends? Pronounciation probabilities?
-    int word_id = m_vocabulary.add_word(m_word);
+    // FIXME! Deal with duplicate word ends? Pronunciation probabilities?
+    if (m_word != "_")
+    {
+      word_id = m_vocabulary.add_word(m_word);
+      if (m_word == word_boundary)
+      {
+        m_lexicon.set_word_boundary_id(word_id);
+      }
+    }
+    else
+      word_id = 0;
 
-    m_lexicon.add_word(hmm_list, word_id);
+    if (hmm_list.size() > 0)
+      m_lexicon.add_word(hmm_list, word_id);
   }
   m_lexicon.finish_tree();
 }

@@ -47,6 +47,9 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
   m_silence_node = NULL;
   m_lm_buf_count = 0;
   m_cross_word_triphones = true;
+  m_optional_short_silence = true;
+  m_short_silence_state = NULL;
+  m_word_boundary_id = 0;
 }
 
 
@@ -79,6 +82,17 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
   // Invariants: source_nodes.size() == source_trans_log_probs.size(),
   //             sink_nodes.size() == sink_trans_log_probs.size()
 
+  if (hmm_list.size() == 1 && hmm_list[0]->states.size() == 3 &&
+      hmm_list[0]->label == "_")
+  {
+    // Short silence
+    m_short_silence_state = &hmm_list[0]->state(2);
+    // Check the self transition
+    assert( m_short_silence_state->transitions.size() == 2 &&
+            m_short_silence_state->transitions[0].target == 2 );
+    return;
+  }
+  
   if (hmm_list.size() == 1 && hmm_list[0]->label == "__")
     silence = true;
 
@@ -190,9 +204,12 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
   {
     assert( source_nodes.size() == 1 ); // The sink state
     end_arc.next = (silence && m_cross_word_triphones?m_root_node:m_end_node);
-    end_arc.log_prob = 0;
+    end_arc.log_prob = get_out_transition_log_prob(source_nodes.front());
     source_nodes.front()->arcs.push_back(end_arc);
+    if (silence)
+      m_last_silence_node = hmm_state_nodes.back();
   }
+
   m_words = word_id+1;
 }
 
@@ -291,7 +308,9 @@ TPLexPrefixTree::finish_tree(void)
     {
       std::vector<Node*> *nlist = (*fan_out_it).second;
       for (int i = 0; i < nlist->size(); i++)
+      {
         link_fan_out_node_to_fan_in((*nlist)[i], (*fan_out_it).first);
+      }
       ++fan_out_it;
     }
 
@@ -583,6 +602,25 @@ TPLexPrefixTree::post_process_fan_triphone(Node *node,
 }
 
 
+void
+TPLexPrefixTree::set_sentence_boundary(int sentence_end_id)
+{
+  Node *sb;
+  Arc temp;
+
+  sb = new Node(sentence_end_id);
+  sb->node_id = node_list.size();
+  sb->flags |= NODE_USE_WORD_END_BEAM;
+  node_list.push_back(sb);
+  temp.next = sb;
+  temp.log_prob = get_out_transition_log_prob(m_last_silence_node);
+  m_last_silence_node->arcs.push_back(temp);
+  temp.next = m_root_node;
+  temp.log_prob = 0;
+  sb->arcs.push_back(temp);
+}
+
+
 // Assumes triphone models, labels must be of form a-b+c.
 void
 TPLexPrefixTree::create_cross_word_network(void)
@@ -661,7 +699,8 @@ TPLexPrefixTree::add_hmm_to_fan_network(int hmm_id,
   assert(sink_nodes.size() == 1);
   last_node = sink_nodes.front();
   assert( last_node == hmm_state_nodes[hmm->states.size()-3] );
-  if ((m_lm_lookahead && fan_out) || (!m_lm_lookahead && !fan_out))
+  if (!m_optional_short_silence &&
+      (m_lm_lookahead && fan_out) || (!m_lm_lookahead && !fan_out))
     last_node->flags |= NODE_INSERT_WORD_BOUNDARY;
 }
 
@@ -696,6 +735,16 @@ TPLexPrefixTree::link_fan_out_node_to_fan_in(Node *node,
   {
     link_node_to_fan_network(key, node->arcs, false, true,
                              get_out_transition_log_prob(node));
+    if (m_optional_short_silence)
+    {
+      Arc temp_arc;
+      Node *silence = get_short_silence_node();
+      temp_arc.next = silence;
+      temp_arc.log_prob = get_out_transition_log_prob(node);
+      node->arcs.push_back(temp_arc);
+      link_node_to_fan_network(key, silence->arcs, false, true,
+                               get_out_transition_log_prob(silence));
+    }
   }
 }
 
@@ -835,9 +884,19 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
       {
         // If LM lookahead is in use, word boundary is inserted at the
         // last state of the fan out branch.
-        if (m_lm_lookahead)
+        if (m_lm_lookahead && !m_optional_short_silence)
           wid_node->flags |= NODE_INSERT_WORD_BOUNDARY;
         link_node_to_fan_network(in_key, wid_node->arcs, false, true, 0);
+        if (m_optional_short_silence)
+        {
+          Arc temp_arc;
+          Node *silence = get_short_silence_node();
+          temp_arc.next = silence;
+          temp_arc.log_prob = 0;
+          wid_node->arcs.push_back(temp_arc);
+          link_node_to_fan_network(in_key, silence->arcs, false, true,
+                                   get_out_transition_log_prob(silence));
+        }
       }
     }
     ++it;
@@ -1019,6 +1078,24 @@ TPLexPrefixTree::free_cross_word_network_connection_points(void)
     delete (*it).second;
     ++it;
   }
+}
+
+
+TPLexPrefixTree::Node*
+TPLexPrefixTree::get_short_silence_node(void)
+{
+  Arc temp_arc;
+  assert( m_short_silence_state != NULL );
+  Node *silence = new Node(m_word_boundary_id, m_short_silence_state);
+  silence->node_id = node_list.size();
+  silence->flags = NODE_FAN_OUT|NODE_USE_WORD_END_BEAM;
+  node_list.push_back(silence);
+  // Make self transition
+  temp_arc.next = silence;
+  temp_arc.log_prob = m_short_silence_state->transitions[0].log_prob;
+  silence->arcs.push_back(temp_arc);
+
+  return silence;
 }
 
 
