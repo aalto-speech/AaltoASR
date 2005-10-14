@@ -32,11 +32,11 @@ audio_callback(void *userdata, Uint8 *stream, int stream_length)
     memset(&stream[stream_pos], 0, stream_length - stream_pos);
 }
 
-AudioPlayer::AudioPlayer() 
+AudioPlayer::AudioPlayer(int freq) 
 {
   // Set the audio format
   SDL_AudioSpec wanted_spec;
-  wanted_spec.freq = 16000;
+  wanted_spec.freq = freq;
   wanted_spec.format = AUDIO_S16SYS;
   wanted_spec.channels = 1;
   wanted_spec.samples = 4096;

@@ -17,7 +17,7 @@ public:
   };
 
   /** Create a player. */
-  AudioPlayer();
+  AudioPlayer(int freq = 16000);
 
   /** Destroy the player. */
   ~AudioPlayer();

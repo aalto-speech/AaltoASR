@@ -7,14 +7,13 @@
 #include "str.hh"
 
 conf::Config config;
-AudioPlayer audio_player;
 SF_INFO sf_info;
 SNDFILE *audio_file = NULL;
 float time_unit;
 float offset;
 
 void
-play_segment(int start_sample, int end_sample)
+play_segment(AudioPlayer &audio_player, int start_sample, int end_sample)
 {
   if (end_sample <= start_sample) {
     printf("end_time less or equal to start_time, skipping\n");
@@ -56,7 +55,7 @@ open_audio_file(std::string file_name)
 }
 
 void
-handle_input()
+handle_input(AudioPlayer &audio_player)
 {
   std::string line;
   std::vector<std::string> fields;
@@ -92,7 +91,7 @@ handle_input()
 			     sf_info.samplerate);
     int end_sample = lrint((end_time + offset) * time_unit * 
 			   sf_info.samplerate);
-    play_segment(start_sample, end_sample);
+    play_segment(audio_player, start_sample, end_sample);
   }
 }
 
@@ -104,6 +103,7 @@ main(int argc, char *argv[])
     ('h', "help", "", "", "display help")
     ('o', "offset=FLOAT", "arg", "0", "offset in seconds (default: 0)")
     ('O', "output", "", "", "write raw waveform to output file")
+    ('r', "rate", "arg", "16000", "audio output sample rate")
     ('t', "time-unit=FLOAT", "arg", "0.0000625", 
      "time unit (s) in input (default: 0.0000625)");
   config.parse(argc, argv);
@@ -118,6 +118,8 @@ main(int argc, char *argv[])
   time_unit = config["time-unit"].get_float();
   offset = config["offset"].get_float();
     
+  AudioPlayer audio_player(config["rate"].get_int());
+
   // Open initial audio file
   if (config.arguments.empty())
     printf("no active audio file yet\n");
@@ -125,7 +127,7 @@ main(int argc, char *argv[])
     open_audio_file(config.arguments[0]);
 
   try {
-    handle_input();
+    handle_input(audio_player);
   }
   catch (std::exception &e) {
     fprintf(stderr, "caught exception: %s\n", e.what());

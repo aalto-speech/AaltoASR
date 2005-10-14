@@ -1,4 +1,4 @@
-OPT = -g
+OPT = -O2
 INCLUDES = -I/share/puhe/suse93/include 
 CXXFLAGS = $(OPT) $(INCLUDES) -Wall $(shell sdl-config --cflags)
 LDFLAGS = -L/share/puhe/suse93/lib -Wl,-rpath -Wl,/share/puhe/suse93/lib
