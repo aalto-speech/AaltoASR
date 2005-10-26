@@ -87,9 +87,9 @@ handle_input(AudioPlayer &audio_player)
     }
 
     // Compute the position in the audio file and play
-    int start_sample = lrint((start_time + offset) * time_unit  * 
+    int start_sample = lrint(((start_time * time_unit) + offset) * 
 			     sf_info.samplerate);
-    int end_sample = lrint((end_time + offset) * time_unit * 
+    int end_sample = lrint(((end_time * time_unit) + offset) * 
 			   sf_info.samplerate);
     play_segment(audio_player, start_sample, end_sample);
   }
