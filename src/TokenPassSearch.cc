@@ -600,7 +600,8 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
   int depth;
   float new_cur_am_log_prob;
   float new_cur_lm_log_prob;
-  float new_real_am_log_prob = token->am_log_prob + transition_score;
+  float new_real_am_log_prob = token->am_log_prob +
+    m_transition_scale*transition_score;
   float new_real_lm_log_prob = token->lm_log_prob;
   float total_token_log_prob;
   int new_word_count = token->word_count;
