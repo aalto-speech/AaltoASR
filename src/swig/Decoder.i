@@ -135,6 +135,7 @@ public:
 	void set_tp_state_beam(float beam);
   void set_max_state_duration(int duration);
   void set_cross_word_triphones(bool cw_triphones);
+  void set_silence_is_word(bool b);
   void set_lm_lookahead(int lmlh);
 	void set_insertion_penalty(float ip);
   void set_print_text_result(int print);
@@ -147,6 +148,7 @@ public:
   void set_word_boundary(const std::string &word);
   void set_sentence_boundary(const std::string &start, const std::string &end);
   void set_dummy_word_boundaries(bool value);
+  void set_require_sentence_end(bool s);
 
   void set_optional_short_silence(bool state);
 

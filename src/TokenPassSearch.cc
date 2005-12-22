@@ -66,6 +66,7 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
   m_use_sentence_boundary = false;
   m_sentence_start_id = -1;
   m_sentence_end_id = -1;
+  m_require_sentence_end = false;
 }
 
 
@@ -73,7 +74,7 @@ void
 TokenPassSearch::set_word_boundary(const std::string &word)
 {
   m_word_boundary_id = m_vocabulary.word_index(word);
-  if (m_word_boundary_id == 0) {
+  if (m_word_boundary_id <= 0) {
     fprintf(stderr, "Search::set_word_boundary(): word boundary not in vocabulary\n");
     exit(1);
   }
@@ -106,7 +107,8 @@ TokenPassSearch::reset_search(int start_frame)
   m_frame = start_frame;
   m_end_frame = -1;
 
-  m_word_boundary_lm_id = m_lex2lm[m_word_boundary_id];
+  if (m_word_boundary_id > 0)
+    m_word_boundary_lm_id = m_lex2lm[m_word_boundary_id];
 
   if (m_use_sentence_boundary)
   {
@@ -225,6 +227,8 @@ TokenPassSearch::run(void)
     printf("run() in frame %d\n", m_frame);
   if (m_end_frame != -1 && m_frame >= m_end_frame)
   {
+    if (m_require_sentence_end)
+      add_sentence_end_to_hypotheses();
     if (m_print_text_result)
       print_best_path(true);
     if (m_print_state_segmentation)
@@ -234,6 +238,8 @@ TokenPassSearch::run(void)
   }
   if (!m_acoustics.go_to(m_frame))
   {
+    if (m_require_sentence_end)
+      add_sentence_end_to_hypotheses();
     if (m_print_text_result)
       print_best_path(true);
     if (m_print_state_segmentation)
@@ -377,10 +383,13 @@ TokenPassSearch::print_guaranteed_path(void)
   int i;
   std::vector<TPLexPrefixTree::WordHistory*> word_list;
   bool collecting = false;
+  int min_word_count = 100000;
 
   for (i = 0; i < m_active_token_list->size(); i++)
     if ((*m_active_token_list)[i] != NULL)
+    {
       break;
+    }
   assert( i < m_active_token_list->size() ); // Must find one token
   word_hist = (*m_active_token_list)[i]->prev_word;
   while (word_hist->prev_word != NULL &&
@@ -413,6 +422,23 @@ TokenPassSearch::print_guaranteed_path(void)
 
 
 void
+TokenPassSearch::print_path(TPLexPrefixTree::Token *token)
+{
+  TPLexPrefixTree::WordHistory *cur_word;
+  int i;
+
+  // Determine the word sequence
+  cur_word = token->prev_word;
+  while (cur_word != NULL)
+  {
+    printf("%i ",cur_word->word_id, cur_word);
+    cur_word = cur_word->prev_word;
+  }
+  printf("\n");
+}
+
+
+void
 TokenPassSearch::print_best_path(bool only_not_printed)
 {
   std::vector<int> word_hist;
@@ -432,9 +458,9 @@ TokenPassSearch::print_best_path(bool only_not_printed)
       }
     }
   }
-  // Determine the word sequence
   cur_word = (*m_active_token_list)[best_token]->prev_word;
-  while (cur_word != NULL)
+  // Determine the word sequence
+  while (cur_word->prev_word != NULL)
   {
     if (only_not_printed && cur_word->printed)
       break;
@@ -508,6 +534,36 @@ TokenPassSearch::print_state_history(void)
 
 
 void
+TokenPassSearch::add_sentence_end_to_hypotheses(void)
+{
+  int i;
+  assert( m_sentence_end_id > -1 );
+  
+  for (i = 0; i < m_active_token_list->size(); i++)
+  {
+    if ((*m_active_token_list)[i] != NULL)
+    {
+      TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
+      if (token->prev_word->word_id != m_sentence_end_id)
+      {
+        token->prev_word =  new TPLexPrefixTree::WordHistory(
+          m_sentence_end_id, m_sentence_end_lm_id, token->prev_word);
+        TPLexPrefixTree::WordHistory::unlink(token->prev_word->prev_word);
+        token->prev_word->link();
+        token->word_hist_code = compute_word_hist_hash_code(token->prev_word);
+        token->lm_log_prob+=get_lm_score(token->prev_word,
+                                         token->word_hist_code)+
+          m_insertion_penalty;
+      }
+      // Use current AM probability but discard LM lookahead probability.
+      token->total_log_prob =
+        get_token_log_prob(token->cur_am_log_prob, token->lm_log_prob);
+    }
+  }
+}
+
+
+void
 TokenPassSearch::propagate_tokens(void)
 {
   int i;
@@ -558,7 +614,8 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
                        source_node->arcs[i].log_prob);
   }
 
-  if (source_node->flags&NODE_INSERT_WORD_BOUNDARY)
+  if (source_node->flags&NODE_INSERT_WORD_BOUNDARY &&
+      m_word_boundary_id > 0)
   {
     if (token->prev_word->word_id != m_word_boundary_id)
     {
@@ -637,8 +694,9 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
           temp = new TPLexPrefixTree::WordHistory(
             m_sentence_start_id, m_sentence_start_lm_id, new_prev_word);
           TPLexPrefixTree::WordHistory::unlink(new_prev_word);
-          temp = new TPLexPrefixTree::WordHistory(
-            m_word_boundary_id, m_word_boundary_lm_id, temp);
+          if (m_word_boundary_id > 0)
+            temp = new TPLexPrefixTree::WordHistory(
+              m_word_boundary_id, m_word_boundary_lm_id, temp);
           new_prev_word = temp;
           new_prev_word->link();
           new_word_hist_code = compute_word_hist_hash_code(new_prev_word);

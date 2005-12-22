@@ -25,6 +25,8 @@ public:
   void print_best_path(bool only_not_printed);
   void print_state_history(void);
 
+  void print_path(TPLexPrefixTree::Token *token);
+
   // Options
   void set_global_beam(float beam) { m_global_beam = beam; if (m_word_end_beam > m_global_beam) m_word_end_beam = beam; }
   void set_word_end_beam(float beam) { m_word_end_beam = beam; }
@@ -46,6 +48,8 @@ public:
   void set_lm_lookahead(int order) { m_lm_lookahead = order; }
   void set_insertion_penalty(float ip) { m_insertion_penalty = ip; }
 
+  void set_require_sentence_end(bool s) { m_require_sentence_end = s; }
+
   void set_sentence_boundary(const std::string &start,
                              const std::string &end);
 
@@ -55,6 +59,7 @@ public:
   int frame(void) { return m_frame; }
 
 private:
+  void add_sentence_end_to_hypotheses(void);
   void propagate_tokens(void);
   void propagate_token(TPLexPrefixTree::Token *token);
   void move_token_to_node(TPLexPrefixTree::Token *token,
@@ -159,6 +164,7 @@ private:
   int m_sentence_end_id;
   int m_sentence_end_lm_id;
   bool m_use_sentence_boundary;
+  bool m_require_sentence_end;
 
   float m_current_glob_beam;
   float m_current_we_beam;

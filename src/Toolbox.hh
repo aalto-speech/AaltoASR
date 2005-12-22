@@ -104,6 +104,7 @@ public:
   void set_lm_lookahead(int lmlh) { m_tp_lexicon.set_lm_lookahead(lmlh); m_tp_search.set_lm_lookahead(lmlh); }
   void set_cross_word_triphones(bool cw_triphones) { m_tp_lexicon.set_cross_word_triphones(cw_triphones); }
   void set_insertion_penalty(float ip) { m_tp_search.set_insertion_penalty(ip); }
+  void set_silence_is_word(bool b) { m_tp_lexicon.set_silence_is_word(b); }
   void set_verbose(int verbose) { m_search.set_verbose(verbose); m_tp_lexicon.set_verbose(verbose); m_tp_search.set_verbose(verbose);}
   void set_print_text_result(int print) { m_tp_search.set_print_text_result(print); }
   void set_print_state_segmentation(int print) { m_tp_search.set_print_state_segmentation(print); }
@@ -120,6 +121,7 @@ public:
   void set_sentence_boundary(const std::string &start, const std::string &end) { m_tp_search.set_sentence_boundary(start, end); }
   void set_dummy_word_boundaries(bool value)
   { m_search.set_dummy_word_boundaries(value); }
+  void set_require_sentence_end(bool s) { m_tp_search.set_require_sentence_end(s); }
 
   void set_optional_short_silence(bool state) { m_tp_lexicon.set_optional_short_silence(state); }
 

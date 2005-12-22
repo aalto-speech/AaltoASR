@@ -49,7 +49,8 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
   m_cross_word_triphones = true;
   m_optional_short_silence = true;
   m_short_silence_state = NULL;
-  m_word_boundary_id = 0;
+  m_word_boundary_id = -1;
+  m_silence_is_word = true;
 }
 
 
@@ -145,7 +146,8 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
         source_trans_log_probs.clear();
         break; // Skip last state (handled in the cross word network).
       }
-      word_end = word_id;
+      if (!silence || m_silence_is_word)
+        word_end = word_id;
     }
 
     // Set up a table for storing the nodes corresponding to the HMM states
@@ -298,7 +300,7 @@ void
 TPLexPrefixTree::finish_tree(void)
 {
   assert( m_silence_node != NULL );
-  
+
   if (m_cross_word_triphones)
   {
     // Link the fan points to create a cross word network
@@ -409,6 +411,11 @@ TPLexPrefixTree::post_process_lex_branch(Node *node,
   Node *original_node = node, *real_next;
   std::vector<Node*> prev_nodes;
   int i;
+
+  if (!m_silence_is_word && node == m_silence_node)// Word LM, no word ID
+  {
+    return;
+  }
 
   assert(((node->flags)&(NODE_FAN_IN|NODE_FAN_OUT)) == 0);
 
@@ -1261,6 +1268,8 @@ TPLexPrefixTree::prune_lm_la_buffer(int delta_thr, int depth_thr,
   int i;
   int cur_size = last_size;
 
+  if (!m_silence_is_word && node == m_silence_node) // Word LM, no word ID
+    return;
   if (node->word_id != -1)
       return; // No more LM lookahead
 

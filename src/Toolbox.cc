@@ -113,7 +113,10 @@ Toolbox::lex_read(const char *filename)
   else
   {
     m_tp_lexicon_reader.read(file, m_word_boundary);
-    m_tp_search.set_word_boundary(m_word_boundary);
+    if (m_word_boundary.size() > 0)
+    {
+      m_tp_search.set_word_boundary(m_word_boundary);
+    }
   }
   fclose(file);
 }
