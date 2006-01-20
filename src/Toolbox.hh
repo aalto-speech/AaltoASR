@@ -32,7 +32,7 @@ public:
 
   // Ngram
   void ngram_read(const char *file, float weight, const bool binary=true);
-  void read_lookahead_ngram(const char *file);
+  void read_lookahead_ngram(const char *file, const bool binary=true);
 
   // Lna
   void lna_open(const char *file, int size);
@@ -62,7 +62,8 @@ public:
   bool run() { return (m_use_stack_decoder?m_search.run():m_tp_search.run()); }
 
   // Token pass search
-  void print_best_path(bool only_not_printed) { m_tp_search.print_best_path(only_not_printed); }
+  void print_best_path(bool only_not_printed, FILE *out=stdout) { m_tp_search.print_best_path(only_not_printed, out); }
+  void print_best_path_to_file(FILE *out) {print_best_path(false, out);}
 
   // Miscellaneous
   void segment(const std::string &str, int start_frame, int end_frame);

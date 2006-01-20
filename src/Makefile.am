@@ -59,4 +59,5 @@ libdecoder_a_SOURCES = \
 	TokenPassSearch.cc		TokenPassSearch.hh \
 					Clustermap.hh \
 					Clustermap_tmpl.hh \
-	io.cc				io.hh
+	io.cc				io.hh \
+	str.cc				str.hh

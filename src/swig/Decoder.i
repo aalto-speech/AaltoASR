@@ -34,6 +34,14 @@
   $result = Py_BuildValue("s#",$1->c_str(),$1->size());
 }
 
+%typemap(python,in) FILE* {
+	if (!(PyFile_Check($input))) {
+		PyErr_SetString(PyExc_TypeError, "not a file pointer");
+		return NULL;
+	}
+	$1=PyFile_AsFile($input);
+}
+
 class Hypo {
 };
 
@@ -77,6 +85,7 @@ public:
   const std::string &lex_phone();
   void ngram_read(const char *file, float weight, const bool binary);
   void ngram_read(const char *file, float weight);
+  void read_lookahead_ngram(const char *file, const bool binary);
   void read_lookahead_ngram(const char *file);
 
   // Lna
@@ -108,7 +117,9 @@ public:
   HypoStack &stack(int frame);
   int paths();
 
+	void print_best_path(bool only_not_printed, FILE *out);
 	void print_best_path(bool only_not_printed);
+	void print_best_path_to_file(FILE *out);
 
 	void select_decoder(int stack_dec);
 

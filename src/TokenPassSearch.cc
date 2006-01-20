@@ -439,7 +439,7 @@ TokenPassSearch::print_path(TPLexPrefixTree::Token *token)
 
 
 void
-TokenPassSearch::print_best_path(bool only_not_printed)
+TokenPassSearch::print_best_path(bool only_not_printed, FILE *out)
 {
   std::vector<int> word_hist;
   TPLexPrefixTree::WordHistory *cur_word;
@@ -470,26 +470,26 @@ TokenPassSearch::print_best_path(bool only_not_printed)
   // Print the best path
   for (i = word_hist.size()-1; i >= 0; i--)
   {
-    printf("%s ",m_vocabulary.word(word_hist[i]).c_str());
+    fprintf(out, "%s ",m_vocabulary.word(word_hist[i]).c_str());
   }
-  printf("\n");
+  fprintf(out, "\n");
   //print_token_path((*m_active_token_list)[best_token]->token_path);
 #ifdef PRUNING_MEASUREMENT
   for (i = 0; i < 6; i++)
-    printf("meas%i: %.3g\n", i, (*m_active_token_list)[best_token]->meas[i]);
+    fprintf(out, "meas%i: %.3g\n", i, (*m_active_token_list)[best_token]->meas[i]);
 #endif
   
 #ifdef COUNT_LM_LA_CACHE_MISS
-  printf("Count: ");
+  fprintf(out, "Count: ");
   for (i = 0; i < MAX_LEX_TREE_DEPTH; i++)
-    printf("%i ", lm_la_cache_count[i]);
-  printf("\n");
-  printf("Miss: ");
+    fprintf(out, "%i ", lm_la_cache_count[i]);
+  fprintf(out, "\n");
+  fprintf(out, "Miss: ");
   for (i = 0; i < MAX_LEX_TREE_DEPTH; i++)
-    printf("%i ", lm_la_cache_miss[i]);
-  printf("\n");
-  printf("WordCount: %d\n", lm_la_word_cache_count);
-  printf("WordMiss: %d\n", lm_la_word_cache_miss);
+    fprintf(out, "%i ", lm_la_cache_miss[i]);
+  fprintf(out, "\n");
+  fprintf(out, "WordCount: %d\n", lm_la_word_cache_count);
+  fprintf(out, "WordMiss: %d\n", lm_la_word_cache_miss);
 #endif
 }
 
@@ -1675,9 +1675,9 @@ TokenPassSearch::save_token_statistics(int count)
         /*val = 63 - ((m_best_log_prob -
                      (*m_active_token_list)[i]->total_log_prob)
                      /m_global_beam*50+0.5);*/
-        val = MAX_TREE_DEPTH-1 - ((m_best_log_prob -
+        val = (int) (MAX_TREE_DEPTH-1 - ((m_best_log_prob -
                      (*m_active_token_list)[i]->total_log_prob)
-                    /m_global_beam*(MAX_TREE_DEPTH-2)+0.5);
+                    /m_global_beam*(MAX_TREE_DEPTH-2)+0.5));
         x = (*m_active_token_list)[i]->depth;
         buf[val]++;
       }

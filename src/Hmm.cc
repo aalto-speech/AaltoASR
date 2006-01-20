@@ -19,7 +19,7 @@ void StateDuration::set_parameters(float a, float b)
   {
     const_term = -a*logf(b)-lgammaf(a);
     temp = b*(a-1); // Mode of the gamma distribution
-    mode = floor(temp);
+    mode = (int) floor(temp);
     if (get_log_prob(mode) < get_log_prob(mode+1))
       mode++;
   }

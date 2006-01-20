@@ -2,29 +2,23 @@
 #include <assert.h>
 #include <math.h>
 
+// BEGIN fwrite-hack
+//#include <unistd.h>
+// END fwrite-hack
+
 #include "Endian.hh"
 #include "TreeGram.hh"
-#include "tools.hh"
+#include "str.hh"
+#include "def.hh"
 
-#ifdef USE_CL
 #include <memory>
 #include "ClusterMap.hh"
-#endif
-
-const double MINLOGPROB=-60;
-const double MINPROB=1e-60;
-inline double safelogprob(double x) {
-  if (x> MINPROB) return(log10(x));
-  return(MINLOGPROB);
-}
 
 static std::string format_str("cis-binlm2\n");
 
 TreeGram::TreeGram()
   :
-#ifdef USE_CL
     clmap(NULL),
-#endif
     m_type(BACKOFF),
     m_order(0),
     m_last_order(0)
@@ -323,8 +317,38 @@ TreeGram::write(FILE *file, bool reflip)
   if (Endian::big) 
     flip_endian(); 
 
+  // BEGIN fwrite-hack
+
   // Write nodes
-  fwrite(&m_nodes[0], m_nodes.size() * sizeof(TreeGram::Node), 1, file);
+#if 0
+  fprintf(stderr, "FIXME: using write() workaround for fwrite().\n"
+          "Fix me when cluster machines have been upgraded to SuSE 9.1\n");
+
+  // The workaround for SuSE 9.0 cluster machines.  In 9.0, the
+  // fwrite() system call can not write buffers of 2^31 bytes or more.
+  size_t bytes_to_write = m_nodes.size() * sizeof(TreeGram::Node);
+  fflush(file);
+  int fd = fileno(file);
+  ssize_t ret = 
+    ::write(fd, &m_nodes[0], bytes_to_write);
+  if (ret < 0) {
+    perror("TreeGram::write(): write() system call failed");
+    abort();
+  }
+  if ((size_t)ret != bytes_to_write) {
+    fprintf(stderr, "TreeGram::write(): "
+	    "write() system call wrote only %lu of %lu bytes\n",
+	    (size_t)ret, bytes_to_write);
+    abort();
+  }
+#else
+  // The original code
+    // unistd.h can be removed from the start of the file, when the
+    // workaround is disabled.  The header file is needed only for the
+    // write() system call.
+    fwrite(&m_nodes[0], m_nodes.size() * sizeof(TreeGram::Node), 1, file);
+#endif
+  // END fwrite-hack
   
   if (ferror(file)) {
     fprintf(stderr, "TreeGram::write(): write error: %s\n", strerror(errno));
@@ -344,15 +368,14 @@ TreeGram::read(FILE *file)
   bool ret;
 
   // Read the header
-  ret = read_string(&line, format_str.length(), file);
+  ret = str::read_string(&line, format_str.length(), file);
   if (!ret || line != format_str) {
     fprintf(stderr, "TreeGram::read(): invalid file format\n");
     exit(1);
   }
   
   // Read LM type
-  read_line(&line, file);
-  chomp(&line);
+  str::read_line(&line, file, true);
   if (line == "backoff")
     m_type = BACKOFF;
   else if (line == "interpolated")
@@ -363,7 +386,7 @@ TreeGram::read(FILE *file)
   }
 
   // Read the number of words
-  if (!read_line(&line, file)) {
+  if (!str::read_line(&line, file)) {
     fprintf(stderr, "TreeGram::read(): unexpected end of file\n");
     exit(1);
   }
@@ -377,12 +400,11 @@ TreeGram::read(FILE *file)
   // Read the vocabulary
   clear_words();
   for (int i=0; i < words; i++) {
-    if (!read_line(&line, file)) {
+    if (!str::read_line(&line, file, true)) {
       fprintf(stderr, "TreeGram::read(): "
 	      "read error while reading vocabulary\n");
       exit(1);
     }
-    chomp(&line);
     add_word(line);
   }
 
@@ -461,11 +483,12 @@ TreeGram::fetch_gram(const Gram &gram, int first)
   }
 }
 
-
 void
 TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
                             std::vector<float> &result_buffer)
 {
+  assert(m_type==BACKOFF);
+
   float back_off_w;
   int i;
   int child_index, next_child_index;
@@ -495,6 +518,7 @@ void
 TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
                              std::vector<float> &result_buffer)
 {
+  assert(m_type==BACKOFF);
   int bigram_index;
 
   // Check if bigram (w1,w2) exists
@@ -546,25 +570,11 @@ TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
 }
 
 float
-TreeGram::log_prob(const Gram &gram_in)
+TreeGram::log_prob(const Gram &gram)
 {
-  assert(gram_in.size() > 0);
-
-#ifdef USE_CL
-  // Ugliness available here 
-  std::auto_ptr<Gram> tmp(NULL);
-  //Gram *tmp=NULL;
-  if (clmap) {
-    tmp.reset(new Gram(gram_in));
-    clmap->wg2cg(*tmp);
-  }
-  const Gram &gram=clmap?*tmp:gram_in;
-#else
-  Gram &gram=gram_in;
-#endif
-
-
+  assert(gram.size() > 0);
   if (m_type==BACKOFF) {
+    assert(!clmap);
     float log_prob = 0.0;
   // Denote by (w(1) w(2) ... w(N)) the ngram that was requested.  The
   // log-probability of the back-off model is computed as follows:
@@ -586,38 +596,68 @@ TreeGram::log_prob(const Gram &gram_in)
       }
       
       // Back-off found?
-      if (m_fetch_stack.size() == gram.size() - n - 1)
+      if (m_fetch_stack.size() == gram.size() -n -1)
 	log_prob += m_nodes[m_fetch_stack.back()].back_off;
       
       n++;
     }
     return log_prob;
   }
+
+  float prob=0.0;
+  float bo;
+  m_last_order=0;
+  Gram const *fetch_me;
+  Gram clgram;
+
   if (m_type==INTERPOLATED) {
-    float prob=0.0;
-    float bo;
-    m_last_order=0;
+    //print_indices(gram);
+    if (!clmap) fetch_me=&gram;
+    else {
+      clgram=gram;
+      clmap->wg2cg(clgram);
+      fetch_me=&clgram;
+    }
+    //fprintf(stderr," -> ");
+    //print_indices(*fetch_me);
 
     const int looptill=std::min(gram.size(),(size_t) m_order);
+    //fprintf(stderr," till %d\n",looptill);
+
     for (int n=1;n<=looptill;n++) {
-      fetch_gram(gram,gram.size()-n);
+      if (clmap) clgram.back()=clmap->get_fcluster(n,gram.back());
+      //fprintf(stderr,"n=%d ",n);
+      //print_indices(clgram);
+      //fprintf(stderr,"\n");
+      fetch_gram(*fetch_me,fetch_me->size()-n);
       if (m_fetch_stack.size() < n-1 || n>m_order) {
+	//fprintf(stderr,"exit stack size < %d, return %f\n",n-1,prob);
 	return(safelogprob(prob)); 
       }
-      
+
       if (m_fetch_stack.size()==n-1) {
-	bo = pow(10,m_nodes[m_fetch_stack.back()].back_off);
-	prob*=bo;
-	continue;
+        bo = pow(10,m_nodes[m_fetch_stack.back()].back_off);
+        prob*=bo;
+	//fprintf(stderr,"stack size %d, bo %.3f to %3f\n", n-1, bo, prob);
+        continue;
       }
       
       if (n>1) {
-	bo = pow(10,m_nodes[m_fetch_stack[m_fetch_stack.size()-2]].back_off);
-	prob=bo*prob;
+        bo = pow(10,m_nodes[m_fetch_stack[m_fetch_stack.size()-2]].back_off);
+        prob=bo*prob;
+	//fprintf(stderr,"backoff %f -> %f\n",bo, prob);
       }
-      prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob);
-      m_last_order++;
+      m_last_order=n;
+      if (!clmap)
+	prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob);
+      else {
+	prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob 
+		    + clmap->get_full_emprob(n,gram.back()));
+	//fprintf(stderr,"prob %.3f * %.3f = %.3f\n", pow(10,m_nodes[m_fetch_stack.back()].log_prob), pow(10,clmap->get_full_emprob(n,gram.back())), pow(10,m_nodes[m_fetch_stack.back()].log_prob + clmap->get_full_emprob(n,gram.back())));
+	//fprintf(stderr,"  (%.3f + %.3f = %.3f)\n", m_nodes[m_fetch_stack.back()].log_prob, clmap->get_full_emprob(n,gram.back()), m_nodes[m_fetch_stack.back()].log_prob + clmap->get_full_emprob(n,gram.back()));
+      }
     }
+    //fprintf(stderr," total %f\n",prob);
     return(safelogprob(prob));
   }
   return(0);
@@ -781,3 +821,4 @@ TreeGram::Iterator::down()
   m_index_stack.push_back(node.child_index);
   return true;
 }
+

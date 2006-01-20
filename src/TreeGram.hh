@@ -7,10 +7,7 @@
 
 #include "Vocabulary.hh"
 
-#define USE_CL
-#ifdef USE_CL
 template <typename KT, typename CT> class ClusterMap;
-#endif
 
 class TreeGram : public Vocabulary {
 public:
@@ -54,6 +51,7 @@ public:
     bool down();
 
     friend class TreeGram;
+
   private:
     TreeGram *m_gram;
     std::vector<int> m_index_stack;
@@ -76,11 +74,6 @@ public:
   void read(FILE *file);
   void write(FILE *file, bool reflip);
 
-  void fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
-                         std::vector<float> &result_buffer);
-  void fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
-                          std::vector<float> &result_buffer);
-  
   float log_prob(const Gram &gram);
   int order() { return m_order; }
   int last_order() { return m_last_order; }
@@ -91,10 +84,14 @@ public:
 
   // Returns an iterator for given gram.
   Iterator iterator(const Gram &gram);
+  ClusterMap<int, int> *clmap; 
+  
+  // These are for LM lookahead in the recognizer
+  void fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
+                         std::vector<float> &result_buffer);
+  void fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
+                          std::vector<float> &result_buffer);
 
-#ifdef USE_CL
-  ClusterMap<int, int> *clmap;
-#endif
 
 private:
   int binary_search(int word, int first, int last);

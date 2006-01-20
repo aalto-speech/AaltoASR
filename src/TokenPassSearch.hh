@@ -22,7 +22,7 @@ public:
 
   // Print the best path
   void print_guaranteed_path(void);
-  void print_best_path(bool only_not_printed);
+  void print_best_path(bool only_not_printed, FILE *out=stdout);
   void print_state_history(void);
 
   void print_path(TPLexPrefixTree::Token *token);

@@ -1,61 +1,69 @@
 #ifndef CLUSTERMAP_HH
 #define CLUSTERMAP_HH
 
-//#include "NgramCounts.hh"
 #include "TreeGram.hh"
-
-const int MAX_WLEN=1000;
+//#include "NgramCounts.hh"
 
 template <typename KT, typename CT>
 class ClusterMap : public Vocabulary {
 public:
-  void init_order(const int order, const int size);
-  inline int num_clusters(const int order);
-  //sikMatrix<KT, CT> *transform_counts(sikMatrix<KT, CT> *mat);
-  inline void change_cluster(const int order, const KT newc, const KT word);
-  inline int get_cluster(const int order, KT w);
-  inline int get_cluster2(const int order, const KT cl);  
-  int read(FILE *in, const int ord, int read_lines);
-  void write(FILE *out);
+  virtual ~ClusterMap() {}
+  virtual bool init_order(const int order);
+  inline void set_cluster(const int order, const KT lowcl, const KT oricl, 
+			  const KT newc);
+  inline KT get_cluster(const int order, KT w);
+  inline KT get_cluster2(const int order, const KT cl);  
+  virtual int read(FILE *in, const int ord, int read_lines);
+  virtual void write(FILE *out);
   void wv2cv(std::vector<KT> &v); 
   void wg2cg(TreeGram::Gram &g);
+  inline int num_clusters(const int o) {return(m_num_cl[o]);}
+  void read_error(const int line, const std::string &text);
+  virtual inline KT get_fcluster(const int order, const KT w) {return(w);}
+  virtual inline KT get_fcluster2(const int order, const KT cl) {return(cl);}
+  virtual inline float get_full_emprob(const int order, KT w) {return(0.0);}  
+  virtual inline int num_fclusters(const int o) {return(num_words());}
 
-/*  inline void wv2cv(std::vector<unsigned short> &v) {
-    std::vector<int> v2;
-    wv2cv(v2);
-    for (int i=0;i<v.size();i++) v[i]=v2[i];
-  }
-*/
-
-private:
+protected:
   std::vector<std::vector <KT> > m_map;
-  std::vector<KT> m_num_cl;
+  std::vector<int> m_num_cl;
 };
 
 template <typename KT, typename CT>
-int ClusterMap<KT,CT>::num_clusters(const int order) {
-  return(m_num_cl.at(order));
-}
+class ClusterFMap : public ClusterMap<KT, CT> {
+public:
+  bool init_order(const int order);
+  int read(FILE *in, const int ord, int read_lines);
+  void write(FILE *out);
 
-template <typename KT, typename CT>
-void ClusterMap<KT,CT>::change_cluster(const int order, const KT newc, const KT word) {
-  // Should assert things here
-  m_map[order][word]=newc;
-  if (newc>=m_num_cl[order]) m_num_cl[order]=newc+1;
-}
-
-template <typename KT, typename CT>
-int ClusterMap<KT,CT>::get_cluster(const int order, KT w) {
-  for (int i=1;i<=order;i++) {
-    w=m_map[i][w];
+  inline void set_fcluster(const int order, const KT lowcl, const KT oricl, const KT newcl);
+  inline KT get_fcluster(const int order, KT w);
+  inline KT get_fcluster2(const int order, const KT cl);  
+  inline float get_full_emprob(const int order, KT w);  
+  inline float get_fprob(const int order, KT w);  
+  inline float get_fprob2(const int order, KT w);  
+  inline void set_fprob(const int order, KT w, const float pr);  
+  inline int num_fclusters(const int o) {
+    return(m_num_fcl[o]);
   }
-  return(w);
-}
 
-template <typename KT, typename CT>
-int ClusterMap<KT, CT>::get_cluster2(const int order, const KT cl) {
-  return(m_map[order][cl]);
-} 
+  struct key_prob {
+    inline key_prob() : key(0), lprob(0) {}
+    KT key;
+    float lprob;
+
+    bool operator<(const key_prob &other) {
+      return(key < other.key);
+    }
+  };
+
+private:
+  std::vector<std::vector <key_prob> > m_fmap; // Forward maps
+  struct sort_key_prob {
+    bool operator()(const key_prob &x, const key_prob &y) { return x.key < y.key; }
+  };
+  std::vector<int> m_num_fcl;
+};
 
 #include "ClusterMap_tmpl.hh"
 #endif

@@ -17,12 +17,11 @@ Toolbox::Toolbox()
     m_lexicon(m_lexicon_reader.lexicon()),
     m_vocabulary(m_lexicon_reader.vocabulary()),
 
-    m_lna_reader(),
-
-    m_tp_lexicon(m_hmm_map, m_hmms),
-
     m_tp_lexicon_reader(m_hmm_map, m_hmms, m_tp_lexicon, m_tp_vocabulary),
+    m_tp_lexicon(m_hmm_map, m_hmms),
     m_tp_search(m_tp_lexicon, m_tp_vocabulary, m_lna_reader),
+
+    m_lna_reader(),
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
     m_search(m_expander, m_vocabulary)
@@ -149,7 +148,7 @@ Toolbox::ngram_read(const char *file, float weight, const bool binary)
 }
 
 void
-Toolbox::read_lookahead_ngram(const char *file)
+Toolbox::read_lookahead_ngram(const char *file, const bool binary)
 {
   if (strlen(file) == 0)
   {
@@ -158,14 +157,19 @@ Toolbox::read_lookahead_ngram(const char *file)
   }
   else
   {
-    FILE *f = fopen(file, "r");
-    if (!f) {
+    io::Stream in(file,"r");
+    if (!in.file) {
       fprintf(stderr, "ngram_read(): could not open %s: %s\n", 
               file, strerror(errno));
       exit(1);
     }
     m_lookahead_ngram = new TreeGram();
-    m_lookahead_ngram->read(f);
+    if (binary) m_lookahead_ngram->read(in.file);
+    else {
+      TreeGramArpaReader areader;
+      areader.read(in.file,m_lookahead_ngram);
+    }
+    assert(m_lookahead_ngram->get_type()==TreeGram::BACKOFF);
     m_tp_search.set_lookahead_ngram(m_lookahead_ngram);
   }
 }

@@ -5,15 +5,12 @@
 #include "TreeGram.hh"
 #include <map>
 
-#ifdef USE_CL
-#include "ClusterMap.hh"
-#endif
-
 class TreeGramArpaReader {
 public:
   TreeGramArpaReader();
   void read(FILE *file, TreeGram *tree_gram);
   void write(FILE *file, TreeGram *tree_gram);
+  void write_interpolated(FILE *file, TreeGram *treegram);
 
 private:
   void read_error();
