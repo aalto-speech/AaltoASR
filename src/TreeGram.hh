@@ -4,7 +4,7 @@
 #include <vector>
 #include <deque>
 #include <stdio.h>
-
+#include <assert.h>
 #include "Vocabulary.hh"
 
 template <typename KT, typename CT> class ClusterMap;
@@ -74,7 +74,25 @@ public:
   void read(FILE *file);
   void write(FILE *file, bool reflip);
 
-  float log_prob(const Gram &gram);
+  // This could be implemented with templates
+  inline float log_prob(const Gram &gram) {
+    assert(gram.size() > 0);
+    switch (m_type) {
+    case BACKOFF:
+      if (!clmap) return(log_prob_bo(gram));
+      return(log_prob_bo_cl(gram));
+    case INTERPOLATED:
+      if (!clmap) return(log_prob_i(gram));
+      return(log_prob_i_cl(gram));
+    default:
+      assert(false);
+    }
+  }
+  float log_prob_bo(const Gram &gram); // Keep this version lean and mean
+  float log_prob_bo_cl(const Gram &gram); // Clustered backoff
+  float log_prob_i(const Gram &gram); // Interpolated
+  float log_prob_i_cl(const Gram &gram); //Interpolated backoff
+
   int order() { return m_order; }
   int last_order() { return m_last_order; }
   int gram_count(int order) { return m_order_count.at(order-1); }
@@ -84,6 +102,7 @@ public:
 
   // Returns an iterator for given gram.
   Iterator iterator(const Gram &gram);
+
   ClusterMap<int, int> *clmap; 
   
   // These are for LM lookahead in the recognizer

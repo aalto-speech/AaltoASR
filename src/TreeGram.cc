@@ -487,8 +487,7 @@ void
 TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
                             std::vector<float> &result_buffer)
 {
-  assert(m_type==BACKOFF);
-
+  assert(m_type=BACKOFF);
   float back_off_w;
   int i;
   int child_index, next_child_index;
@@ -518,7 +517,7 @@ void
 TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
                              std::vector<float> &result_buffer)
 {
-  assert(m_type==BACKOFF);
+  assert(m_type=BACKOFF);
   int bigram_index;
 
   // Check if bigram (w1,w2) exists
@@ -570,97 +569,132 @@ TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
 }
 
 float
-TreeGram::log_prob(const Gram &gram)
+TreeGram::log_prob_bo(const Gram &gram)
 {
-  assert(gram.size() > 0);
-  if (m_type==BACKOFF) {
-    assert(!clmap);
-    float log_prob = 0.0;
+  // Please keep this version lean and mean. Other version can bloat as much
+  // as they like
+
+  float log_prob = 0.0;
   // Denote by (w(1) w(2) ... w(N)) the ngram that was requested.  The
   // log-probability of the back-off model is computed as follows:
 
   // Iterate n = 1..N:
   // - If (w(n) ... w(N)) not found, add the possible (w(n) ... w(N-1) backoff
   // - Otherwise, add the log-prob and return.
-    int n = 0;
-    while (1) {
-      assert(n < gram.size());
-      fetch_gram(gram, n);
-      assert(m_fetch_stack.size() > 0);
-      
-      // Full gram found?
-      if (m_fetch_stack.size() == gram.size() - n) {
-	log_prob += m_nodes[m_fetch_stack.back()].log_prob;
-	m_last_order = gram.size() - n;
-	break;
-      }
-      
-      // Back-off found?
-      if (m_fetch_stack.size() == gram.size() -n -1)
-	log_prob += m_nodes[m_fetch_stack.back()].back_off;
-      
-      n++;
+  int n = 0;
+  while (1) {
+    assert(n < gram.size());
+    fetch_gram(gram, n);
+    assert(m_fetch_stack.size() > 0);
+    
+    // Full gram found?
+    if (m_fetch_stack.size() == gram.size() - n) {
+      log_prob += m_nodes[m_fetch_stack.back()].log_prob;
+      m_last_order = gram.size() - n;
+      break;
     }
-    return log_prob;
+    
+    // Back-off found?
+    if (m_fetch_stack.size() == gram.size() -n -1)
+      log_prob += m_nodes[m_fetch_stack.back()].back_off;
+    
+    n++;
   }
+  return log_prob;
+}
 
+float
+TreeGram::log_prob_bo_cl(const Gram &gram)
+{
+  Gram clgram(gram);
+  clmap->wg2cg(clgram);
+
+  float log_prob = 0.0;
+  int n = 0;
+  while (1) {
+    assert(n < clgram.size());
+    fetch_gram(clgram, n);
+    assert(m_fetch_stack.size() > 0);
+    
+    // Full gram found?
+    if (m_fetch_stack.size() == clgram.size() - n) {
+      log_prob += m_nodes[m_fetch_stack.back()].log_prob;
+      m_last_order = clgram.size() - n;
+      break;
+    }
+    
+    // Back-off found?
+    if (m_fetch_stack.size() == clgram.size() -n -1)
+      log_prob += m_nodes[m_fetch_stack.back()].back_off;
+    
+    n++;
+  }
+  return log_prob;
+}
+
+float
+TreeGram::log_prob_i(const Gram &gram) {
   float prob=0.0;
   float bo;
   m_last_order=0;
-  Gram const *fetch_me;
-  Gram clgram;
 
-  if (m_type==INTERPOLATED) {
-    //print_indices(gram);
-    if (!clmap) fetch_me=&gram;
-    else {
-      clgram=gram;
-      clmap->wg2cg(clgram);
-      fetch_me=&clgram;
+  const int looptill=std::min(gram.size(),(size_t) m_order);
+  for (int n=1;n<=looptill;n++) {
+    fetch_gram(gram,gram.size()-n);
+    if (m_fetch_stack.size() < n-1 || n>m_order) {
+      return(safelogprob(prob)); 
     }
-    //fprintf(stderr," -> ");
-    //print_indices(*fetch_me);
-
-    const int looptill=std::min(gram.size(),(size_t) m_order);
-    //fprintf(stderr," till %d\n",looptill);
-
-    for (int n=1;n<=looptill;n++) {
-      if (clmap) clgram.back()=clmap->get_fcluster(n,gram.back());
-      //fprintf(stderr,"n=%d ",n);
-      //print_indices(clgram);
-      //fprintf(stderr,"\n");
-      fetch_gram(*fetch_me,fetch_me->size()-n);
-      if (m_fetch_stack.size() < n-1 || n>m_order) {
-	//fprintf(stderr,"exit stack size < %d, return %f\n",n-1,prob);
-	return(safelogprob(prob)); 
-      }
-
-      if (m_fetch_stack.size()==n-1) {
-        bo = pow(10,m_nodes[m_fetch_stack.back()].back_off);
-        prob*=bo;
-	//fprintf(stderr,"stack size %d, bo %.3f to %3f\n", n-1, bo, prob);
-        continue;
-      }
-      
-      if (n>1) {
-        bo = pow(10,m_nodes[m_fetch_stack[m_fetch_stack.size()-2]].back_off);
-        prob=bo*prob;
-	//fprintf(stderr,"backoff %f -> %f\n",bo, prob);
-      }
-      m_last_order=n;
-      if (!clmap)
-	prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob);
-      else {
-	prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob 
-		    + clmap->get_full_emprob(n,gram.back()));
-	//fprintf(stderr,"prob %.3f * %.3f = %.3f\n", pow(10,m_nodes[m_fetch_stack.back()].log_prob), pow(10,clmap->get_full_emprob(n,gram.back())), pow(10,m_nodes[m_fetch_stack.back()].log_prob + clmap->get_full_emprob(n,gram.back())));
-	//fprintf(stderr,"  (%.3f + %.3f = %.3f)\n", m_nodes[m_fetch_stack.back()].log_prob, clmap->get_full_emprob(n,gram.back()), m_nodes[m_fetch_stack.back()].log_prob + clmap->get_full_emprob(n,gram.back()));
-      }
+    
+    if (m_fetch_stack.size()==n-1) {
+      bo = pow(10,m_nodes[m_fetch_stack.back()].back_off);
+      prob*=bo;
+      continue;
     }
-    //fprintf(stderr," total %f\n",prob);
-    return(safelogprob(prob));
+    
+    if (n>1) {
+      bo = pow(10,m_nodes[m_fetch_stack[m_fetch_stack.size()-2]].back_off);
+      prob=bo*prob;
+    }
+    m_last_order=n;
+    prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob);
   }
-  return(0);
+  return(safelogprob(prob));
+}
+
+float
+TreeGram::log_prob_i_cl(const Gram &gram) {
+  float prob=0.0;
+  float bo;
+  m_last_order=0;
+  Gram clgram(gram);
+
+  clgram=gram;
+  clmap->wg2cg(clgram);
+  
+  const int looptill=std::min(gram.size(),(size_t) m_order);
+  
+  for (int n=1;n<=looptill;n++) {
+    clgram.back()=clmap->get_fcluster(n,gram.back());
+    fetch_gram(clgram,clgram.size()-n);
+    if (m_fetch_stack.size() < n-1 || n>m_order) {
+      return(safelogprob(prob)); 
+    }
+    
+    if (m_fetch_stack.size()==n-1) {
+      bo = pow(10,m_nodes[m_fetch_stack.back()].back_off);
+      prob*=bo;
+      continue;
+    }
+    
+    if (n>1) {
+      bo = pow(10,m_nodes[m_fetch_stack[m_fetch_stack.size()-2]].back_off);
+      prob=bo*prob;
+    }
+    m_last_order=n;
+    prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob 
+		+ clmap->get_full_emprob(n,gram.back()));
+  }
+  return(safelogprob(prob));
 }
 
 TreeGram::Iterator::Iterator(TreeGram *gram)

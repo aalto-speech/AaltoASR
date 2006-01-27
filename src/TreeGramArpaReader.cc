@@ -183,7 +183,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       sorter.add_gram(gram, log_prob, back_off);
       //fprintf(stderr,"] = [%f %f]\n",log_prob,back_off);
     }
-    
+
     // Sort all grams read above and add them to the tree gram.
     sorter.sort();
     assert(sorter.num_grams() == m_counts[order - 1]);
@@ -213,6 +213,17 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 void
 TreeGramArpaReader::write(FILE *out, TreeGram *tree_gram) 
 {
+  if (tree_gram->clmap) {
+    tree_gram->clmap->write(out);
+    tree_gram->clear_words();
+    char ascii_num[10];
+    for (int i=0;i<tree_gram->clmap->num_clusters(1);i++) {
+      //fprintf(stderr,"loop %d/%d\n",i,m_clustermap.num_clusters(1));
+      sprintf(ascii_num,"%d",i);
+      tree_gram->add_word(ascii_num);
+    }
+  }
+  
   if (tree_gram->get_type()==TreeGram::INTERPOLATED) {
     write_interpolated(out,tree_gram);
     return;
@@ -271,7 +282,12 @@ TreeGramArpaReader::write_interpolated(FILE *out, TreeGram *tree_gram)
       }
       
       // Log-probability
-      float lp=tree_gram->log_prob(indices);
+      float lp;
+      if (tree_gram->get_type()==TreeGram::INTERPOLATED)
+	lp=tree_gram->log_prob_i(indices);
+      else 
+	lp=tree_gram->log_prob_bo(indices);
+
       if (lp>0) {
 	fprintf(stderr,"warning, n-gram [");
 	for (int j=1;j<=order;j++) 

@@ -38,9 +38,10 @@ public:
   // Write vocabulary to a stream.
   void write(FILE *file) const;
 
-protected:
   // Clears the vocabulary without adding the oov.
   void clear_words();
+
+protected:
 
   std::map<std::string,int> m_indices;
   std::vector<std::string> m_words;
