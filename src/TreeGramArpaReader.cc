@@ -175,17 +175,15 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       // Add the gram to sorter
       //fprintf(stderr,"add gram [");
       for (int i = 0; i < order; i++) {
-#ifdef USE_CL
 	if (tree_gram->clmap) gram[i]=atoi(vec[i+1].c_str());
 	else
-#endif
 	gram[i] = tree_gram->add_word(vec[i + 1]);
 	//fprintf(stderr," %d", gram[i]);
       }
       sorter.add_gram(gram, log_prob, back_off);
       //fprintf(stderr,"] = [%f %f]\n",log_prob,back_off);
     }
-
+    
     // Sort all grams read above and add them to the tree gram.
     sorter.sort();
     assert(sorter.num_grams() == m_counts[order - 1]);
