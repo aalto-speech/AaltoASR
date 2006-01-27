@@ -487,18 +487,23 @@ void
 TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
                             std::vector<float> &result_buffer)
 {
-  assert(m_type=BACKOFF);
+  assert(m_type==BACKOFF);
   float back_off_w;
   int i;
-  int child_index, next_child_index;
+  int child_index, next_child_index, cl_idx=-1;
   float *lm_buf = new float[m_words.size()];
   
+  if (clmap) cl_idx=clmap->get_cluster(2,prev_word_id);
+
   // Get backoff weight
-  back_off_w = m_nodes[prev_word_id].back_off;
+  if (clmap) back_off_w = m_nodes[cl_idx].back_off;
+  else back_off_w = m_nodes[prev_word_id].back_off;
   // Fill the unigram probabilities
   for (i = 0; i < m_words.size(); i++)
     lm_buf[i] = back_off_w + m_nodes[i].log_prob;
+
   // Fill the bigram probabilities
+  if (clmap) prev_word_id=cl_idx;
   child_index = m_nodes[prev_word_id].child_index;
   next_child_index = m_nodes[prev_word_id+1].child_index;
   if (child_index != -1 && next_child_index > child_index)
@@ -517,7 +522,7 @@ void
 TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
                              std::vector<float> &result_buffer)
 {
-  assert(m_type=BACKOFF);
+  assert(m_type==BACKOFF);
   int bigram_index;
 
   // Check if bigram (w1,w2) exists
