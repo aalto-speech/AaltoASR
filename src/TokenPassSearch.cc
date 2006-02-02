@@ -1376,6 +1376,7 @@ TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
     if (m_lex2lookaheadlm[i] == 0 && i != 0) {
       fprintf(stderr, "%s not in lookahead LM\n", m_vocabulary.word(i).c_str());
       count++;
+      exit(-1);
     }
   }
 
