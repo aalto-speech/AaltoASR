@@ -282,11 +282,7 @@ TreeGramArpaReader::write_interpolated(FILE *out, TreeGram *tree_gram)
       }
       
       // Log-probability
-      float lp;
-      if (tree_gram->get_type()==TreeGram::INTERPOLATED)
-	lp=tree_gram->log_prob_i(indices);
-      else 
-	lp=tree_gram->log_prob_bo(indices);
+      float lp=tree_gram->log_prob(indices);
 
       if (lp>0) {
 	fprintf(stderr,"warning, n-gram [");
