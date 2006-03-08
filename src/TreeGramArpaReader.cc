@@ -282,7 +282,7 @@ TreeGramArpaReader::write_interpolated(FILE *out, TreeGram *tree_gram)
       }
       
       // Log-probability
-      float lp=tree_gram->log_prob(indices);
+      float lp=tree_gram->log_prob_i(indices); // This bypasses Clustermap->wg2cg()
 
       if (lp>0) {
 	fprintf(stderr,"warning, n-gram [");
