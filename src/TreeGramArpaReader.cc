@@ -46,7 +46,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
     if (line.substr(0,11) == "\\clustermap") {
       int ord;
       if (sscanf(line.c_str(),"\\clustermap %d",&ord)!=1) assert(false);
-      tree_gram->clmap=new ClusterMap<int, int>;
+      tree_gram->clmap=new ClusterMap<int>;
       m_lineno=tree_gram->clmap->read(file,ord,m_lineno);
       for (int i=0;i<tree_gram->clmap->num_words();i++) {
 	tree_gram->add_word(tree_gram->clmap->word(i));
@@ -56,7 +56,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
     if (line.substr(0,12) == "\\fclustermap") {
       int ord;
       if (sscanf(line.c_str(),"\\fclustermap %d",&ord)!=1) assert(false);
-      tree_gram->clmap=new ClusterFMap<int, int>;
+      tree_gram->clmap=new ClusterFMap<int>;
       m_lineno=tree_gram->clmap->read(file,ord,m_lineno);
       for (int i=0;i<tree_gram->clmap->num_words();i++) {
 	tree_gram->add_word(tree_gram->clmap->word(i));
@@ -208,6 +208,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 	break;
     }
   }
+  tree_gram->finalize();
 }
 
 void

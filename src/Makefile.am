@@ -60,4 +60,5 @@ libdecoder_a_SOURCES = \
 					Clustermap.hh \
 					Clustermap_tmpl.hh \
 	io.cc				io.hh \
-	str.cc				str.hh
+	str.cc				str.hh \
+	NGram.hh

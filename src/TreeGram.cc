@@ -6,24 +6,15 @@
 //#include <unistd.h>
 // END fwrite-hack
 
+#include <memory>
 #include "Endian.hh"
 #include "TreeGram.hh"
 #include "str.hh"
 #include "def.hh"
-
-#include <memory>
+#include "TreeGramArpaReader.hh"
 #include "ClusterMap.hh"
 
 static std::string format_str("cis-binlm2\n");
-
-TreeGram::TreeGram()
-  :
-    clmap(NULL),
-    m_type(BACKOFF),
-    m_order(0),
-    m_last_order(0)
-{
-}
 
 void
 TreeGram::reserve_nodes(int nodes)
@@ -116,7 +107,7 @@ TreeGram::binary_search(int word, int first, int last)
 
   int len = last - first;
 
-  while (len > 5) { // FIXME: magic threshold to do linear search
+  while (len > 5) { // magic threshold to do linear search
     half = len / 2;
     middle = first + half;
 
@@ -244,6 +235,7 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off)
 
   // Initialize new order count
   if (gram.size() > m_order_count.size()) {
+    //fprintf(stderr,"init order %d\n", gram.size());
     m_order_count.push_back(0);
     m_order++;
   }
@@ -274,26 +266,43 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off)
     find_path(gram);
 
     // Update the child range start of the parent node.
-    if (m_nodes[m_insert_stack.back()].child_index < 0)
+    if (m_nodes[m_insert_stack.back()].child_index < 0) {
+      //fprintf(stderr,"changing m_nodes[%d].child_index = %d\n",
+      //	      m_insert_stack.back(), m_nodes.size());
       m_nodes[m_insert_stack.back()].child_index = m_nodes.size();
-
+    }
     // Insert the new node.
     m_nodes.push_back(Node(gram.back(), log_prob, back_off, -1));
+    //fprintf(stderr,"Adding %d\n", m_nodes.size());
 
     // Update the child range end of the parent node.  Note, that this
     // must be done after insertion, because in extreme case, we might
     // update the inserted node.
     m_nodes[m_insert_stack.back() + 1].child_index = m_nodes.size();
-
+    //fprintf(stderr,"changing m_nodes[%d].child_index = %d\n",
+    //	      m_insert_stack.back()+1, m_nodes.size());
     m_insert_stack.push_back(m_nodes.size() - 1);
   }
 
+  if (m_nodes.back().child_index != -1) {
+    fprintf(stderr,"TreeGram: Warning, hope you will call finalize()...\n");
+  }
   m_last_gram = gram;
   assert(m_order == m_last_gram.size());
 }
 
 void 
-TreeGram::write(FILE *file, bool reflip) 
+TreeGram::write(FILE *file, bool binary) { 
+  if (!binary) {
+    TreeGramArpaReader areader;
+    areader.write(file, this);
+    return;
+  }
+  write_real(file, true);
+}
+
+void 
+TreeGram::write_real(FILE *file, bool reflip) 
 {
   fputs(format_str.c_str(), file);
 
@@ -361,8 +370,14 @@ TreeGram::write(FILE *file, bool reflip)
 }
 
 void 
-TreeGram::read(FILE *file) 
+TreeGram::read(FILE *file, bool binary) 
 {
+  if (!binary) {
+    TreeGramArpaReader areader;
+    areader.read(file, this);
+    return;
+  }
+
   std::string line;
   int words;
   bool ret;
@@ -613,9 +628,9 @@ TreeGram::log_prob_bo_cl(const Gram &gram)
 {
   Gram clgram(gram);
   clmap->wg2cg(clgram);
+  return(log_prob_bo(clgram));
 
-  float log_prob = 0.0;
-  int n = 0;
+#if 0
   while (1) {
     assert(n < clgram.size());
     fetch_gram(clgram, n);
@@ -635,6 +650,7 @@ TreeGram::log_prob_bo_cl(const Gram &gram)
     n++;
   }
   return log_prob;
+#endif
 }
 
 float
@@ -647,7 +663,8 @@ TreeGram::log_prob_i(const Gram &gram) {
   for (int n=1;n<=looptill;n++) {
     fetch_gram(gram,gram.size()-n);
     if (m_fetch_stack.size() < n-1 || n>m_order) {
-      return(safelogprob(prob)); 
+      continue;
+      //return(safelogprob(prob)); 
     }
     
     if (m_fetch_stack.size()==n-1) {
@@ -682,18 +699,19 @@ TreeGram::log_prob_i_cl(const Gram &gram) {
     clgram.back()=clmap->get_fcluster(n,gram.back());
     fetch_gram(clgram,clgram.size()-n);
     if (m_fetch_stack.size() < n-1 || n>m_order) {
-      return(safelogprob(prob)); 
+      //return(safelogprob(prob)); 
+      continue;
     }
     
     if (m_fetch_stack.size()==n-1) {
       bo = pow(10,m_nodes[m_fetch_stack.back()].back_off);
-      prob*=bo;
+      prob *= bo;
       continue;
     }
     
     if (n>1) {
       bo = pow(10,m_nodes[m_fetch_stack[m_fetch_stack.size()-2]].back_off);
-      prob=bo*prob;
+      prob *= bo;
     }
     m_last_order=n;
     prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob 
@@ -734,11 +752,14 @@ TreeGram::Iterator::next()
     assert(!m_index_stack.empty());
     int index = m_index_stack.back();
     TreeGram::Node *node = &m_gram->m_nodes[index];
+    //fprintf(stderr,"Node->child %d\n", node->child_index);
 
     // If not backtracking, try diving deeper
     if (!backtrack) {
       // Do we have children?
-      if (node->child_index > 0 && (node+1)->child_index > node->child_index) {
+      if (node->child_index > 0 
+	  && (node+1)->child_index 
+	  > node->child_index) {
 	m_index_stack.push_back(node->child_index);
 	return true;
       }
@@ -861,3 +882,14 @@ TreeGram::Iterator::down()
   return true;
 }
 
+void TreeGram::print_debuglist() {
+  for (int i=0;i<m_nodes.size();i++) {
+    fprintf(stderr,"%d: %d %.4f %.4f %d\n", i, m_nodes[i].word, m_nodes[i].log_prob, m_nodes[i].back_off, m_nodes[i].child_index);
+  }
+}
+
+void TreeGram::finalize() {
+  if (m_nodes.back().child_index == -1) return;
+  Node node;
+  m_nodes.push_back(node);
+}

@@ -1,8 +1,7 @@
 #include <algorithm>
-#include "str.hh"
 
-template <typename KT, typename CT>
-bool ClusterMap<KT, CT>::init_order(const int order) {
+template <typename KT>
+bool ClusterMap<KT>::init_order(const int order) {
   int old_order=m_map.size()-1;
   m_map.resize(order+1);
   m_num_cl.resize(order+1,1);
@@ -27,8 +26,8 @@ bool ClusterMap<KT, CT>::init_order(const int order) {
   return(true);
 }
 
-template <typename KT, typename CT>
-void ClusterMap<KT,CT>::write(FILE *out) {
+template <typename KT>
+void ClusterMap<KT>::write(FILE *out) {
   fprintf(out,"\\clustermap %d\n",m_map.size()-1);
   fprintf(out,"\\1-ords %d\n", num_words());
   for (int j=0;j<num_words();j++) 
@@ -46,8 +45,8 @@ void ClusterMap<KT,CT>::write(FILE *out) {
   fprintf(out,"\\endcl\n\n");
 }
 
-template <typename KT, typename CT>
-int ClusterMap<KT,CT>::read(FILE *in, const int ord, int read_lines) {
+template <typename KT>
+int ClusterMap<KT>::read(FILE *in, const int ord, int read_lines) {
   // Assuming that "\\clustermap %d" has already been read
   std::string s;
   std::vector<std::string> split_s;
@@ -96,36 +95,63 @@ int ClusterMap<KT,CT>::read(FILE *in, const int ord, int read_lines) {
   return(read_lines);
 }
 
-template <typename KT,typename CT>
-void ClusterMap<KT,CT>::wv2cv(std::vector<KT> &v) {
+template <typename KT>
+void ClusterMap<KT>::wv2cv(std::vector<KT> &v) {
   const int order=v.size();
-  assert(order<=m_map.size());
+  const int maxclo=m_map.size()-1;
+  //fprintf(stderr,"MAPPING ");print_indices(v);
   for (int i=1;i<=order;i++) {
-    v[order-i]=get_cluster(i,v[order-i]);
+    v[order-i]=get_cluster(std::min(i,maxclo),v[order-i]);
   }
+  //fprintf(stderr,"->");print_indices(v);fprintf(stderr,"\n");
 }
 
-template <typename KT, typename CT>
-void ClusterMap<KT, CT>::wg2cg(TreeGram::Gram &g) {
+template <typename KT>
+void ClusterMap<KT>::wg2cg(NGram::Gram &g) {
   const int order=g.size();
-  for (int i=1;i<=std::min((size_t) order,m_map.size()-1);i++) {
-    g[order-i]=get_cluster(i,g[order-i]);
+  const int maxclo=m_map.size()-1;
+  for (int i=1;i<=order;i++) {
+    g[order-i]=get_cluster(std::min(i, maxclo),g[order-i]);
   }
 }
 
-template <typename KT, typename CT>
-void ClusterMap<KT, CT>::read_error(const int line, const std::string &text) {
+template <typename KT>
+void ClusterMap<KT>::read_error(const int line, const std::string &text) {
   fprintf(stderr,"Error reading clustermap, line %d:\n",line);
   fprintf(stderr,"%s\n", text.c_str());
   fprintf(stderr,"Exit.\n");
   exit(-1);
 }
 
+#if 0
+template <typename KT>
+void ClusterMap<KT>::init_backwards_map() {
+  backmap.resize(m_map.size());
+  for (int o=2;o<m_map.size();o++) {
+    backmap[o].resize(o-1);
+    
+    // Build the mapping to next level of clusters
+    for (int o2=1;o2<o;o2++)
+      backmap[o][o2].resize(num_clusters(o));
+
+    for (int i=0;i<num_clusters(o);i++) 
+      backmap[o][o-1][get_cluster2(i)]=i;
+    
+    for (int o2=o-2;o2>=1;o2++) {
+      backmap[o][o2].resize(num_clusters(o));
+      for (int i=0;i<num_clusters(o);i++) {
+	for (int j=0;j<bacmap[o][o-1]
+      }
+    }
+	     
+}
+#endif
+
 /************************************************************************/
 /* The inlined functions                                                */
 /************************************************************************/
-template <typename KT, typename CT>
-void ClusterMap<KT,CT>::set_cluster(const int order, const KT lowcl,
+template <typename KT>
+void ClusterMap<KT>::set_cluster(const int order, const KT lowcl,
 				    const KT oricl, const KT newcl) {
   // Should assert things here
   m_map[order][lowcl]=newcl;
@@ -137,21 +163,21 @@ void ClusterMap<KT,CT>::set_cluster(const int order, const KT lowcl,
   }
 }
 
-template <typename KT, typename CT>
-KT ClusterMap<KT,CT>::get_cluster(const int order, KT w) {
+template <typename KT>
+KT ClusterMap<KT>::get_cluster(const int order, KT w) {
   for (int i=1;i<=order;i++) {
     w=m_map[i][w];
   }
   return(w);
 }
 
-template <typename KT, typename CT>
-KT ClusterMap<KT, CT>::get_cluster2(const int order, const KT cl) {
+template <typename KT>
+KT ClusterMap<KT>::get_cluster2(const int order, const KT cl) {
   return(m_map[order][cl]);
 } 
 
-template <typename KT, typename CT>
-void ClusterFMap<KT,CT>::set_fcluster(const int order, const KT lowcl,
+template <typename KT>
+void ClusterFMap<KT>::set_fcluster(const int order, const KT lowcl,
 				      const KT oricl, const KT newcl) {
   // Should assert things here
   m_fmap[order][lowcl].key=newcl;
@@ -162,26 +188,26 @@ void ClusterFMap<KT,CT>::set_fcluster(const int order, const KT lowcl,
   //fprintf(stderr,"CUR MAXFC %d: %d (%d)\n", order, m_num_fcl[order], newcl);
 }
 
-template <typename KT, typename CT>
-KT ClusterFMap<KT,CT>::get_fcluster(const int order, KT w) {
+template <typename KT>
+KT ClusterFMap<KT>::get_fcluster(const int order, KT w) {
   for (int i=1;i<=order;i++) {
     w=m_fmap[i][w].key;
   }
   return(w);
 }
 
-template <typename KT, typename CT>
-float ClusterFMap<KT,CT>::get_fprob(const int order, KT w) {
+template <typename KT>
+float ClusterFMap<KT>::get_fprob(const int order, KT w) {
   return(m_fmap[order][get_fcluster(order-1,w)].lprob);
 }
 
-template <typename KT, typename CT>
-float ClusterFMap<KT,CT>::get_fprob2(const int order, KT w) {
+template <typename KT>
+float ClusterFMap<KT>::get_fprob2(const int order, KT w) {
   return(m_fmap[order][w].lprob);
 }
 
-template <typename KT, typename CT>
-float ClusterFMap<KT,CT>::get_full_emprob(const int order, KT w) {
+template <typename KT>
+float ClusterFMap<KT>::get_full_emprob(const int order, KT w) {
   float lprob=0;
   KT w2=w;
   for (int i=2;i<=order;i++) {
@@ -191,19 +217,19 @@ float ClusterFMap<KT,CT>::get_full_emprob(const int order, KT w) {
   return(lprob);
 }
 
-template <typename KT, typename CT>
-void ClusterFMap<KT,CT>::set_fprob(const int order, KT w, const float pr) {
+template <typename KT>
+void ClusterFMap<KT>::set_fprob(const int order, KT w, const float pr) {
   m_fmap[order][w].lprob=pr;
 }
 
-template <typename KT, typename CT>
-KT ClusterFMap<KT, CT>::get_fcluster2(const int order, const KT cl) {
+template <typename KT>
+KT ClusterFMap<KT>::get_fcluster2(const int order, const KT cl) {
   return(m_fmap[order][cl].key);
 } 
 
-template <typename KT, typename CT>
-bool ClusterFMap<KT, CT>::init_order(const int order) {
-  bool resize=ClusterMap<KT, CT>::init_order(order);
+template <typename KT>
+bool ClusterFMap<KT>::init_order(const int order) {
+  bool resize=ClusterMap<KT>::init_order(order);
 
   m_fmap.resize(order+1);
   m_num_fcl.resize(order+1,1);
@@ -227,8 +253,8 @@ bool ClusterFMap<KT, CT>::init_order(const int order) {
 }
 
 
-template <typename KT, typename CT>
-void ClusterFMap<KT,CT>::write(FILE *out) {
+template <typename KT>
+void ClusterFMap<KT>::write(FILE *out) {
   fprintf(out,"\\fclustermap %d\n",m_map.size()-1);
   
   fprintf(out,"\\1-ords %d %d\n", num_words(), num_words());
@@ -253,8 +279,8 @@ void ClusterFMap<KT,CT>::write(FILE *out) {
   fprintf(out,"\\endcl\n\n");
 }
 
-template <typename KT, typename CT>
-int ClusterFMap<KT,CT>::read(FILE *in, const int ord, int read_lines) {
+template <typename KT>
+int ClusterFMap<KT>::read(FILE *in, const int ord, int read_lines) {
   // Assuming that "\\fclustermap %d" has already been read
   std::string s;
   std::vector<std::string> split_s;
@@ -326,4 +352,48 @@ int ClusterFMap<KT,CT>::read(FILE *in, const int ord, int read_lines) {
   return(read_lines);
 }
 
+template <typename KT>
+void ClusterMap<KT>::read_more(FILE *file) {
+  // Mostly copied from TreeGramArpaReader.cc
+  std::string line;
+  std::vector<std::string> vec;
 
+  // Just for efficiency
+  line.reserve(128); 
+  vec.reserve(16);
+
+  bool ok = true;
+
+  int lineno =0;
+
+  // Find header
+  while (1) {
+    ok = str::read_line(&line, file, true);
+    lineno++;
+
+    if (!ok) {
+      fprintf(stderr, "ClusterMap::read_more(): "
+              "error on line %d while waiting \\data\\", lineno);
+      exit(1);
+    }
+
+    if (line.substr(0,11) == "\\clustermap") {
+      int ord;
+      if (sscanf(line.c_str(),"\\clustermap %d",&ord)!=1) assert(false);
+      lineno=read(file,ord,lineno);
+      for (int i=0;i<num_words();i++) {
+        add_word(word(i));
+      }
+      return;
+    } 
+
+    if (line.substr(0,12) == "\\fclustermap") {
+      assert(false);
+    } 
+
+    if (line == "\\data\\")
+      break;
+  }
+  fprintf(stderr,"read_more: error, no clusters found.\n");
+  exit(-1);
+}

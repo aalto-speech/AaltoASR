@@ -137,11 +137,7 @@ Toolbox::ngram_read(const char *file, float weight, const bool binary)
   }
 
   m_ngrams.push_back(new TreeGram());
-  if (binary) m_ngrams.back()->read(in.file);
-  else {
-    TreeGramArpaReader areader;
-    areader.read(in.file,m_ngrams.back());
-  }
+  m_ngrams.back()->read(in.file, binary);
 
   if (m_use_stack_decoder) m_search.add_ngram(m_ngrams.back(), weight);
   else m_tp_search.set_ngram(m_ngrams.back());
@@ -164,11 +160,7 @@ Toolbox::read_lookahead_ngram(const char *file, const bool binary)
       exit(1);
     }
     m_lookahead_ngram = new TreeGram();
-    if (binary) m_lookahead_ngram->read(in.file);
-    else {
-      TreeGramArpaReader areader;
-      areader.read(in.file,m_lookahead_ngram);
-    }
+    m_lookahead_ngram->read(in.file, binary);
     assert(m_lookahead_ngram->get_type()==TreeGram::BACKOFF);
     m_tp_search.set_lookahead_ngram(m_lookahead_ngram);
   }

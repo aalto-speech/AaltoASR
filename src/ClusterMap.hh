@@ -2,18 +2,19 @@
 #define CLUSTERMAP_HH
 
 #include "TreeGram.hh"
-//#include "NgramCounts.hh"
 
-template <typename KT, typename CT>
+template <typename KT>
 class ClusterMap : public Vocabulary {
 public:
   virtual ~ClusterMap() {}
+  inline int order() {return m_map.size()-1;}
   virtual bool init_order(const int order);
   inline void set_cluster(const int order, const KT lowcl, const KT oricl, 
 			  const KT newc);
   inline KT get_cluster(const int order, KT w);
   inline KT get_cluster2(const int order, const KT cl);  
   virtual int read(FILE *in, const int ord, int read_lines);
+  virtual void read_more(FILE *in);
   virtual void write(FILE *out);
   void wv2cv(std::vector<KT> &v); 
   void wg2cg(TreeGram::Gram &g);
@@ -24,13 +25,19 @@ public:
   virtual inline float get_full_emprob(const int order, KT w) {return(0.0);}  
   virtual inline int num_fclusters(const int o) {return(num_words());}
 
+// For prune.cc
+//  void init_backwards_map();
+
 protected:
   std::vector<std::vector <KT> > m_map;
   std::vector<int> m_num_cl;
+
+//For prune.cc
+//  std::vector<std::vector<std::vector<std::vector<int> > > > backmap;
 };
 
-template <typename KT, typename CT>
-class ClusterFMap : public ClusterMap<KT, CT> {
+template <typename KT>
+class ClusterFMap : public ClusterMap<KT> {
 public:
   bool init_order(const int order);
   int read(FILE *in, const int ord, int read_lines);
