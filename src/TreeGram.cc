@@ -247,16 +247,20 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off)
 
   // Handle unigrams separately
   if (gram.size() == 1) {
+    m_insert_stack.clear();
 
     // OOV can be updated anytime.
     if (gram[0] == 0) {
       m_nodes[0].log_prob = log_prob;
       m_nodes[0].back_off = back_off;
+      m_insert_stack.push_back(0);
     }
 
     // Unigram which is not OOV
-    else
+    else {
+      m_insert_stack.push_back(m_nodes.size());
       m_nodes.push_back(Node(gram[0], log_prob, back_off, -1));
+    }
   }
 
   // 2-grams or higher
