@@ -58,10 +58,10 @@ AudioReader::resize(int start, int end)
   int copy_start = std::max(0, offset);
   int copy_end = std::min(old_len, new_len + offset);
   if (offset < 0) 
-    for (int i = copy_start; i < copy_end; i++)
+    for (int i = copy_end - 1; i >= copy_start; i--)
       m_buffer[i + offset] = m_buffer[i];
   else
-    for (int i = copy_end - 1; i >= copy_start; i--)
+    for (int i = copy_start; i < copy_end; i++)
       m_buffer[i - offset] = m_buffer[i];
 }
 
@@ -141,10 +141,10 @@ AudioReader::read_from_file(int start, int end)
 
   // Fill zeros before file start
   //
-  while (start++ < 0) {
-    if (samples_to_read-- == 0)
-      break;
+  while (start < 0 && samples_to_read > 0) {
+    samples_to_read--;
     m_buffer[index++] = 0;
+    start++;
   }
 
   // Read samples from the file
