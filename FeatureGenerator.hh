@@ -7,11 +7,12 @@
 class FeatureGenerator {
 public:
   FeatureGenerator();
-  
+  ~FeatureGenerator();
+
   void open(const std::string &filename, int raw_sample_rate = 0);
   void close();
-  void load_configuration(const std::string &filename);
-  void write_configuration(const std::string &filename);
+  void load_configuration(FILE *file);
+  void write_configuration(FILE *file);
   
   inline ConstFeatureVec generate(int frame);
   inline bool eof(void) { return m_eof_on_last_frame; }

@@ -187,7 +187,7 @@ main(int argc, char *argv[])
     if (cms_win_len==0) cms_win_len=150; // TODO: someone fix the parameter extraction 
     gen.set_cms(cms, cms_win_len);*/
 
-    gen.load_configuration("");
+    gen.load_configuration(NULL);
     
     gen.open(in_file, raw_sample_rate);
     if (raw_head) {

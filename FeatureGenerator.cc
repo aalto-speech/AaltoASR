@@ -9,6 +9,12 @@ FeatureGenerator::FeatureGenerator(void) :
 {
 }
 
+FeatureGenerator::~FeatureGenerator()
+{
+  for (int i = 0; i < (int)m_modules.size(); i++)
+    delete m_modules[i];
+}
+
 void
 FeatureGenerator::open(const std::string &filename, int raw_sample_rate)
 {
@@ -50,7 +56,7 @@ FeatureGenerator::close(void)
 
 
 void
-FeatureGenerator::load_configuration(const std::string &filename)
+FeatureGenerator::load_configuration(FILE *file)
 {
   m_base_module = new FFTModule(this);
   m_modules.push_back(m_base_module);
@@ -82,7 +88,7 @@ FeatureGenerator::load_configuration(const std::string &filename)
 
 
 void
-FeatureGenerator::write_configuration(const std::string &filename)
+FeatureGenerator::write_configuration(FILE *file)
 {
 }
 

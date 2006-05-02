@@ -24,13 +24,13 @@ endif
 
 ##################################################
 
-PROGS = feacat
+PROGS = feacat feacat2
 #meltest adapt vtln train2 phone_probs2 segfea2 feanorm feacat init_hmm2 hmm2dcd tie cepstract
 
 PROGS_SRCS = $(PROGS:=.cc)
 
 CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
-	parse_input.cc 
+	parse_input.cc conf.cc io.cc str.cc 
 #HmmTrainer.cc SphereReader.cc Lattice.cc Viterbi.cc StateGenerator.cc FeatureBuffer.cc HmmSet.cc PhnReader.cc StateProbCache.cc FeatureGenerator.cc Recipe.cc tools.cc TriphoneSet.cc Changeling.cc AdaReader.cc Warpster.cc
 
 CLASS_OBJS = $(CLASS_SRCS:.cc=.o)
