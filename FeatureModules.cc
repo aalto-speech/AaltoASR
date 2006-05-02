@@ -95,6 +95,7 @@ FeatureModule::configure(std::vector<struct ConfigPair> &config)
   configure_module(config);
   assert( m_own_offset_left >= 0 );
   assert( m_own_offset_right >= 0 );
+  assert( m_dim > 0 );
   for (int i = 0; i < (int)m_sources.size(); i++)
     m_sources[i]->set_buffer(m_own_offset_left, m_own_offset_right);
 }
@@ -382,7 +383,7 @@ DeltaModule::generate(int frame)
   for (k = 1; k <= m_delta_width; k++)
   {
     const FeatureVec left = m_sources.back()->at(frame-k);
-    const FeatureVec right = m_sources.back()->at(frame-k);
+    const FeatureVec right = m_sources.back()->at(frame+k);
     for (i = 0; i < m_dim; i++)
       target_fea[i] += k * (right[i] - left[i]);
   }

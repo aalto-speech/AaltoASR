@@ -76,8 +76,6 @@ public:
   short operator[](int sample) const
   { 
     assert(sample >= m_start_sample && sample < m_end_sample);
-    if (sample < 0 || sample >= m_eof_sample)
-      return 0;
     return m_buffer[sample - m_start_sample];
   }
 
