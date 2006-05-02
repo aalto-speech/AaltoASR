@@ -47,14 +47,14 @@ FeatureModule::set_buffer(int left, int right)
 }
 
 
-ConstFeatureVec
+const FeatureVec
 FeatureModule::at(int frame)
 {
   int buffer_gen_start;
   
   if (frame <= m_buffer_last_pos &&
       frame > m_buffer_last_pos - m_buffer_size)
-      return m_buffer.const_at(frame);
+    return m_buffer[frame];
 
   if (frame > m_buffer_last_pos)
   {
@@ -73,7 +73,7 @@ FeatureModule::at(int frame)
   // Generate the buffer
   for (int i = buffer_gen_start; i < m_buffer_last_pos; i++)
     generate(i);
-  return m_buffer.const_at(frame);
+  return m_buffer[frame];
 }
 
 
@@ -266,7 +266,7 @@ MelModule::generate(int frame)
 {
   int t;
   float beg, end, val, scale, sum;
-  ConstFeatureVec data = m_sources.back()->at(frame);
+  const FeatureVec data = m_sources.back()->at(frame);
   
   for (int b = 0; b < m_dim; b++)
   {
@@ -316,7 +316,7 @@ PowerModule::generate(int frame)
 {
   float power = 0;
   int src_dim = m_sources.back()->dim();
-  ConstFeatureVec src = m_sources.back()->at(frame);
+  const FeatureVec src = m_sources.back()->at(frame);
   
   for (int i = 0; i < src_dim; i++)
     power += src[i];
@@ -340,7 +340,7 @@ DCTModule::configure_module(std::vector<struct ConfigPair> &config)
 void
 DCTModule::generate(int frame)
 {
-  ConstFeatureVec source_fea = m_sources.back()->at(frame);
+  const FeatureVec source_fea = m_sources.back()->at(frame);
   FeatureVec target_fea = m_buffer[frame];
   int src_dim = m_sources.back()->dim();
   
@@ -381,8 +381,8 @@ DeltaModule::generate(int frame)
   
   for (k = 1; k <= m_delta_width; k++)
   {
-    ConstFeatureVec left = m_sources.back()->at(frame-k);
-    ConstFeatureVec right = m_sources.back()->at(frame-k);
+    const FeatureVec left = m_sources.back()->at(frame-k);
+    const FeatureVec right = m_sources.back()->at(frame-k);
     for (i = 0; i < m_dim; i++)
       target_fea[i] += k * (right[i] - left[i]);
   }
@@ -421,7 +421,7 @@ MergerModule::generate(int frame)
   
   for (int i = 0; i < (int)m_sources.size(); i++)
   {
-    ConstFeatureVec source_fea = m_sources[i]->at(frame);
+    const FeatureVec source_fea = m_sources[i]->at(frame);
     for (int j = 0; j < source_fea.dim(); j++)
       target_fea[cur_dim++] = source_fea[j];
   }

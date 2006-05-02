@@ -125,7 +125,7 @@ parse_options(int argc, char *argv[])
 }
 
 void
-print_feature(ConstFeatureVec &fea)
+print_feature(const FeatureVec &fea)
 {
   if (noprint)
     return;
@@ -244,7 +244,7 @@ main(int argc, char *argv[])
       }*/
     for (int f = start_frame; f < end_frame; f++)
     {
-      ConstFeatureVec fea = gen.generate(f);
+      const FeatureVec fea = gen.generate(f);
       if (gen.eof())
         break;
       print_feature(fea);

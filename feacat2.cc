@@ -7,7 +7,7 @@ FeatureGenerator gen;
 bool raw = false;
 
 void
-print_feature(ConstFeatureVec &fea)
+print_feature(const FeatureVec &fea)
 {
   // Raw output
   if (raw) {
@@ -52,7 +52,7 @@ main(int argc, char *argv[])
     if (config["end-frame"].specified)
       end_frame = config["end-frame"].get_int();
     for (int f = start_frame; f < end_frame; f++) {
-      ConstFeatureVec fea = gen.generate(f);
+      const FeatureVec fea = gen.generate(f);
       if (gen.eof())
 	break;
       print_feature(fea);

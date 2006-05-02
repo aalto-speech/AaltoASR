@@ -5,35 +5,31 @@
 #include <assert.h>
 #include <vector>
 
-template <class T>
-class FeatureVecBase {
+class FeatureVec {
 public:
-  FeatureVecBase() : m_ptr(NULL), m_dim(0) { }
-  FeatureVecBase(T *ptr, int dim) : m_ptr(ptr), m_dim(dim) { }
+  FeatureVec() : m_ptr(NULL), m_dim(0) { }
+  FeatureVec(const float *ptr, int dim) : m_ptr(ptr), m_dim(dim) { }
 
-  const T &operator[](int index) const 
+  const float &operator[](int index) const 
   { 
     if (index < 0 || index >= m_dim)
       throw std::string("FeatureVec out of bounds");
     return m_ptr[index]; 
   }
 
-  T &operator[](int index) 
+  float &operator[](int index) 
   { 
     if (index < 0 || index >= m_dim)
       throw std::string("FeatureVec out of bounds");
-    return m_ptr[index];
+    return ((float *)m_ptr)[index];
   }
 
   int dim() const { return m_dim; }
-  
+
 private:
-  T *m_ptr;
+  const float *m_ptr;
   int m_dim;
 };
-
-typedef FeatureVecBase<float> FeatureVec;
-typedef FeatureVecBase<const float> ConstFeatureVec;
 
 /** A class for storing feature vectors in a circular window buffer. */
 class FeatureBuffer {
@@ -60,10 +56,10 @@ public:
   int num_frames() const { return m_num_frames; }
 
   /** Constant access to the values in the buffer. */
-  ConstFeatureVec const_at(int frame) const 
+  const FeatureVec operator[](int frame) const 
   { 
     int index = modulo(frame, m_num_frames);
-    return ConstFeatureVec(&m_buffer[index * m_dim], m_dim);
+    return FeatureVec(&m_buffer[index * m_dim], m_dim);
   }
 
   /** Mutable access to the values in the buffer. */

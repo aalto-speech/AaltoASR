@@ -49,7 +49,7 @@ public:
   // can check the dimensions in the configuration.
   void configure(std::vector<struct ConfigPair> &config);
   
-  ConstFeatureVec at(int frame);
+  const FeatureVec at(int frame);
   int dim(void) { return m_dim; } // Valid only after configuration
   
 private:

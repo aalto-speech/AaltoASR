@@ -14,7 +14,7 @@ public:
   void load_configuration(FILE *file);
   void write_configuration(FILE *file);
   
-  inline ConstFeatureVec generate(int frame);
+  inline const FeatureVec generate(int frame);
   inline bool eof(void) { return m_eof_on_last_frame; }
 
   inline int sample_rate(void);
@@ -37,11 +37,11 @@ private:
 };
 
 
-ConstFeatureVec
+const FeatureVec
 FeatureGenerator::generate(int frame)
 {
   assert( m_last_module != NULL );
-  ConstFeatureVec temp = m_last_module->at(frame);
+  const FeatureVec temp = m_last_module->at(frame);
   if (m_base_module->eof(frame))
     m_eof_on_last_frame = true;
   return temp;
