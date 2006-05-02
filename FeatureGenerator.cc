@@ -84,6 +84,7 @@ FeatureGenerator::load_configuration(FILE *file)
   std::vector<struct ConfigPair> empty;
   for (int i=0; i < 8; i++)
     m_modules[i]->configure(empty);
+  m_last_module->set_buffer(0, 0);
 }
 
 

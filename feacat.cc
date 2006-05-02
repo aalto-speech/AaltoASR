@@ -242,7 +242,7 @@ main(int argc, char *argv[])
 	buffer_start = buffer_end;
       }
       }*/
-    for (int f = start_frame; f < end_frame; f++)
+    for (int f = start_frame; end_frame == 0 || f < end_frame; f++)
     {
       const FeatureVec fea = gen.generate(f);
       if (gen.eof())
@@ -252,6 +252,9 @@ main(int argc, char *argv[])
   }
   catch (std::exception &e) {
     std::cerr << "exception: " << e.what() << std::endl;
+  }
+  catch (std::string &s) {
+    std::cerr << "Error: " << s << std::endl;
   }
   catch (...) {
     std::cerr << "exception" << std::endl;

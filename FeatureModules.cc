@@ -71,7 +71,7 @@ FeatureModule::at(int frame)
   m_buffer_last_pos = frame;
   
   // Generate the buffer
-  for (int i = buffer_gen_start; i < m_buffer_last_pos; i++)
+  for (int i = buffer_gen_start; i <= m_buffer_last_pos; i++)
     generate(i);
   return m_buffer[frame];
 }
@@ -108,7 +108,7 @@ FFTModule::FFTModule(FeatureGenerator *fea_gen) :
   m_fea_gen(fea_gen),
   m_sample_rate(0),
   m_frame_rate(0),
-  m_eof_frame(-1),
+  m_eof_frame(INT_MAX),
   m_window_advance(0),
   m_window_width(0),
   m_coeffs(NULL)
@@ -158,7 +158,7 @@ FFTModule::discard_file(void)
 bool
 FFTModule::eof(int frame)
 {
-  if (m_eof_frame < -1 || frame < m_eof_frame)
+  if (frame < m_eof_frame)
     return false;
   return true;
 }
@@ -198,7 +198,7 @@ FFTModule::generate(int frame)
   m_reader.fetch(frame * m_window_advance,
                  frame * m_window_advance + m_window_width + 1);
 
-  if (m_reader.eof_sample() > 0)
+  if (m_reader.eof_sample() < INT_MAX)
   {
     m_eof_frame = std::max((m_reader.eof_sample() - m_window_width - 1) /
                            m_window_advance, 0);
@@ -256,7 +256,7 @@ MelModule::create_mel_bins(void)
   m_bin_edges.resize(edges);
   for (int i = 0; i < edges; i++) {
     m_bin_edges[i] = 1400.0 * (pow(10, (i+1) * mel_step / 2595) - 1)*
-      m_sources.back()->dim() / rate;
+      (m_sources.back()->dim()-1) / rate;
   }
 }
 
