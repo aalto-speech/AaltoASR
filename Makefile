@@ -15,7 +15,7 @@ endif
 # Linux
 ifeq ($(ARCH),i686)
 CXX = /usr/bin/g++
-OPT = -O2
+OPT = -g
 INCLUDES =
 LDFLAGS =
 WARNINGS = -Wall
