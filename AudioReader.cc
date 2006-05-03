@@ -171,7 +171,8 @@ AudioReader::read_from_file(int start, int end)
 
 // INVARIANTS:
 //
-// - afterwards, sample 'start' is located at 0
+// - outside this function, sample 'start' is located at buffer
+// position 0
 void
 AudioReader::fetch(int start, int end)
 {
