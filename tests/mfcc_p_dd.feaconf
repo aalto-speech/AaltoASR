@@ -1,0 +1,55 @@
+module
+{
+	sample_rate 16000
+	name fft
+	type fft
+}
+
+module
+{
+	name mel
+	type mel
+	sources fft
+}
+
+module
+{
+	name power
+	type power
+	sources fft
+}
+
+module
+{
+	name mfcc
+	type dct
+	sources mel
+}
+
+module
+{
+	name mfcc_power
+	type merge
+	sources mfcc power
+}
+
+module
+{
+	name delta1
+	type delta
+	sources mfcc_power
+}
+
+module
+{
+	name delta2
+	type delta
+	sources delta1
+}
+
+module
+{
+	name final
+	type merge
+	sources mfcc_power delta1 delta2
+}
