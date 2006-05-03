@@ -4,15 +4,10 @@
 #include <fftw3.h>
 #include "FeatureBuffer.hh"
 #include "AudioReader.hh"
+#include "ModuleConfig.hh"
 
 
 class FeatureGenerator;
-
-
-struct ConfigPair {
-  std::string name;
-  std::string value;
-};
 
 
 /*
@@ -47,13 +42,13 @@ public:
 
   // Linking has been completed before configure(), so the module
   // can check the dimensions in the configuration.
-  void configure(std::vector<struct ConfigPair> &config);
+  void configure(const ModuleConfig &config);
   
   const FeatureVec at(int frame);
   int dim(void) { return m_dim; } // Valid only after configuration
   
 private:
-  virtual void configure_module(std::vector<struct ConfigPair> &config) = 0;
+  virtual void configure_module(const ModuleConfig &config) = 0;
   virtual void generate(int frame) = 0;
   
 protected:
@@ -105,7 +100,7 @@ public:
   virtual int frame_rate(void) { return m_frame_rate; }
   
 private:
-  virtual void configure_module(std::vector<struct ConfigPair> &config);
+  virtual void configure_module(const ModuleConfig &config);
   virtual void generate(int frame);
 
 private:
@@ -129,7 +124,7 @@ class MelModule : public FeatureModule {
 public:
   MelModule(FeatureGenerator *fea_gen);
 private:
-  virtual void configure_module(std::vector<struct ConfigPair> &config);
+  virtual void configure_module(const ModuleConfig &config);
   virtual void generate(int frame);
 
   void create_mel_bins(void);
@@ -144,25 +139,45 @@ private:
 
 class PowerModule : public FeatureModule {
 private:
-  virtual void configure_module(std::vector<struct ConfigPair> &config);
+  virtual void configure_module(const ModuleConfig &config);
   virtual void generate(int frame);
 };
 
 
 class DCTModule : public FeatureModule {
 private:
-  virtual void configure_module(std::vector<struct ConfigPair> &config);
+  virtual void configure_module(const ModuleConfig &config);
   virtual void generate(int frame);
 };
 
 
 class DeltaModule : public FeatureModule {
 private:
-  virtual void configure_module(std::vector<struct ConfigPair> &config);
+  virtual void configure_module(const ModuleConfig &config);
   virtual void generate(int frame);
 private:
   int m_delta_width;
-  int m_delta_norm;
+  float m_delta_norm;
+};
+
+
+class NormalizationModule : public FeatureModule {
+private:
+  virtual void configure_module(const ModuleConfig &config);
+  virtual void generate(int frame);
+private:
+  std::vector<float> m_mean;
+  std::vector<float> m_scale;
+};
+
+
+class TransformationModule : public FeatureModule {
+private:
+  virtual void configure_module(const ModuleConfig &config);
+  virtual void generate(int frame);
+private:
+  std::vector<float> m_transform;
+  int m_src_dim;
 };
 
 
@@ -170,8 +185,10 @@ class MergerModule : public FeatureModule {
 public:
   virtual void link(FeatureModule *source);
 private:
-  virtual void configure_module(std::vector<struct ConfigPair> &config);
+  virtual void configure_module(const ModuleConfig &config);
   virtual void generate(int frame);
 };
+
+
 
 #endif /* FEATUREMODULES_HH */

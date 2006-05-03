@@ -31,6 +31,7 @@ FeatureModule::set_buffer(int left, int right)
   if (right > m_req_offset_right)
     m_req_offset_right = right;
   new_size = m_req_offset_right + m_req_offset_left + 1;
+  m_buffer_last_pos = INT_MAX; // Invalidate the buffer
   if (new_size > m_buffer_size)
   {
     m_buffer_size = new_size;
@@ -90,14 +91,15 @@ FeatureModule::link(FeatureModule *source)
 
 
 void
-FeatureModule::configure(std::vector<struct ConfigPair> &config)
+FeatureModule::configure(const ModuleConfig &config)
 {
   configure_module(config);
   assert( m_own_offset_left >= 0 );
   assert( m_own_offset_right >= 0 );
   assert( m_dim > 0 );
-  for (int i = 0; i < (int)m_sources.size(); i++)
-    m_sources[i]->set_buffer(m_own_offset_left, m_own_offset_right);
+
+  // Initialize own buffer and propagate requests to sources if necessary
+  set_buffer(0, 0);
 }
 
 
@@ -166,7 +168,7 @@ FFTModule::eof(int frame)
 
 
 void
-FFTModule::configure_module(std::vector<struct ConfigPair> &config)
+FFTModule::configure_module(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -236,7 +238,7 @@ MelModule::MelModule(FeatureGenerator *fea_gen) :
 
 
 void
-MelModule::configure_module(std::vector<struct ConfigPair> &config)
+MelModule::configure_module(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -305,7 +307,7 @@ MelModule::generate(int frame)
 //////////////////////////////////////////////////////////////////
 
 void
-PowerModule::configure_module(std::vector<struct ConfigPair> &config)
+PowerModule::configure_module(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -331,11 +333,15 @@ PowerModule::generate(int frame)
 //////////////////////////////////////////////////////////////////
 
 void
-DCTModule::configure_module(std::vector<struct ConfigPair> &config)
+DCTModule::configure_module(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
-  m_dim = 12;
+  m_dim = 12; // Default dimension
+
+  config.get("dim", m_dim);
+  if (m_dim < 1)
+    throw std::string("DCTModule: Dimension must be > 0");
 }
 
 void
@@ -359,16 +365,21 @@ DCTModule::generate(int frame)
 //////////////////////////////////////////////////////////////////
 
 void
-DeltaModule::configure_module(std::vector<struct ConfigPair> &config)
+DeltaModule::configure_module(const ModuleConfig &config)
 {
-  m_delta_width = 2;
-
-  // Note! Old delta-features used normalization with (m_delta_width-1)
-  m_delta_norm = 2 * m_delta_width*(m_delta_width+1)*(2*m_delta_width+1)/6;
-  
   m_own_offset_left = m_delta_width;
   m_own_offset_right = m_delta_width;
   m_dim = m_sources.back()->dim();
+  m_delta_width = 2; // Default width
+  // Set default normalization for deltas.
+  // Note! Old delta-features used normalization with (m_delta_width-1)
+  m_delta_norm = 2 * m_delta_width*(m_delta_width+1)*(2*m_delta_width+1)/6;
+
+  config.get("width", m_width);
+  config.get("normalization", m_delta_norm);
+
+  if (m_delta_width < 1)
+    throw std::string("DeltaModule: Delta width must be > 0");
 }
 
 void
@@ -394,8 +405,114 @@ DeltaModule::generate(int frame)
 
 
 //////////////////////////////////////////////////////////////////
-// MergerModule
+// NormalizationModule
 //////////////////////////////////////////////////////////////////
+
+void
+NormalizationModule::configure_module(const ModuleConfig &config)
+{
+  std::vector<float> temp;
+  
+  m_dim = m_sources.back()->dim();
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+
+  m_mean.resize(m_dim, 0);
+  m_scale.resize(m_dim, 1);
+
+  config.get("mean", m_mean);
+  if ((int)m_mean.size() != m_dim)
+    throw std::string("NormalizationModule: Invalid mean dimension");
+
+  if (config.exists("var") && config.exists("scale"))
+  {
+    throw std::string("NormalizationModule: Both scale and var can not be defined simultaneously");
+  }
+  if (config.get("var", temp_vec))
+  {
+    if ((int)temp.size() != m_dim)
+      throw std::string("Normalization module: Invalid variance dimension");
+    for (int i = 0; i < m_dim; i++)
+      m_scale[i] = 1/sqrtf(temp[i]);
+  }
+  else if (config.get("scale", m_scale))
+  {
+    if ((int)m_mean.size() != m_dim)
+      throw std::string("NormalizationModule: Invalid scale dimension");
+  }
+}
+
+
+void
+NormalizationModule::generate(int frame)
+{
+  const FeatureVec source_fea = m_sources.back()->at(frame);
+  FeatureVec target_fea = m_buffer[frame];
+  for (int i = 0; i < m_dim; i++)
+    target_fea[i] = (source_fea[i] - m_mean[i]) * m_scale[i];
+}
+
+
+//////////////////////////////////////////////////////////////////
+// TransformationModule
+//////////////////////////////////////////////////////////////////
+
+void
+TransformationModule::configure_module(const ModuleConfig &config)
+{
+  int r, c, index;
+  
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+
+  m_src_dim = m_sources.back()->dim();
+  m_dim = m_src_dim; // Default value
+
+  config.get("matrix", m_transform);
+  config.get("dim", m_dim);
+  if (m_dim < 1)
+    throw std::string("TransformationModule: Dimension must be > 0");
+  
+  if (m_transform.size() == 0)
+  {
+    // Initialize with identity matrix
+    m_transform.resize(m_dim*m_src_dim);
+    for (r = index = 0; r < m_dim; r++)
+    {
+      for (c = 0; c < m_src_dim; c++, index++)
+      {
+        m_transform[index] = ((r == c) ? 1 : 0);
+      }
+    }
+  }
+  else
+  {
+    if (m_dim == 0)
+      throw std::string("TransformationModule: Must set the output dimension");
+    else if ((int)m_transform.size() != m_dim*m_src_dim)
+      throw std::string("TransformationModule: Invalid matrix dimension");
+  }
+}
+
+
+void
+TransformationModule::generate(int frame)
+{
+  int index;
+  const FeatureVec source_fea = m_sources.back()->at(frame);
+  FeatureVec target_fea = m_buffer[frame];
+  for (int i = index = 0; i < m_dim; i++)
+  {
+    target_fea[i] = 0;
+    for (int j = 0; j < m_src_dim; j++, index++)
+      target_fea[i] += m_transform[index]*source_fea[j];
+  }
+}
+
+
+//////////////////////////////////////////////////////////////////
+// MergerModule
+////////////////////////////////////////////////////+//////////////
 
 void
 MergerModule::link(FeatureModule *source)
@@ -405,7 +522,7 @@ MergerModule::link(FeatureModule *source)
 }
 
 void
-MergerModule::configure_module(std::vector<struct ConfigPair> &config)
+MergerModule::configure_module(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -428,3 +545,4 @@ MergerModule::generate(int frame)
   }
   assert( cur_dim == m_dim );
 }
+

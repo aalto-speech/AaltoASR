@@ -66,8 +66,10 @@ FeatureGenerator::load_configuration(FILE *file)
   m_modules.push_back(new MergerModule);
   m_modules.push_back(new DeltaModule);
   m_modules.push_back(new DeltaModule);
-  m_last_module = new MergerModule;
-  m_modules.push_back(m_last_module);
+  m_modules.push_back(new MergerModule);
+  m_modules.push_back(new NormalizationModule);
+  m_modules.push_back(new TransformationModule);
+  m_last_module = m_modules.back();
 
   m_modules[1]->link(m_modules[0]); // MEL->FFT
   m_modules[2]->link(m_modules[0]); // Power->FFT
@@ -79,10 +81,11 @@ FeatureGenerator::load_configuration(FILE *file)
   m_modules[7]->link(m_modules[4]); // Merger2->Merger1
   m_modules[7]->link(m_modules[5]); // Merger2->Delta1
   m_modules[7]->link(m_modules[6]); // Merger2->Delta2
-
+  m_modules[8]->link(m_modules[7]);
+  m_modules[9]->link(m_modules[8]);
 
   std::vector<struct ConfigPair> empty;
-  for (int i=0; i < 8; i++)
+  for (int i=0; i < (int)m_modules.size(); i++)
     m_modules[i]->configure(empty);
   m_last_module->set_buffer(0, 0);
 }
