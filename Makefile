@@ -67,4 +67,4 @@ include .depend
 
 .PHONY: clean
 clean:
-	rm -f $(ALL_OBJS) $(PROGS) .depend
+	rm -f $(ALL_OBJS) $(PROGS) .depend *~
