@@ -219,9 +219,12 @@ private:
 
 
 class NormalizationModule : public FeatureModule {
-private:
+public:
   NormalizationModule();
   static const char *type_str() { return "normalization"; }
+  void set_normalization(const std::vector<float> &mean,
+                         const std::vector<float> &scale);
+private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
@@ -232,9 +235,10 @@ private:
 
 
 class TransformationModule : public FeatureModule {
-private:
+public:
   TransformationModule();
   static const char *type_str() { return "transform"; }
+private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
@@ -248,7 +252,7 @@ class MergerModule : public FeatureModule {
 public:
   MergerModule();
   static const char *type_str() { return "merge"; }
-  virtual void link(FeatureModule *source);
+  virtual void add_source(FeatureModule *source);
 private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);

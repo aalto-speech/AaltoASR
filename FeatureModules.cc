@@ -23,8 +23,12 @@ void
 FeatureModule::set_buffer(int left, int right)
 {
   int new_size;
+  
   assert( left >= 0 );
   assert( right >= 0 );
+  assert( m_own_offset_left >= 0 );
+  assert( m_own_offset_right >= 0 );
+  
   if (left > m_req_offset_left)
     m_req_offset_left = left;
   if (right > m_req_offset_right)
@@ -83,7 +87,8 @@ FeatureModule::add_source(FeatureModule *source)
 {
   if (m_sources.size() > 0)
   {
-    throw std::string("Multiple links are not allowed for this module");
+    throw std::string("Multiple links are not allowed for module ") +
+      m_type_str;
   }
   m_sources.push_back(source);
 }
@@ -147,7 +152,7 @@ FFTModule::set_file(FILE *fp)
   }
   else
   {
-    throw std::string("Trying to open a non-wave file");
+    throw std::string("Trying to open an unknown file");
   }
   // Check that sample rate matches that given in configuration
   if (m_reader.sample_rate() != m_sample_rate)
@@ -507,6 +512,18 @@ NormalizationModule::set_module_config(const ModuleConfig &config)
   }
 }
 
+void
+NormalizationModule::set_normalization(const std::vector<float> &mean,
+                                       const std::vector<float> &scale)
+{
+  if ((int)mean.size() != m_dim || (int)scale.size() != m_dim)
+    throw std::string("NormalizationModule: The dimension of the new normalization does not match the input dimension");
+  for (int i = 0; i < m_dim; i++)
+  {
+    m_mean[i] = mean[i];
+    m_scale[i] = scale[i];
+  }
+}
 
 void
 NormalizationModule::generate(int frame)
@@ -598,7 +615,7 @@ MergerModule::MergerModule()
 }
 
 void
-MergerModule::link(FeatureModule *source)
+MergerModule::add_source(FeatureModule *source)
 {
   // Allow multiple sources
   m_sources.push_back(source);

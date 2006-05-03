@@ -101,8 +101,12 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new DCTModule();
     else if (type == DeltaModule::type_str())
       module = new DeltaModule();
+    else if (type == NormalizationModule::type_str())
+      module = new NormalizationModule();
     else if (type == MergerModule::type_str())
       module = new MergerModule();
+    else
+      throw std::string("Unknown module type '") + type + std::string("'");
     module->set_name(name);
 
     // Insert module in module structures

@@ -33,24 +33,24 @@ main(int argc, char *argv[])
   try {
     config("usage: feacat [OPTION...] FILE\n")
       ('h', "help", "", "", "display help")
-      ('F', "features=FILE", "arg must", "", "read feature configuration")
+      ('c', "config=FILE", "arg must", "", "read feature configuration")
+      ('w', "write-config=FILE", "arg", "", "write feature configuration")
       ('r', "raw-input", "", "", "raw audio input")
       ('R', "raw-output", "", "", "raw float output")
       ('s', "start-frame=INT", "arg", "", "audio start frame")
       ('e', "end-frame=INT", "arg", "", "audio end frame")
-      ('\0', "out-features=FILE", "arg", "", "write feature configuration")
       ;
     config.default_parse(argc, argv);
     if (config.arguments.size() != 1)
       config.print_help(stderr, 1);
     raw_output = config["raw-output"].specified;
 
-    gen.load_configuration(io::Stream(config["features"].get_str()));
+    gen.load_configuration(io::Stream(config["config"].get_str()));
     gen.open(config.arguments[0], config["raw-input"].specified);
 
-    if (config["out-features"].specified)
-      gen.write_configuration(io::Stream(config["out-features"].get_str(), 
-					 "w"));
+    if (config["write-config"].specified)
+      gen.write_configuration(io::Stream(config["write-config"].get_str(),
+                                         "w"));
 
     int start_frame = 0;
     int end_frame = INT_MAX;
