@@ -89,7 +89,7 @@ namespace conf {
      */
     void parse(int argc, char *argv[], bool override = true);
 
-    /** Default parsing with "help" and "config" options.
+    /** Default parsing with "help" option.
      * \param argc = the number of arguments
      * \param argv = the arguments
      */

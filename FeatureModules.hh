@@ -11,47 +11,76 @@
 
 class FeatureGenerator;
 
-/*
-  Some semantics about the module structure:
-
-  The module is initialized by first linking it to its sources (by link())
-  and then calling set_config() with the loaded settings. set_config()
-  calls module's private set_module_config(), which must check that source
-  dimensions match with the given settings. After set_module_config()
-  set_config() calls source modules' set_buffer().
-  
-  When a feature is requested from the module via at() and the feature
-  does not exist for the requsted frame, the module updates its buffer
-  so that the new frame will be the last one in the buffer. The buffer
-  is recomputed from left to right, possibly reusing the values already
-  in the buffer.
-
-  The computation of one feature is done in generate(), which will be
-  called by at() when necessary.
-*/
+/** A base class of a module that computes features from other
+ * features, audio file or some other file.  For the caller, the
+ * FeatureModule provides interface for accesing the features in a
+ * buffered manner.  With \ref FeatureGenerator class these modules
+ * can be combined to perform complex feature extraction.
+ *
+ * \section semantics Some semantics about the module structure
+ *
+ * A FeatureModule is initialized by first linking it to its sources
+ * with the link() method and then calling set_config() with the
+ * desired settings.  The set_config() calls module's virtual private
+ * set_module_config(), which must check that source dimensions match
+ * with the given settings.  After set_module_config(), set_config()
+ * calls set_buffer() for its each source module.
+ * 
+ * When a feature is requested from the module via at() and the
+ * requested frame is not in the buffer, the module updates its buffer
+ * so that the new frame will be the last one in the buffer. The
+ * buffer is recomputed from left to right, possibly reusing the
+ * values already in the buffer.
+ *
+ * The computation of one feature is done in generate(), which will be
+ * called by at() when necessary.
+ */ 
 class FeatureModule {
 public:
   FeatureModule();
   virtual ~FeatureModule();
 
+  /** Set the name of the module.  Should be used only by
+   * FeatureGenerator. */
   void set_name(const std::string &name) { m_name = name; }
+
+  /** Return the name of the module. */
   std::string name() const { return m_name; }
 
-  // Do not call set_buffer() before configuration has been finished!
+  /** Request buffering in addition to the central frame.  Buffering
+   * is requested recursively from the source modules if necessary.
+   *
+   * \param left = number of frames to left of the central frame
+   * \param right = number of frames to right of the cengral frame
+   */
   void set_buffer(int left, int right);
 
-  // Called before set_config(). The default implementation allows
-  // only one source.
-  virtual void link(FeatureModule *source);
+  /** Add a source module.  The default implementation allows only one
+   * source, but many derived classes allow several sources.  \note
+   * All sources must be added before calling set_config().
+   */
+  virtual void add_source(FeatureModule *source);
 
-  // Linking has been completed before set_config(), so the module
-  // can check the dimensions in the configuration.
+  /** Configure the module using the possible settings in \c config.
+   * \note All sources must be added before calling set_config(), so
+   * that the module can check the input dimensions in the
+   * configuration.
+   */
   void set_config(const ModuleConfig &config);
+
+  /** Write all essential configuration in \c config class.
+   * Configuring a newly created class with \c config should result in
+   * an identical configuration. */
   void get_config(ModuleConfig &config);
   
+  /** Access features computed by the module. */
   const FeatureVec at(int frame);
-  int dim(void) { return m_dim; } // Valid only after configuration
 
+  /** The dimension of the feature. \note Valid only after the module
+   * has been configured with set_config(). */
+  int dim(void) { return m_dim; }
+
+  /** Access the source modules. */
   const std::vector<FeatureModule*> sources() const { return m_sources; }
   
 private:
@@ -60,8 +89,10 @@ private:
   virtual void generate(int frame) = 0;
   
 protected:
-  std::string m_name;
-  std::string m_type_str;
+  std::string m_name; //!< The name of the module given by FeatureGenerator
+
+  /** The type of the module.  Should be equal to type_str(). */
+  std::string m_type_str; 
   int m_own_offset_left;  // Buffer offsets for own computations
   int m_own_offset_right;
   int m_req_offset_left;  // Required buffer offsets by calling modules

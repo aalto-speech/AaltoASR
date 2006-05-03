@@ -1,3 +1,5 @@
+#include <errno.h>
+#include <string.h>
 #include "ModuleConfig.hh"
 #include "str.hh"
 #include "FeatureGenerator.hh"
@@ -18,17 +20,18 @@ FeatureGenerator::~FeatureGenerator()
 void
 FeatureGenerator::open(const std::string &filename, bool raw_audio)
 {
+  if (m_file != NULL)
+    close();
+
   if (raw_audio > 0)
     m_audio_format = AF_RAW;
-  else if (filename.find(".htk") != std::string::npos)
-    m_audio_format = AF_HTK;
-  else if (filename.find(".pre") != std::string::npos)
-    m_audio_format = AF_PRE;
   else
-    m_audio_format = AF_WAV;
+    m_audio_format = AF_AUTO;
 
-  if ((m_file = fopen(filename.c_str(), "rb")) == NULL)
-    throw std::string("Could not open file ")+filename;
+  m_file = fopen(filename.c_str(), "rb");
+  if (m_file == NULL)
+    throw std::string("could not open file ") + filename + ": " +
+      strerror(errno);
   
   assert( m_base_module != NULL );
   m_base_module->set_file(m_file);
@@ -38,8 +41,10 @@ FeatureGenerator::open(const std::string &filename, bool raw_audio)
 void
 FeatureGenerator::close(void)
 {
-  if (m_file != NULL)
+  if (m_file != NULL) {
     m_base_module->discard_file();
+    m_file = NULL;
+  }
 }
 
 
@@ -129,7 +134,7 @@ FeatureGenerator::load_configuration(FILE *file)
 	ModuleMap::iterator it = m_module_map.find(sources[i]);
 	if (it == m_module_map.end())
 	  throw std::string("unknown source module: ") + sources[i];
-	module->link(it->second);
+	module->add_source(it->second);
       }
     }
     

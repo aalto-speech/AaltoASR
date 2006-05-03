@@ -31,7 +31,7 @@ PROGS_SRCS = $(PROGS:=.cc)
 
 CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	ModuleConfig.cc \
-	parse_input.cc conf.cc io.cc str.cc 
+	conf.cc io.cc str.cc 
 #HmmTrainer.cc SphereReader.cc Lattice.cc Viterbi.cc StateGenerator.cc FeatureBuffer.cc HmmSet.cc PhnReader.cc StateProbCache.cc FeatureGenerator.cc Recipe.cc tools.cc TriphoneSet.cc Changeling.cc AdaReader.cc Warpster.cc
 
 CLASS_OBJS = $(CLASS_SRCS:.cc=.o)

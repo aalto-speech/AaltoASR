@@ -5,11 +5,21 @@
 #include <assert.h>
 #include <vector>
 
+/** Class for accessing feature vectors of the \ref FeatureBuffer
+ * class with proper const and array-bounds checking. */
 class FeatureVec {
 public:
+  /** Default constructor. */
   FeatureVec() : m_ptr(NULL), m_dim(0) { }
+
+  /** Construct a vector. 
+   *
+   * \param ptr = pointer to the feature vector array
+   * \param dim = the dimension of the vector
+   */
   FeatureVec(const float *ptr, int dim) : m_ptr(ptr), m_dim(dim) { }
 
+  /** Constant access to feature vector values. */
   const float &operator[](int index) const 
   { 
     if (index < 0 || index >= m_dim)
@@ -17,6 +27,7 @@ public:
     return m_ptr[index]; 
   }
 
+  /** Access to feature vector values. */
   float &operator[](int index) 
   { 
     if (index < 0 || index >= m_dim)
@@ -24,14 +35,15 @@ public:
     return ((float *)m_ptr)[index];
   }
 
+  /** The dimension of the vector. */
   int dim() const { return m_dim; }
 
 private:
-  const float *m_ptr;
-  int m_dim;
+  const float *m_ptr; //!< Pointer to the feature vector values
+  int m_dim; //!< The dimensino of the vector
 };
 
-/** A class for storing feature vectors in a circular window buffer. */
+/** A class for storing feature vectors in a circular buffer. */
 class FeatureBuffer {
 public:
 

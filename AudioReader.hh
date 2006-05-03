@@ -26,7 +26,7 @@ public:
   AudioReader(int buffer_size);
   
   /** Destroy the reader (closes file depending on \ref
-   * m_shall_close_file.
+   * m_shall_close_file).
    */
   ~AudioReader();
 

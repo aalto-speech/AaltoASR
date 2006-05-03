@@ -79,7 +79,7 @@ FeatureModule::at(int frame)
 
 // The default implementation allows only one source, overload if necessary.
 void
-FeatureModule::link(FeatureModule *source)
+FeatureModule::add_source(FeatureModule *source)
 {
   if (m_sources.size() > 0)
   {
@@ -141,7 +141,7 @@ FFTModule::set_file(FILE *fp)
   {
     m_reader.open_raw(fp, m_sample_rate);
   }
-  else if (m_fea_gen->audio_format() == FeatureGenerator::AF_WAV)
+  else if (m_fea_gen->audio_format() == FeatureGenerator::AF_AUTO)
   {
     m_reader.open(fp);
   }
