@@ -15,7 +15,6 @@ FeatureModule::FeatureModule() :
 {
 }
 
-
 FeatureModule::~FeatureModule()
 {
 }
@@ -89,11 +88,18 @@ FeatureModule::link(FeatureModule *source)
   m_sources.push_back(source);
 }
 
+void
+FeatureModule::get_config(ModuleConfig &config)
+{
+  config.set("name", m_name);
+  config.set("type", m_type_str);
+  get_module_config(config);
+}
 
 void
-FeatureModule::configure(const ModuleConfig &config)
+FeatureModule::set_config(const ModuleConfig &config)
 {
-  configure_module(config);
+  set_module_config(config);
   assert( m_own_offset_left >= 0 );
   assert( m_own_offset_right >= 0 );
   assert( m_dim > 0 );
@@ -116,6 +122,7 @@ FFTModule::FFTModule(FeatureGenerator *fea_gen) :
   m_window_width(0),
   m_coeffs(NULL)
 {
+  m_type_str = type_str();
 }
 
 
@@ -166,9 +173,13 @@ FFTModule::eof(int frame)
   return true;
 }
 
+void
+FFTModule::get_module_config(ModuleConfig &config)
+{
+}
 
 void
-FFTModule::configure_module(const ModuleConfig &config)
+FFTModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -234,11 +245,16 @@ FFTModule::generate(int frame)
 MelModule::MelModule(FeatureGenerator *fea_gen) :
   m_fea_gen(fea_gen)
 {
+  m_type_str = type_str();
 }
 
+void
+MelModule::get_module_config(ModuleConfig &config)
+{
+}
 
 void
-MelModule::configure_module(const ModuleConfig &config)
+MelModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -306,8 +322,18 @@ MelModule::generate(int frame)
 // PowerModule
 //////////////////////////////////////////////////////////////////
 
+PowerModule::PowerModule()
+{
+  m_type_str = type_str();
+}
+
 void
-PowerModule::configure_module(const ModuleConfig &config)
+PowerModule::get_module_config(ModuleConfig &config)
+{
+}
+
+void
+PowerModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -332,8 +358,20 @@ PowerModule::generate(int frame)
 // DCTModule
 //////////////////////////////////////////////////////////////////
 
+DCTModule::DCTModule()
+{
+  m_type_str = type_str();
+}
+
 void
-DCTModule::configure_module(const ModuleConfig &config)
+DCTModule::get_module_config(ModuleConfig &config)
+{
+  assert(m_dim > 0);
+  config.set("dim", m_dim);
+}
+
+void
+DCTModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -364,8 +402,20 @@ DCTModule::generate(int frame)
 // DeltaModule
 //////////////////////////////////////////////////////////////////
 
+DeltaModule::DeltaModule()
+{
+  m_type_str = type_str();
+}
+
 void
-DeltaModule::configure_module(const ModuleConfig &config)
+DeltaModule::get_module_config(ModuleConfig &config)
+{
+  config.set("width", m_delta_width);
+  config.set("normalization", m_delta_norm);
+}
+
+void
+DeltaModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = m_delta_width;
   m_own_offset_right = m_delta_width;
@@ -375,7 +425,7 @@ DeltaModule::configure_module(const ModuleConfig &config)
   // Note! Old delta-features used normalization with (m_delta_width-1)
   m_delta_norm = 2 * m_delta_width*(m_delta_width+1)*(2*m_delta_width+1)/6;
 
-  config.get("width", m_width);
+  config.get("width", m_delta_width);
   config.get("normalization", m_delta_norm);
 
   if (m_delta_width < 1)
@@ -408,11 +458,21 @@ DeltaModule::generate(int frame)
 // NormalizationModule
 //////////////////////////////////////////////////////////////////
 
-void
-NormalizationModule::configure_module(const ModuleConfig &config)
+NormalizationModule::NormalizationModule()
 {
-  std::vector<float> temp;
-  
+  m_type_str = type_str();
+}
+
+void
+NormalizationModule::get_module_config(ModuleConfig &config)
+{
+  config.set("mean", m_mean);
+  config.set("scale", m_scale);
+}
+
+void
+NormalizationModule::set_module_config(const ModuleConfig &config)
+{
   m_dim = m_sources.back()->dim();
   m_own_offset_left = 0;
   m_own_offset_right = 0;
@@ -428,12 +488,12 @@ NormalizationModule::configure_module(const ModuleConfig &config)
   {
     throw std::string("NormalizationModule: Both scale and var can not be defined simultaneously");
   }
-  if (config.get("var", temp_vec))
+  if (config.get("var", m_scale))
   {
-    if ((int)temp.size() != m_dim)
+    if ((int)m_scale.size() != m_dim)
       throw std::string("Normalization module: Invalid variance dimension");
     for (int i = 0; i < m_dim; i++)
-      m_scale[i] = 1/sqrtf(temp[i]);
+      m_scale[i] = 1 / sqrtf(m_scale[i]);
   }
   else if (config.get("scale", m_scale))
   {
@@ -457,8 +517,21 @@ NormalizationModule::generate(int frame)
 // TransformationModule
 //////////////////////////////////////////////////////////////////
 
+TransformationModule::TransformationModule()
+{
+  m_type_str = type_str();
+}
+
 void
-TransformationModule::configure_module(const ModuleConfig &config)
+TransformationModule::get_module_config(ModuleConfig &config)
+{
+  assert(m_dim > 0);
+  config.set("matrix", m_transform);
+  config.set("dim", m_dim);
+}
+
+void
+TransformationModule::set_module_config(const ModuleConfig &config)
 {
   int r, c, index;
   
@@ -514,6 +587,11 @@ TransformationModule::generate(int frame)
 // MergerModule
 ////////////////////////////////////////////////////+//////////////
 
+MergerModule::MergerModule()
+{
+  m_type_str = type_str();
+}
+
 void
 MergerModule::link(FeatureModule *source)
 {
@@ -522,7 +600,12 @@ MergerModule::link(FeatureModule *source)
 }
 
 void
-MergerModule::configure_module(const ModuleConfig &config)
+MergerModule::get_module_config(ModuleConfig &config)
+{
+}
+
+void
+MergerModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;

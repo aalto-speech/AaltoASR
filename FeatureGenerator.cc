@@ -1,6 +1,6 @@
+#include "ModuleConfig.hh"
+#include "str.hh"
 #include "FeatureGenerator.hh"
-
-
 
 FeatureGenerator::FeatureGenerator(void) :
   m_base_module(NULL),
@@ -58,41 +58,113 @@ FeatureGenerator::close(void)
 void
 FeatureGenerator::load_configuration(FILE *file)
 {
-  m_base_module = new FFTModule(this);
-  m_modules.push_back(m_base_module);
-  m_modules.push_back(new MelModule(this));
-  m_modules.push_back(new PowerModule);
-  m_modules.push_back(new DCTModule);
-  m_modules.push_back(new MergerModule);
-  m_modules.push_back(new DeltaModule);
-  m_modules.push_back(new DeltaModule);
-  m_modules.push_back(new MergerModule);
-  m_modules.push_back(new NormalizationModule);
-  m_modules.push_back(new TransformationModule);
-  m_last_module = m_modules.back();
+  assert(m_modules.empty());
+  std::string line;
+  std::vector<std::string> fields;
+  int lineno = 0;
+  while (str::read_line(&line, file, true)) {
+    lineno++;
+    str::clean(&line, " \t");
+    if (line.empty())
+      continue;
+    if (line != "module")
+      throw str::fmt(256, "expected keyword 'module' on line %d: ", lineno) +
+	line;
 
-  m_modules[1]->link(m_modules[0]); // MEL->FFT
-  m_modules[2]->link(m_modules[0]); // Power->FFT
-  m_modules[3]->link(m_modules[1]); // DCT->MEL
-  m_modules[4]->link(m_modules[3]); // Merger1->DCT
-  m_modules[4]->link(m_modules[2]); // Merger1->Power
-  m_modules[5]->link(m_modules[4]); // Delta1->Merger1
-  m_modules[6]->link(m_modules[5]); // Delta2->Delta1
-  m_modules[7]->link(m_modules[4]); // Merger2->Merger1
-  m_modules[7]->link(m_modules[5]); // Merger2->Delta1
-  m_modules[7]->link(m_modules[6]); // Merger2->Delta2
-  m_modules[8]->link(m_modules[7]);
-  m_modules[9]->link(m_modules[8]);
+    // Read module config
+    //
+    ModuleConfig config;
+    try { 
+      config.read(file);
+    }
+    catch (std::string &str) {
+      lineno += config.num_lines_read();
+      throw str::fmt(256, "failed reading feature module around line %d: ",
+		     lineno) + str;
+    }
+    lineno += config.num_lines_read();
 
-  std::vector<struct ConfigPair> empty;
-  for (int i=0; i < (int)m_modules.size(); i++)
-    m_modules[i]->configure(empty);
-  m_last_module->set_buffer(0, 0);
+
+    // Create module
+    //
+    std::string type;
+    std::string name;
+    if (!config.get("type", type))
+      throw str::fmt(256, "type not defined for module ending on line %d",
+		     lineno);
+    if (!config.get("name", name))
+      throw str::fmt(256, "name not defined for module ending on line %d",
+		     lineno);
+    assert(!name.empty());
+  
+    FeatureModule *module = NULL;
+    if (type == FFTModule::type_str()) 
+      module = new FFTModule(this);
+    else if (type == MelModule::type_str())
+      module = new MelModule(this);
+    else if (type == PowerModule::type_str())
+      module = new PowerModule();
+    else if (type == DCTModule::type_str())
+      module = new DCTModule();
+    else if (type == DeltaModule::type_str())
+      module = new DeltaModule();
+    else if (type == MergerModule::type_str())
+      module = new MergerModule();
+    module->set_name(name);
+
+    // Insert module in module structures
+    //
+    if (m_modules.empty()) {
+      m_base_module = dynamic_cast<BaseFeaModule*>(module);
+      if (m_base_module == NULL)
+	throw std::string("first module should be a base module");
+    }
+    m_last_module = module;
+    m_modules.push_back(module);
+    if (m_module_map.find(name) != m_module_map.end())
+      throw std::string("multiple definitions of module name: ") + name;
+    m_module_map[name] = module;
+
+    // Create source links
+    //
+    bool has_sources = config.exists("sources");
+    if (m_base_module == module && has_sources)
+      throw std::string("can not define sources for the first module");
+    if (m_base_module != module && !has_sources)
+      throw std::string("sources not defined for module: ") + name;
+    
+    std::vector<std::string> sources;
+    config.get("sources", sources);
+    assert(!sources.empty());
+    for (int i = 0; i < (int)sources.size(); i++) {
+      ModuleMap::iterator it = m_module_map.find(sources[i]);
+      if (it == m_module_map.end())
+	throw std::string("unknown source module: ") + sources[i];
+      module->link(it->second);
+    }
+    
+    module->set_config(config);
+  }
 }
 
 
 void
 FeatureGenerator::write_configuration(FILE *file)
 {
+  assert(!m_modules.empty());
+  for (int i = 0; i < (int)m_modules.size(); i++) {
+    FeatureModule *module = m_modules[i];
+
+    ModuleConfig config;
+    module->get_config(config);
+    std::vector<std::string> sources;
+    for (int i = 0; i < (int)module->sources().size(); i++)
+      sources.push_back(module->sources().at(i)->name());
+    config.set("sources", sources);
+
+    fputs("module\n{\n", file);
+    config.write(file);
+    fputs("}\n\n", file);
+  }
 }
 

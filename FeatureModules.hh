@@ -2,6 +2,8 @@
 #define FEATUREMODULES_HH
 
 #include <fftw3.h>
+#include <vector>
+#include "ModuleConfig.hh"
 #include "FeatureBuffer.hh"
 #include "AudioReader.hh"
 #include "ModuleConfig.hh"
@@ -9,15 +11,14 @@
 
 class FeatureGenerator;
 
-
 /*
   Some semantics about the module structure:
 
   The module is initialized by first linking it to its sources (by link())
-  and then calling configure() with the loaded settings. configure()
-  calls module's private configure_module(), which must check that source
-  dimensions match with the given settings. After configure_module()
-  configure() calls source modules' set_buffer().
+  and then calling set_config() with the loaded settings. set_config()
+  calls module's private set_module_config(), which must check that source
+  dimensions match with the given settings. After set_module_config()
+  set_config() calls source modules' set_buffer().
   
   When a feature is requested from the module via at() and the feature
   does not exist for the requsted frame, the module updates its buffer
@@ -33,25 +34,34 @@ public:
   FeatureModule();
   virtual ~FeatureModule();
 
+  void set_name(const std::string &name) { m_name = name; }
+  std::string name() const { return m_name; }
+
   // Do not call set_buffer() before configuration has been finished!
   void set_buffer(int left, int right);
 
-  // Called before configure(). The default implementation allows
+  // Called before set_config(). The default implementation allows
   // only one source.
   virtual void link(FeatureModule *source);
 
-  // Linking has been completed before configure(), so the module
+  // Linking has been completed before set_config(), so the module
   // can check the dimensions in the configuration.
-  void configure(const ModuleConfig &config);
+  void set_config(const ModuleConfig &config);
+  void get_config(ModuleConfig &config);
   
   const FeatureVec at(int frame);
   int dim(void) { return m_dim; } // Valid only after configuration
+
+  const std::vector<FeatureModule*> sources() const { return m_sources; }
   
 private:
-  virtual void configure_module(const ModuleConfig &config) = 0;
+  virtual void set_module_config(const ModuleConfig &config) = 0;
+  virtual void get_module_config(ModuleConfig &config) = 0;
   virtual void generate(int frame) = 0;
   
 protected:
+  std::string m_name;
+  std::string m_type_str;
   int m_own_offset_left;  // Buffer offsets for own computations
   int m_own_offset_right;
   int m_req_offset_left;  // Required buffer offsets by calling modules
@@ -92,6 +102,7 @@ class FFTModule : public BaseFeaModule {
 public:
   FFTModule(FeatureGenerator *fea_gen);
   virtual ~FFTModule();
+  static const char *type_str() { return "fft"; }
   
   virtual void set_file(FILE *fp);
   virtual void discard_file(void);
@@ -100,7 +111,8 @@ public:
   virtual int frame_rate(void) { return m_frame_rate; }
   
 private:
-  virtual void configure_module(const ModuleConfig &config);
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 
 private:
@@ -123,8 +135,10 @@ private:
 class MelModule : public FeatureModule {
 public:
   MelModule(FeatureGenerator *fea_gen);
+  static const char *type_str() { return "mel"; }
 private:
-  virtual void configure_module(const ModuleConfig &config);
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 
   void create_mel_bins(void);
@@ -138,22 +152,34 @@ private:
 
 
 class PowerModule : public FeatureModule {
+public:
+  PowerModule();
+  static const char *type_str() { return "power"; }
 private:
-  virtual void configure_module(const ModuleConfig &config);
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 };
 
 
 class DCTModule : public FeatureModule {
+public:
+  DCTModule();
+  static const char *type_str() { return "dct"; }
 private:
-  virtual void configure_module(const ModuleConfig &config);
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 };
 
 
 class DeltaModule : public FeatureModule {
+public:
+  DeltaModule();
+  static const char *type_str() { return "delta"; }
 private:
-  virtual void configure_module(const ModuleConfig &config);
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 private:
   int m_delta_width;
@@ -163,7 +189,10 @@ private:
 
 class NormalizationModule : public FeatureModule {
 private:
-  virtual void configure_module(const ModuleConfig &config);
+  NormalizationModule();
+  static const char *type_str() { return "normalization"; }
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 private:
   std::vector<float> m_mean;
@@ -173,7 +202,10 @@ private:
 
 class TransformationModule : public FeatureModule {
 private:
-  virtual void configure_module(const ModuleConfig &config);
+  TransformationModule();
+  static const char *type_str() { return "transform"; }
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 private:
   std::vector<float> m_transform;
@@ -183,9 +215,12 @@ private:
 
 class MergerModule : public FeatureModule {
 public:
+  MergerModule();
+  static const char *type_str() { return "merge"; }
   virtual void link(FeatureModule *source);
 private:
-  virtual void configure_module(const ModuleConfig &config);
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 };
 

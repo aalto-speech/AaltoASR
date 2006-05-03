@@ -1,8 +1,12 @@
 #ifndef FEATUREGENERATOR_HH
 #define FEATUREGENERATOR_HH
 
+#include <vector>
+#include <map>
+#include <string>
 #include "FeatureModules.hh"
 
+typedef std::map<std::string, FeatureModule*> ModuleMap;
 
 class FeatureGenerator {
 public:
@@ -27,6 +31,8 @@ public:
 
 private:
   std::vector<FeatureModule*> m_modules;
+  ModuleMap m_module_map;
+
   BaseFeaModule *m_base_module;
   FeatureModule *m_last_module;
   AudioFormat m_audio_format;
