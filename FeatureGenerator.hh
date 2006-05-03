@@ -13,10 +13,11 @@ public:
   FeatureGenerator();
   ~FeatureGenerator();
 
-  void open(const std::string &filename, int raw_sample_rate = 0);
+  void open(const std::string &filename, bool raw_audio);
   void close();
   void load_configuration(FILE *file);
   void write_configuration(FILE *file);
+  FeatureModule *module(const std::string &name);
   
   inline const FeatureVec generate(int frame);
   inline bool eof(void) { return m_eof_on_last_frame; }

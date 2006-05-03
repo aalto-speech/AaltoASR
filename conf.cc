@@ -258,8 +258,6 @@ namespace conf {
       fputs(help_string().c_str(), stdout);
       exit(0);
     }
-    if ((*this)["config"].specified)
-      read(io::Stream((*this)["config"].get_str(), "r").file);
     check_required();
   }
 
@@ -296,7 +294,7 @@ namespace conf {
       }
       if (option.required && !option.specified) {
 	fprintf(stderr, "option%s required\n", option_name.c_str());
-	exit(1);
+	print_help(stderr, 1);
       }
     }
   }

@@ -421,8 +421,6 @@ DeltaModule::get_module_config(ModuleConfig &config)
 void
 DeltaModule::set_module_config(const ModuleConfig &config)
 {
-  m_own_offset_left = m_delta_width;
-  m_own_offset_right = m_delta_width;
   m_dim = m_sources.back()->dim();
   m_delta_width = 2; // Default width
   // Set default normalization for deltas.
@@ -434,6 +432,9 @@ DeltaModule::set_module_config(const ModuleConfig &config)
 
   if (m_delta_width < 1)
     throw std::string("DeltaModule: Delta width must be > 0");
+
+  m_own_offset_left = m_delta_width;
+  m_own_offset_right = m_delta_width;
 }
 
 void

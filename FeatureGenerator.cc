@@ -16,29 +16,19 @@ FeatureGenerator::~FeatureGenerator()
 }
 
 void
-FeatureGenerator::open(const std::string &filename, int raw_sample_rate)
+FeatureGenerator::open(const std::string &filename, bool raw_audio)
 {
-  if (raw_sample_rate > 0)
-  {
+  if (raw_audio > 0)
     m_audio_format = AF_RAW;
-  }
   else if (filename.find(".htk") != std::string::npos)
-  {
     m_audio_format = AF_HTK;
-  } 
   else if (filename.find(".pre") != std::string::npos)
-  {
     m_audio_format = AF_PRE;
-  }
   else
-  {
     m_audio_format = AF_WAV;
-  }
 
   if ((m_file = fopen(filename.c_str(), "rb")) == NULL)
-  {
     throw std::string("Could not open file ")+filename;
-  }
   
   assert( m_base_module != NULL );
   m_base_module->set_file(m_file);
@@ -49,9 +39,7 @@ void
 FeatureGenerator::close(void)
 {
   if (m_file != NULL)
-  {
     m_base_module->discard_file();
-  }
 }
 
 
@@ -132,15 +120,17 @@ FeatureGenerator::load_configuration(FILE *file)
       throw std::string("can not define sources for the first module");
     if (m_base_module != module && !has_sources)
       throw std::string("sources not defined for module: ") + name;
-    
-    std::vector<std::string> sources;
-    config.get("sources", sources);
-    assert(!sources.empty());
-    for (int i = 0; i < (int)sources.size(); i++) {
-      ModuleMap::iterator it = m_module_map.find(sources[i]);
-      if (it == m_module_map.end())
-	throw std::string("unknown source module: ") + sources[i];
-      module->link(it->second);
+
+    if (has_sources) {
+      std::vector<std::string> sources;
+      config.get("sources", sources);
+      assert(!sources.empty());
+      for (int i = 0; i < (int)sources.size(); i++) {
+	ModuleMap::iterator it = m_module_map.find(sources[i]);
+	if (it == m_module_map.end())
+	  throw std::string("unknown source module: ") + sources[i];
+	module->link(it->second);
+      }
     }
     
     module->set_config(config);
@@ -157,14 +147,25 @@ FeatureGenerator::write_configuration(FILE *file)
 
     ModuleConfig config;
     module->get_config(config);
-    std::vector<std::string> sources;
-    for (int i = 0; i < (int)module->sources().size(); i++)
-      sources.push_back(module->sources().at(i)->name());
-    config.set("sources", sources);
+
+    if (!module->sources().empty()) {
+      std::vector<std::string> sources;
+      for (int i = 0; i < (int)module->sources().size(); i++)
+	sources.push_back(module->sources().at(i)->name());
+      config.set("sources", sources);
+    }
 
     fputs("module\n{\n", file);
-    config.write(file);
+    config.write(file, 2);
     fputs("}\n\n", file);
   }
 }
 
+FeatureModule*
+FeatureGenerator::module(const std::string &name)
+{
+  ModuleMap::iterator it = m_module_map.find(name);
+  if (it == m_module_map.end())
+    throw std::string("unknown module requested: ") + name;
+  return it->second;
+}
