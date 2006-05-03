@@ -103,6 +103,8 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new DeltaModule();
     else if (type == NormalizationModule::type_str())
       module = new NormalizationModule();
+    else if (type == TransformationModule::type_str())
+      module = new TransformationModule();
     else if (type == MergerModule::type_str())
       module = new MergerModule();
     else
