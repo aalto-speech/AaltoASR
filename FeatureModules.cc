@@ -176,6 +176,8 @@ FFTModule::eof(int frame)
 void
 FFTModule::get_module_config(ModuleConfig &config)
 {
+  assert(m_sample_rate > 0);
+  config.set("sample_rate", m_sample_rate);
 }
 
 void
@@ -184,8 +186,10 @@ FFTModule::set_module_config(const ModuleConfig &config)
   m_own_offset_left = 0;
   m_own_offset_right = 0;
   
-  m_sample_rate = 16000;
   m_frame_rate = 125;
+
+  if (!config.get("sample_rate", m_sample_rate))
+    throw std::string("FFTModule: Must set sample rate");
 
   m_window_width = (int)(m_sample_rate/62.5);
   m_window_advance = (int)(m_sample_rate/125);
@@ -585,7 +589,7 @@ TransformationModule::generate(int frame)
 
 //////////////////////////////////////////////////////////////////
 // MergerModule
-////////////////////////////////////////////////////+//////////////
+//////////////////////////////////////////////////////////////////
 
 MergerModule::MergerModule()
 {
