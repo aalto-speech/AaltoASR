@@ -120,11 +120,13 @@ ModuleConfig::get(const std::string &name, std::vector<int> &vec) const
   str::split(&m_values.at(it->second), " \t", true, &fields);
   vec.resize(fields.size());
   bool ok = true;
-  for (int i = 0; i < (int)fields.size(); i++)
+  for (int i = 0; i < (int)fields.size(); i++) {
     vec[i] = str::str2long(&fields[i], &ok);
-  if (!ok)
-    throw std::string("invalid value in integer vector: ") + 
-      m_values.at(it->second);
+    if (!ok)
+      throw std::string("invalid value '") + fields[i] + 
+	std::string("'in integer vector: ") + m_values.at(it->second);
+  }
+
   return true;
 }
 
@@ -139,11 +141,12 @@ ModuleConfig::get(const std::string &name, std::vector<float> &vec) const
   str::split(&m_values.at(it->second), " \t", true, &fields);
   vec.resize(fields.size());
   bool ok = true;
-  for (int i = 0; i < (int)fields.size(); i++)
+  for (int i = 0; i < (int)fields.size(); i++) {
     vec[i] = str::str2float(&fields[i], &ok);
-  if (!ok)
-    throw std::string("invalid value in float vector: ") + 
-      m_values.at(it->second);
+    if (!ok)
+      throw std::string("invalid value '") + fields[i] + 
+	std::string("' in float vector: ") + m_values.at(it->second);
+  }
   return true;
 }
 

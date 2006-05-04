@@ -68,3 +68,5 @@ include .depend
 .PHONY: clean
 clean:
 	rm -f $(ALL_OBJS) $(PROGS) .depend *~
+	rm -rf html
+	$(MAKE) 
