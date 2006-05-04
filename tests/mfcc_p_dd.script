@@ -1,4 +1,4 @@
 #!/bin/sh
 
-../feacat --out-features mfcc_p_dd.feaconf.tmp -F mfcc_p_dd.feaconf short.wav
-../feacat -F mfcc_p_dd.feaconf.tmp short.wav
+../feacat --write-config mfcc_p_dd.feaconf.tmp -c mfcc_p_dd.feaconf short.wav
+../feacat -c mfcc_p_dd.feaconf.tmp short.wav
