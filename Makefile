@@ -69,4 +69,4 @@ include .depend
 clean:
 	rm -f $(ALL_OBJS) $(PROGS) .depend *~
 	rm -rf html
-	$(MAKE) 
+	cd tests && $(MAKE) clean
