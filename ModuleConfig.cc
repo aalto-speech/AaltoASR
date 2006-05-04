@@ -186,9 +186,9 @@ ModuleConfig::read(FILE *file)
     str::split(&line, " \t", true, &fields, 2);
     assert(fields.size() >= 1 && fields.size() <= 2);
     if (fields.size() == 1)
-      throw std::string("value missing in module config file: ") + line;
+      throw std::string("value missing for option: ") + line;
     if (m_value_map.find(fields[0]) != m_value_map.end())
-      throw std::string("value redefined in module config file: ") + line;
+      throw std::string("value redefined: ") + line;
     
     insert(fields[0], fields[1]);
   }

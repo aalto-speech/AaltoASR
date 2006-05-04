@@ -87,7 +87,7 @@ FeatureModule::add_source(FeatureModule *source)
 {
   if (m_sources.size() > 0)
   {
-    throw std::string("Multiple links are not allowed for module ") +
+    throw std::string("Multiple sources are not allowed for module ") +
       m_type_str;
   }
   m_sources.push_back(source);

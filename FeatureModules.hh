@@ -20,7 +20,7 @@ class FeatureGenerator;
  * \section semantics Some semantics about the module structure
  *
  * A FeatureModule is initialized by first linking it to its sources
- * with the link() method and then calling set_config() with the
+ * with the add_source() method and then calling set_config() with the
  * desired settings.  The set_config() calls module's virtual private
  * set_module_config(), which must check that source dimensions match
  * with the given settings.  After set_module_config(), set_config()
@@ -47,6 +47,9 @@ public:
 
   /** Return the name of the module. */
   std::string name() const { return m_name; }
+
+  /** Return the type of the module. */
+  std::string type_str() const { return m_type_str; }
 
   /** Request buffering in addition to the central frame.  Buffering
    * is requested recursively from the source modules if necessary.
@@ -121,7 +124,8 @@ public:
   virtual int sample_rate(void) = 0;
   virtual int frame_rate(void) = 0;
   
-  virtual void link(FeatureModule *source) { assert( 0 ); }
+  virtual void add_source(FeatureModule *source) 
+  { throw std::string("base module FFT can not have sources"); }
 };
 
 
