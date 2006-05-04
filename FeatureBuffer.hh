@@ -32,7 +32,7 @@ public:
   { 
     if (index < 0 || index >= m_dim)
       throw std::string("FeatureVec out of bounds");
-    return ((float *)m_ptr)[index];
+    return (const_cast<float*>(m_ptr))[index];
   }
 
   /** The dimension of the vector. */
