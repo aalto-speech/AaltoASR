@@ -64,6 +64,8 @@ main(int argc, char *argv[])
 	break;
       print_feature(fea);
     }
+
+    gen.close();
   }
   catch (std::exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());

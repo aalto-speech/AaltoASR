@@ -13,12 +13,12 @@ const char *out_file;
 
 conf::Config config;
 FeatureGenerator gen;
-NormalizationModule *norm_mod = NULL;
-FeatureModule *norm_mod_src = NULL;
 
 int
 main(int argc, char *argv[])
 {
+  NormalizationModule *norm_mod = NULL;
+  FeatureModule *norm_mod_src = NULL;
   std::vector<double> block_mean_acc, global_mean_acc;
   std::vector<double> block_var_acc, global_var_acc;
   double global_acc_count;
@@ -37,9 +37,9 @@ main(int argc, char *argv[])
       ('c', "config=FILE", "arg must", "", "read feature configuration")
       ('w', "write-config=FILE", "arg", "", "write feature configuration")
       ('r', "raw-input", "", "", "raw audio input")
-      ('m', "module=NAME", "arg", "", "normalization module name")
+      ('M', "module=NAME", "arg", "", "normalization module name")
       ('b', "block=INT", "arg", "1000", "block size (for reducing round-off errors)")
-      ('p', "print", "", "", "print mean and scale to stdout")
+      ('P', "print", "", "", "print mean and scale to stdout")
       ('i', "info=INT", "arg", "1", "info level")
       ;
     config.default_parse(argc, argv);
@@ -96,9 +96,9 @@ main(int argc, char *argv[])
       }
       cur_block_size = 0;
 
-      start_frame = (int)(recipe.infos[recipe_index].start_time /
+      start_frame = (int)(recipe.infos[recipe_index].start_time *
                           gen.frame_rate());
-      end_frame = (int)(recipe.infos[recipe_index].end_time /
+      end_frame = (int)(recipe.infos[recipe_index].end_time *
                         gen.frame_rate());
       if (end_frame == 0)
         end_frame = INT_MAX;
@@ -140,6 +140,8 @@ main(int argc, char *argv[])
           cur_block_size = 0;
         }
       }
+
+      gen.close();
     }
     mean.resize(dim);
     for (int d = 0; d < dim; d++)
