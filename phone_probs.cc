@@ -41,7 +41,7 @@ main(int argc, char *argv[])
   int lnabytes;
   int info = 0;
   std::string out_dir;
-  std::string out_file;
+  std::string out_file = "";
   int start_frame, end_frame;
   FILE *ofp;
   BYTE buffer[4];
@@ -119,13 +119,19 @@ main(int argc, char *argv[])
         printf("Input: %s\n", recipe.infos[recipe_index].audio_path.c_str());
       }
 
-      if (config["output-dir"].specified)
+      if (!config["output-dir"].specified)
+      {
+        // Default: Use recipe filename for output (normally for phn output..)
+        out_file = recipe.infos[recipe_index].phn_out_path;
+      }
+      if (out_file.size() == 0)
       {
         // Use the audio file name with different directory and extension
         std::string file;
         // Strip the old path (if one exists)
         int pos = recipe.infos[recipe_index].audio_path.rfind("/");
-        if (pos >= 0 && pos < (int)file.size()-1)
+        if (pos >= 0 &&
+            pos < (int)recipe.infos[recipe_index].audio_path.size()-1)
           file = recipe.infos[recipe_index].audio_path.substr(pos+1);
         else
           file = recipe.infos[recipe_index].audio_path;
@@ -134,11 +140,6 @@ main(int argc, char *argv[])
         if (pos > 0 && pos <= (int)file.size()-1)
           file.erase(pos);
         out_file = out_dir + file + ".lna";
-      }
-      else
-      {
-        // Default: Use recipe filename for output (normally for phn output..)
-        out_file = recipe.infos[recipe_index].phn_out_path;
       }
       if (info > 0)
         printf("Output: %s\n", out_file.c_str());

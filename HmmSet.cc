@@ -570,7 +570,7 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
     for (int i = 0; i < m_dim; i++)
     {
       dif = feature[i] - kernel.center[i];
-      dist += dif*dif/(double)kernel.cov.diag(0);
+      dist += dif*dif/(double)kernel.cov.diag(i);
     }
     result = exp(-0.5 * dist) / sqrt(kernel.cov.cov_det);
     break;
