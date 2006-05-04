@@ -1,3 +1,4 @@
+#include <set>
 #include <errno.h>
 #include <string.h>
 #include "ModuleConfig.hh"
@@ -91,7 +92,7 @@ FeatureGenerator::load_configuration(FILE *file)
     assert(!name.empty());
   
     FeatureModule *module = NULL;
-    if (type == FFTModule::type_str()) 
+    if (type == FFTModule::type_str())
       module = new FFTModule(this);
     else if (type == MelModule::type_str())
       module = new MelModule(this);
@@ -146,6 +147,8 @@ FeatureGenerator::load_configuration(FILE *file)
     
     module->set_config(config);
   }
+
+  check_model_structure();
 }
 
 
@@ -179,4 +182,33 @@ FeatureGenerator::module(const std::string &name)
   if (it == m_module_map.end())
     throw std::string("unknown module requested: ") + name;
   return it->second;
+}
+
+void
+FeatureGenerator::check_model_structure()
+{
+  if (m_modules.empty())
+    throw std::string("no feature modules defined");
+
+  std::set<FeatureModule*> reached;
+  std::vector<FeatureModule*> stack;
+  stack.push_back(m_last_module);
+
+  while (!stack.empty()) {
+    FeatureModule *module = stack.back();
+    stack.pop_back();
+    for (int i = 0; i < (int)module->sources().size(); i++) {
+      FeatureModule *source = module->sources().at(i);
+      std::pair<std::set<FeatureModule*>::iterator, bool> ret =
+	reached.insert(source);
+      if (ret.second)
+	stack.push_back(source);
+    }
+  }
+
+  assert(!m_modules.empty());
+  for (int i = 0; i < (int)m_modules.size() - 1; i++)
+    if (reached.find(m_modules[i]) == reached.end())
+      fprintf(stderr, "WARNING: module %s (type %s) not used as input\n", 
+	      m_modules[i]->name().c_str(), m_modules[i]->type_str().c_str());
 }

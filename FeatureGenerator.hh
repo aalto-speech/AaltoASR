@@ -67,6 +67,9 @@ public:
   /** Return the format of the audio file. */
   AudioFormat audio_format() { return m_audio_format; }
 
+  /** Check module structure and warn about anomalities. */
+  void check_model_structure();
+
 private:
   typedef std::map<std::string, FeatureModule*> ModuleMap;
 
