@@ -34,8 +34,14 @@ public:
   int num_lines_read() const { return m_num_lines_read; }
 
 private:
-  typedef std::map<std::string, std::string> ValueMap;
+  /** Insert the (name, value) pair in the map and vector structures. */
+  void insert(const std::string &name, const std::string &value);
+
+  typedef std::map<std::string, int> ValueMap;
+
   ValueMap m_value_map;
+  std::vector<std::string> m_values;
+  std::vector<std::string> m_names;
   int m_num_lines_read;
 };
 

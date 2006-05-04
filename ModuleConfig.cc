@@ -13,14 +13,14 @@ void
 ModuleConfig::set(const std::string &name, int value)
 {
   assert(name.find_first_of(" \t\n") == std::string::npos);
-  m_value_map[name] = str::fmt(64, "%d", value);
+  insert(name, str::fmt(64, "%d", value));
 }
 
 void
 ModuleConfig::set(const std::string &name, float value)
 {
   assert(name.find_first_of(" \t\n") == std::string::npos);
-  m_value_map[name] = str::fmt(64, "%g", value);
+  insert(name, str::fmt(64, "%g", value));
 }
 
 void
@@ -28,7 +28,7 @@ ModuleConfig::set(const std::string &name, const std::string &str)
 {
   assert(name.find_first_of(" \t\n") == std::string::npos);
   assert(str.find_first_of("\n") == std::string::npos);
-  m_value_map[name] = str;
+  insert(name, str);
 }
 
 void
@@ -41,7 +41,7 @@ ModuleConfig::set(const std::string &name, const std::vector<int> &vec)
       value_str.append(" ");
     value_str.append(str::fmt(64, "%d", vec[i]));
   }
-  m_value_map[name] = value_str;
+  insert(name, value_str);
 }
 
 void
@@ -54,7 +54,7 @@ ModuleConfig::set(const std::string &name, const std::vector<float> &vec)
       value_str.append(" ");
     value_str.append(str::fmt(64, "%g", vec[i]));
   }
-  m_value_map[name] = value_str;
+  insert(name, value_str);
 }
 
 void
@@ -68,7 +68,7 @@ ModuleConfig::set(const std::string &name, const std::vector<std::string> &vec)
       value_str.append(" ");
     value_str.append(vec[i]);
   }
-  m_value_map[name] = value_str;
+  insert(name, value_str);
 }
 
 bool
@@ -79,9 +79,9 @@ ModuleConfig::get(const std::string &name, int &value) const
     return false;
 
   bool ok = true;
-  value = str::str2long(&it->second, &ok);
+  value = str::str2long(&m_values.at(it->second), &ok);
   if (!ok)
-    throw std::string("invalid integer value: ") + it->second;
+    throw std::string("invalid integer value: ") + m_values.at(it->second);
   return true;
 }
 
@@ -93,9 +93,9 @@ ModuleConfig::get(const std::string &name, float &value) const
     return false;
 
   bool ok = true;
-  value = str::str2float(&it->second, &ok);
+  value = str::str2float(&m_values.at(it->second), &ok);
   if (!ok)
-    throw std::string("invalid float value: ") + it->second;
+    throw std::string("invalid float value: ") + m_values.at(it->second);
   return true;
 }
 
@@ -105,7 +105,7 @@ ModuleConfig::get(const std::string &name, std::string &str) const
   ValueMap::const_iterator it = m_value_map.find(name);
   if (it == m_value_map.end())
     return false;
-  str = it->second;
+  str = m_values.at(it->second);
   return true;
 }
 
@@ -117,13 +117,14 @@ ModuleConfig::get(const std::string &name, std::vector<int> &vec) const
     return false;
 
   std::vector<std::string> fields;
-  str::split(&it->second, " \t", true, &fields);
+  str::split(&m_values.at(it->second), " \t", true, &fields);
   vec.resize(fields.size());
   bool ok = true;
   for (int i = 0; i < (int)fields.size(); i++)
     vec[i] = str::str2long(&fields[i], &ok);
   if (!ok)
-    throw std::string("invalid value in integer vector: ") + it->second;
+    throw std::string("invalid value in integer vector: ") + 
+      m_values.at(it->second);
   return true;
 }
 
@@ -135,13 +136,14 @@ ModuleConfig::get(const std::string &name, std::vector<float> &vec) const
     return false;
 
   std::vector<std::string> fields;
-  str::split(&it->second, " \t", true, &fields);
+  str::split(&m_values.at(it->second), " \t", true, &fields);
   vec.resize(fields.size());
   bool ok = true;
   for (int i = 0; i < (int)fields.size(); i++)
     vec[i] = str::str2float(&fields[i], &ok);
   if (!ok)
-    throw std::string("invalid value in float vector: ") + it->second;
+    throw std::string("invalid value in float vector: ") + 
+      m_values.at(it->second);
   return true;
 }
 
@@ -151,7 +153,7 @@ ModuleConfig::get(const std::string &name, std::vector<std::string> &vec) const
   ValueMap::const_iterator it = m_value_map.find(name);
   if (it == m_value_map.end())
     return false;
-  str::split(&it->second, " \t", true, &vec);
+  str::split(&m_values.at(it->second), " \t", true, &vec);
   return true;
 }
 
@@ -188,23 +190,36 @@ ModuleConfig::read(FILE *file)
     if (m_value_map.find(fields[0]) != m_value_map.end())
       throw std::string("value redefined in module config file: ") + line;
     
-    m_value_map[fields[0]] = fields[1];
+    insert(fields[0], fields[1]);
   }
+  assert(m_value_map.size() == m_names.size());
+  assert(m_value_map.size() == m_values.size());
 }
 
 void
 ModuleConfig::write(FILE *file, int indent) const
 {
   assert(indent >= 0);
+  assert(m_value_map.size() == m_names.size());
+  assert(m_value_map.size() == m_values.size());
   std::string indent_str(indent, ' ');
-  for (ValueMap::const_iterator it = m_value_map.begin(); 
-       it != m_value_map.end(); it++)
-  {
+  for (int i = 0; i < (int)m_values.size(); i++) {
     if (indent > 0) 
       fputs(indent_str.c_str(), file);
-    fputs(it->first.c_str(), file);
+    fputs(m_names[i].c_str(), file);
     fputc(' ', file);
-    fputs(it->second.c_str(), file);
+    fputs(m_values[i].c_str(), file);
     fputc('\n', file);
+  }
+}
+
+void // private
+ModuleConfig::insert(const std::string &name, const std::string &value)
+{
+  std::pair<ValueMap::iterator, bool> ret =
+    m_value_map.insert(ValueMap::value_type(name, (int)m_values.size()));
+  if (ret.second) {
+    m_names.push_back(name);
+    m_values.push_back(value);
   }
 }
