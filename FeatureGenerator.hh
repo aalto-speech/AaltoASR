@@ -6,7 +6,11 @@
 #include <string>
 #include "FeatureModules.hh"
 
-/** A class for generating feature vectors from an audio file. */
+/** A class for generating feature vectors from an audio file.  The
+ * FeatureGenerator and the feature modules are configured in a text
+ * file that contains block for each module in the feature module
+ * chain (see doc/ directory).
+ */
 class FeatureGenerator {
 public:
   /** Format of the audio file. */

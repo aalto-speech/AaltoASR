@@ -427,12 +427,13 @@ void
 DeltaModule::set_module_config(const ModuleConfig &config)
 {
   m_dim = m_sources.back()->dim();
+
   m_delta_width = 2; // Default width
+  config.get("width", m_delta_width);
+
   // Set default normalization for deltas.
   // Note! Old delta-features used normalization with (m_delta_width-1)
   m_delta_norm = 2 * m_delta_width*(m_delta_width+1)*(2*m_delta_width+1)/6;
-
-  config.get("width", m_delta_width);
   config.get("normalization", m_delta_norm);
 
   if (m_delta_width < 1)

@@ -34,6 +34,7 @@ class FeatureGenerator;
  *
  * The computation of one feature is done in generate(), which will be
  * called by at() when necessary.
+ *
  */ 
 class FeatureModule {
 public:

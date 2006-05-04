@@ -1,0 +1,131 @@
+INTRODUCTION
+============
+
+The feature generator is configured in a text file that contains
+definitions the feature modules and connections between them.  For
+example:
+
+module 
+{
+  name first_module
+  type fft
+}
+
+module
+{
+  name second_module
+  type sometype
+  foo 10
+  bar 1.0
+  xyzzy 23.34 42.00e-10 1
+  sources first_module
+}
+
+The above example defines a feature generator that consists of two
+modules.  The first module in the specification must be a so called
+base module which is able to read input file.  All modules must have
+"name" and "type" specified (see below for valid types).  All non-base
+modules must have also "sources", which refers to names of the modules
+that the are used as input.  Source modules must have been defined
+earlier.  Most modules allow only one source, but some allow multiple
+sources (separated by whitespace).  The output of the last module is
+used as final features.
+
+
+MODULE TYPES
+============
+
+- fft (BASE MODULE)
+
+    Short-time fourier spectrum.  A base module that reads an audio
+    file and computes short-time fourier spectrums 125 frames per
+    second using overlapping hamming windows.  For 16000 Hz sample
+    rate, the spectrum is computed from a window of 256 samples, and
+    the start of the window is moved 128 samples per frame.
+    Generally, width = (int)(sample_rate / 62.5) and advance =
+    (int)(sample_rate / 125).  Options:
+
+    Output dimension: (int)(sample_rate / 125.0)
+
+    Options: 
+    - sample_rate (int, obligatory) : samples per second
+
+- mel  
+
+    Compute Mel-like bin features.  The output dimension depends on
+    the sample rate.  A few example values below, see the exact
+    function in the source.
+
+    Output dimension:
+    - 16000 Hz -> 21 dimensions
+    -  8000 Hz -> 15 dimensions
+
+    Options: 
+    - sources: single source
+
+- power
+
+    Compute a power feature: log10(sum of the input values)
+
+    Output dimension: 1
+
+    Options: 
+    - sources: single source
+
+- dct
+
+    Discrete Cosine Transform.  Computes 'dim' first DCT coefficients.
+
+    Options: 
+    - dim (int, default 12): output dimension
+    - sources: single source
+
+- delta
+
+    Compute a "delta"-feature for each element in the input vector
+    using the following function: 
+    out(t) = 1/normalization * sum_{k=1..width} k * (in(t-k) - in(t+k))
+
+    Output dimension: same as input
+
+    Options:
+    - width (int, default 2): the number of context frames used for
+      one direction (uses frames t-width, ..., t, ..., t+width)
+    - normalization: (float, default 2*width*(width+1)*(2*width+1)/6)
+    - sources: single source
+
+- normalization
+
+    Normalize mean and variance.
+
+    Output dimension: same as input
+
+    Options:
+    - mean (float vector, default 0): value to substract from values
+    - scale (float vector, default 1): scale used to multiply values
+    - var (float vector): another way to specify scale (scale = 1/sqrt(var))
+    - sources: single source
+
+- transform
+
+    Apply a linear transformation to the input vector (y = Ax).  The
+    input vector x is thought as a column vector, and 'matrix' option
+    specifies the matrix A in vector format: [A(0,0) ... A(0,src_dim)
+    ... A(1, 0) ... A(1, src_dim) ... ... A(dim, src_dim)]
+    
+    Output dimension: specified by 'dim'
+
+    Options:
+    - dim (int, default input dimension): output dimension
+    - matrix (float vector, default identity): transformation matrix
+    - sources: single source
+
+- merge
+
+    Merges input vectors from multiple sources into a large super
+    vector.
+
+    Output dimension: sum of the dimensions of the sources
+
+    Options:
+    - sources: one or multiple sources
