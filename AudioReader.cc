@@ -60,7 +60,7 @@ AudioReader::resize(int start, int end)
 
   if (offset < 0)
   {
-    for (int i = copy_end - 1; i >= 0; i--)
+    for (int i = copy_end - 1; i >= copy_start; i--)
       m_buffer[i - offset] = m_buffer[i];
   }
   else

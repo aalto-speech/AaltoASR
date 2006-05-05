@@ -37,8 +37,8 @@ MODULE TYPES
 
 - fft (BASE MODULE)
 
-    Short-time fourier spectrum.  A base module that reads an audio
-    file and computes short-time fourier spectrums 125 frames per
+    Short-time fourier power spectrum.  A base module that reads an
+    audio file and computes short-time fourier spectrums 125 frames per
     second using overlapping hamming windows.  For 16000 Hz sample
     rate, the spectrum is computed from a window of 256 samples, and
     the start of the window is moved 128 samples per frame.
@@ -49,6 +49,8 @@ MODULE TYPES
 
     Options: 
     - sample_rate (int, obligatory) : samples per second
+    - copy_borders (int, default 0) : if positive, duplicates the border
+      frames when requesting frames outside the file
 
 - mel  
 
@@ -75,6 +77,7 @@ MODULE TYPES
 - dct
 
     Discrete Cosine Transform.  Computes 'dim' first DCT coefficients.
+    The zeroth coefficient (effectively power) is not included.
 
     Options: 
     - dim (int, default 12): output dimension
@@ -129,3 +132,17 @@ MODULE TYPES
 
     Options:
     - sources: one or multiple sources
+
+- mean_subtractor
+
+    Subtracts a moving average from the feature vector. After MFCC this
+    processing is calle Cepstral Mean Subtraction (CMS).
+
+    Output dimension: same as input
+
+    Options:
+    - left (int, default 75): span of the moving average window to the
+      past
+    - right (int, default 75): span of the moving average window to the
+      future
+    - sources: single source
