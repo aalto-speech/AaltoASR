@@ -24,7 +24,7 @@ main(int argc, char *argv[])
   double global_acc_count;
   std::vector<float> mean, scale;
   bool raw_flag;
-  int info = 0;
+  int info;
   int block_size;
   int cur_block_size;
   int start_frame, end_frame;
@@ -40,13 +40,11 @@ main(int argc, char *argv[])
       ('M', "module=NAME", "arg", "", "normalization module name")
       ('b', "block=INT", "arg", "1000", "block size (for reducing round-off errors)")
       ('P', "print", "", "", "print mean and scale to stdout")
-      ('i', "info=INT", "arg", "1", "info level")
+      ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
 
-    if (config["info"].specified)
-      info = config["info"].get_int();
-
+    info = config["info"].get_int();
     raw_flag = config["raw-input"].specified;
     gen.load_configuration(io::Stream(config["config"].get_str()));
 

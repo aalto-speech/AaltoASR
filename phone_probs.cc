@@ -39,7 +39,7 @@ main(int argc, char *argv[])
 {
   bool raw_flag;
   int lnabytes;
-  int info = 0;
+  int info;
   std::string out_dir;
   std::string out_file = "";
   int start_frame, end_frame;
@@ -51,22 +51,20 @@ main(int argc, char *argv[])
   try {
     config("usage: phone_probs [OPTION...]\n")
       ('h', "help", "", "", "display help")
-      ('b', "base=BASENAME", "arg", "", "Base filename for model files")
+      ('b', "base=BASENAME", "arg", "", "base filename for model files")
       ('g', "gk=FILE", "arg", "", "Gaussian kernels")
       ('m', "mc=FILE", "arg", "", "kernel indices for states")
       ('p', "ph=FILE", "arg", "", "HMM definitions")
-      ('c', "config=FILE", "arg must", "", "read feature configuration")
+      ('c', "config=FILE", "arg must", "", "feature configuration")
       ('\0', "recipe=FILE", "arg must", "", "recipe file")
       ('o', "output-dir=DIR", "arg", "", "output directory (default: use filenames from recipe)")
       ('r', "raw-input", "", "", "raw audio input")
       ('\0', "lnabytes=INT", "arg", "2", "Number of bytes for probabilities, 2 (default) or 4\n")
-      ('i', "info=INT", "arg", "1", "info level")
+      ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
 
-    if (config["info"].specified)
-      info = config["info"].get_int();
-
+    info = config["info"].get_int();
     raw_flag = config["raw-input"].specified;
     gen.load_configuration(io::Stream(config["config"].get_str()));
 

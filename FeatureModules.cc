@@ -160,6 +160,7 @@ FFTModule::set_file(FILE *fp)
     throw std::string(
       "File sample rate does not match the model configuration");
   }
+  m_eof_frame = INT_MAX; // No EOF frame encountered yet
 }
 
 

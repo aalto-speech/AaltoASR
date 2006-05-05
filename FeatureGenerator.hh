@@ -100,8 +100,7 @@ FeatureGenerator::generate(int frame)
 {
   assert( m_last_module != NULL );
   const FeatureVec temp = m_last_module->at(frame);
-  if (m_base_module->eof(frame))
-    m_eof_on_last_frame = true;
+  m_eof_on_last_frame = m_base_module->eof(frame);
   return temp;
 }
 
