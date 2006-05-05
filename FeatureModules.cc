@@ -184,6 +184,7 @@ FFTModule::get_module_config(ModuleConfig &config)
 {
   assert(m_sample_rate > 0);
   config.set("sample_rate", m_sample_rate);
+  config.set("copy_borders", m_copy_borders);
 }
 
 void
@@ -196,6 +197,9 @@ FFTModule::set_module_config(const ModuleConfig &config)
 
   if (!config.get("sample_rate", m_sample_rate))
     throw std::string("FFTModule: Must set sample rate");
+
+  m_copy_borders = 0;
+  config.get("copy_borders", m_copy_borders);
 
   m_window_width = (int)(m_sample_rate/62.5);
   m_window_advance = (int)(m_sample_rate/125);
@@ -218,18 +222,38 @@ FFTModule::set_module_config(const ModuleConfig &config)
 void
 FFTModule::generate(int frame)
 {
-  // Fetch m_window_width samples (+1 for lowpass filtering)
-  m_reader.fetch(frame * m_window_advance,
-                 frame * m_window_advance + m_window_width + 1);
-
+  bool last_frame_border = false;
+  int win_start = frame * m_window_advance;
+  
+  if (m_copy_borders && frame < 0)
+  {
+    m_reader.fetch(0, m_window_width + 1);
+    win_start = 0;
+  }
+  else if (m_copy_borders && frame >= m_eof_frame)
+  {
+    win_start = (m_eof_frame-1) * m_window_advance;
+    m_reader.fetch(win_start, win_start + m_window_width + 1);
+    last_frame_border = true;
+  }
+  else
+  {
+    // Fetch m_window_width samples (+1 for lowpass filtering)
+    m_reader.fetch(win_start, win_start + m_window_width + 1);
+  }
+  
   if (m_reader.eof_sample() < INT_MAX)
   {
     m_eof_frame = std::max((m_reader.eof_sample() - m_window_width - 1) /
                            m_window_advance, 0);
+    if (m_copy_borders && frame >= m_eof_frame && !last_frame_border)
+    {
+      win_start = (m_eof_frame-1) * m_window_advance;
+      m_reader.fetch(win_start, win_start + m_window_width + 1);
+    }
   }
   
   // Apply lowpass filtering and hamming window
-  int win_start = frame * m_window_advance;
   for (int t = 0; t < m_window_width; t++)
   {
     m_fftw_datain[t] = m_hamming_window[t] * 
@@ -653,3 +677,76 @@ MergerModule::generate(int frame)
   assert( cur_dim == m_dim );
 }
 
+
+//////////////////////////////////////////////////////////////////
+// MeanSubtractionModule
+//////////////////////////////////////////////////////////////////
+
+MeanSubtractorModule::MeanSubtractorModule() :
+  m_cur_frame(INT_MAX)
+{
+  m_type_str = type_str();
+}
+
+void
+MeanSubtractorModule::get_module_config(ModuleConfig &config)
+{
+  config.set("left", m_own_offset_left-1);
+  config.set("right", m_own_offset_right);
+}
+
+void
+MeanSubtractorModule::set_module_config(const ModuleConfig &config)
+{
+  m_dim = m_sources.back()->dim();
+  m_cur_mean.resize(m_dim, 0);
+
+  m_own_offset_left = 75; // Default
+  config.get("left", m_own_offset_left);
+
+  // We add 1 to m_own_offset_left so that when generating a new frame
+  // the furthest context on the left is still available from the
+  // previous frame for subtraction from the current mean.
+  m_own_offset_left++;
+
+  m_own_offset_right = 75; // Default
+  config.get("right", m_own_offset_right);
+
+  if (m_own_offset_left < 1 || m_own_offset_right < 0)
+    throw std::string("MeanSubtractorModule: context widths must be >= 0");
+  m_width = m_own_offset_left+m_own_offset_right;
+}
+
+void
+MeanSubtractorModule::generate(int frame)
+{
+  FeatureVec target_fea = m_buffer[frame];
+  const FeatureVec source_fea = m_sources.back()->at(frame);
+  int i, d;
+
+  if (frame == m_cur_frame+1)
+  {
+    // Update the current mean quickly
+    const FeatureVec r = m_sources.back()->at(frame-m_own_offset_left);
+    const FeatureVec a = m_sources.back()->at(frame+m_own_offset_right);
+    for (d = 0; d < m_dim; d++)
+      m_cur_mean[d] += (a[d] - r[d])/m_width;
+  }
+  else
+  {
+    // Must go through the entire buffer to determine the mean
+    for (i = -m_own_offset_left+1; i<=m_own_offset_right; i++)
+    {
+      const FeatureVec v = m_sources.back()->at(frame+i);
+      for (d = 0; d < m_dim; d++)
+        m_cur_mean[d] += v[d];
+    }
+    for (d = 0; d < m_dim; d++)
+      m_cur_mean[d] /= m_width;
+  }
+
+  m_cur_frame = frame;
+
+  for (d = 0; d < m_dim; d++)
+    target_fea[d] = source_fea[d] - m_cur_mean[d];
+}

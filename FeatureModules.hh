@@ -159,6 +159,8 @@ private:
   int m_frame_rate;
   int m_eof_frame;
 
+  int m_copy_borders;
+
   int m_window_advance;
   int m_window_width;
   std::vector<float> m_hamming_window;
@@ -262,6 +264,20 @@ private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
+};
+
+class MeanSubtractorModule : public FeatureModule {
+public:
+  MeanSubtractorModule();
+  static const char *type_str() { return "mean_subtractor"; }
+private:
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
+  virtual void generate(int frame);
+private:
+  std::vector<double> m_cur_mean;
+  int m_cur_frame;
+  int m_width;
 };
 
 

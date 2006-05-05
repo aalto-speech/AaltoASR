@@ -108,6 +108,8 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new TransformationModule();
     else if (type == MergerModule::type_str())
       module = new MergerModule();
+    else if (type == MeanSubtractorModule::type_str())
+      module = new MeanSubtractorModule();
     else
       throw std::string("Unknown module type '") + type + std::string("'");
     module->set_name(name);

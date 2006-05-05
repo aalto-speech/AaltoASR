@@ -57,12 +57,17 @@ AudioReader::resize(int start, int end)
 
   int copy_start = std::max(0, offset);
   int copy_end = std::min(old_len, new_len + offset);
-  if (offset < 0) 
-    for (int i = copy_end - 1; i >= copy_start; i--)
-      m_buffer[i + offset] = m_buffer[i];
+
+  if (offset < 0)
+  {
+    for (int i = copy_end - 1; i >= 0; i--)
+      m_buffer[i - offset] = m_buffer[i];
+  }
   else
+  {
     for (int i = copy_start; i < copy_end; i++)
       m_buffer[i - offset] = m_buffer[i];
+  }
 }
 
 void
