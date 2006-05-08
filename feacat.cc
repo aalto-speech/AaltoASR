@@ -60,7 +60,7 @@ main(int argc, char *argv[])
       end_frame = config["end-frame"].get_int();
     for (int f = start_frame; f < end_frame; f++) {
       const FeatureVec fea = gen.generate(f);
-      if (gen.eof())
+      if (end_frame == INT_MAX && gen.eof())
 	break;
       print_feature(fea);
     }
