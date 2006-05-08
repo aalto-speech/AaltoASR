@@ -83,6 +83,16 @@ namespace util {
       return logf(x);
   }
 
+  /** Compute modulo of two values so that negative arguments are
+   * handled correctly. */
+  int modulo(int a, int b) 
+  {
+    int result = a % b;
+    if (result < 0)
+      result += b;
+    return result;
+  }
+
 };
 
 #endif /* UTIL_HH */
