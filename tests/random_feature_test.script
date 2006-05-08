@@ -1,0 +1,3 @@
+#!/bin/sh
+
+./random_feature_test short.wav mfcc_p_dd.feaconf -10 80 1000
