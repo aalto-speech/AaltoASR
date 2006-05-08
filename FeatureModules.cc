@@ -113,6 +113,13 @@ FeatureModule::set_config(const ModuleConfig &config)
   set_buffer(0, 0);
 }
 
+void
+FeatureModule::reset()
+{
+  m_buffer_last_pos = INT_MAX;
+  reset_module();
+}
+
 
 //////////////////////////////////////////////////////////////////
 // FFTModule
@@ -125,7 +132,9 @@ FFTModule::FFTModule(FeatureGenerator *fea_gen) :
   m_eof_frame(INT_MAX),
   m_window_advance(0),
   m_window_width(0),
-  m_coeffs(NULL)
+  m_coeffs(NULL),
+  m_copy_borders(true),
+  m_last_feature_frame(INT_MIN)
 {
   m_type_str = type_str();
 }
@@ -198,7 +207,7 @@ FFTModule::set_module_config(const ModuleConfig &config)
   if (!config.get("sample_rate", m_sample_rate))
     throw std::string("FFTModule: Must set sample rate");
 
-  m_copy_borders = 0;
+  m_copy_borders = 1;
   config.get("copy_borders", m_copy_borders);
 
   m_window_width = (int)(m_sample_rate/62.5);
@@ -218,38 +227,55 @@ FFTModule::set_module_config(const ModuleConfig &config)
                               &m_fftw_dataout[0], FFTW_R2HC, FFTW_ESTIMATE);
 }
 
+void
+FFTModule::reset_module()
+{
+  m_first_feature.clear();
+  m_last_feature.clear();
+  m_last_feature_frame = INT_MIN;
+}
 
 void
 FFTModule::generate(int frame)
 {
-  bool last_frame_border = false;
-  int win_start = frame * m_window_advance;
-  
+  // NOTE: because of lowpass filtering, (m_window_width PLUS one)
+  // samples are fetched from the audio file
+
+  int window_start = frame * m_window_advance;
+
+  // The first frame is returned for negative frames.
   if (m_copy_borders && frame < 0)
   {
-    m_reader.fetch(0, m_window_width + 1);
-    win_start = 0;
-  }
-  else if (m_copy_borders && frame >= m_eof_frame)
-  {
-    win_start = (m_eof_frame-1) * m_window_advance;
-    m_reader.fetch(win_start, win_start + m_window_width + 1);
-    last_frame_border = true;
-  }
-  else
-  {
-    // Fetch m_window_width samples (+1 for lowpass filtering)
-    m_reader.fetch(win_start, win_start + m_window_width + 1);
+    if (!m_first_feature.empty()) {
+      m_buffer[frame].set(m_first_feature);
+      return;
+    }
+    window_start = 0;
   }
   
-  if (m_reader.eof_sample() < INT_MAX)
+  // The last whole frame (not containing end of file) is returned for
+  // frames after and on the eof.
+  else if (m_copy_borders && frame >= m_eof_frame)
   {
-    m_eof_frame = std::max((m_reader.eof_sample() - m_window_width - 1) /
-                           m_window_advance, 0);
-    if (m_copy_borders && frame >= m_eof_frame && !last_frame_border)
-    {
-      win_start = (m_eof_frame-1) * m_window_advance;
-      m_reader.fetch(win_start, win_start + m_window_width + 1);
+    assert(!m_last_feature.empty());
+    m_buffer[frame].set(m_last_feature);
+    return;
+  }
+
+  int window_end = window_start + m_window_width + 1;
+  m_reader.fetch(window_start, window_end);
+
+  // EOF during this frame?
+  if (m_eof_frame == INT_MAX && m_reader.eof_sample() < window_end) {
+    if (frame == 0)
+      throw std::string("audio shorter than frame");
+    assert(m_reader.eof_sample() >= window_start);
+    m_eof_frame = frame;
+
+    if (m_copy_borders) {
+      assert(!m_last_feature.empty());
+      m_buffer[frame].set(m_last_feature);
+      return;
     }
   }
   
@@ -257,7 +283,7 @@ FFTModule::generate(int frame)
   for (int t = 0; t < m_window_width; t++)
   {
     m_fftw_datain[t] = m_hamming_window[t] * 
-      (m_reader[win_start + t + 1] - 0.95 * m_reader[win_start + t]);
+      (m_reader[window_start + t + 1] - 0.95 * m_reader[window_start + t]);
   }
   
   fftw_execute(m_coeffs);
@@ -268,6 +294,15 @@ FFTModule::generate(int frame)
   {
     target[t] = m_fftw_dataout[t] * m_fftw_dataout[t] + 
       m_fftw_dataout[m_window_width-t] * m_fftw_dataout[m_window_width-t];
+  }
+  
+  if (m_copy_borders && m_first_feature.empty() && frame <= 0)
+    target.get(m_first_feature);
+
+  if (m_copy_borders && frame > m_last_feature_frame) 
+  {
+    target.get(m_last_feature);
+    m_last_feature_frame = frame;
   }
 }
 
@@ -715,6 +750,12 @@ MeanSubtractorModule::set_module_config(const ModuleConfig &config)
   if (m_own_offset_left < 1 || m_own_offset_right < 0)
     throw std::string("MeanSubtractorModule: context widths must be >= 0");
   m_width = m_own_offset_left+m_own_offset_right;
+}
+
+void
+MeanSubtractorModule::reset_module()
+{
+  m_cur_frame = INT_MAX;
 }
 
 void

@@ -76,7 +76,13 @@ public:
    * Configuring a newly created class with \c config should result in
    * an identical configuration. */
   void get_config(ModuleConfig &config);
-  
+
+  /** Reset the internal state of the module.  FeatureGenerator calls
+   * this method for all modules, when it opens a new audio file.
+   * \note Derived classes should implement the virtual method
+   * reset_module() if resetting is desired. */
+  void reset();
+
   /** Access features computed by the module. */
   const FeatureVec at(int frame);
 
@@ -90,6 +96,11 @@ public:
 private:
   virtual void set_module_config(const ModuleConfig &config) = 0;
   virtual void get_module_config(ModuleConfig &config) = 0;
+
+  /** Virtual method for resetting the internal states of the derived
+   * modules. */
+  virtual void reset_module() { }
+  
   virtual void generate(int frame) = 0;
   
 protected:
@@ -149,6 +160,7 @@ public:
 private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);
+  virtual void reset_module();
   virtual void generate(int frame);
 
 private:
@@ -159,14 +171,20 @@ private:
   int m_frame_rate;
   int m_eof_frame;
 
-  int m_copy_borders;
-
   int m_window_advance;
   int m_window_width;
   std::vector<float> m_hamming_window;
   fftw_plan m_coeffs;
   std::vector<double> m_fftw_datain;
   std::vector<double> m_fftw_dataout;
+
+  /** Should we copy border frames when negative or after-eof frames
+   * are requested?  Otherwise, we assume that AudioReader gives zero
+   * samples outside the file. */
+  int m_copy_borders;
+  std::vector<float> m_first_feature; //!< Feature returned for negative frames
+  std::vector<float> m_last_feature; //!< Feature returned after EOF
+  int m_last_feature_frame; //!< The frame of the feature returned after EOF
 };
 
 
@@ -273,6 +291,7 @@ public:
 private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);
+  virtual void reset_module();
   virtual void generate(int frame);
 private:
   std::vector<double> m_cur_mean;
