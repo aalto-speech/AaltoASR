@@ -160,7 +160,7 @@ AudioReader::read_from_file(int start, int end)
 	sf_read_short(m_sndfile, &m_buffer[index], samples_to_read);
       assert(samples_read >= 0);
       if (samples_read == 0) {
-	m_eof_sample = m_end_sample;
+	m_eof_sample = m_file_sample;
 	break;
       }
       m_file_sample += samples_read;
