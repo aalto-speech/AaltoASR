@@ -8,6 +8,7 @@
 FeatureGenerator::FeatureGenerator(void) :
   m_base_module(NULL),
   m_last_module(NULL),
+  m_file(NULL),
   m_eof_on_last_frame(false)
 {
 }
@@ -36,6 +37,9 @@ FeatureGenerator::open(const std::string &filename, bool raw_audio)
   
   assert( m_base_module != NULL );
   m_base_module->set_file(m_file);
+
+  for (int i = 0; i < (int)m_modules.size(); i++)
+    m_modules[i]->reset();
 }
 
 
