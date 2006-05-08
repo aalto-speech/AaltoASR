@@ -49,7 +49,7 @@ MODULE TYPES
 
     Options: 
     - sample_rate (int, obligatory) : samples per second
-    - copy_borders (int, default 0) : if positive, duplicates the border
+    - copy_borders (int, default 1) : if positive, duplicates the border
       frames when requesting frames outside the file
 
 - mel  
