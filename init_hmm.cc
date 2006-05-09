@@ -58,8 +58,14 @@ int main(int argc, char **argv)
 
     outfile = outbase + std::string(".ph");
     model.write_ph(outfile);
-  }  catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
+  }
+  catch (std::exception &e) {
+    fprintf(stderr, "exception: %s\n", e.what());
+    abort();
+  }
+  catch (std::string &str) {
+    fprintf(stderr, "exception: %s\n", str.c_str());
+    abort();
   }
   return (0);
 }

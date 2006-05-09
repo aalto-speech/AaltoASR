@@ -4,7 +4,7 @@ ARCH = $(shell uname -p)
 # Opteron cluster
 ifeq ($(ARCH),x86_64)
 CXX = /usr/bin/g++
-OPT = -O2
+OPT = -g
 INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include
 LDFLAGS = 
 WARNINGS = -Wall
