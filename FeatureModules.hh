@@ -263,6 +263,8 @@ class TransformationModule : public FeatureModule {
 public:
   TransformationModule();
   static const char *type_str() { return "transform"; }
+  const std::vector<float> *get_transformation_matrix(void) { return &m_transform; }
+  void set_transformation_matrix(std::vector<float> &t);
 private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);

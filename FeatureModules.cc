@@ -666,6 +666,15 @@ TransformationModule::generate(int frame)
 }
 
 
+void
+TransformationModule::set_transformation_matrix(std::vector<float> &t)
+{
+  if (t.size() != m_transform.size())
+    throw std::string("TransformationModule: The dimension of the new transformation matrix does not match the old dimension");
+  for (int i = 0; i < (int)m_transform.size(); i++)
+    m_transform[i] = t[i];
+}
+
 //////////////////////////////////////////////////////////////////
 // MergerModule
 //////////////////////////////////////////////////////////////////
