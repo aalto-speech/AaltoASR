@@ -108,7 +108,7 @@ private:
 
 public:
   void set_info(int info) { m_info = info; }
-  void set_transform_module(TransformationModule *mod) { m_transform_module = mod; }
+  void set_transform_module(LinTransformModule *mod) { m_transform_module = mod; }
   void set_mllt(bool mllt_flag) { m_mllt = mllt_flag; }
   void set_hlda(bool hlda_flag) { m_hlda = hlda_flag; }
   void set_min_var(float min_var) { m_min_var = min_var; }
@@ -131,7 +131,7 @@ public:
 private:
 
   int m_info;
-  TransformationModule *m_transform_module;
+  LinTransformModule *m_transform_module;
   int m_source_dim;
   bool m_mllt;
   bool m_hlda;

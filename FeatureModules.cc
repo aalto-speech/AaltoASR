@@ -597,24 +597,27 @@ NormalizationModule::generate(int frame)
 
 
 //////////////////////////////////////////////////////////////////
-// TransformationModule
+// LinTransformModule
 //////////////////////////////////////////////////////////////////
 
-TransformationModule::TransformationModule()
+LinTransformModule::LinTransformModule()
 {
   m_type_str = type_str();
 }
 
 void
-TransformationModule::get_module_config(ModuleConfig &config)
+LinTransformModule::get_module_config(ModuleConfig &config)
 {
   assert(m_dim > 0);
-  config.set("matrix", m_transform);
   config.set("dim", m_dim);
+  if (m_matrix_defined)
+    config.set("matrix", m_transform);
+  if (m_bias_defined)
+    config.set("bias", m_bias);
 }
 
 void
-TransformationModule::set_module_config(const ModuleConfig &config)
+LinTransformModule::set_module_config(const ModuleConfig &config)
 {
   int r, c, index;
   
@@ -625,12 +628,14 @@ TransformationModule::set_module_config(const ModuleConfig &config)
   m_dim = m_src_dim; // Default value
 
   config.get("matrix", m_transform);
+  config.get("bias", m_bias);
   config.get("dim", m_dim);
   if (m_dim < 1)
-    throw std::string("TransformationModule: Dimension must be > 0");
+    throw std::string("LinTransformModule: Dimension must be > 0");
   
   if (m_transform.size() == 0)
   {
+    m_matrix_defined = false;
     // Initialize with identity matrix
     m_transform.resize(m_dim*m_src_dim);
     for (r = index = 0; r < m_dim; r++)
@@ -643,37 +648,84 @@ TransformationModule::set_module_config(const ModuleConfig &config)
   }
   else
   {
-    if (m_dim == 0)
-      throw std::string("TransformationModule: Must set the output dimension");
-    else if ((int)m_transform.size() != m_dim*m_src_dim)
-      throw std::string("TransformationModule: Invalid matrix dimension");
+    m_matrix_defined = true;
+    if ((int)m_transform.size() != m_dim*m_src_dim)
+      throw std::string("LinTransformModule: Invalid matrix dimension");
+  }
+
+  if (m_bias.size() == 0)
+  {
+    m_bias_defined = false;
+    // Initialize with zero vector
+    m_bias.resize(m_dim);
+    for (c = 0; c < m_dim; c++)
+      m_bias[c] = 0;
+  }
+  else
+  {
+    m_bias_defined = true;
+    if ((int)m_bias.size() != m_dim)
+      throw std::string("LinTransformModule: Invalid bias dimension");
   }
 }
 
 
 void
-TransformationModule::generate(int frame)
+LinTransformModule::generate(int frame)
 {
   int index;
   const FeatureVec source_fea = m_sources.back()->at(frame);
   FeatureVec target_fea = m_buffer[frame];
-  for (int i = index = 0; i < m_dim; i++)
+
+  if (m_matrix_defined)
   {
-    target_fea[i] = 0;
-    for (int j = 0; j < m_src_dim; j++, index++)
-      target_fea[i] += m_transform[index]*source_fea[j];
+    for (int i = index = 0; i < m_dim; i++)
+    {
+      target_fea[i] = 0;
+      for (int j = 0; j < m_src_dim; j++, index++)
+        target_fea[i] += m_transform[index]*source_fea[j];
+    }
+  }
+  else
+  {
+    for (int i = 0; i < m_dim; i++)
+      target_fea[i] = source_fea[i];
+  }
+  if (m_bias_defined)
+  {
+    for (int i = 0; i < m_dim; i++)
+      target_fea[i] += m_bias[i];
   }
 }
 
 
 void
-TransformationModule::set_transformation_matrix(std::vector<float> &t)
+LinTransformModule::set_transformation_matrix(std::vector<float> &t)
 {
   if (t.size() != m_transform.size())
-    throw std::string("TransformationModule: The dimension of the new transformation matrix does not match the old dimension");
+    throw std::string("LinTransformnModule: The dimension of the new transformation matrix does not match the old dimension");
   for (int i = 0; i < (int)m_transform.size(); i++)
     m_transform[i] = t[i];
 }
+
+
+void
+LinTransformModule::set_transformation_bias(std::vector<float> &b)
+{
+  if (b.size() == 0)
+  {
+    m_bias.clear();
+    m_bias_defined = false;
+  }
+  else
+  {
+    if ((int)b.size() != m_dim)
+      throw std::string("LinTransformModule: The dimension of the new bias does not match the output dimension");
+    for (int i = 0; i < m_dim; i++)
+      m_bias[i] = b[i];
+  }
+}
+
 
 //////////////////////////////////////////////////////////////////
 // MergerModule
@@ -799,4 +851,51 @@ MeanSubtractorModule::generate(int frame)
 
   for (d = 0; d < m_dim; d++)
     target_fea[d] = source_fea[d] - m_cur_mean[d];
+}
+
+
+//////////////////////////////////////////////////////////////////
+// ConcatModule
+//////////////////////////////////////////////////////////////////
+
+ConcatModule::ConcatModule()
+{
+  m_type_str = type_str();
+}
+
+void
+ConcatModule::get_module_config(ModuleConfig &config)
+{
+  config.set("left", m_own_offset_left);
+  config.set("right", m_own_offset_right);
+}
+
+void
+ConcatModule::set_module_config(const ModuleConfig &config)
+{
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+
+  config.get("left", m_own_offset_left);
+  config.get("right", m_own_offset_right);
+  
+  if (m_own_offset_left < 0 || m_own_offset_right < 0)
+    throw std::string("ConcatModule: context spans must be >= 0");
+
+  m_dim = m_sources.back()->dim() * (1+m_own_offset_left+m_own_offset_right);
+}
+
+void
+ConcatModule::generate(int frame)
+{
+  FeatureVec target_fea = m_buffer[frame];
+  int cur_dim = 0;
+  
+  for (int i = -m_own_offset_left; i <= m_own_offset_right; i++)
+  {
+    const FeatureVec source_fea = m_sources.back()->at(frame + i);
+    for (int j = 0; j < source_fea.dim(); j++)
+      target_fea[cur_dim++] = source_fea[j];
+  }
+  assert( cur_dim == m_dim );
 }

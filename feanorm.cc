@@ -62,6 +62,10 @@ main(int argc, char *argv[])
       assert( sources.front()->dim() == dim );
       norm_mod_src = sources.front();
     }
+    else if (config["write-config"].specified)
+    {
+      fprintf(stderr, "Warning: No --module given, configuration will be written unaltered\n");
+    }
 
     block_size = config["block"].get_int();
 
@@ -135,6 +139,12 @@ main(int argc, char *argv[])
             global_var_acc[d] += block_var_acc[d]/(double)block_size;
           }
           global_acc_count++;
+          // Reset the block accumulators
+          for (int d = 0; d < dim; d++)
+          {
+            block_mean_acc[d] = 0;
+            block_var_acc[d] = 0;
+          }
           cur_block_size = 0;
         }
       }

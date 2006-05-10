@@ -108,12 +108,14 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new DeltaModule();
     else if (type == NormalizationModule::type_str())
       module = new NormalizationModule();
-    else if (type == TransformationModule::type_str())
-      module = new TransformationModule();
+    else if (type == LinTransformModule::type_str())
+      module = new LinTransformModule();
     else if (type == MergerModule::type_str())
       module = new MergerModule();
     else if (type == MeanSubtractorModule::type_str())
       module = new MeanSubtractorModule();
+    else if (type == ConcatModule::type_str())
+      module = new ConcatModule();
     else
       throw std::string("Unknown module type '") + type + std::string("'");
     module->set_name(name);

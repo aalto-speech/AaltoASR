@@ -109,18 +109,21 @@ MODULE TYPES
     - var (float vector): another way to specify scale (scale = 1/sqrt(var))
     - sources: single source
 
-- transform
+- lin_transform
 
-    Apply a linear transformation to the input vector (y = Ax).  The
-    input vector x is thought as a column vector, and 'matrix' option
-    specifies the matrix A in vector format: [A(0,0) ... A(0,src_dim)
-    ... A(1, 0) ... A(1, src_dim) ... ... A(dim, src_dim)]
+    Apply a linear transformation to the input vector (y = Ax + b).
+    The input vector x is thought as a column vector, 'matrix' option
+    specifies the matrix A in vector format [A(0,0) ... A(0,src_dim)
+    ... A(1, 0) ... A(1, src_dim) ... ... A(dim, src_dim)] and
+    'bias' option specifies the bias vector as a (transformed) column
+    vector.
     
     Output dimension: specified by 'dim'
 
     Options:
     - dim (int, default input dimension): output dimension
     - matrix (float vector, default identity): transformation matrix
+    - bias (float vector, default 0): bias vector
     - sources: single source
 
 - merge

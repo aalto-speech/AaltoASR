@@ -161,7 +161,7 @@ main(int argc, char *argv[])
 
     if (config["mllt"].specified)
     {
-      TransformationModule *mllt_module = dynamic_cast< TransformationModule* >
+      LinTransformnModule *mllt_module = dynamic_cast< LinTransformModule* >
         (fea_gen.module(config["mllt"].get_str()));
       if (mllt_module == NULL)
         throw std::string("Module ") + config["mllt"].get_str() +
@@ -173,7 +173,7 @@ main(int argc, char *argv[])
     {
       if (config["mllt"].specified)
         throw std::string("Both --mllt and --hlda can not be defined at the same time");
-      TransformationModule *hlda_module = dynamic_cast< TransformationModule* >
+      LinTransformModule *hlda_module = dynamic_cast< LinTransformModule* >
         (fea_gen.module(config["hlda"].get_str()));
       if (hlda_module == NULL)
         throw std::string("Module ") + config["hlda"].get_str() +

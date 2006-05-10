@@ -3,7 +3,7 @@
 
 #include <fftw3.h>
 #include <vector>
-#include "ModuleConfig.hh"
+
 #include "FeatureBuffer.hh"
 #include "AudioReader.hh"
 #include "ModuleConfig.hh"
@@ -259,18 +259,22 @@ private:
 };
 
 
-class TransformationModule : public FeatureModule {
+class LinTransformModule : public FeatureModule {
 public:
-  TransformationModule();
-  static const char *type_str() { return "transform"; }
+  LinTransformModule();
+  static const char *type_str() { return "lin_transform"; }
   const std::vector<float> *get_transformation_matrix(void) { return &m_transform; }
+  const std::vector<float> *get_transformation_bias(void) { return &m_bias; }
   void set_transformation_matrix(std::vector<float> &t);
+  void set_transformation_bias(std::vector<float> &b);
 private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 private:
   std::vector<float> m_transform;
+  std::vector<float> m_bias;
+  bool m_matrix_defined, m_bias_defined;
   int m_src_dim;
 };
 
@@ -285,6 +289,7 @@ private:
   virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
 };
+
 
 class MeanSubtractorModule : public FeatureModule {
 public:
@@ -301,6 +306,18 @@ private:
   int m_width;
 };
 
+
+class ConcatModule : public FeatureModule {
+public:
+  ConcatModule();
+  static const char *type_str() { return "concat"; }
+private:
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
+  virtual void generate(int frame);
+private:
+  int left, right;
+};
 
 
 #endif /* FEATUREMODULES_HH */
