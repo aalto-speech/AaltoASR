@@ -1477,15 +1477,15 @@ HmmTrainer::write_duration_statistics(HmmSet &model)
 
 
 void
-HmmTrainer::save_tying(const char *filename)
+HmmTrainer::save_tying(const std::string &filename)
 {
   FILE *fp;
   int state_num;
 
   // Save silence models
-  if ((fp = fopen(filename, "w")) == NULL)
+  if ((fp = fopen(filename.c_str(), "w")) == NULL)
   {
-    fprintf(stderr, "Could not open file %s for writing.\n", filename);
+    fprintf(stderr, "Could not open file %s for writing.\n", filename.c_str());
     exit(1);
   }
   fprintf(fp, "_ 1 0\n__ 3 1 2 3\n");

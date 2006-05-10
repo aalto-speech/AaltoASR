@@ -76,8 +76,8 @@ public:
   void add_missing_triphone(std::string &left, std::string &center,
                             std::string &right);
   void tie_triphones(void);
-  void load_rule_set(const char *filename);
-  int save_to_basebind(const char *filename, int initial_statenum);
+  void load_rule_set(const std::string &filename);
+  int save_to_basebind(const std::string &filename, int initial_statenum);
 
 private:
   std::string get_triphone_label(const std::string &left,

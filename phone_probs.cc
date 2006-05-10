@@ -4,6 +4,9 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "str.hh"
 #include "io.hh"
@@ -43,7 +46,8 @@ main(int argc, char *argv[])
   std::string out_dir;
   std::string out_file = "";
   int start_frame, end_frame;
-  FILE *ofp;
+  bool no_overwrite;
+  io::Stream ofp;
   BYTE buffer[4];
 
   assert( sizeof(BYTE) == 1 );
@@ -59,7 +63,8 @@ main(int argc, char *argv[])
       ('\0', "recipe=FILE", "arg must", "", "recipe file")
       ('o', "output-dir=DIR", "arg", "", "output directory (default: use filenames from recipe)")
       ('r', "raw-input", "", "", "raw audio input")
-      ('\0', "lnabytes=INT", "arg", "2", "Number of bytes for probabilities, 2 (default) or 4\n")
+      ('\0', "lnabytes=INT", "arg", "2", "number of bytes for probabilities, 2 (default) or 4")
+      ('n', "no_overwrite", "", "", "prevent overwriting existing files")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -71,6 +76,8 @@ main(int argc, char *argv[])
     lnabytes = config["lnabytes"].get_int();
     if (lnabytes != 2 && lnabytes != 4)
       throw std::string("Invalid number of LNA bytes");
+
+    no_overwrite = config["no_overwrite"].specified;
 
     if (config["base"].specified)
     {
@@ -142,6 +149,18 @@ main(int argc, char *argv[])
       if (info > 0)
         printf("Output: %s\n", out_file.c_str());
 
+      if (no_overwrite)
+      {
+        // Test file to prevent overwriting
+        struct stat buf;
+        if (stat(out_file.c_str(), &buf) == 0)
+        {
+	  fprintf(stderr, "WARNING: skipping existing lna file %s\n",
+                  out_file.c_str());
+	  continue;
+	}
+      }
+      
       start_frame = (int)(recipe.infos[recipe_index].start_time *
                           gen.frame_rate());
       end_frame = (int)(recipe.infos[recipe_index].end_time *
@@ -153,9 +172,7 @@ main(int argc, char *argv[])
 
       // Open files
       gen.open(recipe.infos[recipe_index].audio_path, raw_flag);
-      if ((ofp = fopen(out_file.c_str(),"w")) == NULL)
-        throw std::string("Can not open file ") + out_file +
-          std::string(" for writing");
+      ofp.open(out_file, "w");
 
       // Write header
       write_int(ofp, model.num_states());
@@ -197,7 +214,7 @@ main(int argc, char *argv[])
       }
 
       gen.close();
-      fclose(ofp);
+      ofp.close();
     }
   }
   catch (std::exception &e) {

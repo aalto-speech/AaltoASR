@@ -362,21 +362,27 @@ main(int argc, char *argv[])
 
     trainer.finish_train(model, fea_gen, NULL); // FIXME: ada_file missing
 
-    if (info > 0)
-      fprintf(stderr, "Train finished, writing models\n");
-
     if (!durstat)
+    {
+      if (info > 0)
+        fprintf(stderr, "Train finished, writing models\n");
+
       write_models();
+    }
   }
   catch (HmmSet::UnknownHmm &e) {
     fprintf(stderr, 
 	    "Unknown HMM in transcription, "
 	    "writing incompletely taught models\n");
     write_models();
-    fputs("Exit.\n", stderr);
-    exit(1);
-  } catch (std::exception &e) {
+    abort();
+  }
+  catch (std::exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());
-    exit(1);
+    abort();
+  }
+  catch (std::string &str) {
+    fprintf(stderr, "exception: %s\n", str.c_str());
+    abort();
   }
 }

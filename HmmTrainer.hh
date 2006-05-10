@@ -43,8 +43,8 @@ public:
   int num_unused_features(void) { return m_em_norm_warning_count; }
   double get_log_likelihood(void) { return m_log_likelihood; }
 
-  void load_rule_set(const char *filename) { triphone_set.load_rule_set(filename); }
-  void save_tying(const char *filename);
+  void load_rule_set(const std::string &filename) { triphone_set.load_rule_set(filename); }
+  void save_tying(const std::string &filename);
   
 private:
 

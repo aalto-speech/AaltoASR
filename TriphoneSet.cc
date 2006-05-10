@@ -555,17 +555,17 @@ TriphoneSet::cov_determinant(MatrixD *m)
 }
 
 void
-TriphoneSet::load_rule_set(const char *filename)
+TriphoneSet::load_rule_set(const std::string &filename)
 {
   FILE *fp;
   char line[200], *token;
   DecisionRule rule;
   std::string tmp_string;
 
-  fp = fopen(filename, "r");
+  fp = fopen(filename.c_str(), "r");
   if (fp == NULL)
   {
-    fprintf(stderr, "Could not open file %s for reading\n", filename);
+    fprintf(stderr, "Could not open file %s for reading\n", filename.c_str());
     exit(1);
   }
   while (fgets(line, 200, fp) != NULL)
@@ -615,16 +615,16 @@ TriphoneSet::load_rule_set(const char *filename)
 
 
 int
-TriphoneSet::save_to_basebind(const char *filename, int initial_statenum)
+TriphoneSet::save_to_basebind(const std::string &filename,int initial_statenum)
 {
   FILE *fp;
   int i, j, k, l;
   int statenum = initial_statenum;
 
-  fp = fopen(filename, "a");
+  fp = fopen(filename.c_str(), "a");
   if (fp == NULL)
   {
-    fprintf(stderr, "Could not open file %s for writing\n", filename);
+    fprintf(stderr, "Could not open file %s for writing\n", filename.c_str());
     exit(1);
   }
   for (i = 0; i < (int)m_triphones.size(); i++)
