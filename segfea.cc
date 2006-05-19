@@ -223,7 +223,7 @@ compute_features_segfea(const std::string &in_fname,
   char line[MAXLINE], *token;
   int s_beg, s_end, beg, end, dur, linecount;
   int p,pnum;
-  int state;
+  int state = 0; // Suppress warning
   char *label_token;
   char *state_token;
   int state_index;
@@ -309,7 +309,7 @@ compute_features_segfea(const std::string &in_fname,
           beg = (s_beg + p*dur/pnum);
           end = s_beg + ((p+1)*dur)/pnum;
         }   
-	  
+        
         // ocmpute features in this data segment beg...end
         if (info > 2)
           printf("  part %d/%d: frames %d-%d\n",p+1,pnum,beg,end);
@@ -376,7 +376,7 @@ main(int argc, char *argv[])
       ('z', "zip", "", "", "zip the feature files")
       ('s', "stateseg", "", "", "the segmentation is based on states")
       ('\0', "binary", "", "", "write feature files as binary floats")
-      ('\0', "bufsize=INT", "arg", "6000000", "buffer size, default 6000000")
+      ('\0', "bufsize=INT", "arg", "2000000", "buffer size, default 2000000")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);

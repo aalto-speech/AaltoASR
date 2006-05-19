@@ -100,11 +100,11 @@ main(int argc, char *argv[])
       ('\0', "swins=INT", "arg", "1000", "window size (default: 1000)")
       ('\0', "beam=FLOAT", "arg", "100.0", "log prob beam (default 100.0")
       ('\0', "sbeam=INT", "arg", "100", "state beam (default 100)")
-      ('\0', "overlap=FLOAT", "arg", "0.4", "window overlap (default 0.4)")
+      ('\0', "overlap=FLOAT", "arg", "0.4", "Viterbi window overlap (default 0.4)")
       ('\0', "cov", "", "", "update covariance")
       ('\0', "minvar=FLOAT", "arg", "0.1", "minimum variance value (default 0.1)")
-      ('\0', "mllt=MODULE", "arg", "", "run MLLT estimation for given module")
-      ('\0', "hlda=MODULE", "arg", "", "run HLDA estimation for given module")
+      ('\0', "mllt=MODULE", "arg", "", "run MLLT estimation for a given module")
+      ('\0', "hlda=MODULE", "arg", "", "run HLDA estimation for a given module")
       ('\0', "durstat", "", "", "don't train, just collect duration statistics")
       ('\0', "no_force_end", "", "", "do not force to the last state")
       ('\0', "segment", "", "", "print segmentation")
@@ -161,7 +161,7 @@ main(int argc, char *argv[])
 
     if (config["mllt"].specified)
     {
-      LinTransformnModule *mllt_module = dynamic_cast< LinTransformModule* >
+      LinTransformModule *mllt_module = dynamic_cast< LinTransformModule* >
         (fea_gen.module(config["mllt"].get_str()));
       if (mllt_module == NULL)
         throw std::string("Module ") + config["mllt"].get_str() +

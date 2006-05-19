@@ -34,12 +34,12 @@ FeatureGenerator::open(const std::string &filename, bool raw_audio)
   if (m_file == NULL)
     throw std::string("could not open file ") + filename + ": " +
       strerror(errno);
-  
-  assert( m_base_module != NULL );
-  m_base_module->set_file(m_file);
 
   for (int i = 0; i < (int)m_modules.size(); i++)
     m_modules[i]->reset();
+  
+  assert( m_base_module != NULL );
+  m_base_module->set_file(m_file);
 }
 
 
@@ -98,6 +98,8 @@ FeatureGenerator::load_configuration(FILE *file)
     FeatureModule *module = NULL;
     if (type == FFTModule::type_str())
       module = new FFTModule(this);
+    else if (type == PreModule::type_str())
+      module = new PreModule();
     else if (type == MelModule::type_str())
       module = new MelModule(this);
     else if (type == PowerModule::type_str())
@@ -116,6 +118,8 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new MeanSubtractorModule();
     else if (type == ConcatModule::type_str())
       module = new ConcatModule();
+    else if (type == VtlnModule::type_str())
+      module = new VtlnModule();
     else
       throw std::string("Unknown module type '") + type + std::string("'");
     module->set_name(name);

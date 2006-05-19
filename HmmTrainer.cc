@@ -271,6 +271,8 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
       window_end_frame = window_start_frame + viterbi.last_frame();
     }
 
+    assert( viterbi.feature_frame() == window_end_frame );
+
     // Print debug info
     if (m_info > 0 && old_current_frame < viterbi.current_frame()) {
       int start_frame = old_current_frame;
@@ -847,16 +849,6 @@ HmmTrainer::update_mllt_parameters(HmmSet &model, HmmSet &model_tmp,
           model_tmp.kernel(i).cov.diag(j) = model.kernel(i).cov.diag(j);
         }
       }
-      
-      /*if (model_tmp.kernel(i).cov.type() == HmmCovariance::SINGLE)
-        model_tmp.kernel(i).cov.var() = 1; // FIXME: Unit variance assumed
-      else if (model_tmp.kernel(i).cov.type() == HmmCovariance::DIAGONAL)
-      {
-        for (j = 0; j < model.dim(); j++)
-        {
-          model_tmp.kernel(i).cov.diag(j) = 1;
-        }
-        }*/
     }
     else
     {
@@ -891,8 +883,8 @@ HmmTrainer::update_mllt_parameters(HmmSet &model, HmmSet &model_tmp,
         for (i = 0; i < model.dim(); i++)
         {
           // See update_parameters for comments on the minimum value
-          model_tmp.kernel(k).cov.diag(i) = std::max(dot(rows(temp_m)[i], 
-							 rows(A)[i]), m_min_var);
+          model_tmp.kernel(k).cov.diag(i) =
+            std::max(dot(rows(temp_m)[i], rows(A)[i]), m_min_var);
         }
       }
     }
@@ -937,6 +929,20 @@ HmmTrainer::update_mllt_parameters(HmmSet &model, HmmSet &model_tmp,
         scale(rows(A)[i], temp);
       }
     }
+
+    // Experimental: Normalize A
+    copy(A, temp_m);
+    lu_factor(temp_m, pivots);
+    temp = 1;
+    for (i = 0; i < model.dim(); i++)
+      temp *= temp_m(i,i);
+    // Note, the sign of det(A) is assumed to be positive.. Is it REALLY?
+    Adet = fabs(temp);
+    double scale = pow(Adet, 1/(double)model.dim());
+    fprintf(stderr, "Adet = %f, scale = %f\n", Adet, scale);
+    for (i = 0; i < model.dim(); i++)
+      for (j = 0; j < model.dim(); j++)
+        A(i,j) = A(i,j)/scale;
   }
 
   // Transform mean vectors

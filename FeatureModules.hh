@@ -171,6 +171,9 @@ private:
   int m_frame_rate;
   int m_eof_frame;
 
+  float m_emph_coef; //!< Pre-emphasis filter coefficient
+  int m_magnitude; //!< If nonzero, compute magnitude spectrum instead of power
+
   int m_window_advance;
   int m_window_width;
   std::vector<float> m_hamming_window;
@@ -182,6 +185,39 @@ private:
    * are requested?  Otherwise, we assume that AudioReader gives zero
    * samples outside the file. */
   int m_copy_borders;
+  std::vector<float> m_first_feature; //!< Feature returned for negative frames
+  std::vector<float> m_last_feature; //!< Feature returned after EOF
+  int m_last_feature_frame; //!< The frame of the feature returned after EOF
+};
+
+
+class PreModule : public BaseFeaModule {
+public:
+  PreModule();
+  static const char *type_str() { return "pre"; }
+  
+  virtual void set_file(FILE *fp);
+  virtual void discard_file(void);
+  virtual bool eof(int frame);
+  virtual int sample_rate(void) { return m_sample_rate; }
+  virtual int frame_rate(void) { return m_frame_rate; }
+  
+private:
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
+  virtual void reset_module();
+  virtual void generate(int frame);
+
+private:
+  int m_sample_rate;
+  int m_frame_rate;
+  int m_eof_frame;
+  int m_legacy_file; //!< If nonzero, the dimension in the file is a byte
+  int m_file_offset;
+  int m_cur_pre_frame;
+
+  FILE *m_fp;
+
   std::vector<float> m_first_feature; //!< Feature returned for negative frames
   std::vector<float> m_last_feature; //!< Feature returned after EOF
   int m_last_feature_frame; //!< The frame of the feature returned after EOF
@@ -317,6 +353,29 @@ private:
   virtual void generate(int frame);
 private:
   int left, right;
+};
+
+
+class VtlnModule : public FeatureModule {
+public:
+  VtlnModule();
+  static const char *type_str() { return "vtln"; }
+
+  void set_warp_factor(float factor);
+  
+private:
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
+  virtual void generate(int frame);
+
+  void create_pwlin_bins(void);
+  void create_blin_bins(void);
+
+private:
+  int m_use_pwlin;
+  float m_pwlin_turn_point;
+  std::vector<float> m_vtln_bins;
+  float m_warp_factor;
 };
 
 

@@ -194,6 +194,8 @@ FFTModule::get_module_config(ModuleConfig &config)
   assert(m_sample_rate > 0);
   config.set("sample_rate", m_sample_rate);
   config.set("copy_borders", m_copy_borders);
+  config.set("pre_emph_coef", m_emph_coef);
+  config.set("magnitude", m_magnitude);
 }
 
 void
@@ -209,6 +211,11 @@ FFTModule::set_module_config(const ModuleConfig &config)
 
   m_copy_borders = 1;
   config.get("copy_borders", m_copy_borders);
+
+  m_emph_coef = 0.97;
+  config.get("pre_emph_coef", m_emph_coef);
+  m_magnitude = 0;
+  config.get("magnitude", m_magnitude);
 
   m_window_width = (int)(m_sample_rate/62.5);
   m_window_advance = (int)(m_sample_rate/125);
@@ -283,7 +290,7 @@ FFTModule::generate(int frame)
   for (int t = 0; t < m_window_width; t++)
   {
     m_fftw_datain[t] = m_hamming_window[t] * 
-      (m_reader[window_start + t + 1] - 0.95 * m_reader[window_start + t]);
+      (m_reader[window_start + t + 1] - m_emph_coef * m_reader[window_start + t]);
   }
   
   fftw_execute(m_coeffs);
@@ -294,6 +301,8 @@ FFTModule::generate(int frame)
   {
     target[t] = m_fftw_dataout[t] * m_fftw_dataout[t] + 
       m_fftw_dataout[m_window_width-t] * m_fftw_dataout[m_window_width-t];
+    if (m_magnitude)
+      target[t] = sqrtf(target[t]);
   }
   
   if (m_copy_borders && m_first_feature.empty() && frame <= 0)
@@ -303,6 +312,161 @@ FFTModule::generate(int frame)
   {
     target.get(m_last_feature);
     m_last_feature_frame = frame;
+  }
+}
+
+
+//////////////////////////////////////////////////////////////////
+// FFTModule
+//////////////////////////////////////////////////////////////////
+
+PreModule::PreModule() :
+  m_sample_rate(0),
+  m_frame_rate(0),
+  m_eof_frame(INT_MAX),
+  m_legacy_file(0),
+  m_file_offset(0),
+  m_cur_pre_frame(INT_MAX),
+  m_fp(NULL),
+  m_last_feature_frame(INT_MIN)
+{
+  m_type_str = type_str();
+}
+
+
+void
+PreModule::set_file(FILE *fp)
+{
+  int dim;
+  m_fp = fp;
+
+  // Read the dimension
+  if (m_legacy_file)
+  {
+    char d;
+    if (fread(&d, 1, 1, m_fp) < 1)
+      throw std::string("PreModule: Could not read the file.");
+    dim  = d;
+    m_file_offset = 1;
+  }
+  else
+  {
+    if (fread(&dim, sizeof(int), 1, m_fp) < 1)
+      throw std::string("PreModule: Could not read the file.");
+    m_file_offset = sizeof(int);
+  }
+  
+  // Check that dimension matches that given in configuration
+  if (dim != m_dim)
+  {
+    throw std::string("PreModule: The file has invalid dimension");
+  }
+  m_eof_frame = INT_MAX; // No EOF frame encountered yet
+}
+
+
+void
+PreModule::discard_file(void)
+{
+  reset_module();
+}
+
+
+bool
+PreModule::eof(int frame)
+{
+  if (frame < m_eof_frame)
+    return false;
+  return true;
+}
+
+void
+PreModule::get_module_config(ModuleConfig &config)
+{
+  assert(m_sample_rate > 0);
+  config.set("sample_rate", m_sample_rate);
+  config.set("frame_rate", m_frame_rate);
+  config.set("dim", m_dim);
+  if (m_legacy_file)
+    config.set("legacy_file", m_legacy_file);
+}
+
+void
+PreModule::set_module_config(const ModuleConfig &config)
+{
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+  
+  m_frame_rate = 125;
+  m_sample_rate = 16000;
+  m_legacy_file = 0;
+
+  config.get("sample_rate", m_sample_rate);
+  config.get("frame_rate", m_frame_rate);
+  config.get("legacy_file", m_legacy_file);
+
+  if (!config.get("dim", m_dim))
+    throw std::string("PreModule: Must set dimension");
+}
+
+void
+PreModule::reset_module()
+{
+  m_first_feature.clear();
+  m_last_feature.clear();
+  m_last_feature_frame = INT_MIN;
+  m_cur_pre_frame = INT_MAX;
+  m_fp = NULL;
+}
+
+void
+PreModule::generate(int frame)
+{
+  int pre_frame = frame;
+  FeatureVec target_vec = m_buffer[frame];
+  
+  if (frame < 0)
+  {
+    if (!m_first_feature.empty())
+    {
+      m_buffer[frame].set(m_first_feature);
+      return;
+    }
+    pre_frame = 0;
+  }
+  else if (frame >= m_eof_frame)
+  {
+    assert(!m_last_feature.empty());
+    m_buffer[frame].set(m_last_feature);
+    return;
+  }
+
+  if (pre_frame != m_cur_pre_frame + 1)
+  {
+    // Must seek to the correct place
+    if (fseek(m_fp, m_file_offset + pre_frame * m_dim * sizeof(float),
+              SEEK_SET) < 0)
+      throw std::string("PreModule: Could not seek the file.");
+    
+  }
+  m_cur_pre_frame = pre_frame;
+
+  // Read the frame
+  if ((int)fread(&target_vec[0], sizeof(float), m_dim, m_fp) < m_dim)
+  {
+    if (!feof(m_fp))
+      throw std::string("PreModule: Could not read the file");
+    // EOF
+    m_eof_frame = pre_frame;
+    assert(!m_last_feature.empty());
+    m_buffer[frame].set(m_last_feature);
+    return;
+  }
+
+  if (pre_frame > m_last_feature_frame) 
+  {
+    target_vec.get(m_last_feature);
+    m_last_feature_frame = pre_frame;
   }
 }
 
@@ -702,10 +866,24 @@ LinTransformModule::generate(int frame)
 void
 LinTransformModule::set_transformation_matrix(std::vector<float> &t)
 {
-  if (t.size() != m_transform.size())
-    throw std::string("LinTransformnModule: The dimension of the new transformation matrix does not match the old dimension");
-  for (int i = 0; i < (int)m_transform.size(); i++)
-    m_transform[i] = t[i];
+  if (t.size() == 0)
+  {
+    int r, c, index;
+    m_transform.resize(m_dim*m_src_dim);
+    // Set to identity matrix
+    for (r = index = 0; r < m_dim; r++)
+      for (c = 0; c < m_src_dim; c++, index++)
+        m_transform[index] = ((r == c) ? 1 : 0);
+    m_matrix_defined = false;
+  }
+  else
+  {
+    if ((int)t.size() != m_dim * m_src_dim)
+      throw std::string("LinTransformnModule: The dimension of the new transformation matrix does not match the old dimension");
+    for (int i = 0; i < (int)t.size(); i++)
+      m_transform[i] = t[i];
+    m_matrix_defined = true;
+  }
 }
 
 
@@ -714,8 +892,11 @@ LinTransformModule::set_transformation_bias(std::vector<float> &b)
 {
   if (b.size() == 0)
   {
-    m_bias.clear();
     m_bias_defined = false;
+    // Set to zero vector
+    m_bias.resize(m_dim);
+    for (int i = 0; i < m_dim; i++)
+      m_bias[i] = 0;
   }
   else
   {
@@ -723,6 +904,7 @@ LinTransformModule::set_transformation_bias(std::vector<float> &b)
       throw std::string("LinTransformModule: The dimension of the new bias does not match the output dimension");
     for (int i = 0; i < m_dim; i++)
       m_bias[i] = b[i];
+    m_bias_defined = true;
   }
 }
 
@@ -898,4 +1080,107 @@ ConcatModule::generate(int frame)
       target_fea[cur_dim++] = source_fea[j];
   }
   assert( cur_dim == m_dim );
+}
+
+
+//////////////////////////////////////////////////////////////////
+// VtlnModule
+//////////////////////////////////////////////////////////////////
+VtlnModule::VtlnModule()
+{
+  m_type_str = type_str();
+}
+
+void
+VtlnModule::get_module_config(ModuleConfig &config)
+{
+  if (m_use_pwlin)
+  {
+    config.set("pwlin_vtln", m_use_pwlin);
+    config.set("pwlin_turnpoint", m_pwlin_turn_point);
+  }
+}
+
+void
+VtlnModule::set_module_config(const ModuleConfig &config)
+{
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+  
+  m_dim = m_sources.front()->dim();
+
+  m_use_pwlin = 0;
+  m_pwlin_turn_point = 0.8;
+  config.get("pwlin_vtln", m_use_pwlin);
+  config.get("pwlin_turnpoint", m_pwlin_turn_point);
+
+  m_warp_factor = 1;
+  create_blin_bins();
+}
+
+void
+VtlnModule::set_warp_factor(float factor)
+{
+  m_warp_factor = factor;
+  if (m_use_pwlin)
+    create_pwlin_bins();
+  else
+    create_blin_bins();
+}
+
+void
+VtlnModule::create_pwlin_bins(void)
+{
+  int t;
+  float border, slope = 0, point = 0;
+  bool limit = false;
+
+  border = m_pwlin_turn_point * (float)(m_dim-1);
+
+  m_vtln_bins.reserve(m_dim);
+  for (t = 0; t < m_dim-1; t++)
+  {
+    if (!limit)
+      m_vtln_bins[t] = m_warp_factor * (float)t;
+    else
+      m_vtln_bins[t] = slope * (float)t + point;
+
+    if (!limit && (t >= border || m_vtln_bins[t] >= border))
+    { 
+      slope = ((float)m_dim - 1 - m_vtln_bins[t]) / ((float)m_dim - 1 - t);
+      point = (1 - slope) * (float)(m_dim - 1);
+      limit = true;
+    }
+  }
+  m_vtln_bins[t] = (float)(m_dim - 1);
+}
+
+void
+VtlnModule::create_blin_bins(void)
+{
+  int t;
+  m_vtln_bins.reserve(m_dim);
+  for (t = 0; t < m_dim-1; t++)
+  {
+    double nf = M_PI * (double)t / (m_dim - 1);
+    m_vtln_bins[t] = t + 2*atan2((m_warp_factor-1)*sin(nf),
+                                 1+(1-m_warp_factor)*cos(nf))/M_PI*(m_dim-1);
+  }
+  m_vtln_bins[t] = m_dim-1;
+}
+
+void
+VtlnModule::generate(int frame)
+{
+  float p;
+  const FeatureVec data = m_sources.back()->at(frame);
+  FeatureVec target = m_buffer[frame];
+  
+  for (int b = 0; b < m_dim; b++)
+  {
+    p = ceil(m_vtln_bins[b]) - m_vtln_bins[b]; 
+    
+    target[b] = p*data[(int)floor(m_vtln_bins[b])] + 
+      (1-p)*data[(int)ceil(m_vtln_bins[b])];
+  }
 }

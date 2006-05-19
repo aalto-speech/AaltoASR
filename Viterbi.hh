@@ -127,6 +127,8 @@ public:
   /// The first frame not filled yet because (1) lattice border reached, or (2) end of audio file reached.
   inline int last_frame() const { return m_last_frame; }
 
+  inline int feature_frame() const { return m_feature_frame; }
+
   /// The first position not filled yet because (1) lattice border reached, or (2) end of transcription reached.
   inline int last_position() const { return m_last_position; }
 
