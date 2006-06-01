@@ -889,7 +889,6 @@ LinTransformModule::set_transformation_matrix(std::vector<float> &t)
 {
   if (t.size() == 0)
   {
-    printf("set_transformation_matrix: zero input\n");
     int r, c, index;
     m_transform.resize(m_dim*m_src_dim);
     // Set to identity matrix
@@ -900,10 +899,6 @@ LinTransformModule::set_transformation_matrix(std::vector<float> &t)
   }
   else
   {
-    printf("set_transformation_matrix:\n");
-    for (int i = 0; i < (int)t.size(); i++)
-      printf("%.2f ", t[i]);
-    fprintf(stderr,"\n");
     if ((int)t.size() != m_dim * m_src_dim)
       throw std::string("LinTransformnModule: The dimension of the new transformation matrix does not match the old dimension");
     for (int i = 0; i < (int)t.size(); i++)
