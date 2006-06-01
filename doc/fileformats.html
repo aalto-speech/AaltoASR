@@ -1,0 +1,181 @@
+<!doctype html public "-//w3c//dtd html 3.2//en">
+
+<html>
+<head>
+   <title>Aku: File formats</title>
+</head>
+
+<body bgcolor="#ffffff">
+
+<h1>File formats</h1>
+
+<h3>Hidden Markov model</h3>
+
+The model is stored in four separate text files:
+<ul>
+  <li> gk-file: Gaussian kernels: centers and variances.
+  <li> mc-file: Mixture coefficients: weights of the kernels for each mixture
+  <li> ph-file: Phonemes: transitions and mixtures for states of the phonemes
+  <li> cfg-file: The feature configuration
+</ul>
+
+<h5>gk-file</h5>
+
+The file begins with a line containing the number of kernels,
+dimension, and a string "single_cov" or "diagonal_cov".
+Then follows each kernel on a separate line. The kernel is represented by
+its mean values and a variance value in case of single_cov, or
+diagonal covariance values in case of diagonal_cov. All these numbers
+are on the same line for one kernel, separated by spaces.
+
+<h5>mc-file</h5>
+
+<p>
+The file begins with a line containing the number of HMM states.
+Then comes one line for each state. These lines begin with the number
+of kernels for that state, followed by pairs of numbers stating the
+kernel indices and weights. The kernel indices are the line numbers
+(minus two) of the gk-file. 
+
+<p>
+Example:
+
+<pre>
+76
+5 0 0.217286 1 0.209243 2 0.208041 3 0.194275 4 0.171155
+5 310 0.277007 311 0.279153 312 0.432569 313 0.0112705 314 2.11808e-24
+...
+</pre>
+
+<h5>ph-file</h5>
+
+This format is the same as the one used by a decoder "Noway".
+The first line of the file contains word "PHONE". The second line is the
+number of phonemes. Then for each phoneme comes the next lines:
+<ul>
+  <li> Line containing the phoneme index, number of states in this phoneme and
+       the phoneme label.
+  <li> Line with the state indices, referring to the lines of the mc-file.
+       Value -1 is the entering and -2 the exit state, and these are just dummy states
+       with no emission probabilities.
+  <li> For each phoneme state a line beginning with the relative state index,
+       followed by the number of transitions in that state, and then the transitions
+       represented by pairs of relative state indices and transition probabilities.
+</ul>
+
+<p>
+Example:
+
+<pre>
+PHONE
+26
+1 3 _
+-1 -2 0
+0 1 2 1
+1 0
+2 2 2 0.8 1 0.2
+3 5 a
+-1 -2 4 5 6
+0 1 2 1
+1 0
+2 2 2 0.8 3 0.2
+3 2 3 0.8 4 0.2
+4 2 4 0.8 1 0.2
+...
+</pre>
+
+
+<h5>Configuration file (cfg-file)</h5>
+
+<p>
+Feature configuration file. See feature_configuration.txt.
+
+
+
+<h3>Transcription (phn-file)</h3>
+
+START END LABEL COMMENT
+
+<pre>
+18048 19584 e * ensimmäinen
+19584 19968 n 
+19968 21504 s 
+21504 22144 i 
+22144 23936 m mm 
+23936 25088 ä 
+25088 25472 i 
+25472 25984 n 
+25984 27392 e 
+27392 28416 n 
+28416 28544 _ 
+28544 29568 r * raita
+29568 31232 a 
+31232 32256 i 
+32256 33792 t 
+33792 35456 a 
+35456 48512 __ * #EOS
+48512 50432 e ee eero
+50432 51456 r 
+51456 52608 o 
+</pre>
+
+Numbers are in samples.  Ending time is the first sample after the
+phoneme.
+
+
+<h3>Basebind</h3>
+
+This file is used to define the HMM states for segfea in model initialization.
+Note that the states are allowed to be shared between the phonemes
+(state tying).
+
+<p>
+LABEL STATES INDEX1 INDEX2 ...
+
+<pre>
+_  1 0
+__ 3 1 2 3
+k-o+l 3 4 5 6
+k-o+n 3 4 7 8
+_-k+o 3 9 10 11
+</pre>
+
+
+<h3>Train filelist (recipe)</h3>
+
+FILE PHNFILE OUTPUT_PHNFILE START_TIME(0=start) END_TIME(0=file end) FIRST_LINE(optional) LAST_LINE(optional) SPEAKER_ID(optional)
+
+<pre>
+synt.sph synt.phn synt2.phn 0 42620
+lootus.sph lootus.phn lootus2.phn 100 200 30 50 spk1
+</pre>
+
+Start time and end time are in seconds. First line means the first phn-line to be included and so on: counting starts from 1. If timelimits and linelimits overlap, the most limiting factor is used.
+
+
+<h3>LNA_file</h3>
+
+The LNA file contains the log-probabilities of the states for each
+frame.
+
+<pre>
+Bytes	Field
+------------------------------------------------------------
+4	the number of states (S)
+1	bytes per probability (B)
+
+B	log-prob of state 0 in frame 0
+B	log-prob of state 1 in frame 0
+...
+B	log-prob of state S-1 in frame 0
+
+B	log-prob of state 0 in frame 1
+B	log-prob of state 1 in frame 1
+...
+B	log-prob of state S-1 in frame 1
+------------------------------------------------------------
+</pre>
+
+</body>
+
+</html>
