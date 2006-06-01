@@ -2,8 +2,8 @@ INTRODUCTION
 ============
 
 The feature generator is configured in a text file that contains
-definitions the feature modules and connections between them.  For
-example:
+definitions of the feature modules and connections between them.
+For example:
 
 module 
 {
@@ -43,7 +43,7 @@ MODULE TYPES
     rate, the spectrum is computed from a window of 256 samples, and
     the start of the window is moved 128 samples per frame.
     Generally, width = (int)(sample_rate / 62.5) and advance =
-    (int)(sample_rate / 125).  Options:
+    (int)(sample_rate / 125).
 
     Output dimension: (int)(sample_rate / 125.0)
 
@@ -51,6 +51,20 @@ MODULE TYPES
     - sample_rate (int, obligatory) : samples per second
     - copy_borders (int, default 1) : if positive, duplicates the border
       frames when requesting frames outside the file
+
+- pre (BASE MODULE)
+
+    Reads precomputed features from a file. Options:
+
+    - dim (int, obligatory) : Feature dimension, must match the dimension
+      of the files
+    - legacy_file (int, default 0) : If nonzero, the file dimension is
+      represented by a single byte, otherwise it is a 32-bit integer
+    - sample_rate (int, default 16000) : Sample rate of the original waveform
+      from which the features were precomputed.  Some modules may change
+      their behaviour according to the declared sample rate.
+    - frame_rate (int, default 125) : Frame rate of the original waveform,
+      may also affect the behaviour of other modules.
 
 - mel  
 
@@ -116,7 +130,8 @@ MODULE TYPES
     specifies the matrix A in vector format [A(0,0) ... A(0,src_dim)
     ... A(1, 0) ... A(1, src_dim) ... ... A(dim, src_dim)] and
     'bias' option specifies the bias vector as a (transformed) column
-    vector.
+    vector. This module is also used for MLLR-adaptation, in which
+    case it must be the last module in the feature module chain.
     
     Output dimension: specified by 'dim'
 
@@ -125,6 +140,10 @@ MODULE TYPES
     - matrix (float vector, default identity): transformation matrix
     - bias (float vector, default 0): bias vector
     - sources: single source
+
+    Run-time parameters:
+    - matrix (float vector): transformation matrix
+    - bias (float vector): bias vector
 
 - merge
 
@@ -139,7 +158,7 @@ MODULE TYPES
 - mean_subtractor
 
     Subtracts a moving average from the feature vector. After MFCC this
-    processing is calle Cepstral Mean Subtraction (CMS).
+    processing is called Cepstral Mean Subtraction (CMS).
 
     Output dimension: same as input
 
@@ -149,3 +168,28 @@ MODULE TYPES
     - right (int, default 75): span of the moving average window to the
       future
     - sources: single source
+
+- vtln
+
+    Applies a non-linear transformation to the input, which is assumed to
+    be the output of the FFT module. Used to compensate speaker specific
+    vocal tract length.
+
+    Output dimension: same as input
+
+    Options:
+    - pwlin_vtln (int, default 0): If nonzero, uses piecewise linear warping
+      instead of biliner.
+    - pwlin_turnpoint (float, default 0.8): If using piecewise linear warping,
+      this defines the turn point of the warping in normalized frequency.
+
+    Run-time parameters:
+    - warp_factor (float): Warping factor for the transformation.
+
+- concat
+
+    Concatenates a span of frames into a single supervector.
+
+    Options:
+    - left (int, default 0): span of frames to the past
+    - right (int, default 0): span of frames to the future
