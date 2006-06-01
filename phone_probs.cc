@@ -66,7 +66,7 @@ main(int argc, char *argv[])
       ('o', "output-dir=DIR", "arg", "", "output directory (default: use filenames from recipe)")
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "lnabytes=INT", "arg", "2", "number of bytes for probabilities, 2 (default) or 4")
-      ('n', "no_overwrite", "", "", "prevent overwriting existing files")
+      ('n', "no-overwrite", "", "", "prevent overwriting existing files")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('i', "info=INT", "arg", "0", "info level")
       ;

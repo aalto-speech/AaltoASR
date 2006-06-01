@@ -145,8 +145,6 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
     for (i = 0; i < m_dim; i++)
       detA *= A(i, i);
 
-    fprintf(stderr, "calculate_transform: Adet = %.4f\n", detA);
-    
     scale(cofactors, detA);
     
     // cofactor vector
@@ -183,7 +181,6 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
   {
     b1[i] = (*bias)[i];
     b2[i] = trans(i, 0);
-    fprintf(stderr, "%.2f\n", b1[i]);
     for (j = 0; j < m_dim; j++)
     {
       A1(i, j) = (*matrix)[i*m_dim + j];
@@ -191,11 +188,13 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
     }
   }
 
-//   // calculate A x + b =  A2 (A1 x + b1) + b2
-//   d_vector b(m_dim);
-//   mult(A2, A1, A);
-//   mult(A2, b1, b); 
-//   add(b2, b);
+  // calculate A x + b =  A2 (A1 x + b1) + b2
+  d_vector b(m_dim);
+  mult(A2, A1, A);
+  mtl::set(A,0);
+  mult(A2, A1, A);
+  mult(A2, b1, b); 
+  add(b2, b);
 
   // Set the transformation
   std::vector<float> new_bias;
