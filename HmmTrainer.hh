@@ -4,8 +4,7 @@
 #include "FeatureModules.hh"
 #include "HmmSet.hh"
 #include "Viterbi.hh"
-#include "AdaReader.hh"
-#include "Changeling.hh"
+#include "SpeakerConfig.hh"
 #include "TriphoneSet.hh"
 
 // Matrix template library stuff
@@ -28,17 +27,15 @@ typedef mtl::external_vec<const float> ExtVectorConst;
 
 class HmmTrainer {
 public:
-  HmmTrainer();
+  HmmTrainer(FeatureGenerator &fea_gen);
   ~HmmTrainer();
 
-  void init(HmmSet &model, FeatureGenerator &fea_gen, 
-	    const char *adafile = NULL);
+  void init(HmmSet &model, std::string adafile = "");
   void viterbi_train(int start_frame, int end_frame,
                      HmmSet &model,
-                     FeatureGenerator &fea_gen, Viterbi &viterbi,
-                     FILE *phn_out, std::string *speaker = NULL);
-  void finish_train(HmmSet &model, FeatureGenerator &fea_gen,
-		    const char *adafile = NULL);
+                     Viterbi &viterbi,
+                     FILE *phn_out, std::string speaker = "");
+  void finish_train(HmmSet &model);
 
   int num_unused_features(void) { return m_em_norm_warning_count; }
   double get_log_likelihood(void) { return m_log_likelihood; }
@@ -58,37 +55,20 @@ private:
                          const std::vector<float> &gk_norm);
   void update_transition_probabilities(HmmSet &model, HmmSet &model_tmp);
  
-  // update_tmp_parameters returns the number of frames left untreated !
-  int update_tmp_parameters(std::string *speaker,
-			     HmmSet &model, HmmSet &model_tmp,
-                             FeatureGenerator &fea_gen,
-                             std::vector<float> &gk_norm, Viterbi &viterbi,
-                             int start_frame, int end_frame);
-  void update_morph_boundary_models(HmmSet &model, HmmSet &model_tmp,
-                                    FeatureGenerator &fea_gen,
-                                    std::vector<float> &gk_norm,
-                                    Viterbi &viterbi,
-                                    int start_frame, 
-                                    int end_frame);
-  void run_morph_boundary_update(HmmSet &model, HmmSet &model_tmp,
-                                 FeatureGenerator &fea_gen,
-                                 std::vector<float> &gk_norm,
-                                 std::string hmm_label,
-                                 int start_frame, 
-                                 int end_frame);
+  // update_tmp_parameters returns the number of frames left untreated
+  int update_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
+                            std::vector<float> &gk_norm, Viterbi &viterbi,
+                            int start_frame, int end_frame);
   void update_state_kernels(HmmSet &model, HmmSet &model_tmp,
                             HmmState &state, HmmState &state_accu,
                             const FeatureVec &feature, int dim, bool update_ll,
                             std::vector<float> &gk_norm);
                                  
   void update_mllt_parameters(HmmSet &model, HmmSet &model_tmp,
-                              FeatureGenerator &fea_gen,
                               std::vector<float> &gk_norm, Matrix &A);
   void update_hlda_parameters(HmmSet &model, HmmSet &model_tmp,
-                              FeatureGenerator &fea_gen,
                               std::vector<float> &gk_norm, Matrix &A);
   void update_hlda_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
-                                  FeatureGenerator &fea_gen,
                                   std::vector<float> &gk_norm,
                                   Viterbi &viterbi, int start_frame, 
                                   int end_frame);
@@ -97,14 +77,9 @@ private:
                                            int frames);
   void write_duration_statistics(HmmSet &model);
 
-  void update_triphone_stat(FeatureGenerator &fea_gen,
-                            Viterbi &viterbi,
+  void update_triphone_stat(Viterbi &viterbi,
                             int start_frame, 
                             int end_frame, HmmSet &model);
-
-  void change_speaker(const std::string *new_speaker,
-		      FeatureGenerator &fea_gen, HmmSet &model);
-  void calculate_ada_tr(std::string &ada_speaker, int dim);
 
 public:
   void set_info(int info) { m_info = info; }
@@ -126,16 +101,16 @@ public:
   void set_skip_short_silence_context(bool skip) { m_skip_short_silence_context = skip; }
   void set_ignore_length(bool il) { m_ignore_tying_length = il; }
   void set_print_speakered(bool sphn) { m_print_speakered = sphn; }
-  void set_ordered_speakers(bool ordered_s) { m_ordered_s = ordered_s; }
   
 private:
+  FeatureGenerator &m_fea_gen;
 
   int m_info;
   LinTransformModule *m_transform_module;
   int m_source_dim;
   bool m_mllt;
   bool m_hlda;
-  bool m_adap;
+  bool m_set_speakers; // Do we need to change speakers?
   float m_min_var;
   int m_win_size;
   float m_overlap;
@@ -171,13 +146,7 @@ private:
   int global_count;
   int m_em_norm_warning_count;
 
-  // adaptation
-  AdaReader m_ada; // reads adaptation matrices
-  std::string m_speaker; // ID of current speaker
-  std::vector<std::string> m_speakers; // speaker ID's
-  std::map<std::string, Changeling*> m_changelings; // ada modules
-
-  bool m_ordered_s; // files for a speaker are arranged successively
+  SpeakerConfig m_speaker_config; // Reads and handles speaker configurations
 
   HmmSet model_tmp;
   std::vector<float> gk_norm;

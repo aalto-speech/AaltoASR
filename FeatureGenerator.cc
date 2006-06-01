@@ -48,6 +48,7 @@ FeatureGenerator::close(void)
 {
   if (m_file != NULL) {
     m_base_module->discard_file();
+    fclose(m_file);
     m_file = NULL;
   }
 }
@@ -58,8 +59,8 @@ FeatureGenerator::load_configuration(FILE *file)
 {
   assert(m_modules.empty());
   std::string line;
-  std::vector<std::string> fields;
   int lineno = 0;
+  
   while (str::read_line(&line, file, true)) {
     lineno++;
     str::clean(&line, " \t");
@@ -94,6 +95,8 @@ FeatureGenerator::load_configuration(FILE *file)
       throw str::fmt(256, "name not defined for module ending on line %d",
 		     lineno);
     assert(!name.empty());
+    if (name.find_first_of(" \t\n") != std::string::npos)
+      throw std::string("module name may not contain whitespaces");
   
     FeatureModule *module = NULL;
     if (type == FFTModule::type_str())
@@ -181,9 +184,9 @@ FeatureGenerator::write_configuration(FILE *file)
       config.set("sources", sources);
     }
 
-    fputs("module\n{\n", file);
-    config.write(file, 2);
-    fputs("}\n\n", file);
+    fputs("module\n", file);
+    config.write(file, 0);
+    fputs("\n", file);
   }
 }
 
@@ -195,6 +198,7 @@ FeatureGenerator::module(const std::string &name)
     throw std::string("unknown module requested: ") + name;
   return it->second;
 }
+
 
 void
 FeatureGenerator::check_model_structure()

@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <fstream>
+#include <algorithm>
 
 #include "HmmTrainer.hh"
-#include <algorithm>
+#include "io.hh"
+
 
 #define MAX_MLLT_ITER 7
 #define MAX_MLLT_A_ITER 80
@@ -43,13 +45,14 @@ std::string transform_context(const std::string &context)
   return temp;
 }
 
-HmmTrainer::HmmTrainer()
-  : m_info(0),
+HmmTrainer::HmmTrainer(FeatureGenerator &fea_gen)
+  : m_fea_gen(fea_gen),
+    m_info(0),
     m_transform_module(NULL),
     m_source_dim(0),
     m_mllt(false),
     m_hlda(false),
-    m_adap(false),
+    m_set_speakers(false),
     m_min_var(0.1),
     m_win_size(1000),
     m_overlap(0.6),
@@ -68,7 +71,7 @@ HmmTrainer::HmmTrainer()
     m_print_speakered(false),
     cov_m(NULL),
     m_transform_matrix(NULL),
-    m_ordered_s(false)
+    m_speaker_config(fea_gen)
 {
 }
 
@@ -101,15 +104,10 @@ HmmTrainer::~HmmTrainer()
   }
   if (m_transform_matrix != NULL)
     delete m_transform_matrix;
-
-  for (int s = 0; s < (int)m_speakers.size(); s++)
-    delete m_changelings[m_speakers[s]];
-
 }
 
 
-void HmmTrainer::init(HmmSet &model, FeatureGenerator &fea_gen,
-		      const char *adafile)
+void HmmTrainer::init(HmmSet &model, std::string adafile)
 {
   int i, j;
   
@@ -173,7 +171,7 @@ void HmmTrainer::init(HmmSet &model, FeatureGenerator &fea_gen,
         cov_m[i] = new Matrix(m_source_dim, m_source_dim);
       }
       else
-        cov_m[i] = new Matrix(fea_gen.dim(), fea_gen.dim());
+        cov_m[i] = new Matrix(m_fea_gen.dim(), m_fea_gen.dim());
     }
   }
       
@@ -190,25 +188,20 @@ void HmmTrainer::init(HmmSet &model, FeatureGenerator &fea_gen,
   }
 
   m_em_norm_warning_count = 0;
-  cur_tri_stat_hmm_index = -1;
-  cur_tri_stat_state = -1;
-  cur_tri_stat_right = "_";
-  cur_tri_stat_center = "_";
   
-  // Load adaptation matrices
-  if(adafile != NULL)
+  // Load speaker configurations
+  if (adafile.size() > 0)
   {
-    assert( m_ada.load(adafile) == 0 );
-    m_adap = true;
+    m_speaker_config.read_speaker_file(io::Stream(adafile));
+    m_set_speakers = true;
   }
-
 }
 
 
 void HmmTrainer::viterbi_train(int start_frame, int end_frame,
                                HmmSet &model,
-                               FeatureGenerator &fea_gen, Viterbi &viterbi,
-                               FILE *phn_out, std::string *speaker)
+                               Viterbi &viterbi,
+                               FILE *phn_out, std::string speaker)
 {
   // Compute window borders
   int window_start_frame = start_frame;
@@ -217,12 +210,12 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
  
   viterbi.reset();
   viterbi.set_feature_frame(window_start_frame);
-  viterbi.set_force_end(m_no_force_end);
+  viterbi.set_force_end(!m_no_force_end);
 
   if (m_triphone_tying)
   {
     // Initialize triphone tying
-    triphone_set.set_dimension(fea_gen.dim());
+    triphone_set.set_dimension(m_fea_gen.dim());
     triphone_set.set_info(m_info);
     if (m_tying_min_count > 0)
       triphone_set.set_min_count(m_tying_min_count);
@@ -230,12 +223,15 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
       triphone_set.set_min_likelihood_gain(m_tying_min_lhg);
     triphone_set.set_length_award(m_tying_length_award);
     triphone_set.set_ignore_length(m_ignore_tying_length);
+
+    cur_tri_stat_hmm_index = -1;
+    cur_tri_stat_state = -1;
+    cur_tri_stat_right = "_";
+    cur_tri_stat_center = "_";
   }
 
-  // if train is controlling speaker adaptation
-  // it reads speaker from recipe and sends here
-  if (speaker != NULL)
-    change_speaker(speaker, fea_gen, model);
+  if (m_set_speakers && speaker.size() > 0)
+      m_speaker_config.set_speaker(speaker);
 
   bool last_window = false;
   int print_start = -1;
@@ -264,7 +260,7 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
     viterbi.set_last_window(last_window);
     viterbi.set_last_frame(window_end_frame - window_start_frame);
     viterbi.fill();
-    if (fea_gen.eof())
+    if (m_fea_gen.eof())
     {
       // Viterbi encountered eof and stopped
       last_window = true;
@@ -314,19 +310,19 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
     }
     else if (m_triphone_tying)
     {
-      update_triphone_stat(fea_gen, viterbi, window_start_frame, 
+      update_triphone_stat(viterbi, window_start_frame, 
                            window_start_frame + target_frame,
                            model);
     }
     else if (m_hlda)
-      update_hlda_tmp_parameters(model, model_tmp, fea_gen, gk_norm,
+      update_hlda_tmp_parameters(model, model_tmp, gk_norm,
                                  viterbi, window_start_frame, 
                                  window_start_frame + target_frame);
     else
     {
       int untreated_frames = 
 
-	update_tmp_parameters(speaker, model, model_tmp, fea_gen, 
+	update_tmp_parameters(model, model_tmp,
 			      gk_norm, viterbi, window_start_frame, 
 			      window_start_frame + target_frame);
       target_frame = target_frame - untreated_frames;
@@ -343,7 +339,7 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
 
         if (!state.printed) {
           // Print pending line
-          print_line(phn_out, fea_gen.frame_rate(), print_start,
+          print_line(phn_out, m_fea_gen.frame_rate(), print_start,
                      f + window_start_frame, print_label, print_speaker,
                      print_comment);
 
@@ -353,11 +349,7 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
           print_comment = state.comment;
 
 	  // Speaker ID
-	  if(speaker != NULL)
-            print_speaker = m_speaker;
-	  else
-            print_speaker = *(viterbi.current_speaker(f));
-
+          print_speaker = m_speaker_config.get_cur_speaker();
           state.printed = true;
         }
       }
@@ -390,15 +382,14 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
   if (m_print_segment) {
     // FIXME: The end point window_start_frame+1 assumes 50% frame overlap
 
-    print_line(phn_out, fea_gen.frame_rate(), print_start,
+    print_line(phn_out, m_fea_gen.frame_rate(), print_start,
                window_start_frame + 1, print_label, print_speaker,
                print_comment);
   }
 }
 
 
-void HmmTrainer::finish_train(HmmSet &model, FeatureGenerator &fea_gen,
-			      const char *adafile)
+void HmmTrainer::finish_train(HmmSet &model)
 {
   // Finish updating parameters
   if (m_durstat)
@@ -413,21 +404,13 @@ void HmmTrainer::finish_train(HmmSet &model, FeatureGenerator &fea_gen,
     triphone_set.tie_triphones();
   }
   else if (m_mllt)
-    update_mllt_parameters(model, model_tmp, fea_gen, gk_norm,
+    update_mllt_parameters(model, model_tmp, gk_norm,
                            *m_transform_matrix);
   else if (m_hlda)
-    update_hlda_parameters(model, model_tmp, fea_gen, gk_norm,
+    update_hlda_parameters(model, model_tmp, gk_norm,
                            *m_transform_matrix);
   else
     update_parameters(model, model_tmp, gk_norm);
-
-  if (adafile != NULL)
-  {
-    for(int s = 0; s < (int)m_speakers.size(); s++)
-      calculate_ada_tr(m_speakers[s], model.dim());
-     
-    assert( m_ada.save(adafile) == 0 );
-  }
 
   if (!m_durstat && !m_triphone_tying)
   {
@@ -465,8 +448,7 @@ HmmTrainer::print_line(FILE *f, int fr,
 
 
 void
-HmmTrainer::update_triphone_stat(FeatureGenerator &fea_gen,
-                                 Viterbi &viterbi,
+HmmTrainer::update_triphone_stat(Viterbi &viterbi,
                                  int start_frame, 
                                  int end_frame, HmmSet &model)
 {
@@ -499,8 +481,12 @@ HmmTrainer::update_triphone_stat(FeatureGenerator &fea_gen,
           exit(2);
         if (cur_tri_stat_center != tr_state.label)
         {
+          printf("HmmTrainer::update_triphone_state: Error:\n");
           printf("cur_tri_stat_center = %s\n", cur_tri_stat_center.c_str());
           printf("tr_state.label = %s\n", tr_state.label.c_str());
+          printf("cur_tri_stat_state = %i\n", cur_tri_stat_state);
+          printf("tr_state.state = %i\n", tr_state.state);
+          printf("At frame %d\n", start_frame + f);
           out = true;
         }
         if (!m_skip_short_silence_context || tr_state.label != "_")
@@ -510,12 +496,13 @@ HmmTrainer::update_triphone_stat(FeatureGenerator &fea_gen,
       cur_tri_stat_state_index = tr_state.hmm_state_index;
       cur_tri_stat_state = tr_state.state;
     }
-    
+
     if (cur_tri_stat_center[0] != '_')
     {
       std::string left=transform_context(cur_tri_stat_left);
       std::string right=transform_context(cur_tri_stat_right);
-      triphone_set.add_feature(fea_gen.generate(start_frame+f),left,
+
+      triphone_set.add_feature(m_fea_gen.generate(start_frame+f),left,
                                cur_tri_stat_center, right,
                                cur_tri_stat_state_index);
     }
@@ -681,19 +668,17 @@ HmmTrainer::update_transition_probabilities(HmmSet &model, HmmSet &model_tmp)
 }
 
 int
-HmmTrainer::update_tmp_parameters(std::string *speaker,
-				  HmmSet &model, HmmSet &model_tmp,
-                                  FeatureGenerator &fea_gen,
+HmmTrainer::update_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
                                   std::vector<float> &gk_norm,
                                   Viterbi &viterbi,
                                   int start_frame, 
                                   int end_frame)
 {
-  int dim = fea_gen.dim();
+  int dim = m_fea_gen.dim();
   int frames = end_frame - start_frame;
 
   for (int f = 0; f < frames; f++) {
-    FeatureVec feature = fea_gen.generate(start_frame + f);
+    FeatureVec feature = m_fea_gen.generate(start_frame + f);
     HmmState &state = model.state(viterbi.best_state(f));
     HmmState &state_accu= model_tmp.state(viterbi.best_state(f));
 
@@ -708,25 +693,16 @@ HmmTrainer::update_tmp_parameters(std::string *speaker,
       model_tmp.transition(transition).prob++;
     }
 
-    // update adaptation statistics
-
-    if (speaker != NULL)
-      (m_changelings[*speaker])->find_probs(&state, feature);
-    else if (m_adap && *viterbi.current_speaker(f) != "")
+    if (m_set_speakers && viterbi.current_speaker(f).size() > 0 &&
+        viterbi.current_speaker(f) != m_speaker_config.get_cur_speaker())
     {
-      if (*viterbi.current_speaker(f) != m_speaker)
-      {
-	change_speaker(viterbi.current_speaker(f), fea_gen, model);
-
-	// if speaker change happened in midstream of processing a
-	// window, the number of frames left untreated is returned
-
-	if (f != 0)
-          return frames - f;
-      }
-      (m_changelings[m_speaker])->find_probs(&state, feature);
+      m_speaker_config.set_speaker(viterbi.current_speaker(f));
+      
+      // if speaker change occurred while processing a window,
+      // the number of frames left untreated is returned
+      if (f != 0)
+        return frames - f;
     }
-
   }
 
   return 0;
@@ -785,18 +761,20 @@ HmmTrainer::update_state_kernels(HmmSet &model, HmmSet &model_tmp,
     for (i = 0; i < dim; i++)
       accuker.center[i] += feature[i]*gam[state_k];
 
-    // Add covariance
-    for (i = 0; i < (int)cov_m[hmm_k]->nrows(); i++)
+    if (m_cov_update)
     {
-      add(rows(*cov_m[hmm_k])[i], scaled(fea_vec, gam[state_k]*fea_vec[i]),
-          rows(*cov_m[hmm_k])[i]);
+      // Add covariance
+      for (i = 0; i < (int)cov_m[hmm_k]->nrows(); i++)
+      {
+        add(rows(*cov_m[hmm_k])[i], scaled(fea_vec, gam[state_k]*fea_vec[i]),
+            rows(*cov_m[hmm_k])[i]);
+      }
     }
   }
 }
 
 void
 HmmTrainer::update_mllt_parameters(HmmSet &model, HmmSet &model_tmp,
-                                   FeatureGenerator &fea_gen,
                                    std::vector<float> &gk_norm,
                                    Matrix &A)
 {
@@ -930,13 +908,12 @@ HmmTrainer::update_mllt_parameters(HmmSet &model, HmmSet &model_tmp,
       }
     }
 
-    // Experimental: Normalize A
+    // Normalize A
     copy(A, temp_m);
     lu_factor(temp_m, pivots);
     temp = 1;
     for (i = 0; i < model.dim(); i++)
       temp *= temp_m(i,i);
-    // Note, the sign of det(A) is assumed to be positive.. Is it REALLY?
     Adet = fabs(temp);
     double scale = pow(Adet, 1/(double)model.dim());
     fprintf(stderr, "Adet = %f, scale = %f\n", Adet, scale);
@@ -1034,7 +1011,6 @@ HmmTrainer::update_mllt_parameters(HmmSet &model, HmmSet &model_tmp,
 
 void
 HmmTrainer::update_hlda_parameters(HmmSet &model, HmmSet &model_tmp,
-                                   FeatureGenerator &fea_gen,
                                    std::vector<float> &gk_norm,
                                    Matrix &A)
 {
@@ -1323,7 +1299,6 @@ HmmTrainer::update_hlda_parameters(HmmSet &model, HmmSet &model_tmp,
 
 void
 HmmTrainer::update_hlda_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
-                                       FeatureGenerator &fea_gen,
                                        std::vector<float> &gk_norm,
                                        Viterbi &viterbi,
                                        int start_frame, 
@@ -1335,7 +1310,7 @@ HmmTrainer::update_hlda_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
   int i;
   
   for (int f = 0; f < frames; f++) {
-    FeatureVec feavec = fea_gen.generate(start_frame + f);
+    FeatureVec feavec = m_fea_gen.generate(start_frame + f);
     FeatureVec untransformed_fea =
       m_transform_module->sources().front()->at(start_frame + f);
     ExtVectorConst untransformed_fea_vec(&untransformed_fea[0], dim);
@@ -1498,72 +1473,4 @@ HmmTrainer::save_tying(const std::string &filename)
   fclose(fp);
   
   state_num = triphone_set.save_to_basebind(filename, 4);
-}
-
-void
-HmmTrainer::change_speaker(const std::string *new_speaker,
-			   FeatureGenerator &fea_gen, HmmSet &model)
-{
-
-  printf("New speaker: %s\n", new_speaker->c_str());
-
-  // check if first encounter with speaker, and if so, initialize
-  
-  if (m_changelings.count(*new_speaker) == 0)
-  {
-    // if all files for a speaker are processed successively
-    // we can calculate transformation here and free memory!
-  
-    if (m_ordered_s && m_speakers.size() != 0){
-
-      calculate_ada_tr(m_speaker, model.dim());
-      m_changelings.clear();
-      m_speakers.clear();
-    }
-
-    // initialize for new speaker
-
-    m_speakers.push_back(*new_speaker);
-    
-    m_changelings[*new_speaker] = new Changeling(&model, &fea_gen);
-  }
-  
-  // set new speaker as current speaker
-
-  m_speaker = *new_speaker;
-
-  // adapt feature generator to speaker
-
-  m_changelings[m_speaker]->update_feagen_transform(
-    m_ada.get_ada_matrix(m_speaker));
-  // note: if no adaptation matrix exists for the speaker, this has no effect
-}
-
-void
-HmmTrainer::calculate_ada_tr(std::string &ada_speaker, int dim)
-{
-  Changeling::d_matrix ada_transform(dim, dim+1);
-  
-  // initialize adaptation matrix to unity
-  
-  for (int i = 0; i < (int)ada_transform.nrows(); i++)
-  {
-    for (int j = 0; j < (int)ada_transform.ncols(); j++)
-    {
-      if (i == j-1)
-        ada_transform[i][j] = 1;
-      else
-        ada_transform[i][j] = 0;
-    }
-  }
-  
-  // calculate new adaptation matrix
-  
-  Changeling::d_matrix *previous = m_ada.get_ada_matrix(ada_speaker);
-  
-  m_changelings[ada_speaker]->calculate_transform(&ada_transform, previous);
-  
-  // update to ada reader
-
-  m_ada.update(ada_speaker, &ada_transform);
 }

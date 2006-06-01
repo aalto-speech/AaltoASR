@@ -14,6 +14,7 @@
 #include "Recipe.hh"
 #include "FeatureGenerator.hh"
 #include "HmmSet.hh"
+#include "SpeakerConfig.hh"
 
 
 #define BYTE unsigned char
@@ -22,6 +23,7 @@
 conf::Config config;
 FeatureGenerator gen;
 HmmSet model;
+SpeakerConfig speaker_conf(gen);
 
 
 void write_int(FILE *fp, unsigned int i)
@@ -60,11 +62,12 @@ main(int argc, char *argv[])
       ('m', "mc=FILE", "arg", "", "kernel indices for states")
       ('p', "ph=FILE", "arg", "", "HMM definitions")
       ('c', "config=FILE", "arg must", "", "feature configuration")
-      ('\0', "recipe=FILE", "arg must", "", "recipe file")
+      ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('o', "output-dir=DIR", "arg", "", "output directory (default: use filenames from recipe)")
-      ('r', "raw-input", "", "", "raw audio input")
+      ('R', "raw-input", "", "", "raw audio input")
       ('\0', "lnabytes=INT", "arg", "2", "number of bytes for probabilities, 2 (default) or 4")
       ('n', "no_overwrite", "", "", "prevent overwriting existing files")
+      ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -78,6 +81,9 @@ main(int argc, char *argv[])
       throw std::string("Invalid number of LNA bytes");
 
     no_overwrite = config["no_overwrite"].specified;
+
+    if (config["speakers"].specified)
+      speaker_conf.read_speaker_file(io::Stream(config["speakers"].get_str()));
 
     if (config["base"].specified)
     {
@@ -160,6 +166,9 @@ main(int argc, char *argv[])
 	  continue;
 	}
       }
+
+      if (config["speakers"].specified)
+        speaker_conf.set_speaker(recipe.infos[recipe_index].speaker_id);
       
       start_frame = (int)(recipe.infos[recipe_index].start_time *
                           gen.frame_rate());

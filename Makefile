@@ -4,7 +4,7 @@ ARCH = $(shell uname -p)
 # Opteron cluster
 ifeq ($(ARCH),x86_64)
 CXX = /usr/bin/g++
-OPT = -g
+OPT = -O2
 INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include
 LDFLAGS = 
 WARNINGS = -Wall
@@ -24,14 +24,14 @@ endif
 
 ##################################################
 
-PROGS = feacat feanorm phone_probs segfea init_hmm train tie
+PROGS = feacat feanorm phone_probs segfea init_hmm train tie vtln mllr
 #meltest adapt vtln train2 phone_probs2 segfea2 feanorm feacat init_hmm2 hmm2dcd tie cepstract
 
 PROGS_SRCS = $(PROGS:=.cc)
 
 CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	ModuleConfig.cc HmmSet.cc HmmTrainer.cc Viterbi.cc Lattice.cc \
-	PhnReader.cc TriphoneSet.cc Changeling.cc AdaReader.cc \
+	PhnReader.cc TriphoneSet.cc SpeakerConfig.cc MllrTrainer.cc \
 	Recipe.cc conf.cc io.cc str.cc 
 #HmmTrainer.cc SphereReader.cc Lattice.cc Viterbi.cc StateGenerator.cc FeatureBuffer.cc HmmSet.cc PhnReader.cc StateProbCache.cc FeatureGenerator.cc Recipe.cc tools.cc TriphoneSet.cc Changeling.cc AdaReader.cc Warpster.cc
 

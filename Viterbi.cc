@@ -92,9 +92,7 @@ Viterbi::fill_transcription()
       }
       phn.label.erase(phn.label.begin()); // Remove the first HMM label
       add_hmm_to_transcription(m_model.hmm_index(label),phn.comment,
-                               phn.label, next_label);
-      // Read speaker
-      m_speakers.push_back(phn.speaker);
+                               phn.label, next_label, phn.speaker);
 
       phn = next_phn;
     }
@@ -112,7 +110,8 @@ Viterbi::fill_transcription()
 void
 Viterbi::add_hmm_to_transcription(int hmm_index,std::string &comment,
                                   std::vector<std::string> &additional_hmms,
-                                  std::string &next_hmm_label)
+                                  std::string &next_hmm_label,
+                                  std::string &speaker)
 {
   std::string state_label;
   Hmm &hmm = m_model.hmm(hmm_index);
@@ -148,7 +147,10 @@ Viterbi::add_hmm_to_transcription(int hmm_index,std::string &comment,
     }
 
     m_transcription.back().next_label = next_hmm_label;
-
+    
+    // Set speaker
+    m_speakers.push_back(speaker);
+    
     // Precompute transitions for the given transcription.  In the
     // transcription want the transition indices to be relative to
     // the position in the transcription.
@@ -409,7 +411,7 @@ void Viterbi::fill(){
 void
 Viterbi::move(int frame, int position)
 {
-  m_speakers.erase(m_speakers.begin(), m_speakers.begin() + position/3);
+  m_speakers.erase(m_speakers.begin(), m_speakers.begin() + position);
   m_transcription.erase(m_transcription.begin(), 
 			m_transcription.begin() + position);
   m_lattice.move(frame, position);

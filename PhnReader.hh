@@ -37,6 +37,7 @@ public:
   PhnReader();
 
   void open(std::string filename);
+  void reset_file(void);
   void close();
 
   /** Limits lines to be read from transcription
@@ -46,7 +47,7 @@ public:
    * the last sample corresponding to the defined last_line is set
    */
   void set_line_limit(int first_line, int last_line, 
-		      int *first_sample, int *last_sample);
+		      int *first_sample);
 
   void set_sample_limit(int first_sample, int last_sample);
 

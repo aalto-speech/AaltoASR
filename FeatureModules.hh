@@ -35,6 +35,13 @@ class FeatureGenerator;
  * The computation of one feature is done in generate(), which will be
  * called by at() when necessary.
  *
+ * In addition to module configuration, modules may also have parameters
+ * which are used to change the feature computations on-line. These
+ * are used for e.g. speaker adaptation. The methods used to handle
+ * the parameters, set_parameters() and get_parameters(), use the same
+ * \ref ModuleConfig class for passing the parameters as does the
+ * set_config() and get_config() methods.
+ *
  */ 
 class FeatureModule {
 public:
@@ -82,6 +89,13 @@ public:
    * \note Derived classes should implement the virtual method
    * reset_module() if resetting is desired. */
   void reset();
+
+  /** Set the module's parameters. This is used for e.g. speaker adaptation
+      to change the module's behaviour on-line. */
+  virtual void set_parameters(const ModuleConfig &params) { }
+
+  /** Get the current module parameters. */
+  virtual void get_parameters(ModuleConfig &params) { }
 
   /** Access features computed by the module. */
   const FeatureVec at(int frame);
@@ -303,10 +317,13 @@ public:
   const std::vector<float> *get_transformation_bias(void) { return &m_bias; }
   void set_transformation_matrix(std::vector<float> &t);
   void set_transformation_bias(std::vector<float> &b);
+  virtual void set_parameters(const ModuleConfig &config);
+  virtual void get_parameters(ModuleConfig &config);
 private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);
   virtual void generate(int frame);
+  void check_transform_parameters(void);
 private:
   std::vector<float> m_transform;
   std::vector<float> m_bias;
@@ -362,6 +379,9 @@ public:
   static const char *type_str() { return "vtln"; }
 
   void set_warp_factor(float factor);
+  float get_warp_factor(void) { return m_warp_factor; }
+  virtual void set_parameters(const ModuleConfig &config);
+  virtual void get_parameters(ModuleConfig &config);
   
 private:
   virtual void get_module_config(ModuleConfig &config);

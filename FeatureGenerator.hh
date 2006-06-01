@@ -38,7 +38,7 @@ public:
 
   /** Fetch a module by name. */
   FeatureModule *module(const std::string &name);
-  
+
   /** Generates a feature vector for the requested \c frame.
    * Generating frames sequentially is guaranteed to use buffers of
    * the feature moduls efficiently.  If you need more random access,

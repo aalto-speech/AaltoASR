@@ -4,7 +4,7 @@
 #include "str.hh"
 
 Recipe::Info::Info()
-  : start_time(0), end_time(0), start_line(0), end_line(0)
+  : start_time(0), end_time(0), start_line(0), end_line(0), speaker_id("")
 {
 }
 
@@ -58,5 +58,7 @@ Recipe::read(FILE *f)
       info.start_line = atoi(field[5].c_str());
     if (field.size() > 6)
       info.end_line = atoi(field[6].c_str());
+    if (field.size() > 7)
+      info.speaker_id = field[7];
   }
 }

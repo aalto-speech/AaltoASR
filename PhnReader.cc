@@ -42,6 +42,22 @@ PhnReader::open(std::string filename)
 }
 
 void
+PhnReader::reset_file(void)
+{
+  assert( m_file != NULL );
+  fseek(m_file, 0, SEEK_SET);
+
+  m_current_line = 0;
+  if (m_first_sample > 0)
+    set_sample_limit(m_first_sample, m_last_sample);
+  if (m_first_line > 0)
+  {
+    int fs;
+    set_line_limit(m_first_line, m_last_line, &fs);
+  }
+}
+
+void
 PhnReader::close()
 {
   if (m_file)
@@ -51,7 +67,7 @@ PhnReader::close()
 
 void
 PhnReader::set_line_limit(int first_line, int last_line, 
-			  int *first_sample, int *last_sample) 
+			  int *first_sample) 
 {
   Phn phn;
   m_first_line = first_line;
@@ -61,7 +77,6 @@ PhnReader::set_line_limit(int first_line, int last_line,
     next(phn);  
 
   *first_sample = phn.start;
-  *last_sample = phn.end;
 }
 
 void

@@ -205,7 +205,10 @@ ModuleConfig::write(FILE *file, int indent) const
   assert(indent >= 0);
   assert(m_value_map.size() == m_names.size());
   assert(m_value_map.size() == m_values.size());
-  std::string indent_str(indent, ' ');
+  std::string module_indent_str(indent, ' ');
+  std::string indent_str(indent+2, ' ');
+  fputs(module_indent_str.c_str(), file);
+  fputs("{\n", file);
   for (int i = 0; i < (int)m_values.size(); i++) {
     if (indent > 0) 
       fputs(indent_str.c_str(), file);
@@ -214,6 +217,8 @@ ModuleConfig::write(FILE *file, int indent) const
     fputs(m_values[i].c_str(), file);
     fputc('\n', file);
   }
+  fputs(module_indent_str.c_str(), file);
+  fputs("}\n", file);
 }
 
 void // private
@@ -224,5 +229,9 @@ ModuleConfig::insert(const std::string &name, const std::string &value)
   if (ret.second) {
     m_names.push_back(name);
     m_values.push_back(value);
+  }
+  else {
+    int index = ret.first->second;
+    m_values[index] = value;
   }
 }

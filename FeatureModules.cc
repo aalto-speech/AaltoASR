@@ -783,8 +783,6 @@ LinTransformModule::get_module_config(ModuleConfig &config)
 void
 LinTransformModule::set_module_config(const ModuleConfig &config)
 {
-  int r, c, index;
-  
   m_own_offset_left = 0;
   m_own_offset_right = 0;
 
@@ -797,6 +795,30 @@ LinTransformModule::set_module_config(const ModuleConfig &config)
   if (m_dim < 1)
     throw std::string("LinTransformModule: Dimension must be > 0");
   
+  check_transform_parameters();
+}
+
+void
+LinTransformModule::set_parameters(const ModuleConfig &config)
+{
+  m_transform.clear();
+  m_bias.clear();
+  config.get("matrix", m_transform);
+  config.get("bias", m_bias);
+  check_transform_parameters();
+}
+
+void
+LinTransformModule::get_parameters(ModuleConfig &config)
+{
+  config.set("matrix", m_transform);
+  config.set("bias", m_bias);
+}
+
+void
+LinTransformModule::check_transform_parameters(void)
+{
+  int r, c, index;
   if (m_transform.size() == 0)
   {
     m_matrix_defined = false;
@@ -833,7 +855,6 @@ LinTransformModule::set_module_config(const ModuleConfig &config)
   }
 }
 
-
 void
 LinTransformModule::generate(int frame)
 {
@@ -868,6 +889,7 @@ LinTransformModule::set_transformation_matrix(std::vector<float> &t)
 {
   if (t.size() == 0)
   {
+    printf("set_transformation_matrix: zero input\n");
     int r, c, index;
     m_transform.resize(m_dim*m_src_dim);
     // Set to identity matrix
@@ -878,6 +900,10 @@ LinTransformModule::set_transformation_matrix(std::vector<float> &t)
   }
   else
   {
+    printf("set_transformation_matrix:\n");
+    for (int i = 0; i < (int)t.size(); i++)
+      printf("%.2f ", t[i]);
+    fprintf(stderr,"\n");
     if ((int)t.size() != m_dim * m_src_dim)
       throw std::string("LinTransformnModule: The dimension of the new transformation matrix does not match the old dimension");
     for (int i = 0; i < (int)t.size(); i++)
@@ -1114,8 +1140,21 @@ VtlnModule::set_module_config(const ModuleConfig &config)
   config.get("pwlin_vtln", m_use_pwlin);
   config.get("pwlin_turnpoint", m_pwlin_turn_point);
 
-  m_warp_factor = 1;
-  create_blin_bins();
+  set_warp_factor(1.0);
+}
+
+void
+VtlnModule::set_parameters(const ModuleConfig &config)
+{
+  float wf = 1.0;
+  config.get("warp_factor", wf);
+  set_warp_factor(wf);
+}
+
+void
+VtlnModule::get_parameters(ModuleConfig &config)
+{
+  config.set("warp_factor", m_warp_factor);
 }
 
 void
