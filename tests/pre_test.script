@@ -1,0 +1,4 @@
+#!/bin/sh
+
+../feacat --start-frame 10 --end-frame 60 -c mfcc_p_dd.feaconf -H --raw-output short.wav > pre_test.tmp
+../feacat -c pre.feaconf pre_test.tmp
