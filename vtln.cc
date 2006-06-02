@@ -287,15 +287,15 @@ main(int argc, char *argv[])
     state_num_labels = config["snl"].specified;
     phn_reader.set_state_num_labels(state_num_labels);
     
-    grid_start = config["grid_rad"].get_float();
-    grid_size = std::max(config["grid_size"].get_int(), 1);
+    grid_start = config["grid-rad"].get_float();
+    grid_size = std::max(config["grid-size"].get_int(), 1);
     grid_step = 2*grid_start/std::max(grid_size-1, 1);
     relative_grid = config["relative"].specified;
     if (relative_grid)
     {
-      if (!config["grid_rad"].specified)
+      if (!config["grid-rad"].specified)
         grid_start = 0.03;
-      if (!config["grid_size"].specified)
+      if (!config["grid-size"].specified)
         grid_size = 5;
       grid_step = 2*grid_start/std::max(grid_size-1, 1);
     }

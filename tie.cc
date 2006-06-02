@@ -72,7 +72,7 @@ main(int argc, char *argv[])
       ('\0', "beam=FLOAT", "arg", "100.0", "log prob beam (default 100.0")
       ('\0', "sbeam=INT", "arg", "100", "state beam (default 100)")
       ('\0', "overlap=FLOAT", "arg", "0.4", "window overlap (default 0.4)")
-      ('\0', "no_force_end", "", "", "do not force to the last state")
+      ('\0', "no-force-end", "", "", "do not force to the last state")
       ('\0', "missing", "", "", "also tie missing triphone contexts ")
       ('\0', "count=INT", "arg", "0", "minimum feature count for state clusters")
       ('\0', "lh=FLOAT", "arg", "0", "minimum likelihood gain for cluster splitting")
@@ -120,7 +120,7 @@ main(int argc, char *argv[])
     trainer.set_info(info);
     trainer.set_win_size(win_size);
     trainer.set_overlap(1-config["overlap"].get_float());
-    trainer.set_no_force_end(config["no_force_end"].specified);
+    trainer.set_no_force_end(config["no-force-end"].specified);
     trainer.set_triphone_tying(true);
 
     if (config["count"].specified)

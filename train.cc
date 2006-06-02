@@ -174,7 +174,7 @@ main(int argc, char *argv[])
     trainer.set_win_size(win_size);
     trainer.set_overlap(1-config["overlap"].get_float());
     trainer.set_cov_update(config["cov"].specified);
-    trainer.set_no_force_end(config["no_force_end"].specified);
+    trainer.set_no_force_end(config["no-force-end"].specified);
     print_segment = config["segment"].specified;
     trainer.set_print_segment(print_segment);
     trainer.set_min_var(config["minvar"].get_float());
