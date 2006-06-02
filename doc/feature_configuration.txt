@@ -51,6 +51,10 @@ MODULE TYPES
     - sample_rate (int, obligatory) : samples per second
     - copy_borders (int, default 1) : if positive, duplicates the border
       frames when requesting frames outside the file
+    - magnitude (int, default 1) : If zero, uses power (squared) values
+      instead of magnitude values.
+    - pre_emph_coef (float, default 0.97) : Coefficient for pre-emphasis
+      filter.
 
 - pre (BASE MODULE)
 
