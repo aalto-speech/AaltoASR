@@ -214,7 +214,7 @@ FFTModule::set_module_config(const ModuleConfig &config)
 
   m_emph_coef = 0.97;
   config.get("pre_emph_coef", m_emph_coef);
-  m_magnitude = 0;
+  m_magnitude = 1;
   config.get("magnitude", m_magnitude);
 
   m_window_width = (int)(m_sample_rate/62.5);

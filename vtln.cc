@@ -19,6 +19,7 @@ int info;
 bool raw_flag;
 float start_time, end_time;
 int start_frame, end_frame;
+bool state_num_labels;
 
 float grid_start;
 float grid_step;
@@ -150,9 +151,16 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
       if (cur_speaker.size() == 0)
         throw std::string("Speaker ID is missing");
 
-      hmm = model.hmm(model.hmm_index(phn.label[0]));
-      state_index = hmm.state(phn.state);
-      state = model.state(state_index);  
+      if (state_num_labels)
+      {
+        state_index = phn.state;
+      }
+      else
+      {
+        hmm = model.hmm(model.hmm_index(phn.label[0]));
+        state_index = hmm.state(phn.state);
+      }
+      state = model.state(state_index);
 
       for (f = phn_start_frame; f < phn_end_frame; f++)
       {
@@ -233,7 +241,8 @@ main(int argc, char *argv[])
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('o', "out=FILE", "arg", "", "output speaker configuration file")
       ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihoods)")
-      ('\0', "sphn", "", "", "phns with speaker ID's in use")
+      ('\0', "sphn", "", "", "phn-files with speaker ID's in use")
+      ('\0', "snl", "", "", "phn-files with state number labels")
       ('\0', "grid-size=INT", "arg", "21", "warping grid size (default: 21/5)")
       ('\0', "grid-rad=FLOAT", "arg", "0.1", "radius of warping grid (default: 0.1/0.03)")
       ('\0', "relative", "", "", "relative warping grid (and smaller grid defaults)")
@@ -275,6 +284,9 @@ main(int argc, char *argv[])
 
     phn_reader.set_speaker_phns(config["sphn"].specified);
 
+    state_num_labels = config["snl"].specified;
+    phn_reader.set_state_num_labels(state_num_labels);
+    
     grid_start = config["grid_rad"].get_float();
     grid_size = std::max(config["grid_size"].get_int(), 1);
     grid_step = 2*grid_start/std::max(grid_size-1, 1);

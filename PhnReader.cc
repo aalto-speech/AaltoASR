@@ -17,7 +17,7 @@ PhnReader::Phn::Phn()
 }
 
 PhnReader::PhnReader()
-  : m_file(NULL), m_speaker_phns(false)
+  : m_file(NULL), m_speaker_phns(false), m_state_num_labels(false)
 {
 }
 
@@ -156,10 +156,6 @@ PhnReader::next(Phn &phn)
 	fields[2].erase(fields[2].find('.', 0), 2);
       }
 
-      if(phn.state > 2) phn.state = -1;
-
-      //
-
     }
     else
       ok = false;
@@ -186,15 +182,21 @@ PhnReader::next(Phn &phn)
     return false;
 
   // Read label and comments
-  //phn.label = fields[0];
   phn.label.clear();
-  str::split(&fields[0], ",", false, &phn.label);
+  if (m_state_num_labels)
+  {
+    phn.state = atoi(fields[0].c_str()); // State number instead of label
+  }
+  else
+  {
+    str::split(&fields[0], ",", false, &phn.label);
+  }
 
   if ((int)fields.size() > 1 + ID_field)
     phn.comment = fields[1 + ID_field];
   else
     phn.comment = "";
-
+  
   // Read speaker ID
 
   if (m_speaker_phns)

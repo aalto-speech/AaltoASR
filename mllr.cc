@@ -15,6 +15,7 @@ int info;
 bool raw_flag;
 float start_time, end_time;
 int start_frame, end_frame;
+bool state_num_labels;
 
 conf::Config config;
 Recipe recipe;
@@ -136,9 +137,14 @@ train_mllr(int start_frame, int end_frame, std::string speaker)
     if (cur_speaker.size() == 0)
       throw std::string("Speaker ID is missing");
 
-    hmm = model.hmm(model.hmm_index(phn.label[0]));
-    state_index = hmm.state(phn.state);
-    state = model.state(state_index);  
+    if (state_num_labels)
+      state = model.state(phn.state);
+    else
+    {
+      hmm = model.hmm(model.hmm_index(phn.label[0]));
+      state_index = hmm.state(phn.state);
+      state = model.state(state_index);
+    }
 
     for (f = phn_start_frame; f < phn_end_frame; f++)
     {
@@ -171,8 +177,9 @@ main(int argc, char *argv[])
       ('M', "mllr=MODULE", "arg must", "", "MLLR module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('o', "out=FILE", "arg", "", "output speaker configuration file")
-      ('\0', "sphn", "", "", "phns with speaker ID's in use")
-      ('\0',"ords", "", "", "files for each speaker are arranged successively")
+      ('\0', "sphn", "", "", "phn-files with speaker ID's in use")
+      ('\0', "snl", "", "", "phn-files with state number labels")
+      ('\0', "ords","", "", "files for each speaker are arranged successively")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -209,6 +216,9 @@ main(int argc, char *argv[])
         std::string(" is not a linear transformation module");
 
     phn_reader.set_speaker_phns(config["sphn"].specified);
+
+    state_num_labels = config["snl"].specified;
+    phn_reader.set_state_num_labels(state_num_labels);
 
     // Check the dimension
     if (model.dim() != fea_gen.dim()) {

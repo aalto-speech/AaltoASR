@@ -51,37 +51,40 @@ public:
 
   void set_sample_limit(int first_sample, int last_sample);
 
-  // Sets phn type: normal / speakered (sphn = speakered phn)
-  // speakered phns have speaker ID between label and comment
+  /** Sets phn type: normal / speakered (sphn = speakered phn)
+   * speakered phns have speaker ID between label and comment
+   */   
   void set_speaker_phns(bool sphn);
+
+  void set_state_num_labels(bool l) { m_state_num_labels = l; }
 
   bool next(Phn &phn);
 
 private:
 
-  // first line to be included (1-N)
-  // if no limits, m_first_line = 0
+  /// first line to be included (1-N); if no limits, m_first_line = 0
   int m_first_line;
 
-  // last line to be included (1-N)
-  // if no limits, m_last_line = 0
+  /// last line to be included (1-N); if no limits, m_last_line = 0
   int m_last_line;
 
-  // first sample to be included (0-N)
+  /// first sample to be included (0-N)
   int m_first_sample;
 
-  // last sample to be included (0-N)
-  // if no samplelimit, m_last_sample = 0
+  /// last sample to be included (0-N); if no samplelimit, m_last_sample = 0
   int m_last_sample;
 
-  // current line (1-N)
+  /// current line (1-N)
   int m_current_line;
 
   std::string m_line;
   FILE *m_file;
   
-  // true for speakered phns
+  /// true for speakered phns
   bool m_speaker_phns;
+
+  /// true if labels are state numbers instead of HMM labels
+  bool m_state_num_labels;
 };
 
 #endif /* PHNREADER_HH */
