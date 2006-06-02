@@ -80,7 +80,7 @@ main(int argc, char *argv[])
     if (lnabytes != 2 && lnabytes != 4)
       throw std::string("Invalid number of LNA bytes");
 
-    no_overwrite = config["no_overwrite"].specified;
+    no_overwrite = config["no-overwrite"].specified;
 
     if (config["speakers"].specified)
       speaker_conf.read_speaker_file(io::Stream(config["speakers"].get_str()));

@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     
     config.default_parse(argc, argv);
     statebind = config["bind"].get_str();
-    cb_base = config["cb_base"].get_str();
+    cb_base = config["cb-base"].get_str();
     outbase = config["out"].get_str();
 
     gwidth = config["gausswidth"].get_float();
