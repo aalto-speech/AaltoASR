@@ -15,7 +15,7 @@
 #include "FeatureGenerator.hh"
 #include "HmmSet.hh"
 #include "SpeakerConfig.hh"
-
+#include "endian.hh"
 
 #define BYTE unsigned char
 
@@ -202,6 +202,8 @@ main(int argc, char *argv[])
             BYTE *p = (BYTE*)&model.obs_log_probs[i];
             for (int j = 0; j < 4; j++)
               buffer[j] = p[j];
+            if (endian::big)
+              endian::convert(buffer, 4);
           }
           else if (lnabytes == 2)
           {
