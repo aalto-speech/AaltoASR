@@ -130,6 +130,7 @@ main(int argc, char *argv[])
         printf("Input: %s\n", recipe.infos[recipe_index].audio_path.c_str());
       }
 
+      out_file.clear();
       if (!config["output-dir"].specified)
       {
         // Default: Use recipe filename for output (normally for phn output..)
