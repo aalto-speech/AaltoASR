@@ -38,17 +38,16 @@ MODULE TYPES
 - fft (BASE MODULE)
 
     Short-time fourier power spectrum.  A base module that reads an
-    audio file and computes short-time fourier spectrums 125 frames per
-    second using overlapping hamming windows.  For 16000 Hz sample
-    rate, the spectrum is computed from a window of 256 samples, and
-    the start of the window is moved 128 samples per frame.
-    Generally, width = (int)(sample_rate / 62.5) and advance =
-    (int)(sample_rate / 125).
+    audio file and computes short-time fourier spectrums using
+    hamming windowing.
 
-    Output dimension: (int)(sample_rate / 125.0)
+    Output dimension: (int)(window_width/2 + 1)
 
     Options: 
     - sample_rate (int, obligatory) : samples per second
+    - frame_rate (float, default 125) : frames per second
+    - window_width (int, default 2*sample_rate/frame_rate): width of the
+      short time spectrum window.
     - copy_borders (int, default 1) : if positive, duplicates the border
       frames when requesting frames outside the file
     - magnitude (int, default 1) : If zero, uses power (squared) values
