@@ -1,10 +1,12 @@
 #include "io.hh"
 #include "conf.hh"
 #include "FeatureGenerator.hh"
+#include "SpeakerConfig.hh"
 
 conf::Config config;
 FeatureGenerator gen;
 bool raw_output = false;
+SpeakerConfig speaker_conf(gen);
 
 void
 print_feature(const FeatureVec &fea)
@@ -38,9 +40,11 @@ main(int argc, char *argv[])
       ('w', "write-config=FILE", "arg", "", "write feature configuration")
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "raw-output", "", "", "raw float output")
-      ('H', "header", "", "", "write a header (feature dimension, 32 bits) in raw output")
+      ('H', "header", "", "", "write a header (feature dim, 32 bits) in raw output")
       ('s', "start-frame=INT", "arg", "", "audio start frame")
       ('e', "end-frame=INT", "arg", "", "audio end frame")
+      ('S', "speakers=FILE", "arg", "", "speaker configuration file")
+      ('d', "speaker-id=NAME", "arg", "", "speaker ID")
       ;
     config.default_parse(argc, argv);
     if (config.arguments.size() != 1)
@@ -54,6 +58,12 @@ main(int argc, char *argv[])
 
     gen.load_configuration(io::Stream(config["config"].get_str()));
     gen.open(config.arguments[0], config["raw-input"].specified);
+
+    if (config["speakers"].specified)
+    {
+      speaker_conf.read_speaker_file(io::Stream(config["speakers"].get_str()));
+      speaker_conf.set_speaker(config["speaker-id"].get_str());
+    }
 
     if (config["write-config"].specified)
       gen.write_configuration(io::Stream(config["write-config"].get_str(),
