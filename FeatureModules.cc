@@ -2,6 +2,7 @@
 #include "FeatureGenerator.hh"
 
 #include <math.h>
+#include "util.hh"
 
 
 FeatureModule::FeatureModule() :
@@ -1135,6 +1136,9 @@ VtlnModule::set_module_config(const ModuleConfig &config)
   config.get("pwlin_vtln", m_use_pwlin);
   config.get("pwlin_turnpoint", m_pwlin_turn_point);
 
+  m_sinc_interpolation_rad = 8;
+  config.get("sinc_iterpolation_rad", m_sinc_interpolation_rad);
+
   set_warp_factor(1.0);
 }
 
@@ -1187,6 +1191,8 @@ VtlnModule::create_pwlin_bins(void)
     }
   }
   m_vtln_bins[t] = (float)(m_dim - 1);
+  if (m_sinc_interpolation_rad > 0)
+    create_sinc_coef_table();
 }
 
 void
@@ -1201,6 +1207,25 @@ VtlnModule::create_blin_bins(void)
                                  1+(1-m_warp_factor)*cos(nf))/M_PI*(m_dim-1);
   }
   m_vtln_bins[t] = m_dim-1;
+  if (m_sinc_interpolation_rad > 0)
+    create_sinc_coef_table();
+}
+
+void
+VtlnModule::create_sinc_coef_table(void)
+{
+  m_sinc_coef.resize(m_dim);
+  m_sinc_coef_start.resize(m_dim);
+  for (int b = 0; b < m_dim; b++)
+  {
+    int cent = (int)(m_vtln_bins[b]+0.5);
+    int min_i = std::max(cent-m_sinc_interpolation_rad, 0);
+    int max_i = std::min(cent+m_sinc_interpolation_rad+1, m_dim);
+    m_sinc_coef_start[b] = min_i;
+    m_sinc_coef[b].clear();
+    for (int i = min_i; i < max_i; i++)
+      m_sinc_coef[b].push_back(util::sinc(m_vtln_bins[b] - i));
+  }
 }
 
 void
@@ -1209,12 +1234,131 @@ VtlnModule::generate(int frame)
   float p;
   const FeatureVec data = m_sources.back()->at(frame);
   FeatureVec target = m_buffer[frame];
-  
-  for (int b = 0; b < m_dim; b++)
+
+  if (m_sinc_interpolation_rad > 0)
   {
-    p = ceil(m_vtln_bins[b]) - m_vtln_bins[b]; 
-    
-    target[b] = p*data[(int)floor(m_vtln_bins[b])] + 
-      (1-p)*data[(int)ceil(m_vtln_bins[b])];
+    for (int b = 0; b < m_dim; b++)
+    {
+      double t = 0;
+      int i, di;
+      for (i = 0, di = m_sinc_coef_start[b];
+           i < (int)m_sinc_coef[b].size(); i++, di++)
+        t += data[di]*m_sinc_coef[b][i];
+      target[b] = std::max((float)t, 0.0f);
+    }
+  }
+  else
+  {
+    for (int b = 0; b < m_dim; b++)
+    {
+      p = ceil(m_vtln_bins[b]) - m_vtln_bins[b]; 
+      
+      target[b] = p*data[(int)floor(m_vtln_bins[b])] + 
+        (1-p)*data[(int)ceil(m_vtln_bins[b])];
+    }
+  }
+}
+
+
+//////////////////////////////////////////////////////////////////
+// Module
+//////////////////////////////////////////////////////////////////
+
+SRNormModule::SRNormModule()
+{
+  m_type_str = type_str();
+}
+
+void
+SRNormModule::get_module_config(ModuleConfig &config)
+{
+  config.set("in_frames", m_in_frames);
+  config.set("out_frames", m_out_frames);
+}
+
+void
+SRNormModule::set_module_config(const ModuleConfig &config)
+{
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+
+  m_in_frames = 0;
+  m_out_frames = 0;
+  config.get("in_frames", m_in_frames);
+  config.get("out_frames", m_out_frames);
+
+  if (m_in_frames == 0 || m_out_frames == 0)
+    throw std::string("SRNormModule: Must set both in_frames and out_frames.");
+  
+  m_frame_dim = m_sources.front()->dim() / m_in_frames;
+  if (m_sources.front()->dim() % m_in_frames != 0)
+    throw std::string("SRNormModule: in_frames does not match with the input dimension");
+
+  if (m_in_frames%2 == 0)
+    fprintf(stderr, "SRNormModule: Warning: Number of input frames is even");
+  if (m_in_frames%2 == 0)
+    fprintf(stderr, "SRNormModule: Warning: Number of output frames is even");
+  
+  m_dim = m_out_frames * m_frame_dim;
+
+  float sr = 1.0;
+  config.get("speech_rate", sr);
+  set_speech_rate(sr);
+}
+
+void
+SRNormModule::set_parameters(const ModuleConfig &config)
+{
+  float sr = 1.0;
+  config.get("speech_rate", sr);
+  set_speech_rate(sr);
+}
+
+void
+SRNormModule::get_parameters(ModuleConfig &config)
+{
+  config.set("speech_rate", m_speech_rate);
+}
+
+void
+SRNormModule::set_speech_rate(float sr)
+{
+  float in_cent = (float)(m_in_frames-1)/2;
+  float out_cent = (float)(m_out_frames-1)/2;
+  float target_pos;
+  int index;
+
+  m_speech_rate = sr;
+
+  m_coef.resize(m_out_frames*m_in_frames);
+  for (int i = index = 0; i < m_out_frames; i++)
+  {
+    target_pos = (i - out_cent)/m_speech_rate + in_cent;
+    for (int j = 0; j < m_in_frames; j++, index++)
+      m_coef[index] = util::sinc(target_pos - j);
+  }
+}
+
+
+void
+SRNormModule::generate(int frame)
+{
+  const FeatureVec data = m_sources.back()->at(frame);
+  FeatureVec target = m_buffer[frame];
+  double t;
+  int coef_start_index;
+
+  for (int i = 0; i < m_out_frames; i++)
+  {
+    coef_start_index = i*m_in_frames;
+    for (int d = 0; d < m_frame_dim; d++)
+    {
+      t = 0;
+      for (int j = 0; j < m_in_frames; j++)
+        t += m_coef[coef_start_index + j]*data[j*m_frame_dim + d];
+
+      // Assuming positive input/output
+      target[i*m_frame_dim + d] = std::max((float)t, 0.0f);
+    }
   }
 }

@@ -93,6 +93,14 @@ namespace util {
     return result;
   }
 
+  inline float sinc(float x)
+  {
+    if (fabs(x) < 1e-8)
+      return 1;
+    double y = M_PI*x;
+    return sin(y)/y;
+  }
+
 };
 
 #endif /* UTIL_HH */

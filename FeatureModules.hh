@@ -390,12 +390,40 @@ private:
 
   void create_pwlin_bins(void);
   void create_blin_bins(void);
+  void create_sinc_coef_table(void);
 
 private:
   int m_use_pwlin;
   float m_pwlin_turn_point;
+  int m_sinc_interpolation_rad;
   std::vector<float> m_vtln_bins;
+  std::vector< std::vector<float> > m_sinc_coef;
+  std::vector<int> m_sinc_coef_start;
   float m_warp_factor;
+};
+
+
+class SRNormModule : public FeatureModule {
+public:
+  SRNormModule();
+  static const char *type_str() { return "sr_norm"; }
+
+  void set_speech_rate(float factor);
+  float get_speech_rate(void) { return m_speech_rate; }
+  virtual void set_parameters(const ModuleConfig &config);
+  virtual void get_parameters(ModuleConfig &config);
+  
+private:
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
+  virtual void generate(int frame);
+
+private:
+  int m_in_frames;
+  int m_out_frames;
+  int m_frame_dim;
+  float m_speech_rate;
+  std::vector<float> m_coef;
 };
 
 

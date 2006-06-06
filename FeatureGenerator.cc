@@ -123,6 +123,8 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new ConcatModule();
     else if (type == VtlnModule::type_str())
       module = new VtlnModule();
+    else if (type == SRNormModule::type_str())
+      module = new SRNormModule();
     else
       throw std::string("Unknown module type '") + type + std::string("'");
     module->set_name(name);
