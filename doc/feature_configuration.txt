@@ -186,6 +186,8 @@ MODULE TYPES
       instead of biliner.
     - pwlin_turnpoint (float, default 0.8): If using piecewise linear warping,
       this defines the turn point of the warping in normalized frequency.
+    - sinc_interpolation_rad (int, default 8): Radius of sinc interpolation
+      table. If zero, uses linear interpolation instead.
 
     Run-time parameters:
     - warp_factor (float): Warping factor for the transformation.
