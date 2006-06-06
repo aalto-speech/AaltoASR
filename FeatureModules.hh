@@ -147,7 +147,7 @@ public:
   virtual bool eof(int frame) = 0;
   
   virtual int sample_rate(void) = 0;
-  virtual int frame_rate(void) = 0;
+  virtual float frame_rate(void) = 0;
   
   virtual void add_source(FeatureModule *source) 
   { throw std::string("base module FFT can not have sources"); }
@@ -169,7 +169,7 @@ public:
   virtual void discard_file(void);
   virtual bool eof(int frame);
   virtual int sample_rate(void) { return m_sample_rate; }
-  virtual int frame_rate(void) { return m_frame_rate; }
+  virtual float frame_rate(void) { return m_frame_rate; }
   
 private:
   virtual void get_module_config(ModuleConfig &config);
@@ -182,14 +182,15 @@ private:
 
   AudioReader m_reader;
   int m_sample_rate;
-  int m_frame_rate;
+  float m_frame_rate;
+  float m_window_advance;
+  int m_window_width;
+
   int m_eof_frame;
 
   float m_emph_coef; //!< Pre-emphasis filter coefficient
   int m_magnitude; //!< If nonzero, compute magnitude spectrum instead of power
 
-  int m_window_advance;
-  int m_window_width;
   std::vector<float> m_hamming_window;
   fftw_plan m_coeffs;
   std::vector<double> m_fftw_datain;
@@ -214,7 +215,7 @@ public:
   virtual void discard_file(void);
   virtual bool eof(int frame);
   virtual int sample_rate(void) { return m_sample_rate; }
-  virtual int frame_rate(void) { return m_frame_rate; }
+  virtual float frame_rate(void) { return m_frame_rate; }
   
 private:
   virtual void get_module_config(ModuleConfig &config);
@@ -224,7 +225,7 @@ private:
 
 private:
   int m_sample_rate;
-  int m_frame_rate;
+  float m_frame_rate;
   int m_eof_frame;
   int m_legacy_file; //!< If nonzero, the dimension in the file is a byte
   int m_file_offset;

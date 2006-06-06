@@ -210,8 +210,7 @@ ModuleConfig::write(FILE *file, int indent) const
   fputs(module_indent_str.c_str(), file);
   fputs("{\n", file);
   for (int i = 0; i < (int)m_values.size(); i++) {
-    if (indent > 0) 
-      fputs(indent_str.c_str(), file);
+    fputs(indent_str.c_str(), file);
     fputs(m_names[i].c_str(), file);
     fputc(' ', file);
     fputs(m_values[i].c_str(), file);

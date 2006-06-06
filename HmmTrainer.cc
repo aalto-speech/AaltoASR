@@ -421,13 +421,13 @@ void HmmTrainer::finish_train(HmmSet &model)
 
 
 void
-HmmTrainer::print_line(FILE *f, int fr, 
+HmmTrainer::print_line(FILE *f, float fr, 
 		       int start, int end, 
                        const std::string &label,
 		       const std::string &speaker,
 		       const std::string &comment)
 {
-  int frame_mult = 16000/fr; // NOTE: phn files assume 16kHz sample rate
+  int frame_mult = (int)(16000/fr); // NOTE: phn files assume 16kHz sample rate
     
   if (start < 0)
     return;

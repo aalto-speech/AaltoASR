@@ -45,7 +45,7 @@ public:
   
 private:
 
-  void print_line(FILE *f, int fr,
+  void print_line(FILE *f, float fr,
 		  int start, int end, 
                   const std::string &label,
 		  const std::string &speaker,

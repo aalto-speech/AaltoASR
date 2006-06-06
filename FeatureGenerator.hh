@@ -59,7 +59,7 @@ public:
   inline int sample_rate(void);
 
   /** Return the frame rate (frames per second). */
-  inline int frame_rate(void);
+  inline float frame_rate(void);
 
   /** Return the dimension of the feature fector. */
   inline int dim(void);
@@ -111,7 +111,7 @@ FeatureGenerator::sample_rate(void)
   return m_base_module->sample_rate();
 }
 
-int
+float
 FeatureGenerator::frame_rate(void)
 {
   assert( m_base_module != NULL );

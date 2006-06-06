@@ -130,9 +130,9 @@ FFTModule::FFTModule(FeatureGenerator *fea_gen) :
   m_fea_gen(fea_gen),
   m_sample_rate(0),
   m_frame_rate(0),
-  m_eof_frame(INT_MAX),
   m_window_advance(0),
   m_window_width(0),
+  m_eof_frame(INT_MAX),
   m_coeffs(NULL),
   m_copy_borders(true),
   m_last_feature_frame(INT_MIN)
@@ -194,6 +194,8 @@ FFTModule::get_module_config(ModuleConfig &config)
 {
   assert(m_sample_rate > 0);
   config.set("sample_rate", m_sample_rate);
+  config.set("frame_rate", m_frame_rate);
+  config.set("window_width", m_window_width);
   config.set("copy_borders", m_copy_borders);
   config.set("pre_emph_coef", m_emph_coef);
   config.set("magnitude", m_magnitude);
@@ -205,10 +207,14 @@ FFTModule::set_module_config(const ModuleConfig &config)
   m_own_offset_left = 0;
   m_own_offset_right = 0;
   
-  m_frame_rate = 125;
-
   if (!config.get("sample_rate", m_sample_rate))
     throw std::string("FFTModule: Must set sample rate");
+
+  m_frame_rate = 125;
+  config.get("frame_rate", m_frame_rate);
+  m_window_advance = m_sample_rate/m_frame_rate;
+  m_window_width = (int)(2*m_sample_rate/m_frame_rate);
+  config.get("window_width", m_window_width);
 
   m_copy_borders = 1;
   config.get("copy_borders", m_copy_borders);
@@ -218,8 +224,6 @@ FFTModule::set_module_config(const ModuleConfig &config)
   m_magnitude = 1;
   config.get("magnitude", m_magnitude);
 
-  m_window_width = (int)(m_sample_rate/62.5);
-  m_window_advance = (int)(m_sample_rate/125);
   m_dim = m_window_width/2+1;
   m_hamming_window.resize(m_window_width);
   for (int i = 0; i < m_window_width; i++)
@@ -249,7 +253,7 @@ FFTModule::generate(int frame)
   // NOTE: because of lowpass filtering, (m_window_width PLUS one)
   // samples are fetched from the audio file
 
-  int window_start = frame * m_window_advance;
+  int window_start = (int)(frame * m_window_advance);
 
   // The first frame is returned for negative frames.
   if (m_copy_borders && frame < 0)
@@ -1261,7 +1265,7 @@ VtlnModule::generate(int frame)
 
 
 //////////////////////////////////////////////////////////////////
-// Module
+// SRNormModule
 //////////////////////////////////////////////////////////////////
 
 SRNormModule::SRNormModule()
