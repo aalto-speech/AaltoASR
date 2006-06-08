@@ -103,7 +103,7 @@ set_speaker(std::string speaker, int grid_iter)
     
     for (i = 0; i < (int)speaker_stats[cur_speaker].warp_factors.size(); i++)
     {
-      if (fabs(new_warp - speaker_stats[cur_speaker].warp_factors.back())
+      if (fabs(new_warp - speaker_stats[cur_speaker].warp_factors[i])
           < TINY)
         break;
     }
