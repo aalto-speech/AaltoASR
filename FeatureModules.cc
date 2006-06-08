@@ -1124,6 +1124,7 @@ VtlnModule::get_module_config(ModuleConfig &config)
   {
     config.set("pwlin_vtln", m_use_pwlin);
     config.set("pwlin_turnpoint", m_pwlin_turn_point);
+    config.set("sinc_interpolation_rad", m_sinc_interpolation_rad);
   }
 }
 
@@ -1141,7 +1142,7 @@ VtlnModule::set_module_config(const ModuleConfig &config)
   config.get("pwlin_turnpoint", m_pwlin_turn_point);
 
   m_sinc_interpolation_rad = 8;
-  config.get("sinc_iterpolation_rad", m_sinc_interpolation_rad);
+  config.get("sinc_interpolation_rad", m_sinc_interpolation_rad);
 
   set_warp_factor(1.0);
 }
