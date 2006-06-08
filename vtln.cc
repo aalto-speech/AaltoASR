@@ -35,6 +35,7 @@ SpeakerConfig speaker_conf(fea_gen);
 
 VtlnModule *vtln_module;
 std::string cur_speaker;
+int cur_warp_index;
 
 typedef struct {
   float center; // Center warp value
@@ -75,34 +76,50 @@ void
 set_speaker(std::string speaker, int grid_iter)
 {
   float new_warp;
+  int i;
   
-  speaker_conf.set_speaker(speaker);
   cur_speaker = speaker;
 
-  SpeakerStatsMap::iterator it = speaker_stats.find(speaker);
-  if (it == speaker_stats.end())
+  if (cur_speaker.size() > 0)
   {
-    // New speaker encountered
-    SpeakerStats new_speaker;
-
-    if (relative_grid)
-      new_speaker.center = vtln_module->get_warp_factor();
-    else
-      new_speaker.center = 1;
-    speaker_stats[cur_speaker] = new_speaker;
+    speaker_conf.set_speaker(speaker);
+    
+    SpeakerStatsMap::iterator it = speaker_stats.find(speaker);
+    if (it == speaker_stats.end())
+    {
+      // New speaker encountered
+      SpeakerStats new_speaker;
+      
+      if (relative_grid)
+        new_speaker.center = vtln_module->get_warp_factor();
+      else
+        new_speaker.center = 1;
+      speaker_stats[cur_speaker] = new_speaker;
+    }
+    
+    new_warp = speaker_stats[cur_speaker].center + grid_start +
+      grid_iter*grid_step;
+    vtln_module->set_warp_factor(new_warp);
+    
+    for (i = 0; i < (int)speaker_stats[cur_speaker].warp_factors.size(); i++)
+    {
+      if (fabs(new_warp - speaker_stats[cur_speaker].warp_factors.back())
+          < TINY)
+        break;
+    }
+    if (i == (int)speaker_stats[cur_speaker].warp_factors.size())
+    {
+      // New warp factor
+      speaker_stats[cur_speaker].warp_factors.push_back(new_warp);
+      speaker_stats[cur_speaker].log_likelihoods.push_back(0);
+    }
+    cur_warp_index = i;
   }
-
-  new_warp = speaker_stats[cur_speaker].center + grid_start +
-    grid_iter*grid_step;
-  if (speaker_stats[cur_speaker].warp_factors.size() == 0 ||
-      fabs(new_warp - speaker_stats[cur_speaker].warp_factors.back()) > TINY)
+  else
   {
-    // New warp factor
-    speaker_stats[cur_speaker].warp_factors.push_back(new_warp);
-    speaker_stats[cur_speaker].log_likelihoods.push_back(0);
+    vtln_module->set_warp_factor(1 + grid_start + grid_iter*grid_step);
+    cur_warp_index = -1;
   }
-  
-  vtln_module->set_warp_factor(new_warp);
 }
 
 
@@ -120,11 +137,8 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
 
   for (grid_iter = 0; grid_iter < grid_size; grid_iter++)
   {
-    if (speaker.size() > 0)
-      set_speaker(speaker, grid_iter);
-    else
-      cur_speaker = "";
-
+    set_speaker(speaker, grid_iter);
+    
     phn_reader.reset_file();
     
     while (phn_reader.next(phn))
@@ -169,9 +183,12 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
           break;
       
         // Get probabilities
-        model.reset_state_probs();
-        speaker_stats[cur_speaker].log_likelihoods.back() += 
-          log(model.state_prob(state_index, fea_vec));
+        if (cur_warp_index >= 0)
+        {
+          model.reset_state_probs();
+          speaker_stats[cur_speaker].log_likelihoods[cur_warp_index] += 
+            log(model.state_prob(state_index, fea_vec));
+        }
       }
       if (f < phn_end_frame)
         break; // EOF in FeatureGenerator
