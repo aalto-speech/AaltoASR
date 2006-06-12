@@ -203,10 +203,10 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
   new_matrix.resize(m_dim*m_dim, 0);
   for (i = 0; i < m_dim; i++)
   {
-    new_bias[i] = b2[i];
+    new_bias[i] = b[i];
     for (j = 0; j < m_dim; j++)
     {
-      new_matrix[i*m_dim+j] = A2(i, j);
+      new_matrix[i*m_dim+j] = A(i, j);
     }
   }
   
