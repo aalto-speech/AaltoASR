@@ -1124,8 +1124,10 @@ VtlnModule::get_module_config(ModuleConfig &config)
   {
     config.set("pwlin_vtln", m_use_pwlin);
     config.set("pwlin_turnpoint", m_pwlin_turn_point);
-    config.set("sinc_interpolation_rad", m_sinc_interpolation_rad);
   }
+  if (m_lanczos_window)
+    config.set("lanczos_window", 1);
+  config.set("sinc_interpolation_rad", m_sinc_interpolation_rad);
 }
 
 void
@@ -1143,6 +1145,13 @@ VtlnModule::set_module_config(const ModuleConfig &config)
 
   m_sinc_interpolation_rad = 8;
   config.get("sinc_interpolation_rad", m_sinc_interpolation_rad);
+
+  int lanczos = 1;
+  config.get("lanczos_window", lanczos);
+  if (lanczos > 0)
+    m_lanczos_window = true;
+  else
+    m_lanczos_window = false;
 
   set_warp_factor(1.0);
 }
@@ -1219,6 +1228,7 @@ VtlnModule::create_blin_bins(void)
 void
 VtlnModule::create_sinc_coef_table(void)
 {
+  float t;
   m_sinc_coef.resize(m_dim);
   m_sinc_coef_start.resize(m_dim);
   for (int b = 0; b < m_dim; b++)
@@ -1229,7 +1239,17 @@ VtlnModule::create_sinc_coef_table(void)
     m_sinc_coef_start[b] = min_i;
     m_sinc_coef[b].clear();
     for (int i = min_i; i < max_i; i++)
-      m_sinc_coef[b].push_back(util::sinc(m_vtln_bins[b] - i));
+    {
+      t = util::sinc(i - m_vtln_bins[b]);
+      if (m_lanczos_window)
+      {
+        if (fabs(i-m_vtln_bins[b]) < m_sinc_interpolation_rad)
+          t *= util::sinc((i-m_vtln_bins[b])/(float)m_sinc_interpolation_rad);
+        else
+          t = 0;
+      }
+      m_sinc_coef[b].push_back(t);
+    }
   }
 }
 

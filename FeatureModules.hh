@@ -397,6 +397,7 @@ private:
   int m_use_pwlin;
   float m_pwlin_turn_point;
   int m_sinc_interpolation_rad;
+  bool m_lanczos_window;
   std::vector<float> m_vtln_bins;
   std::vector< std::vector<float> > m_sinc_coef;
   std::vector<int> m_sinc_coef_start;

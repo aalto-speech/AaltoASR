@@ -916,7 +916,6 @@ HmmTrainer::update_mllt_parameters(HmmSet &model, HmmSet &model_tmp,
       temp *= temp_m(i,i);
     Adet = fabs(temp);
     double scale = pow(Adet, 1/(double)model.dim());
-    fprintf(stderr, "Adet = %f, scale = %f\n", Adet, scale);
     for (i = 0; i < model.dim(); i++)
       for (j = 0; j < model.dim(); j++)
         A(i,j) = A(i,j)/scale;
