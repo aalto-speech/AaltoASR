@@ -1299,6 +1299,7 @@ SRNormModule::get_module_config(ModuleConfig &config)
 {
   config.set("in_frames", m_in_frames);
   config.set("out_frames", m_out_frames);
+  config.set("lanczos_order", m_lanczos_order);
 }
 
 void
@@ -1326,6 +1327,12 @@ SRNormModule::set_module_config(const ModuleConfig &config)
   
   m_dim = m_out_frames * m_frame_dim;
 
+  m_lanczos_order = 4;
+  config.get("lanczos_order", m_lanczos_order);
+  if (m_lanczos_order < 1)
+    throw std::string("SRNormModule: lanczos_order must be positive.");
+
+  // Debug options?
   float sr = 1.0;
   config.get("speech_rate", sr);
   set_speech_rate(sr);
@@ -1351,16 +1358,30 @@ SRNormModule::set_speech_rate(float sr)
   float in_cent = (float)(m_in_frames-1)/2;
   float out_cent = (float)(m_out_frames-1)/2;
   float target_pos;
-  int index;
 
   m_speech_rate = sr;
 
-  m_coef.resize(m_out_frames*m_in_frames);
-  for (int i = index = 0; i < m_out_frames; i++)
+  m_coef.resize(m_out_frames);
+  m_interpolation_start.resize(m_out_frames);
+  for (int i = 0; i < m_out_frames; i++)
   {
     target_pos = (i - out_cent)/m_speech_rate + in_cent;
-    for (int j = 0; j < m_in_frames; j++, index++)
-      m_coef[index] = util::sinc(target_pos - j);
+
+    int cent = (int)roundf(target_pos);
+    int interp_start = std::max(cent-m_lanczos_order, 0);
+    int interp_end = std::min(cent+m_lanczos_order+1, m_in_frames);
+    m_interpolation_start[i] = interp_start;
+    m_coef[i].clear();
+    
+    for (int j = interp_start; j < interp_end; j++)
+    {
+      float t = util::sinc(j - target_pos);
+      if (fabs(j - target_pos) < m_lanczos_order)
+        t *= util::sinc((j-target_pos)/(float)m_lanczos_order);
+      else
+        t = 0;
+      m_coef[i].push_back(t);
+    }
   }
 }
 
@@ -1371,16 +1392,16 @@ SRNormModule::generate(int frame)
   const FeatureVec data = m_sources.back()->at(frame);
   FeatureVec target = m_buffer[frame];
   double t;
-  int coef_start_index;
+  int i, j, d, fi;
 
-  for (int i = 0; i < m_out_frames; i++)
+  for (i = 0; i < m_out_frames; i++)
   {
-    coef_start_index = i*m_in_frames;
-    for (int d = 0; d < m_frame_dim; d++)
+    for (d = 0; d < m_frame_dim; d++)
     {
       t = 0;
-      for (int j = 0; j < m_in_frames; j++)
-        t += m_coef[coef_start_index + j]*data[j*m_frame_dim + d];
+      for (j = 0, fi = m_interpolation_start[i];
+           j < (int)m_coef[i].size(); j++, fi++)
+        t += m_coef[i][j]*data[fi*m_frame_dim + d];
 
       // Assuming positive input/output
       target[i*m_frame_dim + d] = std::max((float)t, 0.0f);

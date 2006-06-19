@@ -424,8 +424,10 @@ private:
   int m_in_frames;
   int m_out_frames;
   int m_frame_dim;
+  int m_lanczos_order;
   float m_speech_rate;
-  std::vector<float> m_coef;
+  std::vector< std::vector<float> > m_coef;
+  std::vector<int> m_interpolation_start;
 };
 
 

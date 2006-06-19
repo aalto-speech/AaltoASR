@@ -21,9 +21,11 @@ main(int argc, char *argv[])
   FeatureModule *norm_mod_src = NULL;
   std::vector<double> block_mean_acc, global_mean_acc;
   std::vector<double> block_var_acc, global_var_acc;
+  std::vector<double> block_cov_acc, global_cov_acc;
   double global_acc_count;
   std::vector<float> mean, scale;
   bool raw_flag;
+  bool cov_flag;
   int info;
   int block_size;
   int cur_block_size;
@@ -40,6 +42,7 @@ main(int argc, char *argv[])
       ('M', "module=NAME", "arg", "", "normalization module name")
       ('b', "block=INT", "arg", "1000", "block size (for reducing round-off errors)")
       ('P', "print", "", "", "print mean and scale to stdout")
+      ('\0', "cov", "", "", "estimate and print covariance matrix")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -69,12 +72,20 @@ main(int argc, char *argv[])
 
     block_size = config["block"].get_int();
 
+    cov_flag = config["cov"].specified;
+
     // Initialize accumulators
     block_mean_acc.resize(dim);
     block_var_acc.resize(dim);
     global_mean_acc.resize(dim, 0);
     global_var_acc.resize(dim, 0);
     global_acc_count = 0;
+
+    if (cov_flag)
+    {
+      block_cov_acc.resize(dim*dim);
+      global_cov_acc.resize(dim*dim, 0);
+    }
 
     // Read recipe file
     Recipe recipe;
@@ -95,6 +106,11 @@ main(int argc, char *argv[])
       {
         block_mean_acc[d] = 0;
         block_var_acc[d] = 0;
+      }
+      if (cov_flag)
+      {
+        for (int d = 0; d < dim*dim; d++)
+          block_cov_acc[d] = 0;
       }
       cur_block_size = 0;
 
@@ -117,6 +133,11 @@ main(int argc, char *argv[])
               global_mean_acc[d] += block_mean_acc[d]/(double)block_size;
               global_var_acc[d] += block_var_acc[d]/(double)block_size;
             }
+            if (cov_flag)
+            {
+              for (int d = 0; d < dim*dim; d++)
+                global_cov_acc[d] += block_cov_acc[d]/(double)block_size;
+            }
             global_acc_count += (double)cur_block_size/(double)block_size;
           }
           break;
@@ -129,6 +150,12 @@ main(int argc, char *argv[])
           block_mean_acc[d] += vec[d];
           block_var_acc[d] += vec[d]*vec[d];
         }
+        if (cov_flag)
+        {
+          for (int d1 = 0; d1 < dim; d1++)
+            for (int d2 = 0; d2 < dim; d2++)
+              block_cov_acc[d1*dim+d2] += vec[d1]*vec[d2];
+        }
         cur_block_size++;
         if (cur_block_size == block_size)
         {
@@ -138,12 +165,22 @@ main(int argc, char *argv[])
             global_mean_acc[d] += block_mean_acc[d]/(double)block_size;
             global_var_acc[d] += block_var_acc[d]/(double)block_size;
           }
+          if (cov_flag)
+          {
+            for (int d = 0; d < dim*dim; d++)
+              global_cov_acc[d] += block_cov_acc[d]/(double)block_size;
+          }
           global_acc_count++;
           // Reset the block accumulators
           for (int d = 0; d < dim; d++)
           {
             block_mean_acc[d] = 0;
             block_var_acc[d] = 0;
+          }
+          if (cov_flag)
+          {
+            for (int d = 0; d < dim*dim; d++)
+              block_cov_acc[d] = 0;
           }
           cur_block_size = 0;
         }
@@ -154,7 +191,8 @@ main(int argc, char *argv[])
     mean.resize(dim);
     for (int d = 0; d < dim; d++)
     {
-      mean[d] = global_mean_acc[d] /= global_acc_count;
+      global_mean_acc[d] /= global_acc_count;
+      mean[d] = global_mean_acc[d];
     }
     scale.resize(dim);
     for (int d = 0; d < dim; d++)
@@ -174,6 +212,20 @@ main(int argc, char *argv[])
         printf("%8.2f ", scale[d]);
       printf("\n");
 
+    }
+
+    if (cov_flag)
+    {
+      for (int d1 = 0; d1 < dim; d1++)
+      {
+        for (int d2 = 0; d2 < dim; d2++)
+        {
+          double t = global_cov_acc[d1*dim+d2] / global_acc_count -
+            global_mean_acc[d1]*global_mean_acc[d2];
+          printf("%f ", t);
+        }
+        printf("\n");
+      }
     }
       
     if (norm_mod != NULL)

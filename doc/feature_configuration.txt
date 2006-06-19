@@ -187,6 +187,8 @@ MODULE TYPES
       this defines the turn point of the warping in normalized frequency.
     - sinc_interpolation_rad (int, default 8): Radius of sinc interpolation
       table. If zero, uses linear interpolation instead.
+    - lanczos_window (int, default 1): If positive, uses lanczos windowing
+      instead of pure sinc interpolation.
 
     Run-time parameters:
     - warp_factor (float): Warping factor for the transformation.
