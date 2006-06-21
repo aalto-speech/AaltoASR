@@ -8,6 +8,13 @@
 
 #include "FeatureModules.hh"
 
+#include "mtl/mtl.h"
+#include "mtl/blais.h"
+
+typedef mtl::matrix<float, mtl::rectangle<>, mtl::dense<>,
+                    mtl::row_major>::type Matrix;
+typedef mtl::dense1D<float> Vector;
+
 // FIXME: precicions in writes!!
 
 //
@@ -25,9 +32,14 @@ public:
   inline Type type() const { return m_cov_type; }
   inline float &var() { return data[0]; }
   inline float &diag(int i) { return data[i]; }
-  inline float &full(int row, int col) { assert(false); return data[0]; } // FIXME
+  //  inline float &full(int row, int col) { assert(false); return data[0]; } // FIXME
 
+  // Single & Diagonal
   std::vector<float> data;
+
+  // Unrestricted
+  Matrix full;
+  Matrix full_inv_cholesky_transpose;
 
   // Determinant for the covariance matrix (FIXME: only for diagonal covariances)
   // Computed in HmmSet::comput_covariance_determinants, remember to call it
@@ -115,6 +127,7 @@ class HmmSet {
 public:
   HmmSet();
   HmmSet(int dimension);
+  HmmSet(const HmmSet &hmm_set);
 
   void reset();
   void copy(const HmmSet &hmm_set);
@@ -309,5 +322,7 @@ HmmSet::transition(int transition)
 {
   return m_transitions[transition];
 }
+
+void cholesky_factor(const Matrix &A, Matrix &B);
 
 #endif /* HMMSET_HH */

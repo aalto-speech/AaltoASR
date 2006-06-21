@@ -6,6 +6,7 @@
 
 #include "HmmSet.hh"
 #include "util.hh"
+#include "mtl/lu.h"
 
 #define MIN_STATE_PROB 1e-20
 #define MIN_KERNEL_POS_PROB 1e-30
@@ -13,7 +14,12 @@
 void
 HmmCovariance::reset(int value)
 {
-  std::fill(data.begin(), data.end(), value);
+  if (m_cov_type == FULL) {
+    mtl::set(full, 0);
+    mtl::set(full_inv_cholesky_transpose, 0);
+  }
+  else
+    std::fill(data.begin(), data.end(), value);
 }
 
 void
@@ -24,8 +30,13 @@ HmmCovariance::resize(int dim, Type type)
     data.resize(1);
   else if (m_cov_type == DIAGONAL)
     data.resize(dim);
+  else if (m_cov_type == FULL) {
+    full.resize(dim, dim);
+    full_inv_cholesky_transpose.resize(dim,dim);
+  }
   else
     throw std::string("Unknown covariance type");
+  reset();
 }
 
 
@@ -48,12 +59,44 @@ HmmSet::HmmSet()
 {
 }
 
+
+HmmSet::HmmSet(const HmmSet &hmm_set)
+{
+  obs_log_probs = hmm_set.obs_log_probs;
+  obs_kernel_likelihoods = hmm_set.obs_kernel_likelihoods;
+  m_dim = hmm_set.m_dim;
+  m_cov_type = hmm_set.m_cov_type;
+  m_hmm_map = hmm_set.m_hmm_map;
+  m_transitions = hmm_set.m_transitions;
+  m_states = hmm_set.m_states;
+  m_hmms = hmm_set.m_hmms;
+  m_state_probs = hmm_set.m_state_probs;
+  m_kernel_likelihoods = hmm_set.m_kernel_likelihoods;
+  m_valid_stateprobs = hmm_set.m_valid_stateprobs;
+  m_valid_kernel_likelihoods = hmm_set.m_valid_kernel_likelihoods;
+  m_viterbi_scale_coeff = hmm_set.m_viterbi_scale_coeff;
+
+  m_kernels.resize(hmm_set.m_kernels.size());
+  for (unsigned int i=0; i<m_kernels.size(); i++) {
+    m_kernels[i].center = hmm_set.m_kernels[i].center;
+    m_kernels[i].cov.resize(m_dim, hmm_set.m_kernels[i].cov.type());
+    m_kernels[i].cov.data = hmm_set.m_kernels[i].cov.data;
+    m_kernels[i].cov.cov_det = hmm_set.m_kernels[i].cov.cov_det;
+    if (m_cov_type == HmmCovariance::FULL) {
+      m_kernels[i].cov.full.resize(m_dim, m_dim);
+      m_kernels[i].cov.full_inv_cholesky_transpose.resize(m_dim, m_dim);
+      mtl::copy(hmm_set.m_kernels[i].cov.full, m_kernels[i].cov.full);
+      mtl::copy(hmm_set.m_kernels[i].cov.full_inv_cholesky_transpose, m_kernels[i].cov.full_inv_cholesky_transpose);
+    }
+  }
+}
+
 void
 HmmSet::reset()
 {
   for (int k = 0; k < num_kernels(); k++) {
     std::fill(m_kernels[k].center.begin(), m_kernels[k].center.end(), 0);
-    std::fill(m_kernels[k].cov.data.begin(), m_kernels[k].cov.data.end(), 0);
+    m_kernels[k].cov.reset();
   }
 
   for (int s = 0; s < num_states(); s++) {
@@ -197,7 +240,9 @@ HmmSet::read_gk(const std::string &filename)
     m_cov_type = HmmCovariance::SINGLE;
   else if (cov_str == "diagonal_cov")
     m_cov_type = HmmCovariance::DIAGONAL;
-  else
+  else if (cov_str == "full_cov")
+    m_cov_type = HmmCovariance::FULL;
+ else
     throw std::string("Unknown covariance type");
 
   assert(m_cov_type != HmmCovariance::INVALID);
@@ -214,10 +259,21 @@ HmmSet::read_gk(const std::string &filename)
     // Read covariance
     if (m_cov_type == HmmCovariance::SINGLE) {
       in >> kernel.cov.var();
-    } else if (m_cov_type == HmmCovariance::DIAGONAL) {
+    } 
+    else if (m_cov_type == HmmCovariance::DIAGONAL) {
       for (int d = 0; d < m_dim; d++)
 	in >> kernel.cov.diag(d);
-    } else {
+    } 
+    else if (m_cov_type == HmmCovariance::FULL) {
+      for (int i=0; i<m_dim; i++)
+	for (int j=0; j<m_dim; j++) {
+	  float f = 0;
+	  in >> f;
+	  kernel.cov.full(i,j) = f;
+	  kernel.cov.full(j,i) = f;
+	}
+    }
+    else {
       throw std::string("Unknown covariance type");
     }
   }
@@ -346,6 +402,8 @@ HmmSet::write_gk(const std::string &filename)
     out << "single_cov";
   else if (m_cov_type == HmmCovariance::DIAGONAL)
     out << "diagonal_cov";
+  else if (m_cov_type == HmmCovariance::FULL)
+    out << "full_cov";
   else
     throw std::string("Unknown covariance type");
   out << std::endl;
@@ -364,10 +422,16 @@ HmmSet::write_gk(const std::string &filename)
     // Write covariance
     if (m_cov_type == HmmCovariance::SINGLE) {
       out << " " << kernel.cov.var() << std::endl;
-    } else {
-      for (int d = 0; d < m_dim; d++) {
+    } 
+    else if (m_cov_type == HmmCovariance::DIAGONAL) {
+      for (int d = 0; d < m_dim; d++)
 	out << " " << kernel.cov.diag(d);
-      }
+      out << std::endl;
+    }
+    else if (m_cov_type == HmmCovariance::FULL) {
+      for (int i=0; i<m_dim; i++)
+	for (int j=0; j<m_dim; j++)
+	  out << " " << kernel.cov.full(i,j);
       out << std::endl;
     }
   }
@@ -464,6 +528,31 @@ HmmSet::compute_covariance_determinants(void)
         det *= kernel.cov.diag(d);
       kernel.cov.cov_det = det;
     }
+
+    else if (kernel.cov.type() == HmmCovariance::FULL)
+      {
+      	Matrix t(m_dim, m_dim);
+	Matrix precision(m_dim, m_dim);
+	Matrix precision_cholesky(m_dim, m_dim);
+	mtl::copy(kernel.cov.full, t);
+	mtl::dense1D<int> pivots(m_dim, 0);
+	mtl::lu_factor(t, pivots);
+	mtl::lu_inverse(t, pivots, precision);
+	cholesky_factor(precision, precision_cholesky);
+	mtl::transpose(precision_cholesky, kernel.cov.full_inv_cholesky_transpose);
+	
+	det=1;
+	for (d=0; d<m_dim; d++)
+	  // Sqrt of the determinant of the inverse
+	  det *= precision_cholesky(d,d);
+	kernel.cov.cov_det = det;
+	if (det <= 0) {
+	  print_all_matrix(kernel.cov.full);
+	  assert(det>0);
+	}
+	// Clean up, only cholesky factors for the precision are needed
+	kernel.cov.full.resize(0,0);
+      }
   }
 }
 
@@ -552,7 +641,10 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
   float result;
   double dist = 0.0;
   double dif;
-
+  Vector s(m_dim);
+  Vector t(m_dim);
+  double temp;
+  
   HmmKernel &kernel = m_kernels[k];
   
   switch (kernel.cov.type())
@@ -575,6 +667,18 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
     result = exp(-0.5 * dist) / sqrt(kernel.cov.cov_det);
     break;
 
+  case HmmCovariance::FULL:
+    for (int i = 0; i < m_dim; i++)
+      s[i] = feature[i]-kernel.center[i];
+
+    for (int i=0; i<m_dim; i++)
+      for (int j=i; j<m_dim; j++)
+	t[i] += kernel.cov.full_inv_cholesky_transpose(i,j)*s[j];
+
+    temp = mtl::dot(t, t);
+    result = kernel.cov.cov_det * exp(-0.5 * temp);
+    break;  
+
   default:
     throw std::string("Unknown covariance type");
   }
@@ -583,4 +687,28 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
     result = 0;
 
   return(result);
+}
+
+
+
+void cholesky_factor(const Matrix &A, Matrix &B)
+{
+  assert(A.nrows() == A.ncols());
+  assert(B.nrows() == B.ncols());
+  assert(A.nrows() == B.nrows());
+  mtl::copy(A, B);
+  
+  for (unsigned int j=0; j<B.nrows(); j++) 
+    {
+      for (unsigned int k=0; k<j; k++)
+	for (unsigned int i=j; i<B.nrows(); i++)
+	  B(i,j) = B(i,j)-B(i,k)*B(j,k);
+      B(j,j) = sqrt(B(j,j));
+      for (unsigned int k=j+1; k<B.nrows(); k++)
+	B(k,j) = B(k,j)/B(j,j);
+    }
+  
+  for (unsigned int i=0; i<B.nrows(); i++)
+    for (unsigned int j=i+1; j<B.ncols(); j++)
+      B(i,j) = 0;
 }
