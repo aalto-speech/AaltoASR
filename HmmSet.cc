@@ -16,7 +16,7 @@ HmmCovariance::reset(int value)
 {
   if (m_cov_type == FULL) {
     mtl::set(full, 0);
-    mtl::set(full_inv_cholesky_transpose, 0);
+    mtl::set(precision_cholesky_transpose, 0);
   }
   else
     std::fill(data.begin(), data.end(), value);
@@ -32,7 +32,7 @@ HmmCovariance::resize(int dim, Type type)
     data.resize(dim);
   else if (m_cov_type == FULL) {
     full.resize(dim, dim);
-    full_inv_cholesky_transpose.resize(dim,dim);
+    precision_cholesky_transpose.resize(dim,dim);
   }
   else
     throw std::string("Unknown covariance type");
@@ -84,9 +84,9 @@ HmmSet::HmmSet(const HmmSet &hmm_set)
     m_kernels[i].cov.cov_det = hmm_set.m_kernels[i].cov.cov_det;
     if (m_cov_type == HmmCovariance::FULL) {
       m_kernels[i].cov.full.resize(m_dim, m_dim);
-      m_kernels[i].cov.full_inv_cholesky_transpose.resize(m_dim, m_dim);
+      m_kernels[i].cov.precision_cholesky_transpose.resize(m_dim, m_dim);
       mtl::copy(hmm_set.m_kernels[i].cov.full, m_kernels[i].cov.full);
-      mtl::copy(hmm_set.m_kernels[i].cov.full_inv_cholesky_transpose, m_kernels[i].cov.full_inv_cholesky_transpose);
+      mtl::copy(hmm_set.m_kernels[i].cov.precision_cholesky_transpose, m_kernels[i].cov.precision_cholesky_transpose);
     }
   }
 }
@@ -539,7 +539,7 @@ HmmSet::compute_covariance_determinants(void)
 	mtl::lu_factor(t, pivots);
 	mtl::lu_inverse(t, pivots, precision);
 	cholesky_factor(precision, precision_cholesky);
-	mtl::transpose(precision_cholesky, kernel.cov.full_inv_cholesky_transpose);
+	mtl::transpose(precision_cholesky, kernel.cov.precision_cholesky_transpose);
 	
 	det=1;
 	for (d=0; d<m_dim; d++)
@@ -550,8 +550,6 @@ HmmSet::compute_covariance_determinants(void)
 	  print_all_matrix(kernel.cov.full);
 	  assert(det>0);
 	}
-	// Clean up, only cholesky factors for the precision are needed
-	kernel.cov.full.resize(0,0);
       }
   }
 }
@@ -673,7 +671,7 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
 
     for (int i=0; i<m_dim; i++)
       for (int j=i; j<m_dim; j++)
-	t[i] += kernel.cov.full_inv_cholesky_transpose(i,j)*s[j];
+	t[i] += kernel.cov.precision_cholesky_transpose(i,j)*s[j];
 
     temp = mtl::dot(t, t);
     result = kernel.cov.cov_det * exp(-0.5 * temp);

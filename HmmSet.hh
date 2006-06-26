@@ -39,7 +39,7 @@ public:
 
   // Unrestricted
   Matrix full;
-  Matrix full_inv_cholesky_transpose;
+  Matrix precision_cholesky_transpose;
 
   // Determinant for the covariance matrix (FIXME: only for diagonal covariances)
   // Computed in HmmSet::comput_covariance_determinants, remember to call it
