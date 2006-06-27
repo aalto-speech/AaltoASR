@@ -40,7 +40,8 @@ class FeatureGenerator;
  * are used for e.g. speaker adaptation. The methods used to handle
  * the parameters, set_parameters() and get_parameters(), use the same
  * \ref ModuleConfig class for passing the parameters as does the
- * set_config() and get_config() methods.
+ * set_config() and get_config() methods. The on-line parameters may not
+ * change the feature dimension or buffering behaviour.
  *
  */ 
 class FeatureModule {
@@ -60,9 +61,10 @@ public:
 
   /** Request buffering in addition to the central frame.  Buffering
    * is requested recursively from the source modules if necessary.
+   * \note Should be called only through set_config()!
    *
    * \param left = number of frames to left of the central frame
-   * \param right = number of frames to right of the cengral frame
+   * \param right = number of frames to right of the central frame
    */
   void set_buffer(int left, int right);
 
@@ -89,6 +91,22 @@ public:
    * \note Derived classes should implement the virtual method
    * reset_module() if resetting is desired. */
   void reset();
+
+  /** Update buffer offsets required for the initial buffer filling.
+   *  Used by FeatureGenerator to ensure large enough buffering so that when
+   *  feature buffers are initially filled and there are branching feature
+   *  module streams the features are always generated from left to right
+   *  in all modules.
+   *
+   * \param target = target module from which the offsets are fetched.
+   */
+  void update_init_offsets(const FeatureModule &target);
+
+  /** Called by FeatureGenerator for modules which should implement the
+   *  extra buffering needed for initial buffer filling. \note This may not
+   *  be called before the normal buffering has been determined through
+   *  module configuration. */
+  void require_init_buffer(void);
 
   /** Set the module's parameters. This is used for e.g. speaker adaptation
       to change the module's behaviour on-line. */
@@ -126,6 +144,8 @@ protected:
   int m_own_offset_right;
   int m_req_offset_left;  // Required buffer offsets by calling modules
   int m_req_offset_right;
+  int m_init_offset_left; // Buffer offsets used in initial buffer filling
+  int m_init_offset_right;
   int m_buffer_size;
   int m_buffer_last_pos;  // The last frame number in the buffer
   FeatureBuffer m_buffer;

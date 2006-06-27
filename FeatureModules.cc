@@ -10,6 +10,8 @@ FeatureModule::FeatureModule() :
   m_own_offset_right(-1),
   m_req_offset_left(0),
   m_req_offset_right(0),
+  m_init_offset_left(0),
+  m_init_offset_right(0),
   m_buffer_size(0),
   m_buffer_last_pos(INT_MAX),
   m_dim(0)
@@ -48,6 +50,32 @@ FeatureModule::set_buffer(int left, int right)
         m_sources[i]->set_buffer(m_req_offset_left + m_own_offset_left,
                                  m_req_offset_right + m_own_offset_right);
     }
+  }
+}
+
+void
+FeatureModule::update_init_offsets(const FeatureModule &target)
+{
+  int left = std::max(target.m_init_offset_left, target.m_req_offset_left) +
+    m_own_offset_left;
+  int right = std::max(target.m_init_offset_right, target.m_req_offset_right) +
+    m_own_offset_right;
+
+  if (left > m_init_offset_left)
+    m_init_offset_left = left;
+  if (right > m_init_offset_right)
+    m_init_offset_right = right;
+}
+
+void
+FeatureModule::require_init_buffer(void)
+{  
+  int new_size = m_init_offset_left + m_init_offset_right + 1;
+  
+  if (new_size > m_buffer_size)
+  {
+    m_buffer_size = new_size;
+    m_buffer.resize(m_buffer_size, m_dim);
   }
 }
 
@@ -1359,7 +1387,7 @@ SRNormModule::set_speech_rate(float sr)
   float out_cent = (float)(m_out_frames-1)/2;
   float target_pos;
 
-  m_speech_rate = sr;
+  m_speech_rate = sr; // Fast: >1, slow: <1
 
   m_coef.resize(m_out_frames);
   m_interpolation_start.resize(m_out_frames);
