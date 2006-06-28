@@ -93,6 +93,8 @@ public:
   void lna_close();
   void lna_seek(int frame);
   Acoustics &acoustics();
+  void use_one_frame_acoustics();
+  void set_one_frame(int frame, const std::vector<float> log_probs);
 
   // Expander
   void expand(int frame, int frames);

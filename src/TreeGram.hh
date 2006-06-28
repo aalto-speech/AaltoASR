@@ -69,49 +69,49 @@ public:
 
   inline float log_prob_bo(const std::vector<int> &gram) {
     Gram g(gram.size());
-    for (int i=0;i<gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
     return(log_prob_bo(g));
   }
 
   inline float log_prob_bo_cl(const std::vector<int> &gram) {
     Gram g(gram.size());
-    for (int i=0;i<gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
     return(log_prob_bo_cl(g));
   }
 
   inline float log_prob_i(const std::vector<int> &gram){
     Gram g(gram.size());
-    for (int i=0;i<gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
     return(log_prob_i(g));
   }
 
   inline float log_prob_i_cl(const std::vector<int> &gram){
     Gram g(gram.size());
-    for (int i=0;i<gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
     return(log_prob_i_cl(g));
   }
 
   inline float log_prob_bo(const std::vector<unsigned short> &gram) {
     Gram g(gram.size());
-    for (int i=0;i<gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
     return(log_prob_bo(g));
   }
 
   inline float log_prob_bo_cl(const std::vector<unsigned short> &gram) {
     Gram g(gram.size());
-    for (int i=0;i<gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
     return(log_prob_bo_cl(g));
   }
 
   inline float log_prob_i(const std::vector<unsigned short> &gram){
     Gram g(gram.size());
-    for (int i=0;i<gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
     return(log_prob_i(g));
   }
 
   inline float log_prob_i_cl(const std::vector<unsigned short> &gram){
     Gram g(gram.size());
-    for (int i=0;i<gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
     return(log_prob_i_cl(g));
   }
 

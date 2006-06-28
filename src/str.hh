@@ -8,6 +8,9 @@
 /** Functions for handling strings of the Standard Template Library. */
 namespace str {
 
+  /** Format a string. */
+  std::string fmt(size_t size, const char *fmt, ...);
+
   /** Read a line from a file.
    * \param str = the string to read to
    * \param file = the file to read from
@@ -76,14 +79,16 @@ namespace str {
 
   /** Convert a string to numeric value. 
    * \param str = the string to convert
-   * \param ok = set to false if the whole string could not be converted.
+   * \param ok = set to false if the whole string could not be converted, 
+   * otherwise the value is not changed
    * \return the numeric value.
    */
   /*@{*/
   long str2long(const char *str, bool *ok);
   double str2float(const char *str, bool *ok);
-  long str2long(std::string *str, bool *ok);
-  double str2float(std::string *str, bool *ok);
+  long str2long(const std::string *str, bool *ok);
+  double str2float(const std::string *str, bool *ok);
   /*@}*/
 };
-#endif
+
+#endif /* STR_HH */

@@ -8,10 +8,12 @@
 #define MAX_WC_COUNT 200
 #define MAX_LEX_TREE_DEPTH 60
 
+typedef std::vector<TPLexPrefixTree::WordHistory*> HistoryVector;
+
 class TokenPassSearch {
 public:
   TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
-                  Acoustics &acoustics);
+                  Acoustics *acoustics);
 
   // Resets search and creates the initial token
   void reset_search(int start_frame);
@@ -24,10 +26,12 @@ public:
   void print_guaranteed_path(void);
   void print_best_path(bool only_not_printed, FILE *out=stdout);
   void print_state_history(void);
+  void get_path(HistoryVector &vec, bool guaranteed, bool only_new = true);
 
   void print_path(TPLexPrefixTree::Token *token);
 
   // Options
+  void set_acoustics(Acoustics *acoustics) { m_acoustics = acoustics; }
   void set_global_beam(float beam) { m_global_beam = beam; if (m_word_end_beam > m_global_beam) m_word_end_beam = beam; }
   void set_word_end_beam(float beam) { m_word_end_beam = beam; }
   void set_eq_depth_beam(float beam) { m_eq_depth_beam = beam; }
@@ -102,7 +106,7 @@ private:
   TPLexPrefixTree &m_lexicon;
   TPLexPrefixTree::Node *m_root, *m_start_node;
   Vocabulary &m_vocabulary;
-  Acoustics &m_acoustics;
+  Acoustics *m_acoustics;
 
   std::vector<TPLexPrefixTree::Token*> *m_active_token_list;
   std::vector<TPLexPrefixTree::Token*> *m_new_token_list;

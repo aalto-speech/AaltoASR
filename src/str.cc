@@ -1,9 +1,24 @@
 #include <math.h>
 #include <string.h>
-#include <cassert>
+#include <stdarg.h>
+#include <assert.h>
 #include "str.hh"
 
 namespace str {
+
+  std::string
+  fmt(size_t size, const char *fmt, ...)
+  {
+    va_list ap;
+    va_start(ap, fmt);
+    char *buf = new char[size];
+    vsnprintf(buf, size, fmt, ap);
+    va_end(ap);
+
+    std::string str(buf);
+    delete[] buf;
+    return str;
+  }
 
   bool
   read_line(std::string *str, FILE *file, bool do_chomp)
@@ -262,13 +277,13 @@ namespace str {
   }
 
   long 
-  str2long(std::string *str, bool *ok) 
+  str2long(const std::string *str, bool *ok) 
   { 
     return str2long(str->c_str(), ok); 
   }
 
   double 
-  str2float(std::string *str, bool *ok) 
+  str2float(const std::string *str, bool *ok) 
   { 
     return str2float(str->c_str(), ok); 
   }

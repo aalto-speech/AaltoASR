@@ -27,7 +27,7 @@
 
 
 TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
-                                 Acoustics &acoustics) :
+                                 Acoustics *acoustics) :
   m_lexicon(lex),
   m_vocabulary(vocab),
   m_acoustics(acoustics)
@@ -236,7 +236,7 @@ TokenPassSearch::run(void)
 
     return false;
   }
-  if (!m_acoustics.go_to(m_frame))
+  if (!m_acoustics->go_to(m_frame))
   {
     if (m_require_sentence_end)
       add_sentence_end_to_hypotheses();
@@ -372,6 +372,51 @@ TokenPassSearch::analyze_tokens(void)
   }
 }
 #endif
+
+void
+TokenPassSearch::get_path(HistoryVector &vec, bool guaranteed, 
+                          bool only_new)
+{
+  assert(!m_print_text_result);
+  
+  TPLexPrefixTree::Token *best_token = NULL;
+  float best_log_prob = m_best_log_prob;
+  for (int t = 0; t < m_active_token_list->size(); t++) {
+    TPLexPrefixTree::Token *token = (*m_active_token_list)[t];
+    if (token == NULL)
+      continue;
+    if (guaranteed) {
+      best_token = token;
+      break;
+    }
+    if (token->total_log_prob >= best_log_prob) {
+      best_token = token;
+      best_log_prob = token->total_log_prob;
+    }
+  }
+
+  assert(best_token != NULL);
+
+  vec.clear();
+  TPLexPrefixTree::WordHistory *hist = best_token->prev_word;
+  bool collecting = false;
+  while (hist->word_id >= 0) {
+    if (only_new && hist->printed)
+      break;
+    if (!guaranteed || hist->prev_word->get_num_references() == 1)
+      collecting = true;
+    else if (collecting) {
+      vec.clear();
+      collecting = false;
+    }
+    if (collecting)
+      vec.push_back(hist);
+    hist = hist->prev_word;
+  }
+
+  for (int i = 0; i < (int)vec.size(); i++)
+    vec[i]->printed = 1;
+}
 
 
 void
@@ -809,7 +854,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     // Normal propagation
     TPLexPrefixTree::Token *new_token;
     TPLexPrefixTree::Token *similar_word_hist;
-    float ac_log_prob = m_acoustics.log_prob(node->state->model);
+    float ac_log_prob = m_acoustics->log_prob(node->state->model);
 
     new_real_am_log_prob += ac_log_prob;
     new_cur_am_log_prob += ac_log_prob;

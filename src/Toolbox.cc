@@ -19,9 +19,11 @@ Toolbox::Toolbox()
 
     m_tp_lexicon_reader(m_hmm_map, m_hmms, m_tp_lexicon, m_tp_vocabulary),
     m_tp_lexicon(m_hmm_map, m_hmms),
-    m_tp_search(m_tp_lexicon, m_tp_vocabulary, m_lna_reader),
+    m_tp_search(m_tp_lexicon, m_tp_vocabulary, &m_lna_reader),
 
+    m_acoustics(NULL),
     m_lna_reader(),
+    m_one_frame_acoustics(),
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
     m_search(m_expander, m_vocabulary)
@@ -171,6 +173,7 @@ void
 Toolbox::lna_open(const char *file, int size)
 {
   m_lna_reader.open(file, size);
+  m_acoustics = &m_lna_reader;
 }
 
 void

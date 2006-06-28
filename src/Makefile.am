@@ -47,6 +47,7 @@ libdecoder_a_SOURCES = \
 	Ngram.cc			Ngram.hh \
 	NowayLexiconReader.cc		NowayLexiconReader.hh \
 	NowayHmmReader.cc		NowayHmmReader.hh \
+	OneFrameAcoustics.cc		OneFrameAcoustics.hh \
 	Search.cc			Search.hh \
 					Timer.hh \
 	Toolbox.cc			Toolbox.hh \

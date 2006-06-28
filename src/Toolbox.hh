@@ -10,6 +10,7 @@
 #include "Expander.hh"
 #include "Search.hh"
 #include "TokenPassSearch.hh"
+#include "OneFrameAcoustics.hh"
 
 class Toolbox {
 public:
@@ -28,7 +29,8 @@ public:
   void lex_read(const char *file);
   const std::string &lex_word() const { return m_lexicon_reader.word(); }
   const std::string &lex_phone() const { return m_lexicon_reader.phone(); }
-  const std::string &word(int index) const { return m_vocabulary.word(index); }
+  const std::string &word(int index) const 
+  { return m_tp_vocabulary.word(index); }
 
   // Ngram
   void ngram_read(const char *file, float weight, const bool binary=true);
@@ -38,7 +40,17 @@ public:
   void lna_open(const char *file, int size);
   void lna_close();
   void lna_seek(int frame) { m_lna_reader.seek(frame); }
-  Acoustics &acoustics() { return m_lna_reader; }
+  Acoustics &acoustics() { return *m_acoustics; }
+  void use_one_frame_acoustics() 
+  { 
+    m_acoustics = &m_one_frame_acoustics; 
+    m_tp_search.set_acoustics(m_acoustics);
+  }
+  void set_one_frame(int frame, const std::vector<float> log_probs)
+  {
+    assert(m_acoustics == &m_one_frame_acoustics);
+    m_one_frame_acoustics.set(frame, log_probs);
+  }
 
   // Expander
   void expand(int frame, int frames);
@@ -69,6 +81,7 @@ public:
   void segment(const std::string &str, int start_frame, int end_frame);
 
   // Info
+  TokenPassSearch &tp_search() { return m_tp_search; }
   int frame() { return (m_use_stack_decoder?m_search.frame():m_tp_search.frame()); }
   int first_frame() { return m_search.first_frame(); }
   int last_frame() { return m_search.last_frame(); }
@@ -158,7 +171,9 @@ private:
   Vocabulary m_tp_vocabulary;
   TokenPassSearch m_tp_search;
   
+  Acoustics *m_acoustics;
   LnaReaderCircular m_lna_reader;
+  OneFrameAcoustics m_one_frame_acoustics;
 
   std::string m_word_boundary;
 
