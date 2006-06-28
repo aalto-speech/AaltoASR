@@ -47,8 +47,7 @@ FeatureModule::set_buffer(int left, int right)
     {
       // Require buffering from source modules
       for (int i = 0; i < (int)m_sources.size(); i++)
-        m_sources[i]->set_buffer(m_req_offset_left + m_own_offset_left,
-                                 m_req_offset_right + m_own_offset_right);
+        m_sources[i]->set_buffer(m_own_offset_left, m_own_offset_right);
     }
   }
 }
@@ -56,15 +55,16 @@ FeatureModule::set_buffer(int left, int right)
 void
 FeatureModule::update_init_offsets(const FeatureModule &target)
 {
-  int left = std::max(target.m_init_offset_left, target.m_req_offset_left) +
-    m_own_offset_left;
-  int right = std::max(target.m_init_offset_right, target.m_req_offset_right) +
-    m_own_offset_right;
+  int left = target.m_init_offset_left + target.m_own_offset_left;
+  int right = target.m_init_offset_right + target.m_own_offset_right;
 
   if (left > m_init_offset_left)
     m_init_offset_left = left;
   if (right > m_init_offset_right)
     m_init_offset_right = right;
+
+  assert(m_init_offset_left >= m_req_offset_left);
+  assert(m_init_offset_right >= m_req_offset_right);
 }
 
 void
@@ -149,6 +149,23 @@ FeatureModule::reset()
   reset_module();
 }
 
+void
+FeatureModule::print_dot_node(FILE *file)
+{
+  fprintf(file, "  %s [label=\""
+          "%s\\n"
+          "own=%d-%d\\n"
+          "req=%d-%d\\n"
+          "init=%d-%d\\n"
+          "buf=%d\\n"
+          "\"]\n", 
+          m_name.c_str(), m_name.c_str(),
+          m_own_offset_left, m_own_offset_right,
+          m_req_offset_left, m_req_offset_right,
+          m_init_offset_left, m_init_offset_right,
+          m_buffer_size
+    );
+}
 
 //////////////////////////////////////////////////////////////////
 // FFTModule
