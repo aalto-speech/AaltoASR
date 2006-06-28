@@ -123,7 +123,10 @@ public:
   int dim(void) { return m_dim; }
 
   /** Access the source modules. */
-  const std::vector<FeatureModule*> sources() const { return m_sources; }
+  const std::vector<FeatureModule*> &sources() const { return m_sources; }
+
+  /** Print module info in DOT node format. */
+  void print_dot_node(FILE *file);
   
 private:
   virtual void set_module_config(const ModuleConfig &config) = 0;
