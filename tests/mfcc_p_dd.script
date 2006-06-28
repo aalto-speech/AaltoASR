@@ -1,4 +1,4 @@
 #!/bin/sh
 
-../feacat --start-frame -10 --end-frame 80 --write-config mfcc_p_dd.feaconf.tmp -c mfcc_p_dd.feaconf short.wav
-../feacat --start-frame -10 --end-frame 80 -c mfcc_p_dd.feaconf.tmp short.wav
+cat short.wav | ../feacat --start-frame -10 --end-frame 80 --write-config mfcc_p_dd.feaconf.tmp -c mfcc_p_dd.feaconf -
+cat short.wav | ../feacat --start-frame -10 --end-frame 80 -c mfcc_p_dd.feaconf.tmp -
