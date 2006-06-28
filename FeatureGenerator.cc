@@ -9,6 +9,7 @@ FeatureGenerator::FeatureGenerator(void) :
   m_base_module(NULL),
   m_last_module(NULL),
   m_file(NULL),
+  m_dont_fclose(false),
   m_eof_on_last_frame(false)
 {
 }
@@ -25,15 +26,27 @@ FeatureGenerator::open(const std::string &filename, bool raw_audio)
   if (m_file != NULL)
     close();
 
-  if (raw_audio > 0)
+  FILE *file = fopen(filename.c_str(), "rb");
+  if (file == NULL)
+    throw std::string("could not open file ") + filename + ": " +
+      strerror(errno);
+  m_dont_fclose = false;
+
+  open(file, raw_audio);
+}
+
+void
+FeatureGenerator::open(FILE *file, bool raw_audio)
+{
+  if (m_file != NULL)
+    close();
+  m_file = file;
+  m_dont_fclose = true;
+
+  if (raw_audio)
     m_audio_format = AF_RAW;
   else
     m_audio_format = AF_AUTO;
-
-  m_file = fopen(filename.c_str(), "rb");
-  if (m_file == NULL)
-    throw std::string("could not open file ") + filename + ": " +
-      strerror(errno);
 
   for (int i = 0; i < (int)m_modules.size(); i++)
     m_modules[i]->reset();
@@ -42,13 +55,13 @@ FeatureGenerator::open(const std::string &filename, bool raw_audio)
   m_base_module->set_file(m_file);
 }
 
-
 void
 FeatureGenerator::close(void)
 {
   if (m_file != NULL) {
     m_base_module->discard_file();
-    fclose(m_file);
+    if (!m_dont_fclose)
+      fclose(m_file);
     m_file = NULL;
   }
 }
@@ -165,6 +178,7 @@ FeatureGenerator::load_configuration(FILE *file)
     module->set_config(config);
   }
 
+  compute_init_buffers();
   check_model_structure();
 }
 
@@ -202,7 +216,68 @@ FeatureGenerator::module(const std::string &name)
 }
 
 
-void
+void // private
+FeatureGenerator::compute_init_buffers()
+{
+  // Compute number of targets for each module.
+  //
+
+  std::vector<int> target_counts(m_modules.size(), 0);
+  std::map<FeatureModule*, int> index_map;
+  for (int i = 0; i < (int)m_modules.size(); i++)
+    index_map[m_modules[i]] = i;
+
+  for (int i = 0; i < (int)m_modules.size(); i++) {
+    FeatureModule *module = m_modules[i];
+    for (int j = 0; j < (int)module->sources().size(); j++) {
+      int src_index = index_map[module->sources()[j]];
+      target_counts[src_index]++;
+    }
+  }
+
+  // Find bottle-neck modules, i.e. modules that are not in a branch.
+  // Below it is assumed that m_modules is sorted topologically so
+  // that sources are always before targets.
+  //
+  std::vector<bool> bottle_neck(m_modules.size(), false);
+  int cur_branch_level = 0;
+  for (int i = m_modules.size() - 1; i >= 0; i--) {
+    FeatureModule *module = m_modules[i];
+    if (target_counts.at(i) >= 2)
+      cur_branch_level -= target_counts.at(i) - 1;
+    assert(cur_branch_level >= 0);
+    if (cur_branch_level == 0)
+      bottle_neck.at(i) = true;
+    if (module->sources().size() >= 2)
+      cur_branch_level += module->sources().size() - 1;
+  }
+
+  // Every target-branching module M must have a buffer offsets that
+  // include the largest offsets between M and the next bottle-neck
+  // module.  Otherwise, duplicated computation is done when buffers
+  // are filled for the first time (thus the name init_offset_left and
+  // right).  Some target-branching modules could actually have
+  // smaller buffers, but it would be more complicated to compute the
+  // minimal size.
+  //
+
+  for (int i = m_modules.size() - 1; i >= 0; i--) {
+    FeatureModule *module = m_modules[i];
+
+    if (!bottle_neck[i]) {
+      for (int j = 0; j < (int)module->sources().size(); j++) {
+        FeatureModule *src_module = module->sources()[j];
+        src_module->update_init_offsets(*module);
+      }
+    }
+
+    if (target_counts[i] > 1)
+      module->require_init_buffer();
+  }
+}
+
+
+void // private
 FeatureGenerator::check_model_structure()
 {
   if (m_modules.empty())
@@ -229,4 +304,25 @@ FeatureGenerator::check_model_structure()
     if (reached.find(m_modules[i]) == reached.end())
       fprintf(stderr, "WARNING: module %s (type %s) not used as input\n", 
 	      m_modules[i]->name().c_str(), m_modules[i]->type_str().c_str());
+}
+
+void
+FeatureGenerator::print_dot_graph(FILE *file)
+{
+  fprintf(file, "digraph features {\n");
+  fprintf(file, "rankdir=RL;\n");
+  for (int i = 0; i < (int)m_modules.size(); i++) {
+    FeatureModule *module = m_modules[i];
+    module->print_dot_node(file);
+  }
+
+  for (int i = 0; i < (int)m_modules.size(); i++) {
+    FeatureModule *module = m_modules[i];
+    for (int j = 0; j < (int)module->sources().size(); j++) {
+      fprintf(file, "\t%s -> %s;\n", module->name().c_str(),
+              module->sources()[j]->name().c_str());
+    }
+  }
+
+  fprintf(file, "}\n");
 }

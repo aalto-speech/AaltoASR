@@ -27,6 +27,14 @@ public:
    */
   void open(const std::string &filename, bool raw_audio);
 
+  /** Open an audio file closing the possible previously opened file.
+   *
+   * \param file = The file pointer of the audio file.  
+   * \param raw_audio = If true, the file assumed to contain raw audio
+   * samples.  Otherwise, automatic file format is used.
+   */
+  void open(FILE *file, bool raw_audio);
+
   /** Close the previously opened file. */
   void close();
 
@@ -67,10 +75,19 @@ public:
   /** Return the format of the audio file. */
   AudioFormat audio_format() { return m_audio_format; }
 
+  /** Print the module structure in DOT format. */
+  void print_dot_graph(FILE *file);
+      
+
+private:
+
+  /** Compute buffer offsets for modules so that duplicate computation
+   * is avoided in module branches. */
+  void compute_init_buffers();
+
   /** Check module structure and warn about anomalities. */
   void check_model_structure();
 
-private:
   typedef std::map<std::string, FeatureModule*> ModuleMap;
 
   std::vector<FeatureModule*> m_modules; //!< The feature modules
@@ -89,6 +106,9 @@ private:
 
   /** The audio file. */
   FILE *m_file;
+
+  /** Should we call fclose when closing the file. */
+  bool m_dont_fclose;
 
   /** Was end of file reached on the frame requested from generate(). */
   bool m_eof_on_last_frame;
