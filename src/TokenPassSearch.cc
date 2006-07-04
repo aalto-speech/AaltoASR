@@ -536,6 +536,7 @@ TokenPassSearch::print_best_path(bool only_not_printed, FILE *out)
   fprintf(out, "WordCount: %d\n", lm_la_word_cache_count);
   fprintf(out, "WordMiss: %d\n", lm_la_word_cache_miss);
 #endif
+  fflush(out);
 }
 
 
