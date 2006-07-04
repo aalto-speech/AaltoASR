@@ -5,8 +5,8 @@ ARCH = $(shell uname -p)
 ifeq ($(ARCH),x86_64)
 CXX = /usr/bin/g++
 OPT = -O2
-INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include
-LDFLAGS = 
+INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include -I/share/puhe/linux/include/lapackpp
+LDFLAGS = -L/home/mavarjok/lapackpp/lib
 WARNINGS = -Wall
 DEPFLAG = -MM
 endif
@@ -32,12 +32,12 @@ PROGS_SRCS = $(PROGS:=.cc)
 CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	ModuleConfig.cc HmmSet.cc HmmTrainer.cc Viterbi.cc Lattice.cc \
 	PhnReader.cc TriphoneSet.cc SpeakerConfig.cc MllrTrainer.cc \
-	Recipe.cc conf.cc io.cc str.cc endian.cc
+	Recipe.cc conf.cc io.cc str.cc endian.cc Pcgmm.cc
 #HmmTrainer.cc SphereReader.cc Lattice.cc Viterbi.cc StateGenerator.cc FeatureBuffer.cc HmmSet.cc PhnReader.cc StateProbCache.cc FeatureGenerator.cc Recipe.cc tools.cc TriphoneSet.cc Changeling.cc AdaReader.cc Warpster.cc
 
 CLASS_OBJS = $(CLASS_SRCS:.cc=.o)
 
-LIBS = -lfftw3 -lsndfile -lm
+LIBS = -lfftw3 -lsndfile -lm -llapackpp -llapack
 
 ALL_SRCS = $(CLASS_SRCS) $(PROGS_SRCS)
 ALL_OBJS = $(ALL_SRCS:.cc=.o)
