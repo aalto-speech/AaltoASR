@@ -26,7 +26,8 @@ public:
   void print_guaranteed_path(void);
   void print_best_path(bool only_not_printed, FILE *out=stdout);
   void print_state_history(void);
-  void get_path(HistoryVector &vec, bool guaranteed, bool only_new = true);
+  void get_path(HistoryVector &vec, bool use_best_token, 
+                TPLexPrefixTree::WordHistory *limit);
 
   void print_path(TPLexPrefixTree::Token *token);
 
@@ -47,6 +48,7 @@ public:
   void set_max_num_tokens(int tokens) { m_max_num_tokens = tokens; }
   void set_print_text_result(int print) { m_print_text_result = print; }
   void set_print_state_segmentation(int print) { m_print_state_segmentation = print; }
+  void set_print_frames(int print) { m_print_frames = print; }
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_word_boundary(const std::string &word);
   void set_lm_lookahead(int order) { m_lm_lookahead = order; }
@@ -148,6 +150,7 @@ private:
   // Options
   int m_print_text_result;
   int m_print_state_segmentation;
+  bool m_print_frames;
   float m_global_beam;
   float m_word_end_beam;
   int m_similar_word_hist_span;

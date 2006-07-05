@@ -34,6 +34,7 @@
 #define NODE_FAN_IN_CONNECTION    0x80
 #define NODE_LINKED               0x0100
 #define NODE_SILENCE_FIRST        0x0200
+#define NODE_FIRST_STATE_OF_WORD  0x0200
 
 
 class TPLexPrefixTree {
@@ -51,7 +52,8 @@ public:
     int word_id;
     int lm_id; // Word ID in LM
     WordHistory *prev_word;
-    unsigned char printed;
+    bool printed; // TokenPassSearch::print* functions may set this true
+    int word_start_frame;
   private:
     int m_reference_count;
   };
@@ -97,6 +99,7 @@ public:
     float total_log_prob;
     WordHistory *prev_word;
     int word_hist_code; // Hash code for word history (up to LM order)
+    int word_start_frame;
 
 #ifdef PRUNING_MEASUREMENT
     float meas[6];
@@ -251,7 +254,8 @@ TPLexPrefixTree::WordHistory::WordHistory(int word_id, int lm_id,
   : word_id(word_id),
     lm_id(lm_id),
     prev_word(prev),
-    printed(0),
+    printed(false),
+    word_start_frame(0),
     m_reference_count(0)
 {
   if (prev)

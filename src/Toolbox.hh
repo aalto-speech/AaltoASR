@@ -129,7 +129,9 @@ public:
   void set_print_indices(bool print_indices) 
   { m_search.set_print_indices(print_indices); }
   void set_print_frames(bool print_frames) 
-  { m_search.set_print_frames(print_frames); }
+  { m_search.set_print_frames(print_frames); 
+  m_tp_search.set_print_frames(print_frames);
+  }
   void set_word_boundary(const std::string &word)
   { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_word_boundary = word; }
   void set_sentence_boundary(const std::string &start, const std::string &end) { m_tp_search.set_sentence_boundary(start, end); }

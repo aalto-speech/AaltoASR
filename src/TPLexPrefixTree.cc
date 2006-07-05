@@ -182,6 +182,8 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
       m_silence_node = hmm_state_nodes[0];
       m_silence_node->flags |= NODE_SILENCE_FIRST;
     }
+    if (i == 0)
+      hmm_state_nodes[0]->flags |= NODE_FIRST_STATE_OF_WORD;
 
     // Expand other states, from left to right
     for (j = 2; j < hmm_list[i]->states.size(); j++)
@@ -617,7 +619,7 @@ TPLexPrefixTree::set_sentence_boundary(int sentence_end_id)
 
   sb = new Node(sentence_end_id);
   sb->node_id = node_list.size();
-  sb->flags |= NODE_USE_WORD_END_BEAM;
+  sb->flags |= (NODE_USE_WORD_END_BEAM | NODE_FIRST_STATE_OF_WORD);
   node_list.push_back(sb);
   temp.next = sb;
   temp.log_prob = get_out_transition_log_prob(m_last_silence_node);
@@ -684,7 +686,7 @@ TPLexPrefixTree::add_hmm_to_fan_network(int hmm_id,
     flags = NODE_FAN_IN;//|NODE_USE_WORD_END_BEAM; // | NODE_AFTER_WORD_ID;
     hmm_state_nodes[0] =
       get_fan_in_entry_node(&hmm->state(2), hmm->label);
-    hmm_state_nodes[0]->flags |= NODE_FAN_IN_FIRST;
+    hmm_state_nodes[0]->flags |= NODE_FAN_IN_FIRST | NODE_FIRST_STATE_OF_WORD;
     hmm_state_nodes[hmm->states.size()-3] =
       get_fan_in_last_node(&hmm->state(hmm->states.size()-1), hmm->label);
   }
@@ -1095,7 +1097,8 @@ TPLexPrefixTree::get_short_silence_node(void)
   assert( m_short_silence_state != NULL );
   Node *silence = new Node(m_word_boundary_id, m_short_silence_state);
   silence->node_id = node_list.size();
-  silence->flags = NODE_FAN_OUT|NODE_USE_WORD_END_BEAM;
+  silence->flags = NODE_FAN_OUT | NODE_USE_WORD_END_BEAM |
+    NODE_FIRST_STATE_OF_WORD;
   node_list.push_back(silence);
   // Make self transition
   temp_arc.next = silence;
