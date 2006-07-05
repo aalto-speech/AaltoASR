@@ -9,6 +9,7 @@
 #include "conf.hh"
 #include "Recipe.hh"
 #include "FeatureGenerator.hh"
+#include "SpeakerConfig.hh"
 
 #define MAXLINE 4000
 
@@ -358,6 +359,7 @@ int
 main(int argc, char *argv[])
 {
   FeatureGenerator gen;
+  SpeakerConfig speaker_config(gen); // Speaker configuration handler
   int info;
   int num_states;
   std::vector <long int> occurrences;
@@ -377,6 +379,7 @@ main(int argc, char *argv[])
       ('s', "stateseg", "", "", "the segmentation is based on states")
       ('\0', "binary", "", "", "write feature files as binary floats")
       ('\0', "bufsize=INT", "arg", "2000000", "buffer size, default 2000000")
+      ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -390,6 +393,11 @@ main(int argc, char *argv[])
 
     // Load state configuration
     load_phoneme_state_info(config["bind"].get_str(), pho_info);
+
+    // Speaker configuration
+    if (config["speakers"].specified)
+      speaker_config.read_speaker_file(
+        io::Stream(config["speakers"].get_str()));
 
     // Count the number of states for allocating the buffers
     num_states = 0;
@@ -409,6 +417,9 @@ main(int argc, char *argv[])
         printf("file %d/%d '%s' '%s'\n", fi+1, (int)recipe.infos.size(),
                recipe.infos[fi].audio_path.c_str(), 
                recipe.infos[fi].phn_path.c_str());
+
+      if (config["speakers"].specified)
+        speaker_config.set_speaker(recipe.infos[fi].speaker_id);
 
       start_frame = (int)(recipe.infos[fi].start_time * gen.frame_rate());
       end_frame = (int)(recipe.infos[fi].end_time * gen.frame_rate());

@@ -6,13 +6,14 @@
 #include "conf.hh"
 #include "Recipe.hh"
 #include "FeatureGenerator.hh"
-
+#include "SpeakerConfig.hh"
 
 const char *recipe_file;
 const char *out_file;
 
 conf::Config config;
 FeatureGenerator gen;
+SpeakerConfig m_speaker_config(gen); // Speaker configuration handler
 
 int
 main(int argc, char *argv[])
@@ -43,6 +44,7 @@ main(int argc, char *argv[])
       ('b', "block=INT", "arg", "1000", "block size (for reducing round-off errors)")
       ('P', "print", "", "", "print mean and scale to stdout")
       ('\0', "cov", "", "", "estimate and print covariance matrix")
+      ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -74,6 +76,10 @@ main(int argc, char *argv[])
 
     cov_flag = config["cov"].specified;
 
+    if (config["speakers"].specified)
+      m_speaker_config.read_speaker_file(
+        io::Stream(config["speakers"].get_str()));
+
     // Initialize accumulators
     block_mean_acc.resize(dim);
     block_var_acc.resize(dim);
@@ -101,6 +107,9 @@ main(int argc, char *argv[])
 	      recipe.infos[recipe_index].audio_path.c_str());
       }
       gen.open(recipe.infos[recipe_index].audio_path, raw_flag);
+
+      if (config["speakers"].specified)
+        m_speaker_config.set_speaker(recipe.infos[recipe_index].speaker_id);
 
       for (int d = 0; d < dim; d++)
       {

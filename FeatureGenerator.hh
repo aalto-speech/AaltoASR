@@ -32,8 +32,9 @@ public:
    * \param file = The file pointer of the audio file.  
    * \param raw_audio = If true, the file assumed to contain raw audio
    * samples.  Otherwise, automatic file format is used.
+   * \param dont_fclose = If true, the file is not closed by FeatureGenerator
    */
-  void open(FILE *file, bool raw_audio);
+  void open(FILE *file, bool raw_audio, bool dont_fclose);
 
   /** Close the previously opened file. */
   void close();

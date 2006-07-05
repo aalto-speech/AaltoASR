@@ -58,7 +58,7 @@ main(int argc, char *argv[])
 
     gen.load_configuration(io::Stream(config["config"].get_str()));
     io::Stream audio_stream(config.arguments[0]);
-    gen.open(audio_stream, config["raw-input"].specified);
+    gen.open(audio_stream, config["raw-input"].specified, true);
 
     if (config["speakers"].specified)
     {

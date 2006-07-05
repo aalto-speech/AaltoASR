@@ -37,6 +37,7 @@ PhnReader::open(std::string filename)
   if (!m_file) {
     fprintf(stderr, "PhnReader::open(): could not open %s\n", 
 	    filename.c_str());
+    perror("error");
     exit(1);
   }
 }

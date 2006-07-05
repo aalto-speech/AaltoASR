@@ -268,7 +268,7 @@ main(int argc, char *argv[])
 
     trainer.finish_train(model);
 
-    if (!durstat)
+    if (!durstat && out_file.size() > 0)
     {
       if (info > 0)
         fprintf(stderr, "Train finished, writing models\n");

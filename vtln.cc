@@ -153,7 +153,7 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
         assert( phn_end_frame > start_frame );
         phn_start_frame = start_frame;
       }
-      if (phn_end_frame > end_frame)
+      if (end_frame > 0 && phn_end_frame > end_frame)
       {
         assert( phn_start_frame < end_frame );
         phn_end_frame = end_frame;

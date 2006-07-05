@@ -1180,7 +1180,7 @@ VtlnModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
-  
+
   m_dim = m_sources.front()->dim();
 
   m_use_pwlin = 0;
@@ -1313,7 +1313,7 @@ VtlnModule::generate(int frame)
       int i, di;
       for (i = 0, di = m_sinc_coef_start[b];
            i < (int)m_sinc_coef[b].size(); i++, di++)
-        t += data[di]*m_sinc_coef[b][i];
+          t += data[di]*m_sinc_coef[b][i];
       target[b] = std::max((float)t, 0.0f);
     }
   }

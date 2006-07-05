@@ -79,6 +79,8 @@ main(int argc, char *argv[])
       ('\0', "laward=FLOAT", "arg", "0", "likelihood award from applying the length rule")
       ('\0', "sc", "", "", "triphone context is used over short silences \'_\'")
       ('\0', "il", "", "", "ignore center phoneme length (case sensitive phonemes")
+      ('S', "speakers=FILE", "arg", "", "speaker configuration file")
+      ('\0', "sphn", "", "", "phns with speaker ID's in use")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -132,13 +134,15 @@ main(int argc, char *argv[])
     trainer.set_ignore_length(config["il"].specified);
     trainer.load_rule_set(config["rule"].get_str());
 
+    phn_reader.set_speaker_phns(config["sphn"].specified);
+    
     // Check the dimension
     if (model.dim() != fea_gen.dim()) {
       throw str::fmt(128,
                      "gaussian dimension is %d but feature dimension is %d",
                      model.dim(), fea_gen.dim());
     }
-    trainer.init(model, ""); // FIXME: ada_file missing
+    trainer.init(model, config["speakers"].get_str());
 
     for (int f = 0; f < (int)recipe.infos.size(); f++)
     {
@@ -164,7 +168,7 @@ main(int argc, char *argv[])
                  recipe.infos[f].end_line);
 
       trainer.viterbi_train(start_frame, end_frame, model,
-                            viterbi, NULL);
+                            viterbi, NULL, recipe.infos[f].speaker_id);
 
       fea_gen.close();
       phn_reader.close();

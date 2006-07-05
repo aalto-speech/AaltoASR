@@ -30,18 +30,17 @@ FeatureGenerator::open(const std::string &filename, bool raw_audio)
   if (file == NULL)
     throw std::string("could not open file ") + filename + ": " +
       strerror(errno);
-  m_dont_fclose = false;
 
-  open(file, raw_audio);
+  open(file, raw_audio, false);
 }
 
 void
-FeatureGenerator::open(FILE *file, bool raw_audio)
+FeatureGenerator::open(FILE *file, bool raw_audio, bool dont_fclose)
 {
   if (m_file != NULL)
     close();
   m_file = file;
-  m_dont_fclose = true;
+  m_dont_fclose = dont_fclose;
 
   if (raw_audio)
     m_audio_format = AF_RAW;
