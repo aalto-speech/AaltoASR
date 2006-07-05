@@ -438,7 +438,10 @@ TreeGram::read(FILE *file, bool binary)
     fscanf(file, "%d\n", &m_order_count[i]);
     sum += m_order_count[i];
   }
-  if (sum != number_of_nodes) {
+
+   if (sum+1 == number_of_nodes) {
+    fprintf(stderr, "TreeGram::read(): number of nodes exceeds the sum of order counts by one, probably having a sentinel n-gram. Continuing.\n");
+  } else if (sum != number_of_nodes) {
     fprintf(stderr, "TreeGram::read(): "
 	    "the sum of order counts %d does not match number of nodes %d\n",
 	    sum, number_of_nodes);
