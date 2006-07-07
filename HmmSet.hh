@@ -7,6 +7,8 @@
 #include <assert.h>
 
 #include "FeatureModules.hh"
+#include "Pcgmm.hh"
+#include "Scgmm.hh"
 
 #include "mtl/mtl.h"
 #include "mtl/blais.h"
@@ -22,7 +24,7 @@ typedef mtl::dense1D<float> Vector;
 //
 class HmmCovariance {
 public:
-  enum Type { SINGLE = 0, DIAGONAL = 1, FULL = 2, INVALID = 3 };
+  enum Type { SINGLE = 0, DIAGONAL = 1, FULL = 2, PCGMM = 3, SCGMM = 4, INVALID = 5 };
 
   HmmCovariance() : m_cov_type(INVALID) { }
 
@@ -32,7 +34,6 @@ public:
   inline Type type() const { return m_cov_type; }
   inline float &var() { return data[0]; }
   inline float &diag(int i) { return data[i]; }
-  //  inline float &full(int row, int col) { assert(false); return data[0]; } // FIXME
 
   // Single & Diagonal
   std::vector<float> data;
@@ -242,6 +243,9 @@ private:
   std::vector<int> m_valid_stateprobs;
   std::vector<int> m_valid_kernel_likelihoods;
   float m_viterbi_scale_coeff;
+
+  Pcgmm pcgmm;
+  Scgmm scgmm;
 };
 
 HmmCovariance::Type

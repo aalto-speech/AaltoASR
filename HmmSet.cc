@@ -34,6 +34,8 @@ HmmCovariance::resize(int dim, Type type)
     full.resize(dim, dim);
     precision_cholesky_transpose.resize(dim,dim);
   }
+  else if (m_cov_type == PCGMM);
+  else if (m_cov_type == SCGMM);
   else
     throw std::string("Unknown covariance type");
   reset();
@@ -43,7 +45,8 @@ HmmCovariance::resize(int dim, Type type)
 void
 HmmKernel::resize(int dim, HmmCovariance::Type cov_type)
 {
-  center.resize(dim);
+  if (cov_type != HmmCovariance::PCGMM && cov_type != HmmCovariance::SCGMM)
+    center.resize(dim);
   cov.resize(dim, cov_type);
 }
 
@@ -89,6 +92,8 @@ HmmSet::HmmSet(const HmmSet &hmm_set)
       mtl::copy(hmm_set.m_kernels[i].cov.precision_cholesky_transpose, m_kernels[i].cov.precision_cholesky_transpose);
     }
   }
+  pcgmm.copy(hmm_set.pcgmm);
+  scgmm.copy(hmm_set.scgmm);
 }
 
 void
@@ -242,6 +247,19 @@ HmmSet::read_gk(const std::string &filename)
     m_cov_type = HmmCovariance::DIAGONAL;
   else if (cov_str == "full_cov")
     m_cov_type = HmmCovariance::FULL;
+  else if (cov_str == "pcgmm") {
+    m_cov_type = HmmCovariance::PCGMM;
+    in.close();
+    pcgmm.read_gk(filename);
+    return;
+  }
+  else if (cov_str == "scgmm") {
+    m_cov_type = HmmCovariance::SCGMM;
+    in.close();
+    scgmm.read_gk(filename);
+    return;
+  }
+
  else
     throw std::string("Unknown covariance type");
 
@@ -404,21 +422,29 @@ HmmSet::write_gk(const std::string &filename)
     out << "diagonal_cov";
   else if (m_cov_type == HmmCovariance::FULL)
     out << "full_cov";
+  else if (m_cov_type == HmmCovariance::PCGMM) {
+    pcgmm.write_gk(filename);
+    return;
+  }
+  else if (m_cov_type == HmmCovariance::SCGMM) {
+    scgmm.write_gk(filename);
+    return;
+  }
   else
     throw std::string("Unknown covariance type");
   out << std::endl;
-
+  
   // Write kernels
   for (int k = 0; k < (int)m_kernels.size(); k++) {
     HmmKernel &kernel = m_kernels[k];
-
+    
     // Write centers
     for (int d = 0; d < m_dim; d++) {
       if (d > 0)
 	out << " ";
       out << kernel.center[d];
     }
-
+    
     // Write covariance
     if (m_cov_type == HmmCovariance::SINGLE) {
       out << " " << kernel.cov.var() << std::endl;
@@ -560,6 +586,12 @@ HmmSet::compute_observation_log_probs(const FeatureVec &feature)
 {
   double sum = 0;
 
+  if (pcgmm.basis_dim() > 0)
+    pcgmm.precompute(feature);
+  
+  if (scgmm.basis_dim() > 0)
+    scgmm.precompute(feature);
+
   obs_kernel_likelihoods.resize(num_kernels());
   for (int k = 0; k < num_kernels(); k++) {
     obs_kernel_likelihoods[k] = compute_kernel_likelihood(k, feature);
@@ -676,6 +708,14 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
     temp = mtl::dot(t, t);
     result = kernel.cov.cov_det * exp(-0.5 * temp);
     break;  
+
+  case HmmCovariance::PCGMM:
+    result = pcgmm.gaussian_likelihood(k);
+    break;
+
+  case HmmCovariance::SCGMM:
+    result = scgmm.gaussian_likelihood(k);
+    break;
 
   default:
     throw std::string("Unknown covariance type");
