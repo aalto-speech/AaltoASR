@@ -587,7 +587,7 @@ HmmSet::compute_observation_log_probs(const FeatureVec &feature)
   double sum = 0;
 
   if (pcgmm.basis_dim() > 0)
-    pcgmm.precompute(feature);
+    pcgmm.compute_likelihoods(feature);
   
   if (scgmm.basis_dim() > 0)
     scgmm.precompute(feature);

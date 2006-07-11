@@ -4,25 +4,76 @@
 void
 Pcgmm::copy(const Pcgmm &orig)
 {
-  // FIXME
+  assert(orig.mbasis.size()==orig.vbasis.size());
+
+  mbasis.resize(orig.mbasis.size());
+  vbasis.resize(orig.vbasis.size());
+  gaussians.resize(orig.gaussians.size());
+  biases.resize(orig.biases.size());
+  linear_weights.resize(orig.linear_weights.size());
+  quadratic_feas.resize(orig.quadratic_feas.size(),1);
+
+  for (unsigned int i=0; i<orig.mbasis.size(); i++) {
+    mbasis.at(i).copy(orig.mbasis.at(i));
+    vbasis.at(i).copy(orig.mbasis.at(i));
+  }
+
+  for (unsigned int i=0; i<orig.gaussians.size(); i++) {
+    gaussians.at(i).mu.copy(orig.gaussians.at(i).mu);
+    gaussians.at(i).lambda.copy(orig.gaussians.at(i).lambda);
+  }
+}
+
+
+void 
+Pcgmm::precompute()
+{
+  for (unsigned int i=0; i<num_gaussians(); i++) {
+    LaGenMatDouble t;
+    calculate_precision(gaussians.at(i).lambda, t);
+    Blas_Mat_Vec_Mult(t, gaussians.at(i).mu, linear_weights.at(i));
+    t.scale(1/(2*3.1416));
+    biases.at(i) = sqrt(log(determinant(t)));
+      - 0.5*Blas_Dot_Prod(gaussians.at(i).mu,linear_weights.at(i));
+  }
 }
 
 void 
-Pcgmm::precompute(const FeatureVec &feature)
+Pcgmm::compute_likelihoods(const FeatureVec &feature)
 {
-  // FIXME
+  // Convert feature vector to lapackpp vector
+  LaVectorDouble f=LaVectorDouble(feature.dim());
+  for (int i=0; i<feature.dim(); i++)
+    f(i)=feature[i];
+
+  // Compute 'quadratic features'
+  for (int i=0; i<basis_dim(); i++) {
+    LaVectorDouble y;
+    Blas_Mat_Vec_Mult(mbasis.at(i), f, y);
+    quadratic_feas(i)=-0.5*Blas_Dot_Prod(f,y);
+  }
+
+  // Compute likelihoods
+  for (unsigned int i=0; i<num_gaussians(); i++) {
+    likelihoods.at(i)=biases.at(i)
+      +Blas_Dot_Prod(linear_weights.at(i),f)
+      +Blas_Dot_Prod(gaussians.at(i).lambda,quadratic_feas);
+    likelihoods.at(i)=exp(likelihoods.at(i));
+  }
 }
+
+
 
 double 
 Pcgmm::gaussian_likelihood(const int k)
 {
-  // FIXME
-  return 0;
+  return likelihoods.at(k);
 }
 
 
 void
-Pcgmm::map_m2v(const LaGenMatDouble &m, LaVectorDouble &v)
+Pcgmm::map_m2v(const LaGenMatDouble &m,
+	       LaVectorDouble &v)
 {
   assert(m.rows()==m.cols());
 
@@ -43,7 +94,8 @@ Pcgmm::map_m2v(const LaGenMatDouble &m, LaVectorDouble &v)
 
 
 void
-Pcgmm::map_v2m(const LaVectorDouble &v, LaGenMatDouble &m)
+Pcgmm::map_v2m(const LaVectorDouble &v,
+	       LaGenMatDouble &m)
 {
   // Deduce the matrix dimensions; numel(v)=dim*(dim+1)/2
   int dim=(int)(0.5*sqrt(1+8*v.size())-0.5);
@@ -143,7 +195,7 @@ Pcgmm::initialize_basis_svd(const std::vector<int> &c,
 
 void 
 Pcgmm::reset_basis(const unsigned int basis_dim, 
-		       const unsigned int d)
+		   const unsigned int d)
 {
   unsigned int d_vec=(unsigned int)d*(d+1)/2;
   mbasis.resize(basis_dim);
@@ -200,6 +252,8 @@ Pcgmm::read_gk(const std::string &filename)
     for (int i=0; i<basis_dim; i++)
       in >> gaussians[g].lambda(i);
   }
+
+  precompute();
 }
 
 
@@ -224,7 +278,7 @@ Pcgmm::write_gk(const std::string &filename)
   for (unsigned int g=0; g<num_gaussians(); g++) {
     for (unsigned int i=0; i<fea_dim(); i++)
       out << gaussians[g].mu(i) << " ";
-    for (unsigned int i=0; i<basis_dim(); i++)
+    for (int i=0; i<basis_dim(); i++)
       out << gaussians[g].lambda(i) << " ";
     out << std::endl;
   }
@@ -240,7 +294,7 @@ Pcgmm::calculate_precision(const LaVectorDouble &lambda,
   // Current precisision
   precision.resize(fea_dim(),fea_dim());
   LaGenMatDouble identity = LaGenMatDouble::eye(fea_dim());
-  for (unsigned int b=0; b<lambda.size(); b++)
+  for (int b=0; b<lambda.size(); b++)
     Blas_Mat_Mat_Mult(identity, mbasis[b], precision, lambda(b), 1);
 }
 
@@ -299,7 +353,7 @@ Pcgmm::gradient(const LaVectorDouble &lambda,
     for (unsigned int j=0; j<fea_dim(); j++)
       curr_cov_estimate(i,j) -= sample_cov(i,j);
 
-  for (unsigned int i=0; i<basis_dim(); i++) {
+  for (int i=0; i<basis_dim(); i++) {
     LaGenMatDouble projection;
     Blas_Mat_Mat_Mult(curr_cov_estimate, mbasis.at(i), projection);
     grad(i)=projection.trace();
@@ -398,8 +452,8 @@ Pcgmm::line_search_more_thuente(const LaGenMatDouble &P,
 
 double
 Pcgmm::eval_aux_function(const LaVectorDouble &eigs,
-				double step,
-				double trace)
+			 double step,
+			 double trace)
 {
   double f=0;
   for (int i=0; i<eigs.size(); i++)
@@ -410,8 +464,8 @@ Pcgmm::eval_aux_function(const LaVectorDouble &eigs,
 
 double
 Pcgmm::eval_aux_function_derivative(const LaVectorDouble &eigs,
-					   double step,
-					   double trace)
+				    double step,
+				    double trace)
 {
   double d=trace;
   for (int i=0; i<eigs.size(); i++)
@@ -422,9 +476,9 @@ Pcgmm::eval_aux_function_derivative(const LaVectorDouble &eigs,
 
 void
 Pcgmm::limit_line_search(const LaGenMatDouble &R,
-			      const LaGenMatDouble &curr_prec_estimate,
-			      double &min_interval,
-			      double &max_interval)
+			 const LaGenMatDouble &curr_prec_estimate,
+			 double &min_interval,
+			 double &max_interval)
 {
   assert(R.rows()==R.cols());
   assert(curr_prec_estimate.rows()==curr_prec_estimate.cols());
@@ -491,8 +545,8 @@ Pcgmm::limit_line_search(const LaGenMatDouble &R,
 
 void
 Pcgmm::generalized_eigenvalues(const LaGenMatDouble &A,
-				    const LaGenMatDouble &B,
-				    LaVectorDouble &eigs)
+			       const LaGenMatDouble &B,
+			       LaVectorDouble &eigs)
 {
   assert(A.rows()==A.cols());
   assert(B.rows()==B.cols());
@@ -523,7 +577,8 @@ Pcgmm::generalized_eigenvalues(const LaGenMatDouble &A,
 
 
 void
-Pcgmm::cholesky_factor(const LaGenMatDouble &A, LaGenMatDouble &B)
+Pcgmm::cholesky_factor(const LaGenMatDouble &A,
+		       LaGenMatDouble &B)
 {
   assert(A.rows() == A.cols());
 
@@ -561,4 +616,19 @@ Pcgmm::is_spd(const LaGenMatDouble &A)
       return false;
 
   return true;
+}
+
+
+double
+Pcgmm::determinant(const LaGenMatDouble &A)
+{
+  assert(A.rows()==A.cols());
+  LaGenMatDouble chol;
+  cholesky_factor(A, chol);
+  double det=1;
+  for (int i=0; i<chol.rows(); i++)
+    det *= chol(i,i);
+  det *=det;
+
+  return det;
 }

@@ -35,22 +35,29 @@ class Pcgmm {
     };
   };
   
-private:
+protected:
 
   std::vector<LaGenMatDouble> mbasis;
   std::vector<LaVectorDouble> vbasis;
   std::vector<Gaussian> gaussians;
 
+  std::vector<double> biases;
+  std::vector<LaVectorDouble> linear_weights;
+  LaVectorDouble quadratic_feas;
+  std::vector<double> likelihoods;
+  
 public:
-
+  
   Pcgmm() {};
   ~Pcgmm() {};
   
   inline unsigned int fea_dim() { return gaussians[0].mu.size(); };
   inline int basis_dim() { return mbasis.size(); };
   inline unsigned int num_gaussians() { return gaussians.size(); };
+  
+  void precompute();
 
-  void precompute(const FeatureVec &feature);
+  void compute_likelihoods(const FeatureVec &feature);
 
   double gaussian_likelihood(const int k);
 
@@ -66,26 +73,26 @@ public:
 			   LaGenMatDouble &covariance);
 
   void calculate_covariance(const LaVectorDouble &lambda,
-			   LaVectorDouble &covariance);
+			    LaVectorDouble &covariance);
 
   void read_gk(const std::string &filename);
   void write_gk(const std::string &filename);
-
+  
   void reset_basis(const unsigned int basis_dim, 
-		  const unsigned int dim);
-
+		   const unsigned int dim);
+  
   void resize(int fea_dim, int basis_dim) {
     for (unsigned int i=0; i<num_gaussians(); i++)
       gaussians.at(i).resize(fea_dim, basis_dim);
   };
-
+  
   void initialize_basis_svd(const std::vector<int> &weights, 
 			    const std::vector<LaGenMatDouble> &sample_covs, 
 			    const unsigned int basis_dim);
   
   void train_precision_polak_ribiere(int state, 
 				     LaGenMatDouble &sample_cov);
-
+  
   void polak_ribiere_direction(const LaVectorDouble &old_grad,
 			       const LaVectorDouble &new_grad,
 			       const LaVectorDouble &old_direction,
@@ -99,7 +106,7 @@ public:
 			 const LaGenMatDouble &curr_prec_estimate, 
 			 double &min_interval,
 			 double &max_interval);
-
+  
   double line_search_more_thuente(const LaGenMatDouble &P,
 				  const LaGenMatDouble &R,
 				  const LaGenMatDouble &sample_cov,
@@ -119,7 +126,7 @@ public:
   
   void map_m2v(const LaGenMatDouble &m,
 	       LaVectorDouble &v);
-
+  
   void map_v2m(const LaVectorDouble &v, 
 	       LaGenMatDouble &m);
   
@@ -131,6 +138,8 @@ public:
 		       LaGenMatDouble &B);
   
   bool is_spd(const LaGenMatDouble &A);
+
+  double determinant(const LaGenMatDouble &A);
 };
 
 
