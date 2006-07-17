@@ -21,6 +21,8 @@ Pcgmm::copy(const Pcgmm &orig)
   for (unsigned int i=0; i<orig.gaussians.size(); i++) {
     gaussians.at(i).mu.copy(orig.gaussians.at(i).mu);
     gaussians.at(i).lambda.copy(orig.gaussians.at(i).lambda);
+    gaussians.at(i).linear_weight.copy(orig.gaussians.at(i).linear_weight);
+    gaussians.at(i).bias=orig.gaussians.at(i).bias;
   }
 }
 
@@ -31,10 +33,10 @@ Pcgmm::precompute()
   for (unsigned int i=0; i<num_gaussians(); i++) {
     LaGenMatDouble t;
     calculate_precision(gaussians.at(i).lambda, t);
-    Blas_Mat_Vec_Mult(t, gaussians.at(i).mu, linear_weights.at(i));
+    Blas_Mat_Vec_Mult(t, gaussians.at(i).mu, gaussians.at(i).linear_weight);
     t.scale(1/(2*3.1416));
-    biases.at(i) = sqrt(log(determinant(t)));
-      - 0.5*Blas_Dot_Prod(gaussians.at(i).mu,linear_weights.at(i));
+    gaussians.at(i).bias = sqrt(log(determinant(t)));
+      - 0.5*Blas_Dot_Prod(gaussians.at(i).mu,gaussians.at(i).linear_weight);
   }
 }
 
@@ -56,7 +58,7 @@ Pcgmm::compute_likelihoods(const FeatureVec &feature)
   // Compute likelihoods
   for (unsigned int i=0; i<num_gaussians(); i++) {
     likelihoods.at(i)=biases.at(i)
-      +Blas_Dot_Prod(linear_weights.at(i),f)
+      +Blas_Dot_Prod(gaussians.at(i).linear_weight,f)
       +Blas_Dot_Prod(gaussians.at(i).lambda,quadratic_feas);
     likelihoods.at(i)=exp(likelihoods.at(i));
   }
@@ -200,6 +202,8 @@ Pcgmm::reset_basis(const unsigned int basis_dim,
   unsigned int d_vec=(unsigned int)d*(d+1)/2;
   mbasis.resize(basis_dim);
   vbasis.resize(basis_dim);
+  quadratic_feas.resize(basis_dim,1);
+
 
   for (unsigned int i=0; i<basis_dim; i++) {
     mbasis.at(i).resize(d,d);
@@ -244,7 +248,7 @@ Pcgmm::read_gk(const std::string &filename)
       }
     map_m2v(mbasis[b], vbasis[b]);
   }
-
+  
   // Read gaussian parameters
   for (int g=0; g<num_gaussians; g++) {
     for (int i=0; i<fea_dim; i++)
@@ -252,7 +256,7 @@ Pcgmm::read_gk(const std::string &filename)
     for (int i=0; i<basis_dim; i++)
       in >> gaussians[g].lambda(i);
   }
-
+  
   precompute();
 }
 

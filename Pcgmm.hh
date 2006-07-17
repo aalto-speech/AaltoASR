@@ -28,9 +28,13 @@ class Pcgmm {
   public:
     LaVectorDouble mu;
     LaVectorDouble lambda;
+    double bias;
+    LaVectorDouble linear_weight;
+
     void resize(const unsigned int fea_dim,
 		const unsigned int basis_dim) {
       mu.resize(fea_dim,1);
+      linear_weight.resize(fea_dim,1);
       lambda.resize(basis_dim,1);
     };
   };
@@ -60,17 +64,17 @@ public:
   void compute_likelihoods(const FeatureVec &feature);
 
   double gaussian_likelihood(const int k);
-
+  
   void copy(const Pcgmm &orig);
-
+  
   void calculate_precision(const LaVectorDouble &lambda,
 			   LaGenMatDouble &precision);
-
+  
   void calculate_precision(const LaVectorDouble &lambda,
 			   LaVectorDouble &precision);
-
+  
   void calculate_covariance(const LaVectorDouble &lambda,
-			   LaGenMatDouble &covariance);
+			    LaGenMatDouble &covariance);
 
   void calculate_covariance(const LaVectorDouble &lambda,
 			    LaVectorDouble &covariance);
@@ -138,7 +142,7 @@ public:
 		       LaGenMatDouble &B);
   
   bool is_spd(const LaGenMatDouble &A);
-
+  
   double determinant(const LaGenMatDouble &A);
 };
 
