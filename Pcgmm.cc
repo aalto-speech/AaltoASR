@@ -366,6 +366,48 @@ Pcgmm::gradient(const LaVectorDouble &lambda,
 
 
 void
+Pcgmm::train_precision_polak_ribiere(int state,
+				     LaGenMatDouble &sample_cov,
+				     int iter)
+{
+  // Initialize
+  double min_interval, max_interval, best_step;
+  LaVectorDouble old_grad, new_grad, old_d, new_d, old_lambda, new_lambda;
+  LaGenMatDouble R, curr_precision;
+
+  old_grad.resize(basis_dim(),1);
+  new_grad.resize(basis_dim(),1);
+  old_d.resize(basis_dim(),1);
+  new_d.resize(basis_dim(),1);
+  old_lambda.resize(basis_dim(),1);
+  new_lambda.resize(basis_dim(),1);
+  calculate_precision(gaussians.at(state).lambda, curr_precision);
+
+  for (int i=0; i<iter; i++) {
+    old_grad.copy(new_grad);
+    old_d.copy(new_d);
+
+    gradient(gaussians.at(state).lambda, sample_cov, new_grad);
+    polak_ribiere_direction(old_grad, new_grad, old_d, new_d);
+    
+    calculate_precision(new_d, R);
+    limit_line_search(R, curr_precision, min_interval, max_interval);
+
+    best_step=line_search_more_thuente(curr_precision, R, sample_cov,
+				       min_interval, max_interval);
+    best_step=std::max(best_step, 0.0000001);
+
+    old_lambda.copy(new_lambda);
+    Blas_Add_Mult(new_lambda, best_step, new_d);
+
+    calculate_precision(new_lambda, curr_precision);
+  }
+
+  gaussians.at(state).lambda.copy(new_lambda);
+}
+
+
+void
 Pcgmm::polak_ribiere_direction(const LaVectorDouble &old_grad,
 			       const LaVectorDouble &new_grad,
 			       const LaVectorDouble &old_direction,

@@ -95,7 +95,8 @@ public:
 			    const unsigned int basis_dim);
   
   void train_precision_polak_ribiere(int state, 
-				     LaGenMatDouble &sample_cov);
+				     LaGenMatDouble &sample_cov,
+				     int iter = 0);
   
   void polak_ribiere_direction(const LaVectorDouble &old_grad,
 			       const LaVectorDouble &new_grad,

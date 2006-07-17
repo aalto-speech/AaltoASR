@@ -516,7 +516,7 @@ HmmTrainer::update_parameters(HmmSet &model, HmmSet &model_tmp,
 {
   float sum;
 //  static float *tmpcov = NULL;
-  int i;
+  int i,j;
 
   for (int k = 0; k < model.num_kernels(); k++)
   {
@@ -568,10 +568,16 @@ HmmTrainer::update_parameters(HmmSet &model, HmmSet &model_tmp,
 						       m_min_var);
           }
         }
-        else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL) 
-        {
-          // FIXME: Not implemented
-        }
+        else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL
+		 || model_tmp.kernel(k).cov.type() == HmmCovariance::PCGMM) 
+	{
+          for (i = 0; i < model.dim(); i++)
+	    for (j = 0; j < model.dim(); j++)
+	      if (i==j)
+		model_tmp.kernel(k).cov.full(i,j) = std::max((*cov_m[k])(i,i), m_min_var);
+	      else
+		model_tmp.kernel(k).cov.full(i,j) = (*cov_m[k])(i,i); 
+	}
       }
       else
       {
@@ -584,6 +590,13 @@ HmmTrainer::update_parameters(HmmSet &model, HmmSet &model_tmp,
             model_tmp.kernel(k).cov.diag(i) = model.kernel(k).cov.diag(i);
           }
         }
+        else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL
+		 || model_tmp.kernel(k).cov.type() == HmmCovariance::PCGMM)
+	  {
+          for (i = 0; i < model.dim(); i++)
+	    for (j = 0; j < model.dim(); j++)
+	      model_tmp.kernel(k).cov.full(i,j) = model.kernel(k).cov.full(i,j);
+	}
       }
     }
     else
@@ -602,6 +615,14 @@ HmmTrainer::update_parameters(HmmSet &model, HmmSet &model_tmp,
           model_tmp.kernel(k).cov.diag(i) = model.kernel(k).cov.diag(i);
         }
       }
+      else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL 
+	       || model_tmp.kernel(k).cov.type() == HmmCovariance::PCGMM)
+      {
+	  for (i = 0; i < model.dim(); i++)
+	    for (j = 0; i < model.dim(); j++)
+	      model_tmp.kernel(k).cov.full(i,j) = model.kernel(k).cov.full(i,j);
+      }
+
     }
   }
 
