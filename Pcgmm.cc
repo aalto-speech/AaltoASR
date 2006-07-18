@@ -9,8 +9,6 @@ Pcgmm::copy(const Pcgmm &orig)
   mbasis.resize(orig.mbasis.size());
   vbasis.resize(orig.vbasis.size());
   gaussians.resize(orig.gaussians.size());
-  biases.resize(orig.biases.size());
-  linear_weights.resize(orig.linear_weights.size());
   quadratic_feas.resize(orig.quadratic_feas.size(),1);
 
   for (unsigned int i=0; i<orig.mbasis.size(); i++) {
@@ -31,18 +29,22 @@ void
 Pcgmm::precompute()
 {
   for (unsigned int i=0; i<num_gaussians(); i++) {
-    LaGenMatDouble t;
+    LaGenMatDouble t,t2;
     calculate_precision(gaussians.at(i).lambda, t);
     Blas_Mat_Vec_Mult(t, gaussians.at(i).mu, gaussians.at(i).linear_weight);
     t.scale(1/(2*3.1416));
-    gaussians.at(i).bias = sqrt(log(determinant(t)));
+    matrix_power(t, t2, 0.5);
+    gaussians.at(i).bias = log(determinant(t))
       - 0.5*Blas_Dot_Prod(gaussians.at(i).mu,gaussians.at(i).linear_weight);
   }
 }
 
 void 
-Pcgmm::compute_likelihoods(const FeatureVec &feature)
+Pcgmm::compute_likelihoods(const FeatureVec &feature,
+			   std::vector<float> &lls)
 {
+  lls.resize(num_gaussians());
+
   // Convert feature vector to lapackpp vector
   LaVectorDouble f=LaVectorDouble(feature.dim());
   for (int i=0; i<feature.dim(); i++)
@@ -50,17 +52,18 @@ Pcgmm::compute_likelihoods(const FeatureVec &feature)
 
   // Compute 'quadratic features'
   for (int i=0; i<basis_dim(); i++) {
-    LaVectorDouble y;
+    LaVectorDouble y=LaVectorDouble(feature.dim());
     Blas_Mat_Vec_Mult(mbasis.at(i), f, y);
     quadratic_feas(i)=-0.5*Blas_Dot_Prod(f,y);
   }
 
   // Compute likelihoods
   for (unsigned int i=0; i<num_gaussians(); i++) {
-    likelihoods.at(i)=biases.at(i)
+    likelihoods.at(i)=gaussians.at(i).bias
       +Blas_Dot_Prod(gaussians.at(i).linear_weight,f)
       +Blas_Dot_Prod(gaussians.at(i).lambda,quadratic_feas);
     likelihoods.at(i)=exp(likelihoods.at(i));
+    lls.at(i)=likelihoods.at(i);
   }
 }
 
@@ -135,7 +138,7 @@ Pcgmm::initialize_basis_svd(const std::vector<int> &c,
   int c_sum=0;
 
   // Reset current basis
-  reset_basis(basis_dim, d);
+  reset(basis_dim, d, num_gaussians());
 
   // Calculate c_sum
   for (unsigned int i=0; i<c.size(); i++)
@@ -196,14 +199,19 @@ Pcgmm::initialize_basis_svd(const std::vector<int> &c,
 
 
 void 
-Pcgmm::reset_basis(const unsigned int basis_dim, 
-		   const unsigned int d)
+Pcgmm::reset(const unsigned int basis_dim, 
+	     const unsigned int d,
+	     const unsigned int g)
 {
   unsigned int d_vec=(unsigned int)d*(d+1)/2;
   mbasis.resize(basis_dim);
   vbasis.resize(basis_dim);
   quadratic_feas.resize(basis_dim,1);
 
+  gaussians.resize(g);
+  for (unsigned int i=0; i<g; i++)
+    gaussians.at(i).resize(d, basis_dim);
+  likelihoods.resize(g);
 
   for (unsigned int i=0; i<basis_dim; i++) {
     mbasis.at(i).resize(d,d);
@@ -227,11 +235,11 @@ Pcgmm::read_gk(const std::string &filename)
     assert(false);
   }
   
-  int num_gaussians=0, basis_dim=0, fea_dim=0;
+  int gauss=0, basis_dim=0, fea_dim=0;
   std::string cov_str;
 
   // Read header line
-  in >> num_gaussians >> fea_dim >> cov_str;
+  in >> gauss >> fea_dim >> cov_str;
   
   if (!(cov_str == "pcgmm")) {
     throw std::string("Model type not pcgmm");
@@ -240,7 +248,7 @@ Pcgmm::read_gk(const std::string &filename)
   
   // Read precision basis
   in >> basis_dim;
-  reset_basis(basis_dim, fea_dim);
+  reset(basis_dim, fea_dim, gauss);
   for (int b=0; b<basis_dim; b++) {
     for (int i=0; i<fea_dim; i++)
       for (int j=0; j<fea_dim; j++) {
@@ -248,9 +256,9 @@ Pcgmm::read_gk(const std::string &filename)
       }
     map_m2v(mbasis[b], vbasis[b]);
   }
-  
+
   // Read gaussian parameters
-  for (int g=0; g<num_gaussians; g++) {
+  for (int g=0; g<gauss; g++) {
     for (int i=0; i<fea_dim; i++)
       in >> gaussians[g].mu(i);
     for (int i=0; i<basis_dim; i++)
@@ -677,4 +685,27 @@ Pcgmm::determinant(const LaGenMatDouble &A)
   det *=det;
 
   return det;
+}
+
+
+void 
+Pcgmm::matrix_power(const LaGenMatDouble &A,
+		    LaGenMatDouble &B,
+		    double power)
+{
+  LaVectorDouble D = LaVectorDouble(A.rows(),1);
+  LaGenMatDouble V = LaGenMatDouble(A);
+
+  LaEigSolveSymmetricVecIP(V, D);
+
+  LaGenMatDouble V_inverse = LaGenMatDouble(V);  
+  LaVectorLongInt pivots(A.rows());
+  LUFactorizeIP(V_inverse, pivots);
+  LaLUInverseIP(V_inverse, pivots);
+
+  B.resize(A.rows(), A.cols());
+  for (int i=0; i<A.rows(); i++)
+    for (int j=0; j<A.cols(); j++)
+      V_inverse(i,j)=V_inverse(i,j) * pow(D(j),power);
+  Blas_Mat_Mat_Mult(V, V_inverse, B);
 }

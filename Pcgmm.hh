@@ -44,9 +44,6 @@ protected:
   std::vector<LaGenMatDouble> mbasis;
   std::vector<LaVectorDouble> vbasis;
   std::vector<Gaussian> gaussians;
-
-  std::vector<double> biases;
-  std::vector<LaVectorDouble> linear_weights;
   LaVectorDouble quadratic_feas;
   std::vector<double> likelihoods;
   
@@ -61,7 +58,8 @@ public:
   
   void precompute();
 
-  void compute_likelihoods(const FeatureVec &feature);
+  void compute_likelihoods(const FeatureVec &feature,
+			   std::vector<float> &lls);
 
   double gaussian_likelihood(const int k);
   
@@ -82,13 +80,9 @@ public:
   void read_gk(const std::string &filename);
   void write_gk(const std::string &filename);
   
-  void reset_basis(const unsigned int basis_dim, 
-		   const unsigned int dim);
-  
-  void resize(int fea_dim, int basis_dim) {
-    for (unsigned int i=0; i<num_gaussians(); i++)
-      gaussians.at(i).resize(fea_dim, basis_dim);
-  };
+  void reset(const unsigned int basis_dim, 
+	     const unsigned int dim,
+	     const unsigned int gaussians);
   
   void initialize_basis_svd(const std::vector<int> &weights, 
 			    const std::vector<LaGenMatDouble> &sample_covs, 
@@ -145,6 +139,11 @@ public:
   bool is_spd(const LaGenMatDouble &A);
   
   double determinant(const LaGenMatDouble &A);
+
+  void matrix_power(const LaGenMatDouble &A,
+		    LaGenMatDouble &B,
+		    double power);
+
 };
 
 

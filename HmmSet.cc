@@ -587,16 +587,14 @@ HmmSet::compute_observation_log_probs(const FeatureVec &feature)
   double sum = 0;
 
   if (pcgmm.basis_dim() > 0)
-    pcgmm.compute_likelihoods(feature);
-  
-  if (scgmm.basis_dim() > 0)
-    scgmm.precompute(feature);
-
-  obs_kernel_likelihoods.resize(num_kernels());
-  for (int k = 0; k < num_kernels(); k++) {
-    obs_kernel_likelihoods[k] = compute_kernel_likelihood(k, feature);
+    pcgmm.compute_likelihoods(feature, obs_kernel_likelihoods);
+  else {
+    obs_kernel_likelihoods.resize(num_kernels());
+    for (int k = 0; k < num_kernels(); k++) {
+      obs_kernel_likelihoods[k] = compute_kernel_likelihood(k, feature);
+    }
   }
-  
+
   obs_log_probs.resize(num_states());
   for (int s = 0; s < num_states(); s++) {
     HmmState &state = m_states[s];
