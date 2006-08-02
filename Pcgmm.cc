@@ -34,7 +34,7 @@ Pcgmm::precompute()
     Blas_Mat_Vec_Mult(t, gaussians.at(i).mu, gaussians.at(i).linear_weight);
     t.scale(1/(2*3.1416));
     matrix_power(t, t2, 0.5);
-    gaussians.at(i).bias = log(determinant(t))
+    gaussians.at(i).bias = log(determinant(t2))
       - 0.5*Blas_Dot_Prod(gaussians.at(i).mu,gaussians.at(i).linear_weight);
   }
 }
@@ -543,7 +543,7 @@ Pcgmm::limit_line_search(const LaGenMatDouble &R,
   double min=DBL_MAX;
   double max=-DBL_MAX;
 
-  // First limit the line search based 
+  // Limit the line search based 
   // on the eigenvalues of the pair (R, curr_prec..)
   for (int i=0; i<eigs.size(); i++) {
     if (eigs(i)<min)
@@ -561,39 +561,6 @@ Pcgmm::limit_line_search(const LaGenMatDouble &R,
     min_interval=-DBL_MAX;
   else
     min_interval=-1/max;
-
-  // Then limit more to ensure positive defitiveness
-  // of the resulting precision matrix estimate
-  LaGenMatDouble t=LaGenMatDouble(curr_prec_estimate);
-  LaGenMatDouble id=LaGenMatDouble::eye(R.rows());
-
-  double min_lower=min_interval, min_upper=0, step=0;
-  while (min_upper-min_lower>0.0001) {
-    step=min_lower+(min_upper-min_lower)/2;
-    Blas_Mat_Mat_Mult(id, R, t, step, 1.0);
-    if (is_spd(t))
-      min_upper=step;
-    else
-      min_lower=step;
-    t.copy(curr_prec_estimate);
-  }
-
-  double max_lower=0, max_upper=max_interval;
-  while (max_upper-max_lower>0.0001) {
-    step=max_lower+(max_upper-max_lower)/2;
-    Blas_Mat_Mat_Mult(id, R, t, step, 1.0);
-    if (is_spd(t))
-      max_lower=step;
-    else
-      max_upper=step;
-    t.copy(curr_prec_estimate);
-  }
-
-  if (min_upper>min_interval)
-    min_interval=min_upper;
-
-  if (max_lower<max_interval)
-    max_interval=max_lower;
 }
 
 
