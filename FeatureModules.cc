@@ -295,6 +295,8 @@ FFTModule::reset_module()
 void
 FFTModule::generate(int frame)
 {
+  int t;
+  
   // NOTE: because of lowpass filtering, (m_window_width PLUS one)
   // samples are fetched from the audio file
 
@@ -337,7 +339,7 @@ FFTModule::generate(int frame)
   }
   
   // Apply lowpass filtering and hamming window
-  for (int t = 0; t < m_window_width; t++)
+  for (t = 0; t < m_window_width; t++)
   {
     m_fftw_datain[t] = m_hamming_window[t] * 
       (m_reader[window_start + t + 1] - m_emph_coef * m_reader[window_start + t]);
@@ -347,13 +349,17 @@ FFTModule::generate(int frame)
 
   // NOTE: fftw returns the imaginary parts in funny order
   FeatureVec target = m_buffer[frame];
-  for (int t = 0; t <= m_window_width / 2; t++)
+  for (t = 0; t < m_window_width / 2; t++)
   {
     target[t] = m_fftw_dataout[t] * m_fftw_dataout[t] + 
       m_fftw_dataout[m_window_width-t] * m_fftw_dataout[m_window_width-t];
     if (m_magnitude)
       target[t] = sqrtf(target[t]);
   }
+  // The highest frequency component has zero imaginary part
+  target[t] = m_fftw_dataout[t] * m_fftw_dataout[t];
+  if (m_magnitude)
+    target[t] = sqrtf(target[t]);
   
   if (m_copy_borders && m_first_feature.empty() && frame <= 0)
     target.get(m_first_feature);
