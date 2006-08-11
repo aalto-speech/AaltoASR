@@ -100,6 +100,7 @@ public:
   void set_tying_length_award(float award) { m_tying_length_award = award; }
   void set_skip_short_silence_context(bool skip) { m_skip_short_silence_context = skip; }
   void set_ignore_length(bool il) { m_ignore_tying_length = il; }
+  void set_ignore_context_length(bool icl) { m_ignore_tying_context_length = icl; }
   void set_print_speakered(bool sphn) { m_print_speakered = sphn; }
   
 private:
@@ -126,6 +127,7 @@ private:
   double m_tying_min_lhg;
   double m_tying_length_award;
   bool m_ignore_tying_length;
+  bool m_ignore_tying_context_length;
   bool m_skip_short_silence_context;
   
   int **dur_table;

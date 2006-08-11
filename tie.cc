@@ -69,7 +69,7 @@ main(int argc, char *argv[])
       ('o', "out=FILE", "arg", "", "output filename for basebind")
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "swins=INT", "arg", "1000", "window size (default: 1000)")
-      ('\0', "beam=FLOAT", "arg", "100.0", "log prob beam (default 100.0")
+      ('\0', "beam=FLOAT", "arg", "100.0", "log prob beam (default 100.0)")
       ('\0', "sbeam=INT", "arg", "100", "state beam (default 100)")
       ('\0', "overlap=FLOAT", "arg", "0.4", "window overlap (default 0.4)")
       ('\0', "no-force-end", "", "", "do not force to the last state")
@@ -78,7 +78,8 @@ main(int argc, char *argv[])
       ('\0', "lh=FLOAT", "arg", "0", "minimum likelihood gain for cluster splitting")
       ('\0', "laward=FLOAT", "arg", "0", "likelihood award from applying the length rule")
       ('\0', "sc", "", "", "triphone context is used over short silences \'_\'")
-      ('\0', "il", "", "", "ignore center phoneme length (case sensitive phonemes")
+      ('\0', "il", "", "", "ignore center phoneme length (case sensitive phonemes)")
+      ('\0', "icl", "", "", "ignore context length (case sensitive context)")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('\0', "sphn", "", "", "phns with speaker ID's in use")
       ('i', "info=INT", "arg", "0", "info level")
@@ -132,6 +133,7 @@ main(int argc, char *argv[])
     trainer.set_tying_length_award(config["laward"].get_float());
     trainer.set_fill_missing_contexts(config["missing"].specified);
     trainer.set_ignore_length(config["il"].specified);
+    trainer.set_ignore_context_length(config["icl"].specified);
     trainer.load_rule_set(config["rule"].get_str());
 
     phn_reader.set_speaker_phns(config["sphn"].specified);

@@ -35,12 +35,11 @@ int my_tolower(int c)
   return tolower(c);
 }
 
-std::string transform_context(const std::string &context)
+std::string transform_context(const std::string &context, bool ignore_context_length)
 {
-  std::string temp;
-  if (context[0] == '_')
-    return "_";
-  temp = context;
+  if (context[0] == '_') return "_";
+  if (ignore_context_length) return context;
+  std::string temp = context;
   std::transform(temp.begin(), temp.end(), temp.begin(), my_tolower);
   return temp;
 }
@@ -223,6 +222,7 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
       triphone_set.set_min_likelihood_gain(m_tying_min_lhg);
     triphone_set.set_length_award(m_tying_length_award);
     triphone_set.set_ignore_length(m_ignore_tying_length);
+    triphone_set.set_ignore_context_length(m_ignore_tying_context_length);
 
     cur_tri_stat_hmm_index = -1;
     cur_tri_stat_state = -1;
@@ -498,11 +498,10 @@ HmmTrainer::update_triphone_stat(Viterbi &viterbi,
     }
 
     if (cur_tri_stat_center[0] != '_')
-    {
-      std::string left=transform_context(cur_tri_stat_left);
-      std::string right=transform_context(cur_tri_stat_right);
-
-      triphone_set.add_feature(m_fea_gen.generate(start_frame+f),left,
+      {
+	std::string left=transform_context(cur_tri_stat_left, m_ignore_tying_context_length);
+	std::string right=transform_context(cur_tri_stat_right, m_ignore_tying_context_length);
+	triphone_set.add_feature(m_fea_gen.generate(start_frame+f),left,
                                cur_tri_stat_center, right,
                                cur_tri_stat_state_index);
     }

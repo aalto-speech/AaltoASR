@@ -242,9 +242,8 @@ compute_features_segfea(const std::string &in_fname,
   while (fgets(line,MAXLINE,fp))
   {
     token = get_seg_info(line, &s_beg, &s_end);
-    s_beg = (int)((double)s_beg/gen.sample_rate()*gen.frame_rate());
-    s_end = (int)((double)s_end/gen.sample_rate()*gen.frame_rate());
-
+    s_beg = (int)((double)s_beg/16000.0*gen.frame_rate());
+    s_end = (int)((double)s_end/16000.0*gen.frame_rate());
     if (s_end < start_frame)
       continue;
     else if (s_beg < start_frame)
@@ -258,6 +257,7 @@ compute_features_segfea(const std::string &in_fname,
 
     // PHN labels may include several models, iterate them through
     label_token = strtok(token,",");
+    fprintf(stderr,"#%s\n", label_token);
     while (label_token != NULL)
     {
       if (state_segmentation) {
@@ -270,7 +270,7 @@ compute_features_segfea(const std::string &in_fname,
       }
 	
       std::map<std::string,PhonemeInfo>::const_iterator it =
-        pho_info.find(label_token);
+	pho_info.find(label_token);
       if (it == pho_info.end())
       {
         fclose(fp);

@@ -33,6 +33,7 @@ TriphoneSet::TriphoneSet()
   : m_dim(0),
     m_info(0),
     m_ignore_length(false),
+    m_ignore_context_length(false),
     m_min_count(300),
     m_min_likelihood_gain(1000),
     m_length_award(0)

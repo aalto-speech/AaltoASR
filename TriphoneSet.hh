@@ -67,6 +67,7 @@ public:
   void set_min_likelihood_gain(double lhg) { m_min_likelihood_gain = lhg; }
   void set_length_award(double award) { m_length_award = award; }
   void set_ignore_length(bool il) { m_ignore_length = il; }
+  void set_ignore_context_length(bool icl) { m_ignore_context_length = icl; }
 
   void add_feature(const FeatureVec &f, const std::string &left,
                    const std::string &center,
@@ -108,6 +109,7 @@ private:
   std::vector<DecisionRule> m_rule_set;
 
   bool m_ignore_length;
+  bool m_ignore_context_length;
 
   int m_min_count;
   double m_min_likelihood_gain;
