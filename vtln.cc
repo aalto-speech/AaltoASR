@@ -125,7 +125,7 @@ set_speaker(std::string speaker, int grid_iter)
 
 void
 compute_vtln_log_likelihoods(int start_frame, int end_frame,
-                             std::string speaker)
+                             std::string &speaker, std::string &utterance)
 {
   int grid_iter;
   Hmm hmm;
@@ -138,6 +138,8 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
   for (grid_iter = 0; grid_iter < grid_size; grid_iter++)
   {
     set_speaker(speaker, grid_iter);
+    if (utterance.size() > 0)
+      speaker_conf.set_utterance(utterance);
     
     phn_reader.reset_file();
     
@@ -160,7 +162,11 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
       }
 
       if (phn.speaker.size() > 0 && phn.speaker != cur_speaker)
+      {
         set_speaker(phn.speaker, grid_iter);
+        if (utterance.size() > 0)
+          speaker_conf.set_utterance(utterance);
+      }
 
       if (cur_speaker.size() == 0)
         throw std::string("Speaker ID is missing");
@@ -356,7 +362,8 @@ main(int argc, char *argv[])
         throw std::string("Speaker ID is missing");
 
       compute_vtln_log_likelihoods(start_frame, end_frame,
-                                   recipe.infos[f].speaker_id);
+                                   recipe.infos[f].speaker_id,
+                                   recipe.infos[f].utterance_id);
 
       fea_gen.close();
       phn_reader.close();

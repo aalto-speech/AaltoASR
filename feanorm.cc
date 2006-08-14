@@ -109,7 +109,12 @@ main(int argc, char *argv[])
       gen.open(recipe.infos[recipe_index].audio_path, raw_flag);
 
       if (config["speakers"].specified)
+      {
         m_speaker_config.set_speaker(recipe.infos[recipe_index].speaker_id);
+        if (recipe.infos[recipe_index].utterance_id.size() > 0)
+          m_speaker_config.set_utterance(
+            recipe.infos[recipe_index].utterance_id);
+      }
 
       for (int d = 0; d < dim; d++)
       {

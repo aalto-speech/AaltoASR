@@ -1,7 +1,6 @@
 #include "io.hh"
 #include "conf.hh"
 #include "FeatureGenerator.hh"
-#include "SpeakerConfig.hh"
 
 conf::Config config;
 FeatureGenerator gen;

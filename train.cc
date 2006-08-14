@@ -220,7 +220,8 @@ main(int argc, char *argv[])
       trainer.viterbi_train(start_frame, end_frame, model,
                             viterbi,
                             (print_segment?phn_out_file.file:NULL),
-                            recipe.infos[f].speaker_id);
+                            recipe.infos[f].speaker_id,
+                            recipe.infos[f].utterance_id);
 
       if (print_segment)
         phn_out_file.close();

@@ -169,7 +169,11 @@ main(int argc, char *argv[])
       }
 
       if (config["speakers"].specified)
+      {
         speaker_conf.set_speaker(recipe.infos[recipe_index].speaker_id);
+        if (recipe.infos[recipe_index].utterance_id.size() > 0)
+          speaker_conf.set_utterance(recipe.infos[recipe_index].utterance_id);
+      }
       
       start_frame = (int)(recipe.infos[recipe_index].start_time *
                           gen.frame_rate());

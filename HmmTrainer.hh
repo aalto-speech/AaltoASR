@@ -34,7 +34,8 @@ public:
   void viterbi_train(int start_frame, int end_frame,
                      HmmSet &model,
                      Viterbi &viterbi,
-                     FILE *phn_out, std::string speaker = "");
+                     FILE *phn_out, std::string speaker = "",
+                     std::string utterance = "");
   void finish_train(HmmSet &model);
 
   int num_unused_features(void) { return m_em_norm_warning_count; }
@@ -99,6 +100,7 @@ public:
   void set_tying_min_likelihood_gain(double gain) { m_tying_min_lhg = gain; }
   void set_tying_length_award(float award) { m_tying_length_award = award; }
   void set_skip_short_silence_context(bool skip) { m_skip_short_silence_context = skip; }
+  void set_triphone_phn(bool tri) { m_triphone_phn = tri; }
   void set_ignore_length(bool il) { m_ignore_tying_length = il; }
   void set_ignore_context_length(bool icl) { m_ignore_tying_context_length = icl; }
   void set_print_speakered(bool sphn) { m_print_speakered = sphn; }
@@ -129,6 +131,7 @@ private:
   bool m_ignore_tying_length;
   bool m_ignore_tying_context_length;
   bool m_skip_short_silence_context;
+  bool m_triphone_phn;
   
   int **dur_table;
   int m_num_dur_models;

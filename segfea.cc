@@ -419,7 +419,11 @@ main(int argc, char *argv[])
                recipe.infos[fi].phn_path.c_str());
 
       if (config["speakers"].specified)
+      {
         speaker_config.set_speaker(recipe.infos[fi].speaker_id);
+        if (recipe.infos[fi].utterance_id.size() > 0)
+          speaker_config.set_utterance(recipe.infos[fi].utterance_id);
+      }
 
       start_frame = (int)(recipe.infos[fi].start_time * gen.frame_rate());
       end_frame = (int)(recipe.infos[fi].end_time * gen.frame_rate());

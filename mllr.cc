@@ -99,7 +99,8 @@ set_speaker(std::string new_speaker)
 
 
 void
-train_mllr(int start_frame, int end_frame, std::string speaker)
+train_mllr(int start_frame, int end_frame, std::string &speaker,
+           std::string &utterance)
 {
   Hmm hmm;
   HmmState state;
@@ -109,7 +110,11 @@ train_mllr(int start_frame, int end_frame, std::string speaker)
   int f;
 
   if (speaker.size() > 0)
+  {
     set_speaker(speaker);
+    if (utterance.size() > 0)
+      speaker_conf.set_utterance(utterance);
+  }
   else
     cur_speaker = "";
 
@@ -132,7 +137,11 @@ train_mllr(int start_frame, int end_frame, std::string speaker)
     }
 
     if (phn.speaker.size() > 0 && phn.speaker != cur_speaker)
+    {
       set_speaker(phn.speaker);
+      if (utterance.size() > 0)
+        speaker_conf.set_utterance(utterance);
+    }
 
     if (cur_speaker.size() == 0)
       throw std::string("Speaker ID is missing");
@@ -257,7 +266,8 @@ main(int argc, char *argv[])
           recipe.infos[f].speaker_id.size() == 0)
         throw std::string("Speaker ID is missing");
 
-      train_mllr(start_frame, end_frame, recipe.infos[f].speaker_id);
+      train_mllr(start_frame, end_frame, recipe.infos[f].speaker_id,
+                 recipe.infos[f].utterance_id);
 
       fea_gen.close();
       phn_reader.close();

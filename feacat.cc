@@ -45,6 +45,7 @@ main(int argc, char *argv[])
       ('e', "end-frame=INT", "arg", "", "audio end frame")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('d', "speaker-id=NAME", "arg", "", "speaker ID")
+      ('u', "utterance-id=NAME", "arg", "", "utterance ID")
       ;
     config.default_parse(argc, argv);
     if (config.arguments.size() != 1)
@@ -64,6 +65,8 @@ main(int argc, char *argv[])
     {
       speaker_conf.read_speaker_file(io::Stream(config["speakers"].get_str()));
       speaker_conf.set_speaker(config["speaker-id"].get_str());
+      if (config["utterance-id"].specified)
+        speaker_conf.set_utterance(config["utterance-id"].get_str());
     }
 
     if (config["write-config"].specified)

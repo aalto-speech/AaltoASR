@@ -37,11 +37,29 @@ int my_tolower(int c)
 
 std::string transform_context(const std::string &context, bool ignore_context_length)
 {
-  if (context[0] == '_') return "_";
-  if (ignore_context_length) return context;
+  if (context[0] == '_')
+    return "_";
+  if (ignore_context_length)
+    return context;
   std::string temp = context;
   std::transform(temp.begin(), temp.end(), temp.begin(), my_tolower);
   return temp;
+}
+
+std::string extract_left_context(const std::string &tri)
+{
+  return tri.substr(0, tri.rfind('-'));
+}
+
+std::string extract_right_context(const std::string &tri)
+{
+  return tri.substr(tri.find('+')+1);
+}
+
+std::string extract_center_pho(const std::string &tri)
+{
+  std::string temp = tri.substr(tri.rfind('-')+1);
+  return temp.substr(0, temp.find('+'));
 }
 
 HmmTrainer::HmmTrainer(FeatureGenerator &fea_gen)
@@ -66,6 +84,7 @@ HmmTrainer::HmmTrainer(FeatureGenerator &fea_gen)
     m_tying_min_lhg(0),
     m_tying_length_award(0),
     m_skip_short_silence_context(false),
+    m_triphone_phn(false),
     m_num_dur_models(0),
     m_print_speakered(false),
     cov_m(NULL),
@@ -200,7 +219,8 @@ void HmmTrainer::init(HmmSet &model, std::string adafile)
 void HmmTrainer::viterbi_train(int start_frame, int end_frame,
                                HmmSet &model,
                                Viterbi &viterbi,
-                               FILE *phn_out, std::string speaker)
+                               FILE *phn_out, std::string speaker,
+                               std::string utterance)
 {
   // Compute window borders
   int window_start_frame = start_frame;
@@ -231,7 +251,11 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
   }
 
   if (m_set_speakers && speaker.size() > 0)
-      m_speaker_config.set_speaker(speaker);
+  {
+    m_speaker_config.set_speaker(speaker);
+    if (utterance.size() > 0)
+      m_speaker_config.set_utterance(utterance);
+  }
 
   bool last_window = false;
   int print_start = -1;
@@ -459,51 +483,76 @@ HmmTrainer::update_triphone_stat(Viterbi &viterbi,
   {
     const Viterbi::TranscriptionState &tr_state =
       viterbi.transcription(viterbi.best_position(f));
-    
-    if (tr_state.state != cur_tri_stat_state)
+
+    if (!m_triphone_phn)
     {
-      if (tr_state.hmm_state_index == 0 ||
-          cur_tri_stat_hmm_index != tr_state.hmm_index)
+      if (tr_state.state != cur_tri_stat_state)
       {
-        if (!m_skip_short_silence_context ||
-            cur_tri_stat_center != "_")
-          cur_tri_stat_left = cur_tri_stat_center;
-        if (!m_skip_short_silence_context ||
-            tr_state.label != "_")
-          cur_tri_stat_center = cur_tri_stat_right;
-        else
-          cur_tri_stat_center = tr_state.label; // Short silence
-        
-        if (cur_tri_stat_state == -1)
-          cur_tri_stat_center = tr_state.label;
-
-        if (out)
-          exit(2);
-        if (cur_tri_stat_center != tr_state.label)
+        if (tr_state.hmm_state_index == 0 ||
+            cur_tri_stat_hmm_index != tr_state.hmm_index)
         {
-          printf("HmmTrainer::update_triphone_state: Error:\n");
-          printf("cur_tri_stat_center = %s\n", cur_tri_stat_center.c_str());
-          printf("tr_state.label = %s\n", tr_state.label.c_str());
-          printf("cur_tri_stat_state = %i\n", cur_tri_stat_state);
-          printf("tr_state.state = %i\n", tr_state.state);
-          printf("At frame %d\n", start_frame + f);
-          out = true;
-        }
-        if (!m_skip_short_silence_context || tr_state.label != "_")
-          cur_tri_stat_right = tr_state.next_label;
-        cur_tri_stat_hmm_index = tr_state.hmm_index;
-      }
-      cur_tri_stat_state_index = tr_state.hmm_state_index;
-      cur_tri_stat_state = tr_state.state;
-    }
+          if (!m_skip_short_silence_context ||
+              cur_tri_stat_center != "_")
+            cur_tri_stat_left = cur_tri_stat_center;
+          if (!m_skip_short_silence_context ||
+              tr_state.label != "_")
+            cur_tri_stat_center = cur_tri_stat_right;
+          else
+            cur_tri_stat_center = tr_state.label; // Short silence
+        
+          if (cur_tri_stat_state == -1)
+            cur_tri_stat_center = tr_state.label;
 
-    if (cur_tri_stat_center[0] != '_')
+          if (out)
+            exit(2);
+          if (cur_tri_stat_center != tr_state.label)
+          {
+            printf("HmmTrainer::update_triphone_state: Error:\n");
+            printf("cur_tri_stat_center = %s\n", cur_tri_stat_center.c_str());
+            printf("tr_state.label = %s\n", tr_state.label.c_str());
+            printf("cur_tri_stat_state = %i\n", cur_tri_stat_state);
+            printf("tr_state.state = %i\n", tr_state.state);
+            printf("At frame %d\n", start_frame + f);
+            out = true;
+          }
+          if (!m_skip_short_silence_context || tr_state.label != "_")
+            cur_tri_stat_right = tr_state.next_label;
+          cur_tri_stat_hmm_index = tr_state.hmm_index;
+        }
+        cur_tri_stat_state_index = tr_state.hmm_state_index;
+        cur_tri_stat_state = tr_state.state;
+      }
+
+      if (cur_tri_stat_center[0] != '_')
       {
-	std::string left=transform_context(cur_tri_stat_left, m_ignore_tying_context_length);
-	std::string right=transform_context(cur_tri_stat_right, m_ignore_tying_context_length);
-	triphone_set.add_feature(m_fea_gen.generate(start_frame+f),left,
-                               cur_tri_stat_center, right,
-                               cur_tri_stat_state_index);
+        std::string left=transform_context(cur_tri_stat_left,
+                                           m_ignore_tying_context_length);
+        std::string right=transform_context(cur_tri_stat_right,
+                                            m_ignore_tying_context_length);
+
+        triphone_set.add_feature(m_fea_gen.generate(start_frame+f),left,
+                                 cur_tri_stat_center, right,
+                                 cur_tri_stat_state_index);
+      }
+    }
+    else
+    {
+      if (tr_state.state != cur_tri_stat_state &&
+          tr_state.hmm_state_index == 0)
+      {
+        cur_tri_stat_left=extract_left_context(tr_state.label);
+        cur_tri_stat_right=extract_right_context(tr_state.label);
+        cur_tri_stat_center=extract_center_pho(tr_state.label);
+        cur_tri_stat_state = tr_state.state;
+      }
+
+      if (cur_tri_stat_center[0] != '_')
+      {
+        triphone_set.add_feature(m_fea_gen.generate(start_frame+f),
+                                 cur_tri_stat_left, cur_tri_stat_center,
+                                 cur_tri_stat_right,
+                                 tr_state.hmm_state_index);
+      }
     }
   }
 }
@@ -716,7 +765,9 @@ HmmTrainer::update_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
     if (m_set_speakers && viterbi.current_speaker(f).size() > 0 &&
         viterbi.current_speaker(f) != m_speaker_config.get_cur_speaker())
     {
+      std::string utterance = m_speaker_config.get_cur_utterance();
       m_speaker_config.set_speaker(viterbi.current_speaker(f));
+      m_speaker_config.set_utterance(utterance); // Preserve utterance ID
       
       // if speaker change occurred while processing a window,
       // the number of frames left untreated is returned

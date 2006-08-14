@@ -78,8 +78,9 @@ main(int argc, char *argv[])
       ('\0', "lh=FLOAT", "arg", "0", "minimum likelihood gain for cluster splitting")
       ('\0', "laward=FLOAT", "arg", "0", "likelihood award from applying the length rule")
       ('\0', "sc", "", "", "triphone context is used over short silences \'_\'")
-      ('\0', "il", "", "", "ignore center phoneme length (case sensitive phonemes)")
+      ('\0', "il", "", "", "ignore center phoneme length (case sensitive phonemes")
       ('\0', "icl", "", "", "ignore context length (case sensitive context)")
+      ('\0', "tri", "", "", "triphone phn")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('\0', "sphn", "", "", "phns with speaker ID's in use")
       ('i', "info=INT", "arg", "0", "info level")
@@ -119,6 +120,7 @@ main(int argc, char *argv[])
 
     viterbi.set_skip_next_short_silence(config["sc"].specified);
     trainer.set_skip_short_silence_context(config["sc"].specified);
+    trainer.set_triphone_phn(config["tri"].specified);
 
     trainer.set_info(info);
     trainer.set_win_size(win_size);
@@ -170,7 +172,8 @@ main(int argc, char *argv[])
                  recipe.infos[f].end_line);
 
       trainer.viterbi_train(start_frame, end_frame, model,
-                            viterbi, NULL, recipe.infos[f].speaker_id);
+                            viterbi, NULL, recipe.infos[f].speaker_id,
+                            recipe.infos[f].utterance_id);
 
       fea_gen.close();
       phn_reader.close();
