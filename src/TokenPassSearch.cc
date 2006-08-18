@@ -572,8 +572,8 @@ TokenPassSearch::print_state_history(void)
   // Print the best path
   for (i = state_num.size()-1; i >= 0; i--)
   {
-    printf("%i %i %i\n", state_start_time[i+1], state_start_time[i],
-           state_num[i]);
+    printf("%i %i %i\n", state_start_time[i+1]*128,
+           state_start_time[i]*128, state_num[i]);
   }
 }
 
@@ -781,7 +781,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       new_state_history->link();
       new_state_history_linked = true;
     }
-      
+    
     // Update duration probability
     new_dur = 0;
     depth = token->depth + 1;
@@ -980,6 +980,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
           // Replace the previous token
           new_token = similar_word_hist;
           TPLexPrefixTree::WordHistory::unlink(new_token->prev_word);
+          TPLexPrefixTree::StateHistory::unlink(new_token->state_history);
 
           //TPLexPrefixTree::PathHistory::unlink(new_token->token_path);
         }
@@ -1300,17 +1301,19 @@ TokenPassSearch::prune_tokens(void)
         if (num_active_tokens < m_max_num_tokens)
           break;
       }
-      new_min_log_prob = m_worst_log_prob + i*bin_adv;
+      int deleted = 0;
+      new_min_log_prob = m_worst_log_prob + (i+1)*bin_adv;
       for (i = 0; i < m_active_token_list->size(); i++)
       {
         if ((*m_active_token_list)[i]->total_log_prob < new_min_log_prob)
         {
           release_token((*m_active_token_list)[i]);
           (*m_active_token_list)[i] = NULL;
+          deleted++;
         }
       }
       if (m_verbose > 1)
-        printf("%d tokens after histogram pruning\n", num_active_tokens);
+        printf("%d tokens after histogram pruning\n", m_active_token_list->size() - deleted);
 
       // Pass the new beam limit to next token propagation
       m_current_glob_beam = std::min((m_best_log_prob-new_min_log_prob),

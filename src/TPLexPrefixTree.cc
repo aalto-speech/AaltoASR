@@ -181,8 +181,10 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
     {
       m_silence_node = hmm_state_nodes[0];
       m_silence_node->flags |= NODE_SILENCE_FIRST;
+      if (m_silence_is_word)
+        m_silence_node->flags |= NODE_FIRST_STATE_OF_WORD;
     }
-    if (i == 0)
+    else if (i == 0)
       hmm_state_nodes[0]->flags |= NODE_FIRST_STATE_OF_WORD;
 
     // Expand other states, from left to right
@@ -709,7 +711,7 @@ TPLexPrefixTree::add_hmm_to_fan_network(int hmm_id,
   last_node = sink_nodes.front();
   assert( last_node == hmm_state_nodes[hmm->states.size()-3] );
   if (!m_optional_short_silence &&
-      (m_lm_lookahead && fan_out) || (!m_lm_lookahead && !fan_out))
+      ((m_lm_lookahead && fan_out) || (!m_lm_lookahead && !fan_out)))
     last_node->flags |= NODE_INSERT_WORD_BOUNDARY;
 }
 

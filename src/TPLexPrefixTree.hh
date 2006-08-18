@@ -34,7 +34,7 @@
 #define NODE_FAN_IN_CONNECTION    0x80
 #define NODE_LINKED               0x0100
 #define NODE_SILENCE_FIRST        0x0200
-#define NODE_FIRST_STATE_OF_WORD  0x0200
+#define NODE_FIRST_STATE_OF_WORD  0x0400
 
 
 class TPLexPrefixTree {
