@@ -1099,8 +1099,9 @@ TPLexPrefixTree::get_short_silence_node(void)
   assert( m_short_silence_state != NULL );
   Node *silence = new Node(m_word_boundary_id, m_short_silence_state);
   silence->node_id = node_list.size();
-  silence->flags = NODE_FAN_OUT | NODE_USE_WORD_END_BEAM |
-    NODE_FIRST_STATE_OF_WORD;
+  silence->flags = NODE_FAN_OUT | NODE_USE_WORD_END_BEAM;
+  if (m_silence_is_word)
+    silence->flags |= NODE_FIRST_STATE_OF_WORD;
   node_list.push_back(silence);
   // Make self transition
   temp_arc.next = silence;
