@@ -1,3 +1,4 @@
+#include <sstream>
 #include <stdio.h>
 #include <math.h>
 #include "TokenPassSearch.hh"
@@ -44,7 +45,8 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
   m_state_beam = 1e10;
 
   m_print_text_result = 1;
-  m_print_state_segmentation = 0;
+  m_print_state_segmentation = false;
+  m_keep_state_segmentation = false;
   m_print_frames = false;
 
   m_similar_word_hist_span = 0;
@@ -176,7 +178,7 @@ TokenPassSearch::reset_search(int start_frame)
   //t->token_path->link();
   t->word_count = 0;
 
-  if (m_print_state_segmentation)
+  if (m_keep_state_segmentation)
   {
     t->state_history = new TPLexPrefixTree::StateHistory(
       0, 0, NULL);
@@ -386,7 +388,7 @@ TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
   }
   
   TPLexPrefixTree::Token *orig_token = NULL;
-  float best_log_prob = m_best_log_prob;
+  float best_log_prob = -1e20;
   for (int t = 0; t < m_active_token_list->size(); t++) {
     TPLexPrefixTree::Token *token = (*m_active_token_list)[t];
     if (token == NULL)
@@ -411,6 +413,7 @@ TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
     vec.push_back(hist);
     hist = hist->prev_word;
   }
+  assert(limit == NULL || hist->word_id >= 0);
 }
 
 
@@ -538,42 +541,69 @@ TokenPassSearch::print_best_path(bool only_not_printed, FILE *out)
   fflush(out);
 }
 
-
-void
-TokenPassSearch::print_state_history(void)
+TPLexPrefixTree::Token*
+TokenPassSearch::get_best_token()
 {
-  std::vector<int> state_num;
-  std::vector<int> state_start_time;
-  TPLexPrefixTree::StateHistory *cur_state;
-  float max_log_prob = -1e20;
-  int i, best_token;
+  TPLexPrefixTree::Token *best_token = NULL;
+  float best_log_prob = -1e20;
+  for (int i = 0; i < m_active_token_list->size(); i++) {
+    TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
+    if (token == NULL)
+      continue;
 
-  // Find the best token
-  for (i = 0; i < m_active_token_list->size(); i++)
-  {
-    if ((*m_active_token_list)[i] != NULL)
-    {
-      if ((*m_active_token_list)[i]->total_log_prob > max_log_prob)
-      {
-        best_token = i;
-        max_log_prob = (*m_active_token_list)[i]->total_log_prob;
-      }
+    if (token->total_log_prob > best_log_prob) {
+      best_token = token;
+      best_log_prob = token->total_log_prob;
     }
   }
-  state_start_time.push_back(m_frame); // End frame
-  // Determine the state sequence
-  cur_state = (*m_active_token_list)[best_token]->state_history;
-  while (cur_state != NULL && cur_state->prev != NULL)
+  assert(best_token != NULL);
+  return best_token;
+}
+
+void
+TokenPassSearch::print_state_history(FILE *file)
+{
+  std::vector<TPLexPrefixTree::StateHistory*> stack;
+  get_state_history(stack);
+
+  for (int i = stack.size()-1; i >= 0; i--)
   {
-    state_num.push_back(cur_state->hmm_model);
-    state_start_time.push_back(cur_state->start_time);
-    cur_state = cur_state->prev;
+    int end_time = i == 0 ? m_frame : stack[i-1]->start_time;
+    fprintf(file, "%i %i %i\n", stack[i]->start_time, end_time, 
+            stack[i]->hmm_model);
   }
-  // Print the best path
-  for (i = state_num.size()-1; i >= 0; i--)
+
+  fprintf(file, "DEBUG: %s\n", state_history_string().c_str());
+}
+
+std::string 
+TokenPassSearch::state_history_string()
+{
+  std::string str;
+  std::vector<TPLexPrefixTree::StateHistory*> stack;
+  get_state_history(stack);
+
+  std::ostringstream buf;
+  for (int i = stack.size()-1; i >= 0; i--)
+    buf << stack[i]->start_time << " " << stack[i]->hmm_model << " ";
+  buf << m_frame;
+  
+  return buf.str();
+}
+
+void
+TokenPassSearch::get_state_history(
+  std::vector<TPLexPrefixTree::StateHistory*> &stack)
+{
+  TPLexPrefixTree::Token *token = get_best_token();
+
+  // Determine the state sequence
+  stack.clear();
+  TPLexPrefixTree::StateHistory *state = token->state_history;
+  while (state != NULL && state->prev != NULL)
   {
-    printf("%i %i %i\n", state_start_time[i+1]*128,
-           state_start_time[i]*128, state_num[i]);
+    stack.push_back(state);
+    state = state->prev;
   }
 }
 
@@ -594,6 +624,7 @@ TokenPassSearch::add_sentence_end_to_hypotheses(void)
         token->prev_word =  new TPLexPrefixTree::WordHistory(
           m_sentence_end_id, m_sentence_end_lm_id, token->prev_word);
         TPLexPrefixTree::WordHistory::unlink(token->prev_word->prev_word);
+        token->prev_word->word_start_frame = m_frame;
         token->prev_word->link();
         token->word_hist_code = compute_word_hist_hash_code(token->prev_word);
         token->lm_log_prob+=get_lm_score(token->prev_word,
@@ -670,6 +701,8 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
       temp_prev_word = token->prev_word;
       token->prev_word = new TPLexPrefixTree::WordHistory(
         m_word_boundary_id, m_word_boundary_lm_id, token->prev_word);
+      token->word_start_frame = m_frame;
+      token->prev_word->word_start_frame = m_frame;
       token->word_hist_code = compute_word_hist_hash_code(token->prev_word);
       token->prev_word->link();
       lm_score = get_lm_score(token->prev_word, token->word_hist_code);
@@ -729,6 +762,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       if (node->word_id != -1) // Is word ID unique?
       {
         // Add LM probability
+        assert(word_start_frame >= 0);
         new_prev_word = new TPLexPrefixTree::WordHistory(
           node->word_id, m_lex2lm[node->word_id], token->prev_word);
         new_prev_word->word_start_frame = word_start_frame;
@@ -774,7 +808,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     else
       new_cur_lm_log_prob = new_real_lm_log_prob;
 
-    if (m_print_state_segmentation && node->state != NULL)
+    if (m_keep_state_segmentation && node->state != NULL)
     {
       new_state_history = new TPLexPrefixTree::StateHistory(
         node->state->model, m_frame, token->state_history);
@@ -1758,7 +1792,39 @@ TokenPassSearch::save_token_statistics(int count)
   delete buf;
 }
 
+void 
+TokenPassSearch::debug_ensure_all_paths_contain_history(
+  TPLexPrefixTree::WordHistory *limit)
+{
+  fprintf(stderr, "DEBUG: ensure_all_paths_contain_history\n");
+  for (int t = 0; t < m_active_token_list->size(); t++) {
+    TPLexPrefixTree::Token *token = (*m_active_token_list)[t];
+    if (token == NULL)
+      continue;
+    TPLexPrefixTree::WordHistory *hist = token->prev_word;
+    while (hist != NULL) {
+      if (hist == limit)
+        break;
+      hist = hist->prev_word;
+    }
 
+    if (hist == NULL) {
+      fprintf(stderr, "ERROR: path does not contain history %p\n", limit);
+      fprintf(stderr, "token = %p\n", token);
+      fprintf(stderr, "node = %d\n", token->node->node_id);
+      fprintf(stderr, "history:");
+      hist = token->prev_word;
+      while (hist->word_id >= 0) {
+        fprintf(stderr, " %d %s 0x%p (ref %d)", hist->word_start_frame,
+                m_vocabulary.word(hist->word_id).c_str(), hist,
+                hist->get_num_references());
+        hist = hist->prev_word;
+      }
+      fprintf(stderr, "\n");
+      exit(1);
+    }
+  }
+}
 
 /*void
 TokenPassSearch::print_token_path(TPLexPrefixTree::PathHistory *hist)

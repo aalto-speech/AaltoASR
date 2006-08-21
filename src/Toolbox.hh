@@ -122,6 +122,7 @@ public:
   void set_verbose(int verbose) { m_search.set_verbose(verbose); m_tp_lexicon.set_verbose(verbose); m_tp_search.set_verbose(verbose);}
   void set_print_text_result(int print) { m_tp_search.set_print_text_result(print); }
   void set_print_state_segmentation(int print) { m_tp_search.set_print_state_segmentation(print); }
+  void set_keep_state_segmentation(int value) { m_tp_search.set_keep_state_segmentation(value); }
   void set_print_probs(bool print_probs) 
   { m_search.set_print_probs(print_probs); }
   void set_multiple_endings(int multiple_endings) 

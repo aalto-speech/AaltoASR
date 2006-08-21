@@ -115,6 +115,8 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
         std::vector<Arc> new_arcs;
         wid_node->node_id = node_list.size();
         wid_node->flags = NODE_USE_WORD_END_BEAM;
+        if (i == 0)
+          wid_node->flags |= NODE_FIRST_STATE_OF_WORD;
         node_list.push_back(wid_node);
         temp_arc.next = wid_node;
         for (j = 0; j < source_nodes.size(); j++)

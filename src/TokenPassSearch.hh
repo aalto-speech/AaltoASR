@@ -23,9 +23,12 @@ public:
   bool run(void);
 
   // Print the best path
+  TPLexPrefixTree::Token *get_best_token();
   void print_guaranteed_path(void);
   void print_best_path(bool only_not_printed, FILE *out=stdout);
-  void print_state_history(void);
+  void print_state_history(FILE *file = stdout);
+  std::string state_history_string();
+  void get_state_history(std::vector<TPLexPrefixTree::StateHistory*> &stack);
   void get_path(HistoryVector &vec, bool use_best_token, 
                 TPLexPrefixTree::WordHistory *limit);
 
@@ -47,7 +50,15 @@ public:
   void set_transition_scale(float trans_scale) { m_transition_scale = trans_scale; }
   void set_max_num_tokens(int tokens) { m_max_num_tokens = tokens; }
   void set_print_text_result(int print) { m_print_text_result = print; }
-  void set_print_state_segmentation(int print) { m_print_state_segmentation = print; }
+  void set_print_state_segmentation(int print) 
+  { 
+    m_print_state_segmentation = print; 
+    m_keep_state_segmentation = print;
+  }
+  void set_keep_state_segmentation(int value)
+  {
+    m_keep_state_segmentation = value;
+  }
   void set_print_frames(int print) { m_print_frames = print; }
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_word_boundary(const std::string &word);
@@ -63,6 +74,8 @@ public:
   void set_lookahead_ngram(TreeGram *ngram);
 
   int frame(void) { return m_frame; }
+
+  void debug_ensure_all_paths_contain_history(TPLexPrefixTree::WordHistory *limit);
 
 private:
   void add_sentence_end_to_hypotheses(void);
@@ -103,7 +116,7 @@ private:
 
   void save_token_statistics(int count);
   //void print_token_path(TPLexPrefixTree::PathHistory *hist);
-  
+
 private:
   TPLexPrefixTree &m_lexicon;
   TPLexPrefixTree::Node *m_root, *m_start_node;
@@ -149,7 +162,8 @@ private:
 
   // Options
   int m_print_text_result;
-  int m_print_state_segmentation;
+  bool m_print_state_segmentation;
+  bool m_keep_state_segmentation;
   bool m_print_frames;
   float m_global_beam;
   float m_word_end_beam;
