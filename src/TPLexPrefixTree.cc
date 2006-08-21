@@ -876,7 +876,7 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
       // Create a null node
       wid_node = new Node(word_id);
       wid_node->node_id = node_list.size();
-      wid_node->flags = NODE_USE_WORD_END_BEAM;
+      wid_node->flags = NODE_USE_WORD_END_BEAM | NODE_FIRST_STATE_OF_WORD;
       node_list.push_back(wid_node);
       temp_arc.next = wid_node;
       nlist = (*it).second;
