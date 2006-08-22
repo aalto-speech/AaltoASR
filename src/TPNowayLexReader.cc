@@ -13,7 +13,8 @@ TPNowayLexReader::TPNowayLexReader(
   : m_hmm_map(hmm_map),
     m_hmms(hmms),
     m_lexicon(lex_tree),
-    m_vocabulary(vocab)
+    m_vocabulary(vocab),
+    m_silence_is_word(true)
 {
 }
 
@@ -132,7 +133,7 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
     // Add word to lexicon
 
     // FIXME! Deal with duplicate word ends? Pronunciation probabilities?
-    if (m_word != "_")
+    if (m_word != "_" && (m_word[0] != '_' || m_silence_is_word))
     {
       word_id = m_vocabulary.add_word(m_word);
       if (m_word == word_boundary)

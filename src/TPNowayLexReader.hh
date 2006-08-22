@@ -29,6 +29,8 @@ public:
   void skip_while(FILE *file, const char *chars);
   void get_until(FILE *file, std::string &str, char *delims);
 
+  void set_silence_is_word(bool b) { m_silence_is_word = b; }
+
   // Current state for error diagnosis
   inline const std::string &word() const { return m_word; }
   inline const std::string &phone() const { return m_phone; }
@@ -59,6 +61,8 @@ protected:
 
   // Temporary variables
   std::string m_phone;
+
+  bool m_silence_is_word;
 };
 
 #endif /* TPNOWAYLEXREADER_HH */
