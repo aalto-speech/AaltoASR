@@ -572,8 +572,7 @@ TokenPassSearch::print_state_history(FILE *file)
     fprintf(file, "%i %i %i\n", stack[i]->start_time, end_time, 
             stack[i]->hmm_model);
   }
-
-  fprintf(file, "DEBUG: %s\n", state_history_string().c_str());
+  //fprintf(file, "DEBUG: %s\n", state_history_string().c_str());
 }
 
 std::string 
@@ -701,7 +700,7 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
       temp_prev_word = token->prev_word;
       token->prev_word = new TPLexPrefixTree::WordHistory(
         m_word_boundary_id, m_word_boundary_lm_id, token->prev_word);
-      token->word_start_frame = m_frame;
+      token->word_start_frame = -1; // FIXME? If m_frame, causes an assert
       token->prev_word->word_start_frame = m_frame;
       token->word_hist_code = compute_word_hist_hash_code(token->prev_word);
       token->prev_word->link();
@@ -752,7 +751,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
   {
     // Moving to another node
 
-    if (node->flags & NODE_FIRST_STATE_OF_WORD) {
+    if (node->flags & NODE_FIRST_STATE_OF_WORD) {        
       assert(word_start_frame < 0);
       word_start_frame = m_frame;
     }
