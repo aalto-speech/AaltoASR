@@ -257,7 +257,6 @@ compute_features_segfea(const std::string &in_fname,
 
     // PHN labels may include several models, iterate them through
     label_token = strtok(token,",");
-    fprintf(stderr,"#%s\n", label_token);
     while (label_token != NULL)
     {
       if (state_segmentation) {
