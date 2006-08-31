@@ -71,9 +71,7 @@ int
 main(int argc, char *argv[])
 {
   double sum_data_likelihood = 0.0, prec_buff = 0.0;
-  io::Stream phn_out_file;
   HmmTrainer trainer(fea_gen);
-  bool print_segment;
 
   try {
     config("usage: train [OPTION...]\n")
@@ -84,20 +82,14 @@ main(int argc, char *argv[])
       ('p', "ph=FILE", "arg", "", "HMM definitions")
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
+      ('O', "ophn", "", "", "use output phns for training")
       ('o', "out=BASENAME", "arg", "", "base filename for output models")
       ('R', "raw-input", "", "", "raw audio input")
-      ('\0', "swins=INT", "arg", "1000", "window size (default: 1000)")
-      ('\0', "beam=FLOAT", "arg", "100.0", "log prob beam (default 100.0")
-      ('\0', "sbeam=INT", "arg", "100", "state beam (default 100)")
-      ('\0', "overlap=FLOAT", "arg", "0.4", "Viterbi window overlap (default 0.4)")
       ('\0', "cov", "", "", "update covariance")
       ('\0', "minvar=FLOAT", "arg", "0.1", "minimum variance value (default 0.1)")
       ('\0', "mllt=MODULE", "arg", "", "run MLLT estimation for a given module")
       ('\0', "hlda=MODULE", "arg", "", "run HLDA estimation for a given module")
       ('\0', "durstat", "", "", "don't train, just collect duration statistics")
-      ('\0', "no-force-end", "", "", "do not force to the last state")
-      ('\0', "segment", "", "", "print segmentation")
-      ('\0', "stateseg", "", "", "print all states to segmentation file")
       ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihood etc.)")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('\0', "sphn", "", "", "phns with speaker ID's in use")
@@ -132,18 +124,11 @@ main(int argc, char *argv[])
     // Read recipe file
     recipe.read(io::Stream(config["recipe"].get_str()));
 
-    win_size = config["swins"].get_int();
-    Viterbi viterbi(model, fea_gen, &phn_reader);
-    viterbi.set_prob_beam(config["beam"].get_float());
-    viterbi.set_state_beam(config["sbeam"].get_int());
-    viterbi.resize(win_size, win_size, config["sbeam"].get_int() / 4);
-    viterbi.set_print_all_states(config["stateseg"].specified);
-
     durstat = config["durstat"].specified;
     if (durstat)
     {
       fprintf(stderr, "WARNING: You have defined -durstat option, "
-              "no training will be performed\n");
+              "no HMM training will be performed\n");
     }
     trainer.set_duration_statistics(durstat);
     trainer.set_info(info);
@@ -171,15 +156,9 @@ main(int argc, char *argv[])
       trainer.set_transform_module(hlda_module);
     }
     
-    trainer.set_win_size(win_size);
-    trainer.set_overlap(1-config["overlap"].get_float());
     trainer.set_cov_update(config["cov"].specified);
-    trainer.set_no_force_end(config["no-force-end"].specified);
-    print_segment = config["segment"].specified;
-    trainer.set_print_segment(print_segment);
     trainer.set_min_var(config["minvar"].get_float());
 
-    trainer.set_print_speakered(config["sphn"].specified);
     phn_reader.set_speaker_phns(config["sphn"].specified);
 
     // Check the dimension
@@ -209,22 +188,15 @@ main(int argc, char *argv[])
     
       // Open the audio and phn files from the given list.
       open_files(recipe.infos[f].audio_path, 
-                 recipe.infos[f].phn_path,
+                 (config["ophn"].specified?recipe.infos[f].phn_out_path:
+                  recipe.infos[f].phn_path),
                  recipe.infos[f].start_line,
                  recipe.infos[f].end_line);
-      if (print_segment)
-      {
-        phn_out_file.open(recipe.infos[f].phn_out_path.c_str(), "w");
-      }
     
-      trainer.viterbi_train(start_frame, end_frame, model,
-                            viterbi,
-                            (print_segment?phn_out_file.file:NULL),
-                            recipe.infos[f].speaker_id,
-                            recipe.infos[f].utterance_id);
+      trainer.train(phn_reader, start_frame, end_frame, model,
+                    recipe.infos[f].speaker_id,
+                    recipe.infos[f].utterance_id);
 
-      if (print_segment)
-        phn_out_file.close();
       fea_gen.close();
       phn_reader.close();
 

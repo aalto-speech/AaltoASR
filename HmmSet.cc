@@ -8,7 +8,7 @@
 #include "util.hh"
 #include "mtl/lu.h"
 
-#define MIN_STATE_PROB 1e-20
+#define MIN_STATE_PROB 1e-30
 #define MIN_KERNEL_POS_PROB 1e-30
 
 void
@@ -79,6 +79,9 @@ HmmSet::HmmSet(const HmmSet &hmm_set)
   m_valid_kernel_likelihoods = hmm_set.m_valid_kernel_likelihoods;
   m_viterbi_scale_coeff = hmm_set.m_viterbi_scale_coeff;
 
+  m_kernel_temp_s.resize(m_dim);
+  m_kernel_temp_t.resize(m_dim);
+
   m_kernels.resize(hmm_set.m_kernels.size());
   for (unsigned int i=0; i<m_kernels.size(); i++) {
     m_kernels[i].center = hmm_set.m_kernels[i].center;
@@ -123,6 +126,8 @@ void
 HmmSet::set_dim(int dim)
 {
   m_dim = dim;
+  m_kernel_temp_s.resize(m_dim);
+  m_kernel_temp_t.resize(m_dim);
 }
 
 void
@@ -239,8 +244,9 @@ HmmSet::read_gk(const std::string &filename)
   
   int kernels = 0;
   std::string cov_str;
+  int dim;
 
-  in >> kernels >> m_dim >> cov_str;
+  in >> kernels >> dim >> cov_str;
   if (cov_str == "single_cov")
     m_cov_type = HmmCovariance::SINGLE;
   else if (cov_str == "diagonal_cov")
@@ -259,9 +265,10 @@ HmmSet::read_gk(const std::string &filename)
     scgmm.read_gk(filename);
     return;
   }
-
- else
+  else
     throw std::string("Unknown covariance type");
+
+  set_dim(dim);
 
   assert(m_cov_type != HmmCovariance::INVALID);
 
@@ -552,31 +559,31 @@ HmmSet::compute_covariance_determinants(void)
       det = 1;
       for (d = 0; d < m_dim; d++)
         det *= kernel.cov.diag(d);
-      kernel.cov.cov_det = det;
+      kernel.cov.cov_det = 1/sqrt(det);
+      
     }
-
     else if (kernel.cov.type() == HmmCovariance::FULL)
-      {
-      	Matrix t(m_dim, m_dim);
-	Matrix precision(m_dim, m_dim);
-	Matrix precision_cholesky(m_dim, m_dim);
-	mtl::copy(kernel.cov.full, t);
-	mtl::dense1D<int> pivots(m_dim, 0);
-	mtl::lu_factor(t, pivots);
-	mtl::lu_inverse(t, pivots, precision);
-	cholesky_factor(precision, precision_cholesky);
-	mtl::transpose(precision_cholesky, kernel.cov.precision_cholesky_transpose);
+    {
+      Matrix t(m_dim, m_dim);
+      Matrix precision(m_dim, m_dim);
+      Matrix precision_cholesky(m_dim, m_dim);
+      mtl::copy(kernel.cov.full, t);
+      mtl::dense1D<int> pivots(m_dim, 0);
+      mtl::lu_factor(t, pivots);
+      mtl::lu_inverse(t, pivots, precision);
+      cholesky_factor(precision, precision_cholesky);
+      mtl::transpose(precision_cholesky, kernel.cov.precision_cholesky_transpose);
 	
-	det=1;
-	for (d=0; d<m_dim; d++)
-	  // Sqrt of the determinant of the inverse
-	  det *= precision_cholesky(d,d);
-	kernel.cov.cov_det = det;
-	if (det <= 0) {
-	  print_all_matrix(kernel.cov.full);
-	  assert(det>0);
-	}
+      det=1;
+      for (d=0; d<m_dim; d++)
+        // Sqrt of the determinant of the inverse
+        det *= precision_cholesky(d,d);
+      kernel.cov.cov_det = det;
+      if (det <= 0) {
+        print_all_matrix(kernel.cov.full);
+        assert(det>0);
       }
+    }
   }
 }
 
@@ -655,10 +662,10 @@ HmmSet::state_prob(const int s, const FeatureVec &feature)
     }
     temp += state.weights[w].weight * m_kernel_likelihoods[k];
   }
+
   if (temp < MIN_STATE_PROB)
-    m_state_probs[s] = MIN_STATE_PROB;
-  else
-    m_state_probs[s] = temp;
+    temp = MIN_STATE_PROB;
+  m_state_probs[s] = temp;
   m_valid_stateprobs.push_back(s);
   return(m_state_probs[s]);
 }
@@ -669,8 +676,6 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
   float result;
   double dist = 0.0;
   double dif;
-  Vector s(m_dim);
-  Vector t(m_dim);
   double temp;
   
   HmmKernel &kernel = m_kernels[k];
@@ -692,18 +697,19 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
       dif = feature[i] - kernel.center[i];
       dist += dif*dif/(double)kernel.cov.diag(i);
     }
-    result = exp(-0.5 * dist) / sqrt(kernel.cov.cov_det);
+    result = exp(-0.5 * dist) * kernel.cov.cov_det;
     break;
 
   case HmmCovariance::FULL:
     for (int i = 0; i < m_dim; i++)
-      s[i] = feature[i]-kernel.center[i];
+      m_kernel_temp_s[i] = feature[i]-kernel.center[i];
 
     for (int i=0; i<m_dim; i++)
       for (int j=i; j<m_dim; j++)
-	t[i] += kernel.cov.precision_cholesky_transpose(i,j)*s[j];
+	m_kernel_temp_t[i] += kernel.cov.precision_cholesky_transpose(i,j)*
+          m_kernel_temp_s[j];
 
-    temp = mtl::dot(t, t);
+    temp = mtl::dot(m_kernel_temp_t, m_kernel_temp_t);
     result = kernel.cov.cov_det * exp(-0.5 * temp);
     break;  
 

@@ -74,7 +74,7 @@ namespace util {
     return b + log1pf(exp(delta));
   }
 
-  static const float tiny_for_log = (float)1e-16;
+  static const float tiny_for_log = (float)1e-30;
   inline double safe_log(double x)
   {
     if (x < tiny_for_log)

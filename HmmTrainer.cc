@@ -13,55 +13,6 @@
 #define MAX_DURATION_COUNT 100
 
 
-inline double safe_log(double x)
-{
-  if (x < 1e-30)
-  {
-    return -69; // about log(1e-30)
-  }
-  else
-    return log(x);
-}
-
-
-int my_tolower(int c)
-{
-  if (c == 'Å')
-    return 'å';
-  else if (c == 'Ä')
-    return 'ä';
-  else if (c == 'Ö')
-    return 'ö';
-  return tolower(c);
-}
-
-std::string transform_context(const std::string &context, bool ignore_context_length)
-{
-  if (context[0] == '_')
-    return "_";
-  if (ignore_context_length)
-    return context;
-  std::string temp = context;
-  std::transform(temp.begin(), temp.end(), temp.begin(), my_tolower);
-  return temp;
-}
-
-std::string extract_left_context(const std::string &tri)
-{
-  return tri.substr(0, tri.rfind('-'));
-}
-
-std::string extract_right_context(const std::string &tri)
-{
-  return tri.substr(tri.find('+')+1);
-}
-
-std::string extract_center_pho(const std::string &tri)
-{
-  std::string temp = tri.substr(tri.rfind('-')+1);
-  return temp.substr(0, temp.find('+'));
-}
-
 HmmTrainer::HmmTrainer(FeatureGenerator &fea_gen)
   : m_fea_gen(fea_gen),
     m_info(0),
@@ -71,22 +22,10 @@ HmmTrainer::HmmTrainer(FeatureGenerator &fea_gen)
     m_hlda(false),
     m_set_speakers(false),
     m_min_var(0.1),
-    m_win_size(1000),
-    m_overlap(0.6),
     m_cov_update(false),
     m_durstat(false),
-    m_triphone_tying(false),
-    m_no_force_end(false),
-    m_print_segment(false),
     m_log_likelihood(0),
-    m_fill_missing_contexts(false),
-    m_tying_min_count(0),
-    m_tying_min_lhg(0),
-    m_tying_length_award(0),
-    m_skip_short_silence_context(false),
-    m_triphone_phn(false),
     m_num_dur_models(0),
-    m_print_speakered(false),
     cov_m(NULL),
     m_transform_matrix(NULL),
     m_speaker_config(fea_gen)
@@ -191,6 +130,18 @@ void HmmTrainer::init(HmmSet &model, std::string adafile)
       else
         cov_m[i] = new Matrix(m_fea_gen.dim(), m_fea_gen.dim());
     }
+
+    if (!m_hlda)
+    {
+      int dim = m_fea_gen.dim();
+      // For normal covariance, use tight triangular representation
+      tri_cov_m = new std::vector<float>*[model.num_kernels()];
+      for (i = 0; i < model.num_kernels(); i++)
+      {
+        tri_cov_m[i] = new std::vector<float>;
+        tri_cov_m[i]->resize(dim*(dim+1)/2);
+      }
+    }
   }
       
   // Allocate HLDA buffers
@@ -216,39 +167,16 @@ void HmmTrainer::init(HmmSet &model, std::string adafile)
 }
 
 
-void HmmTrainer::viterbi_train(int start_frame, int end_frame,
-                               HmmSet &model,
-                               Viterbi &viterbi,
-                               FILE *phn_out, std::string speaker,
-                               std::string utterance)
+void HmmTrainer::train(PhnReader &phn_reader,
+                       int start_frame, int end_frame,
+                       HmmSet &model,
+                       std::string speaker, std::string utterance)
 {
-  // Compute window borders
-  int window_start_frame = start_frame;
-  int window_end_frame = 0;
-  int target_frame;
- 
-  viterbi.reset();
-  viterbi.set_feature_frame(window_start_frame);
-  viterbi.set_force_end(!m_no_force_end);
-
-  if (m_triphone_tying)
-  {
-    // Initialize triphone tying
-    triphone_set.set_dimension(m_fea_gen.dim());
-    triphone_set.set_info(m_info);
-    if (m_tying_min_count > 0)
-      triphone_set.set_min_count(m_tying_min_count);
-    if (m_tying_min_lhg > 0)
-      triphone_set.set_min_likelihood_gain(m_tying_min_lhg);
-    triphone_set.set_length_award(m_tying_length_award);
-    triphone_set.set_ignore_length(m_ignore_tying_length);
-    triphone_set.set_ignore_context_length(m_ignore_tying_context_length);
-
-    cur_tri_stat_hmm_index = -1;
-    cur_tri_stat_state = -1;
-    cur_tri_stat_right = "_";
-    cur_tri_stat_center = "_";
-  }
+  Hmm hmm;
+  PhnReader::Phn cur_phn, next_phn;
+  int state_index;
+  int phn_start_frame, phn_end_frame;
+  bool cur_not_eof, next_not_eof;
 
   if (m_set_speakers && speaker.size() > 0)
   {
@@ -257,158 +185,96 @@ void HmmTrainer::viterbi_train(int start_frame, int end_frame,
       m_speaker_config.set_utterance(utterance);
   }
 
-  bool last_window = false;
-  int print_start = -1;
-  std::string print_label;
-  std::string print_speaker;
-  std::string print_comment;
+  cur_not_eof = phn_reader.next(cur_phn);
 
   m_log_likelihood = 0;
-
-  // Process the file window by window
-  while (1)
+  
+  while (cur_not_eof)
   {
-    // Compute window borders
-    window_end_frame = window_start_frame + m_win_size;
-    if (end_frame > 0) {
-      if (window_start_frame >= end_frame)
+    if (cur_phn.state < 0)
+      throw std::string("Training requires state segmented phn files!");
+
+    next_not_eof = phn_reader.next(next_phn);
+
+    phn_start_frame=(int)((double)cur_phn.start/16000.0*m_fea_gen.frame_rate()
+                          +0.5);
+    phn_end_frame=(int)((double)cur_phn.end/16000.0*m_fea_gen.frame_rate()
+                        +0.5);
+    if (phn_start_frame < start_frame)
+    {
+      assert( phn_end_frame > start_frame );
+      phn_start_frame = start_frame;
+    }
+    if (end_frame != 0 && phn_end_frame > end_frame)
+    {
+      assert( phn_start_frame < end_frame );
+      phn_end_frame = end_frame;
+    }
+
+    if (m_set_speakers && cur_phn.speaker.size() > 0 &&
+        cur_phn.speaker != m_speaker_config.get_cur_speaker())
+    {
+      m_speaker_config.set_speaker(speaker);
+      if (utterance.size() > 0)
+        m_speaker_config.set_utterance(utterance);
+    }
+
+    hmm = model.hmm(model.hmm_index(cur_phn.label[0]));
+    state_index = hmm.state(cur_phn.state);
+
+    // Find transitions
+    std::vector<int> &trans = hmm.transitions(cur_phn.state);
+    int self_transition = -1;
+    int out_transition = -1;
+    for (int i = 0; i < (int)trans.size(); i++)
+    {
+      if (model.transition(trans[i]).target == cur_phn.state)
+      {
+        self_transition = trans[i];
         break;
-      if (window_end_frame >= end_frame) {
-        window_end_frame = end_frame;
-        last_window = true;
       }
     }
-    
-    // Fill lattice
-    int old_current_frame = viterbi.current_frame();
-    viterbi.set_last_window(last_window);
-    viterbi.set_last_frame(window_end_frame - window_start_frame);
-    viterbi.fill();
-    if (m_fea_gen.eof())
+    assert( self_transition >= 0 );
+    if (next_not_eof)
     {
-      // Viterbi encountered eof and stopped
-      last_window = true;
-      window_end_frame = window_start_frame + viterbi.last_frame();
-    }
-
-    assert( viterbi.feature_frame() == window_end_frame );
-
-    // Print debug info
-    if (m_info > 0 && old_current_frame < viterbi.current_frame()) {
-      int start_frame = old_current_frame;
-      int end_frame = viterbi.current_frame();
-      int start_pos = viterbi.best_position(start_frame);
-      int end_pos = viterbi.best_position(end_frame-1);
-      float average_log_prob = 
-        ((viterbi.at(end_frame-1, end_pos).log_prob - 
-          viterbi.at(start_frame, start_pos).log_prob) 
-         / (end_frame - start_frame));
-
-      fprintf(stderr, "filled frames %d-%d (%f)\n",
-              start_frame + window_start_frame,
-              end_frame + window_start_frame,
-              average_log_prob);
-    }
-
-    // The beginning part of the lattice is used for teaching.
-    // Compute the frame dividing the lattice in two parts.  NOTE:
-    // if the end of speech is in the window, we use the whole
-    // window and do not continue further.
-    target_frame = (int)(m_win_size * m_overlap);
-    if (last_window)
-      target_frame = window_end_frame - window_start_frame;
-    if (window_start_frame + target_frame > window_end_frame)
-      target_frame = window_end_frame - window_start_frame;
-
-    // Print progress info
-    if (m_info > 1) {
-      fprintf(stderr, "teaching frames %d-%d\n",
-              window_start_frame, window_start_frame + target_frame);
+      int target = -2;
+      if (next_phn.label[0] == cur_phn.label[0] &&
+          next_phn.state > cur_phn.state) // NOTE: Left to right HMMs
+        target = next_phn.state;
+      for (int i = 0; i < (int)trans.size(); i++)
+      {
+        if (model.transition(trans[i]).target == target)
+        {
+          out_transition = trans[i];
+          break;
+        }
+      }
     }
 
     // Update parameters 
     if (m_durstat)
     {
       // Just collect the duration statistics
-      update_duration_statistics(model, viterbi, target_frame);
-    }
-    else if (m_triphone_tying)
-    {
-      update_triphone_stat(viterbi, window_start_frame, 
-                           window_start_frame + target_frame,
-                           model);
+      update_duration_statistics(state_index,
+                                 phn_end_frame - phn_start_frame - 1);
     }
     else if (m_hlda)
-      update_hlda_tmp_parameters(model, model_tmp, gk_norm,
-                                 viterbi, window_start_frame, 
-                                 window_start_frame + target_frame);
+    {
+      if (!update_hlda_tmp_parameters(model, model_tmp, state_index, gk_norm,
+                                      self_transition, out_transition,
+                                      phn_start_frame, phn_end_frame))
+        break;
+    }
     else
     {
-      int untreated_frames = 
-
-	update_tmp_parameters(model, model_tmp,
-			      gk_norm, viterbi, window_start_frame, 
-			      window_start_frame + target_frame);
-      target_frame = target_frame - untreated_frames;
-
-    }
-    // Print best path
-    if (m_print_segment) {
-      int f = 0;
-      for (f = 0; f < target_frame; f++) {
-
-        int pos = viterbi.best_position(f);
-        const Viterbi::TranscriptionState &state = 
-          viterbi.transcription(pos);
-
-        if (!state.printed) {
-          // Print pending line
-          print_line(phn_out, m_fea_gen.frame_rate(), print_start,
-                     f + window_start_frame, print_label, print_speaker,
-                     print_comment);
-
-          // Prepare the next print
-          print_start = f + window_start_frame;
-          print_label = state.label;
-          print_comment = state.comment;
-
-	  // Speaker ID
-          print_speaker = m_speaker_config.get_cur_speaker();
-          state.printed = true;
-        }
-      }
+      if (!update_tmp_parameters(model, model_tmp, state_index, gk_norm,
+                                 self_transition, out_transition,
+                                 phn_start_frame, phn_end_frame))
+        break;
     }
 
-    // Check if we have done the job; if not, move to next window
-
-    window_start_frame += target_frame;
-      
-    if (last_window && window_start_frame >= end_frame)
-      break;
-
-    int position = viterbi.best_position(target_frame);
-
-    // We used to leave some magic space under the best path, but we
-    // noticed that we do not need it because the path must match with
-    // the start of the old path.  This is problem if we have long
-    // silence which is longer than the window.  In the previous
-    // window, the silence ends up in the last state, and in the next
-    // window the best path gets back to first state if we have space
-    // below the window.
-
-    //      position -= (int)(viterbi.last_position() * 0.10);
-    //      if (position < 0)
-    //        position = 0;
-
-    viterbi.move(target_frame, position);
-  } // Process the next window
-
-  if (m_print_segment) {
-    // FIXME: The end point window_start_frame+1 assumes 50% frame overlap
-
-    print_line(phn_out, m_fea_gen.frame_rate(), print_start,
-               window_start_frame + 1, print_label, print_speaker,
-               print_comment);
+    cur_phn = next_phn;
+    cur_not_eof = next_not_eof;
   }
 }
 
@@ -420,140 +286,36 @@ void HmmTrainer::finish_train(HmmSet &model)
   {
     write_duration_statistics(model);
   }
-  else if (m_triphone_tying)
-  {
-    triphone_set.finish_triphone_statistics();
-    if (m_fill_missing_contexts)
-      triphone_set.fill_missing_contexts(false);
-    triphone_set.tie_triphones();
-  }
-  else if (m_mllt)
-    update_mllt_parameters(model, model_tmp, gk_norm,
-                           *m_transform_matrix);
-  else if (m_hlda)
-    update_hlda_parameters(model, model_tmp, gk_norm,
-                           *m_transform_matrix);
   else
-    update_parameters(model, model_tmp, gk_norm);
-
-  if (!m_durstat && !m_triphone_tying)
   {
+    if (m_cov_update && !m_hlda)
+    {
+      // Expand triangular accumulators to symmetric covariances
+      int k, i, r, c;
+      for (k = 0; k < model.num_kernels(); k++)
+      {
+        for (r = i = 0; r < model.dim(); r++)
+        {
+          (*cov_m[k])[r][r] = (*tri_cov_m[k])[i++];
+          for (c = r+1; c < model.dim(); c++)
+          {
+            (*cov_m[k])[r][c] = (*tri_cov_m[k])[i];
+            (*cov_m[k])[c][r] = (*tri_cov_m[k])[i++];
+          }
+        }
+      }
+    }
+    if (m_mllt)
+      update_mllt_parameters(model, model_tmp, gk_norm,
+                             *m_transform_matrix);
+    else if (m_hlda)
+      update_hlda_parameters(model, model_tmp, gk_norm,
+                             *m_transform_matrix);
+    else
+      update_parameters(model, model_tmp, gk_norm);
+
     // Replace the old models with new ones
     model = model_tmp;
-  }
-}
-
-
-void
-HmmTrainer::print_line(FILE *f, float fr, 
-		       int start, int end, 
-                       const std::string &label,
-		       const std::string &speaker,
-		       const std::string &comment)
-{
-  int frame_mult = (int)(16000/fr); // NOTE: phn files assume 16kHz sample rate
-    
-  if (start < 0)
-    return;
-
-  if (!m_print_speakered)
-  {
-    // normal phns
-    fprintf(f, "%d %d %s %s\n", start * frame_mult, end * frame_mult, 
-            label.c_str(), comment.c_str());
-  }
-  else
-  {
-    // speakered phns: speaker ID printed between label & comments
-    fprintf(f, "%d %d %s %s %s\n", start * frame_mult, end * frame_mult,
-            label.c_str(), speaker.c_str(), comment.c_str());
-  }
-}
-
-
-void
-HmmTrainer::update_triphone_stat(Viterbi &viterbi,
-                                 int start_frame, 
-                                 int end_frame, HmmSet &model)
-{
-  int frames = end_frame - start_frame;
-  bool out = false;
-
-  for (int f = 0; f < frames; f++)
-  {
-    const Viterbi::TranscriptionState &tr_state =
-      viterbi.transcription(viterbi.best_position(f));
-
-    if (!m_triphone_phn)
-    {
-      if (tr_state.state != cur_tri_stat_state)
-      {
-        if (tr_state.hmm_state_index == 0 ||
-            cur_tri_stat_hmm_index != tr_state.hmm_index)
-        {
-          if (!m_skip_short_silence_context ||
-              cur_tri_stat_center != "_")
-            cur_tri_stat_left = cur_tri_stat_center;
-          if (!m_skip_short_silence_context ||
-              tr_state.label != "_")
-            cur_tri_stat_center = cur_tri_stat_right;
-          else
-            cur_tri_stat_center = tr_state.label; // Short silence
-        
-          if (cur_tri_stat_state == -1)
-            cur_tri_stat_center = tr_state.label;
-
-          if (out)
-            exit(2);
-          if (cur_tri_stat_center != tr_state.label)
-          {
-            printf("HmmTrainer::update_triphone_state: Error:\n");
-            printf("cur_tri_stat_center = %s\n", cur_tri_stat_center.c_str());
-            printf("tr_state.label = %s\n", tr_state.label.c_str());
-            printf("cur_tri_stat_state = %i\n", cur_tri_stat_state);
-            printf("tr_state.state = %i\n", tr_state.state);
-            printf("At frame %d\n", start_frame + f);
-            out = true;
-          }
-          if (!m_skip_short_silence_context || tr_state.label != "_")
-            cur_tri_stat_right = tr_state.next_label;
-          cur_tri_stat_hmm_index = tr_state.hmm_index;
-        }
-        cur_tri_stat_state_index = tr_state.hmm_state_index;
-        cur_tri_stat_state = tr_state.state;
-      }
-
-      if (cur_tri_stat_center[0] != '_')
-      {
-        std::string left=transform_context(cur_tri_stat_left,
-                                           m_ignore_tying_context_length);
-        std::string right=transform_context(cur_tri_stat_right,
-                                            m_ignore_tying_context_length);
-
-        triphone_set.add_feature(m_fea_gen.generate(start_frame+f),left,
-                                 cur_tri_stat_center, right,
-                                 cur_tri_stat_state_index);
-      }
-    }
-    else
-    {
-      if (tr_state.state != cur_tri_stat_state &&
-          tr_state.hmm_state_index == 0)
-      {
-        cur_tri_stat_left=extract_left_context(tr_state.label);
-        cur_tri_stat_right=extract_right_context(tr_state.label);
-        cur_tri_stat_center=extract_center_pho(tr_state.label);
-        cur_tri_stat_state = tr_state.state;
-      }
-
-      if (cur_tri_stat_center[0] != '_')
-      {
-        triphone_set.add_feature(m_fea_gen.generate(start_frame+f),
-                                 cur_tri_stat_left, cur_tri_stat_center,
-                                 cur_tri_stat_right,
-                                 tr_state.hmm_state_index);
-      }
-    }
   }
 }
 
@@ -706,7 +468,7 @@ void
 HmmTrainer::update_transition_probabilities(HmmSet &model, HmmSet &model_tmp)
 {
   float sum;
-  
+
   /* transition probabilities */
   for (int h = 0; h < (int)model.num_hmms(); h++) {
     for (int s = 0; s < (int)model.hmm(h).num_states(); s++) {
@@ -736,60 +498,57 @@ HmmTrainer::update_transition_probabilities(HmmSet &model, HmmSet &model_tmp)
   }
 }
 
-int
+bool
 HmmTrainer::update_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
-                                  std::vector<float> &gk_norm,
-                                  Viterbi &viterbi,
-                                  int start_frame, 
-                                  int end_frame)
+                                  int state_index, std::vector<float> &gk_norm,
+                                  int self_transition, int out_transition,
+                                  int start_frame, int end_frame)
 {
   int dim = m_fea_gen.dim();
   int frames = end_frame - start_frame;
+  HmmState &state = model.state(state_index);
+  HmmState &state_accu = model_tmp.state(state_index);
 
+  
   for (int f = 0; f < frames; f++) {
     FeatureVec feature = m_fea_gen.generate(start_frame + f);
-    HmmState &state = model.state(viterbi.best_state(f));
-    HmmState &state_accu= model_tmp.state(viterbi.best_state(f));
+    if (m_fea_gen.eof())
+      return false;
 
     update_state_kernels(model, model_tmp, state, state_accu,
-                         feature, dim, true, gk_norm);
-
-    /* Update transition counts.  Note, that the last state does not
-       have transition (marked with -1) */
-    int transition = viterbi.best_transition(f);
-    if (transition >= 0)
-    {
-      model_tmp.transition(transition).prob++;
-    }
-
-    if (m_set_speakers && viterbi.current_speaker(f).size() > 0 &&
-        viterbi.current_speaker(f) != m_speaker_config.get_cur_speaker())
-    {
-      std::string utterance = m_speaker_config.get_cur_utterance();
-      m_speaker_config.set_speaker(viterbi.current_speaker(f));
-      m_speaker_config.set_utterance(utterance); // Preserve utterance ID
-      
-      // if speaker change occurred while processing a window,
-      // the number of frames left untreated is returned
-      if (f != 0)
-        return frames - f;
-    }
+                         feature, dim, gk_norm);
   }
 
-  return 0;
-
+  /* Update transition counts.  Note, that the last state does not
+     have transition (marked with -1) */
+  if (self_transition != -1)
+  {
+    int num_frames = std::max(end_frame - start_frame - 1, 0);
+    model_tmp.transition(self_transition).prob += num_frames;
+    m_log_likelihood += num_frames*
+      util::safe_log(model.transition(self_transition).prob);
+  }
+  if (out_transition != -1)
+  {
+    model_tmp.transition(out_transition).prob++;
+    m_log_likelihood += util::safe_log(model.transition(out_transition).prob);
+  }
+  
+  return true;
 }
 
 void
 HmmTrainer::update_state_kernels(HmmSet &model, HmmSet &model_tmp,
                                  HmmState &state, HmmState &state_accu,
                                  const FeatureVec &feature, int dim,
-                                 bool update_ll, std::vector<float> &gk_norm)
+                                 std::vector<float> &gk_norm)
                                  
 {
   double gamma_norm;
   int i;
   ExtVectorConst fea_vec(&feature[0], dim);
+  Vector temp_fea_vec(dim);
+  int r,c;
   
   gam.reserve(state.weights.size());
   gamma_norm = 0;
@@ -802,7 +561,8 @@ HmmTrainer::update_state_kernels(HmmSet &model, HmmSet &model_tmp,
     gamma_norm += gam[state_k];
   }
 
-  if (update_ll) m_log_likelihood += safe_log(gamma_norm) + safe_log(mllt_determinant);
+  m_log_likelihood += util::safe_log(gamma_norm) +
+    util::safe_log(mllt_determinant);
 
   if (gamma_norm == 0)
   {
@@ -816,6 +576,18 @@ HmmTrainer::update_state_kernels(HmmSet &model, HmmSet &model_tmp,
   }
 
   // Normalize the probabilities and add to the accumulators
+
+  // Precompute the outer product of the feature vector to a tight
+  // triangular matrix
+  std::vector<float> outer_prod;
+  outer_prod.resize((dim+1)*dim/2);
+  for (r = i = 0; r < dim; r++)
+  {
+    outer_prod[i++] = feature[r]*feature[r];
+    for (c = r+1; c < dim; c++)
+      outer_prod[i++] = feature[c]*feature[r];
+  }
+  
   for (int state_k = 0; state_k < (int)state.weights.size(); state_k++)
   {
     int hmm_k = state.weights[state_k].kernel;
@@ -830,16 +602,16 @@ HmmTrainer::update_state_kernels(HmmSet &model, HmmSet &model_tmp,
 
     // Add mean
     for (i = 0; i < dim; i++)
+    {
       accuker.center[i] += feature[i]*gam[state_k];
+    }
 
     if (m_cov_update)
     {
       // Add covariance
-      for (i = 0; i < (int)cov_m[hmm_k]->nrows(); i++)
-      {
-        add(rows(*cov_m[hmm_k])[i], scaled(fea_vec, gam[state_k]*fea_vec[i]),
-            rows(*cov_m[hmm_k])[i]);
-      }
+      r = (dim+1)*dim/2;
+      for (i = 0; i < r; i++)
+        (*tri_cov_m[hmm_k])[i] += gam[state_k]*outer_prod[i];
     }
   }
 }
@@ -1367,25 +1139,29 @@ HmmTrainer::update_hlda_parameters(HmmSet &model, HmmSet &model_tmp,
 }
 
 
-void
+bool
 HmmTrainer::update_hlda_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
+                                       int state_index,
                                        std::vector<float> &gk_norm,
-                                       Viterbi &viterbi,
-                                       int start_frame, 
-                                       int end_frame)
+                                       int self_transition, int out_transition,
+                                       int start_frame, int end_frame)
 {
   int dim = m_source_dim;
   int frames = end_frame - start_frame;
   double gamma_norm;
   int i;
+  HmmState &state = model.state(state_index);
+  HmmState &state_accu= model_tmp.state(state_index);
+
   
   for (int f = 0; f < frames; f++) {
     FeatureVec feavec = m_fea_gen.generate(start_frame + f);
+    if (m_fea_gen.eof())
+      return false;
+    
     FeatureVec untransformed_fea =
       m_transform_module->sources().front()->at(start_frame + f);
     ExtVectorConst untransformed_fea_vec(&untransformed_fea[0], dim);
-    HmmState &state = model.state(viterbi.best_state(f));
-    HmmState &state_accu= model_tmp.state(viterbi.best_state(f));
 
     gam.reserve(state.weights.size());
     gamma_norm = 0;
@@ -1398,7 +1174,7 @@ HmmTrainer::update_hlda_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
       gamma_norm += gam[state_k];
     }
 
-    m_log_likelihood +=  safe_log(gamma_norm);
+    m_log_likelihood += util::safe_log(gamma_norm);
 
     // Global mean and covariance
     for (i = 0; i < dim; i++)
@@ -1437,77 +1213,32 @@ HmmTrainer::update_hlda_tmp_parameters(HmmSet &model, HmmSet &model_tmp,
         }
       }
     }
-    
-    /* Update transition counts.  Note, that the last state does not
-       have transition (marked with -1) */
-    int transition = viterbi.best_transition(f);
-    if (transition >= 0)
-      model_tmp.transition(transition).prob++;
   }
-}
-
-
-void
-HmmTrainer::update_duration_statistics(HmmSet &model, Viterbi &viterbi,
-                                       int frames)
-{
-  static int prev_state = -1;
-  static int state_count = 0;
-
-  for (int f = 0; f < frames; f++) {
-
-    if (prev_state != viterbi.best_state(f))
-    {
-      if (prev_state != -1)
-      {
-        if (state_count >= MAX_DURATION_COUNT)
-          state_count = MAX_DURATION_COUNT-1;
-        dur_table[prev_state][state_count]++;
-      }
-      prev_state = viterbi.best_state(f);
-      state_count = 0;
-    }
-    else
-    {
-      state_count++;
-    }
-  }
-}
-
-
-void
-HmmTrainer::update_boundary_duration_statistics(HmmSet &model,Viterbi *viterbi,
-                                                int frames)
-{
-  int prev_state = -1;
-  int state_count = 0;
-
-  for (int f = 0; f < frames; f++) {
-
-    if (prev_state != viterbi->best_state(f))
-    {
-      if (prev_state != -1)
-      {
-        if (state_count >= MAX_DURATION_COUNT)
-          state_count = MAX_DURATION_COUNT-1;
-        dur_table[prev_state][state_count]++;
-      }
-      prev_state = viterbi->best_state(f);
-      state_count = 0;
-    }
-    else
-    {
-      state_count++;
-    }
-  }
-  if (prev_state != -1)
+  /* Update transition counts.  Note, that the last state does not
+     have transition (marked with -1) */
+  if (self_transition != -1)
   {
-    if (state_count >= MAX_DURATION_COUNT)
-      state_count = MAX_DURATION_COUNT-1;
-    dur_table[prev_state][state_count]++;
+    int num_frames = std::max(end_frame - start_frame - 1, 0);
+    model_tmp.transition(self_transition).prob += num_frames;
+    m_log_likelihood += num_frames*
+      util::safe_log(model.transition(self_transition).prob);
   }
+  if (out_transition != -1)
+  {
+    model_tmp.transition(out_transition).prob++;
+    m_log_likelihood += util::safe_log(model.transition(out_transition).prob);
+  }
+  return true;
 }
 
+
+void
+HmmTrainer::update_duration_statistics(int state_index, int num_frames)
+{
+  if (num_frames >= MAX_DURATION_COUNT)
+    num_frames = MAX_DURATION_COUNT-1;
+  dur_table[state_index][num_frames]++;  
+}
 
 
 void
@@ -1526,21 +1257,3 @@ HmmTrainer::write_duration_statistics(HmmSet &model)
   }
 }
 
-
-void
-HmmTrainer::save_tying(const std::string &filename)
-{
-  FILE *fp;
-  int state_num;
-
-  // Save silence models
-  if ((fp = fopen(filename.c_str(), "w")) == NULL)
-  {
-    fprintf(stderr, "Could not open file %s for writing.\n", filename.c_str());
-    exit(1);
-  }
-  fprintf(fp, "_ 1 0\n__ 3 1 2 3\n");
-  fclose(fp);
-  
-  state_num = triphone_set.save_to_basebind(filename, 4);
-}

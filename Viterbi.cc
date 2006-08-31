@@ -20,8 +20,7 @@ Viterbi::Viterbi(HmmSet &model, FeatureGenerator &fea_gen,
     m_state_beam(INT_MAX),
     m_force_end(false),
     m_last_window(false),
-    m_print_all_states(false),
-    m_skip_next_short_silence(false)
+    m_print_all_states(false)
 {
 }
 
@@ -40,6 +39,8 @@ Viterbi::reset()
   m_force_end = false;
   m_last_window = false;
   m_state_prob.resize(m_lattice.positions());
+  m_accumulated_log_prob = 0;
+  m_final_log_prob = 0;
 }
 
 void
@@ -47,6 +48,7 @@ Viterbi::resize(int frames, int positions, int block)
 {
   m_lattice.resize(frames, positions, block);
   m_best_path.resize(frames);
+  m_best_path[0].position = 0; // Initialize
 
   m_transcription.resize(positions);
   m_transcription.clear();
@@ -61,9 +63,8 @@ Viterbi::resize(int frames, int positions, int block)
 void
 Viterbi::fill_transcription()
 {
-  static PhnReader::Phn phn, next_phn, next2_phn;
-  static bool eof, eof2;
-  static bool next_read = false;
+  static PhnReader::Phn phn;
+  static bool eof;
 
   if (m_phn_reader != NULL)
   {
@@ -72,29 +73,11 @@ Viterbi::fill_transcription()
       eof = !m_phn_reader->next(phn);
     while (!eof && (int)m_transcription.size() < m_last_position) {
       // Read the next label and get the hmm of the phoneme
-      if (next_read)
-      {
-        next_phn = next2_phn;
-        eof = eof2;
-        next_read = false;
-      }
-      else
-      {
-        eof = !m_phn_reader->next(next_phn);
-      }
       std::string label = phn.label[0];
-      std::string next_label = next_phn.label[0];
-      if (m_skip_next_short_silence && next_label == "_" && !eof)
-      {
-        eof2 = !m_phn_reader->next(next2_phn);
-        next_label = next2_phn.label[0];
-        next_read = true;
-      }
       phn.label.erase(phn.label.begin()); // Remove the first HMM label
       add_hmm_to_transcription(m_model.hmm_index(label),phn.comment,
-                               phn.label, next_label, phn.speaker);
-
-      phn = next_phn;
+                               phn.label, phn.speaker);
+      eof = !m_phn_reader->next(phn);
     }
 
     if (m_last_position > (int)m_transcription.size())
@@ -110,7 +93,6 @@ Viterbi::fill_transcription()
 void
 Viterbi::add_hmm_to_transcription(int hmm_index,std::string &comment,
                                   std::vector<std::string> &additional_hmms,
-                                  std::string &next_hmm_label,
                                   std::string &speaker)
 {
   std::string state_label;
@@ -145,8 +127,6 @@ Viterbi::add_hmm_to_transcription(int hmm_index,std::string &comment,
       state.printed = (m_print_all_states?false:true);
       m_transcription.push_back(state);
     }
-
-    m_transcription.back().next_label = next_hmm_label;
     
     // Set speaker
     m_speakers.push_back(speaker);
@@ -274,8 +254,11 @@ Viterbi::fill_observation_probs(const FeatureVec &fea_vec)
   }
   assert(best_prob > 0);
 
+  float best_log_prob = util::safe_log(best_prob);
   for (p = range.start; p < range.end; p++) 
-    m_state_prob[p] = util::safe_log(m_state_prob[p] / best_prob);
+    m_state_prob[p] = util::safe_log(m_state_prob[p]) - best_log_prob;
+
+  m_accumulated_log_prob += best_log_prob;
   
   // Add observation probabilities to lattice.
   m_best_position = -1;
@@ -293,9 +276,6 @@ Viterbi::fill_observation_probs(const FeatureVec &fea_vec)
 
     if (!cell.unused())
     {
-      // FIXME: Currently the HmmSet returns just squared distances
-      // without any scaling, because we are going to normalize the
-      // probabilities above anyway.
       cell.log_prob += m_state_prob[p];
       if (cell.log_prob > m_best_log_prob) {
         m_best_log_prob = cell.log_prob;
@@ -344,6 +324,8 @@ Viterbi::compute_best_path()
     position = new_pos;
   }
 
+  // Save the log-likelihood of the final path
+  m_final_log_prob = at(frame, position).log_prob;
 
   // In the end we want to check that the path is continuous
   int check_position = m_best_path[0].position;
@@ -372,13 +354,21 @@ Viterbi::compute_best_path()
       << m_best_path[0].position - check_position << std::endl;  
 }
 
-void Viterbi::fill(){
+void Viterbi::fill()
+{
   fill_transcription();
   m_model.reset_state_probs();
   if (m_current_frame == 0) {
     m_lattice.reset_frame(0, 0, 1);
     // FIXME: Ok? We do not use real probabilities anyway.    
-    m_lattice.at(0, 0).log_prob = 0; 
+    m_lattice.at(0, 0).log_prob = 0;
+
+    // Fill the correct log-prob for reporting (the probability of
+    // the first state does not change the viterbi path)
+    const FeatureVec feavec = m_fea_gen.generate(m_feature_frame);
+    m_accumulated_log_prob = util::safe_log(
+      m_model.state_prob(m_transcription[0].state, feavec));
+    
     m_feature_frame++;
     m_current_frame++;
   }
@@ -428,8 +418,10 @@ Viterbi::move(int frame, int position)
   // last frame.
   int f = m_current_frame - 1;
   float log_prob = at(f, m_best_path[f].position).log_prob;
+  m_accumulated_log_prob += log_prob;
+  m_final_log_prob = 0;
   Lattice::Range &range = m_lattice.range(f);
-  for (register int p = range.start; p < range.end; p++)
+  for (int p = range.start; p < range.end; p++)
     at(f, p).log_prob -= log_prob;
 }
 

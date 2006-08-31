@@ -43,7 +43,7 @@ public:
   Matrix precision_cholesky_transpose;
 
   // Determinant for the covariance matrix (FIXME: only for diagonal covariances)
-  // Computed in HmmSet::comput_covariance_determinants, remember to call it
+  // Computed in HmmSet::compute_covariance_determinants, remember to call it
   // if you modify the covariance!
   double cov_det;
   
@@ -243,6 +243,10 @@ private:
   std::vector<int> m_valid_stateprobs;
   std::vector<int> m_valid_kernel_likelihoods;
   float m_viterbi_scale_coeff;
+
+  // For computing full covariance kernels
+  Vector m_kernel_temp_s;
+  Vector m_kernel_temp_t;
 
   Pcgmm pcgmm;
   Scgmm scgmm;

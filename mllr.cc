@@ -123,8 +123,9 @@ train_mllr(int start_frame, int end_frame, std::string &speaker,
     if (phn.state < 0)
       throw std::string("State segmented phn file is needed");
 
-    phn_start_frame = (int)((float)phn.start/16000.0*fea_gen.frame_rate());
-    phn_end_frame = (int)((float)phn.end/16000.0*fea_gen.frame_rate());
+    phn_start_frame = (int)((double)phn.start/16000.0*fea_gen.frame_rate()
+                            +0.5);
+    phn_end_frame = (int)((double)phn.end/16000.0*fea_gen.frame_rate()+0.5);
     if (phn_start_frame < start_frame)
     {
       assert( phn_end_frame > start_frame );

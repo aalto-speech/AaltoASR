@@ -72,9 +72,6 @@ public:
     /// Label of the phoneme
     std::string label;
 
-    /// Label of the next phoneme (is not necessarily set!)
-    std::string next_label;
-
     int hmm_index; // HMM index in HmmSet
     int hmm_state_index; // HMM state index
 
@@ -89,7 +86,7 @@ public:
 
     /** Are the comment and label printed already?  (true by default)
      * 
-     * This is used by train only.  Viterbi should not use this
+     * This is used by align only.  Viterbi should not use this
      * variable at all.  This is an ugly hack.  FIXME!
      **/
     mutable bool printed;
@@ -109,7 +106,6 @@ public:
   /// Add hmm to transcription, use if you don't wan't to read the transcription.
   void add_hmm_to_transcription(int hmm_index, std::string &comment,
                                 std::vector<std::string> &additional_hmms,
-                                std::string &next_hmm_label,
                                 std::string &speaker);
 
   /// Move the lattice forward by repositioning the lattice.
@@ -123,7 +119,6 @@ public:
   inline void set_force_end(bool force) { m_force_end = force; }
   inline void set_last_window(bool last) { m_last_window = last; }
   inline void set_print_all_states(bool print) { m_print_all_states = print; }
-  inline void set_skip_next_short_silence(bool skip) {m_skip_next_short_silence = skip; }
 
   /// The first frame not filled yet because (1) lattice border reached, or (2) end of audio file reached.
   inline int last_frame() const { return m_last_frame; }
@@ -147,6 +142,9 @@ public:
 
   /// The position of the best path at the given frame.
   inline int best_position(int frame) const;
+
+  /// Accumulated log-probability of the best path since the last reset
+  double best_path_log_prob(void) { return m_accumulated_log_prob + m_final_log_prob; }
 
   /// The transition index to the best path at the given frame.
   /**
@@ -239,6 +237,12 @@ private:
   /// The best log-probability at the current frame.
   float m_best_log_prob;
 
+  /// Accumulated log-probabilities which have been reduced in window moving
+  double m_accumulated_log_prob;
+
+  /// The final log-probability of the current window
+  double m_final_log_prob;
+  
   /// The position of the best log-probability.
   int m_best_position;
 
@@ -260,8 +264,6 @@ private:
   bool m_last_window;
 
   bool m_print_all_states;
-
-  bool m_skip_next_short_silence; // For training tied triphones with silences
 
   /// Work space for probability computation.
   std::vector<float> m_state_prob;

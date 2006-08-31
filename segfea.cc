@@ -369,8 +369,9 @@ main(int argc, char *argv[])
     config("usage: segfea [OPTION...]\n")
       ('h', "help", "", "", "display help")
       ('b', "bind=FILE", "arg must", "", "model state configuration and bindings")
-      ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('c', "config=FILE", "arg must", "", "feature configuration")
+      ('r', "recipe=FILE", "arg must", "", "recipe file")
+      ('O', "ophn", "", "", "use output phns for training")
       ('o', "out=FILE", "arg must", "", "base filename for features")
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "occ=FILE", "arg", "", "save state occurrence information to file")
@@ -412,10 +413,14 @@ main(int argc, char *argv[])
 
     for (int fi = 0; fi < (int)recipe.infos.size(); fi++)
     {
+      std::string phn_path = (config["ophn"].specified?
+                              recipe.infos[fi].phn_out_path:
+                              recipe.infos[fi].phn_path);
+
       if (info > 0)
         printf("file %d/%d '%s' '%s'\n", fi+1, (int)recipe.infos.size(),
                recipe.infos[fi].audio_path.c_str(), 
-               recipe.infos[fi].phn_path.c_str());
+               phn_path.c_str());
 
       if (config["speakers"].specified)
       {
@@ -427,7 +432,7 @@ main(int argc, char *argv[])
       start_frame = (int)(recipe.infos[fi].start_time * gen.frame_rate());
       end_frame = (int)(recipe.infos[fi].end_time * gen.frame_rate());
       compute_features_segfea(recipe.infos[fi].audio_path,
-                              recipe.infos[fi].phn_path,
+                              phn_path,
                               start_frame, end_frame,
                               pho_info, config["stateseg"].specified,
                               config["raw-input"].specified,
