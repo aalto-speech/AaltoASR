@@ -16,6 +16,8 @@ bool raw_flag;
 float start_time, end_time;
 int start_frame, end_frame;
 bool state_num_labels;
+int phn_deviation = 0;
+bool seg_files;
 
 conf::Config config;
 Recipe recipe;
@@ -43,16 +45,35 @@ open_files(const std::string &audio_file, const std::string &phn_file,
 
   // Open transcription
   phn_reader.open(phn_file);
-  // Note: PHN files always use time multiplied by 16000
-  phn_reader.set_sample_limit((int)(start_time * 16000), 
-			      (int)(end_time * 16000));
+
+  // Start and end time
+
+  if(seg_files)
+  {
+    phn_deviation = (int)(start_time * fea_gen.frame_rate());
+  }
+  else
+  {
+    phn_deviation = 0;
+
+    // Note: PHN files always use time multiplied by 16000
+    phn_reader.set_sample_limit((int)(start_time * 16000), 
+				(int)(end_time * 16000));
+  }
+
+  // Start and end line
+
   phn_reader.set_line_limit(first_phn_line, last_phn_line, 
 			    &first_sample);
 
-  if (first_sample > 16000 * start_time) {
+  float phn_time = (float)phn_deviation / fea_gen.frame_rate();
+
+  if (first_sample + 16000 * phn_time > 16000 * start_time) {
     start_time = (float)(first_sample / 16000);
-    start_frame = (int)(fea_gen.frame_rate() * start_time);
+    start_frame = (int)(fea_gen.frame_rate() * start_time) + phn_deviation;
   }
+
+  // note: we calculate frame = sample / 16000 * frame_rate + phn_deviation
 }
 
 
@@ -64,6 +85,7 @@ calculate_mllr_transform(const std::string &speaker)
   if (cur_speaker != speaker)
     speaker_conf.set_speaker(speaker);
   (mllr_trainers[speaker])->calculate_transform(mllr_module);
+  (mllr_trainers[speaker])->clear_stats();
   if (cur_speaker != speaker)
     speaker_conf.set_speaker(cur_speaker);
 }
@@ -126,6 +148,10 @@ train_mllr(int start_frame, int end_frame, std::string &speaker,
     phn_start_frame = (int)((double)phn.start/16000.0*fea_gen.frame_rate()
                             +0.5);
     phn_end_frame = (int)((double)phn.end/16000.0*fea_gen.frame_rate()+0.5);
+
+    phn_start_frame = phn_start_frame + phn_deviation;
+    phn_end_frame = phn_end_frame + phn_deviation;
+
     if (phn_start_frame < start_frame)
     {
       assert( phn_end_frame > start_frame );
@@ -187,6 +213,7 @@ main(int argc, char *argv[])
       ('M', "mllr=MODULE", "arg must", "", "MLLR module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('o', "out=FILE", "arg", "", "output speaker configuration file")
+      ('\0', "seg", "", "", "decoder given state sequence hypothesis")
       ('\0', "sphn", "", "", "phn-files with speaker ID's in use")
       ('\0', "snl", "", "", "phn-files with state number labels")
       ('\0', "ords","", "", "files for each speaker are arranged successively")
@@ -230,6 +257,8 @@ main(int argc, char *argv[])
     state_num_labels = config["snl"].specified;
     phn_reader.set_state_num_labels(state_num_labels);
 
+    seg_files = config["seg"].specified;
+
     // Check the dimension
     if (model.dim() != fea_gen.dim()) {
       throw str::fmt(128,
@@ -253,6 +282,7 @@ main(int argc, char *argv[])
     
       start_time = recipe.infos[f].start_time;
       end_time = recipe.infos[f].end_time;
+
       start_frame = (int)(start_time * fea_gen.frame_rate());
       end_frame = (int)(end_time * fea_gen.frame_rate());
     
