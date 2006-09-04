@@ -40,9 +40,9 @@ public:
    */
   void calculate_transform(LinTransformModule *mllr_mod);
 
-private:
-
   void clear_stats();
+
+private:
 
   /** update ksum and gsum
    *  \param state hmm-state index
