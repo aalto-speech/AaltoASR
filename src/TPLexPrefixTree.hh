@@ -150,6 +150,7 @@ public:
   void set_lm_lookahead(int lm_lookahead) { m_lm_lookahead = lm_lookahead; }
   void set_cross_word_triphones(bool cw_triphones) { m_cross_word_triphones = cw_triphones; }
   void set_silence_is_word(bool b) { m_silence_is_word = b; }
+  void set_ignore_case(bool b) { m_ignore_case = b; }
 
   void initialize_lex_tree(void);
   void add_word(std::vector<Hmm*> &hmm_list, int word_id);
@@ -231,7 +232,7 @@ private:
   int m_lm_buf_count;
 
   bool m_silence_is_word;
-
+  bool m_ignore_case;
   bool m_optional_short_silence;
   HmmState *m_short_silence_state;
   int m_word_boundary_id;

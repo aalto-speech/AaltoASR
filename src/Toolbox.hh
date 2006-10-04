@@ -119,6 +119,7 @@ public:
   void set_cross_word_triphones(bool cw_triphones) { m_tp_lexicon.set_cross_word_triphones(cw_triphones); }
   void set_insertion_penalty(float ip) { m_tp_search.set_insertion_penalty(ip); }
   void set_silence_is_word(bool b) { m_tp_lexicon.set_silence_is_word(b); m_tp_lexicon_reader.set_silence_is_word(b); }
+  void set_ignore_case(bool b) { m_tp_lexicon.set_ignore_case(b);}
   void set_verbose(int verbose) { m_search.set_verbose(verbose); m_tp_lexicon.set_verbose(verbose); m_tp_search.set_verbose(verbose);}
   void set_print_text_result(int print) { m_tp_search.set_print_text_result(print); }
   void set_print_state_segmentation(int print) { m_tp_search.set_print_state_segmentation(print); }

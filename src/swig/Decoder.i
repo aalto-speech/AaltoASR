@@ -149,6 +149,7 @@ public:
   void set_max_state_duration(int duration);
   void set_cross_word_triphones(bool cw_triphones);
   void set_silence_is_word(bool b);
+	void set_ignore_case(bool b);		
   void set_lm_lookahead(int lmlh);
 	void set_insertion_penalty(float ip);
   void set_print_text_result(int print);

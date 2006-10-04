@@ -1476,7 +1476,7 @@ TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
   if (count > 0) {
     fprintf(stderr,"there were %d out-of-LM words in total in lookahead LM\n",
     count);
-    exit(-1);
+    //exit(-1);
   }
 }
 

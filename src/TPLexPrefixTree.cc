@@ -51,6 +51,7 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
   m_short_silence_state = NULL;
   m_word_boundary_id = -1;
   m_silence_is_word = true;
+  m_ignore_case= true;
 }
 
 
@@ -801,7 +802,7 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
   else
   {
     new_key = key;
-    if (ignore_length)
+    if (ignore_length && m_ignore_case)
     {
       std::transform(new_key.begin(), new_key.end(), new_key.begin(),
                      safe_tolower);
@@ -827,8 +828,9 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
   if (!fan_out && ignore_length)
   {
     // Try with long length
-    std::transform(++new_key.begin(), new_key.end(), ++new_key.begin(),
-                   safe_toupper);
+    if (m_ignore_case)
+      std::transform(++new_key.begin(), new_key.end(), ++new_key.begin(),
+		     safe_toupper);
     target_nodes = get_fan_node_list(new_key, m_fan_in_entry_nodes);
     for (i = 0; i < target_nodes->size(); i++)
     {
@@ -871,8 +873,9 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
     {
       std::string right((*it).first, 1, 1);
       std::string in_key = left+right;
-      std::transform(in_key.begin(), in_key.end(), in_key.begin(),
-                     safe_tolower);
+      if (m_ignore_case)
+	std::transform(in_key.begin(), in_key.end(), in_key.begin(),
+		       safe_tolower);
       // Create a null node
       wid_node = new Node(word_id);
       wid_node->node_id = node_list.size();
@@ -1137,7 +1140,8 @@ TPLexPrefixTree::get_fan_out_last_node(HmmState *state,
 {
   std::string temp1(label, 2, 1);
   std::string temp2(label, 4, 1);
-  std::transform(temp1.begin(), temp1.end(), temp1.begin(), safe_tolower);
+  if (m_ignore_case)
+    std::transform(temp1.begin(), temp1.end(), temp1.begin(), safe_tolower);
   std::string key = temp1+temp2;
   std::vector<Node*> *nlist = get_fan_node_list(key, m_fan_out_last_nodes);
   Node *node;
