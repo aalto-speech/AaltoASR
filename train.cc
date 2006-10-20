@@ -135,6 +135,9 @@ main(int argc, char *argv[])
 
     if (config["mllt"].specified)
     {
+      if (model.kernel(0).cov.type() == HmmCovariance::FULL)
+	throw std::string("Don't use MLLT with full covariances");
+
       LinTransformModule *mllt_module = dynamic_cast< LinTransformModule* >
         (fea_gen.module(config["mllt"].get_str()));
       if (mllt_module == NULL)
