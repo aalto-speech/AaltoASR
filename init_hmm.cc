@@ -13,7 +13,7 @@
 
 void read_segmodels(HmmSet &model, const std::string &filename);
 void read_kernels(HmmSet &model, const std::string &cb_base, float gwidth,
-                  bool diag_cov);
+                  bool diag_cov, bool full_cov);
 void make_transitions(HmmSet &model);
 
 
@@ -25,7 +25,7 @@ int main(int argc, char **argv)
   std::string statebind, cb_base, outbase;
   std::string outfile;
   float gwidth;
-  int diag_cov = 0;
+  int diag_cov = 0, full_cov = 0;
   HmmSet model;
   
   try {
@@ -36,6 +36,7 @@ int main(int argc, char **argv)
       ('o', "out=BASENAME", "arg must", "", "base filename for output models")
       ('w', "gausswidth=FLOAT", "arg", "1.0", "width of the Gaussian kernels")
       ('d', "diag", "", "", "use diagonal covariances")
+      ('f', "full", "", "", "use full covariances")
       ;
     
     config.default_parse(argc, argv);
@@ -45,9 +46,13 @@ int main(int argc, char **argv)
 
     gwidth = config["gausswidth"].get_float();
     diag_cov = config["diag"].specified;
+    full_cov = config["full"].specified;
+
+    if (diag_cov && full_cov)
+      throw std::string("Both -d and -f can't be defined at the same time");
 
     read_segmodels(model, statebind);
-    read_kernels(model, cb_base, gwidth, diag_cov);
+    read_kernels(model, cb_base, gwidth, diag_cov, full_cov);
     make_transitions(model);
 
     outfile = outbase + std::string(".gk");
@@ -111,7 +116,7 @@ void read_segmodels(HmmSet &model, const std::string &filename)
 }
 
 void read_kernels(HmmSet &model, const std::string &cb_base, float gwidth,
-                  bool diag_cov)
+                  bool diag_cov, bool full_cov)
 {
   std::string ifile;
   int k, num_of_kernels, d;
@@ -124,6 +129,10 @@ void read_kernels(HmmSet &model, const std::string &cb_base, float gwidth,
   if (diag_cov) {
     model.set_covariance_type(HmmCovariance::DIAGONAL);
     type=HmmCovariance::DIAGONAL;
+  }
+  else if (full_cov) {
+    model.set_covariance_type(HmmCovariance::FULL);
+    type=HmmCovariance::FULL;
   }
   else {
     model.set_covariance_type(HmmCovariance::SINGLE);
@@ -181,6 +190,11 @@ void read_kernels(HmmSet &model, const std::string &cb_base, float gwidth,
       {
         for (d=0; d<dim; d++)
           kernel.cov.diag(d) = gwidth;
+      }
+      else if (type==HmmCovariance::FULL)
+      {
+        for (d=0; d<dim; d++)
+	  kernel.cov.full(d,d) = gwidth;
       }
       else if (type==HmmCovariance::SINGLE)
       {
