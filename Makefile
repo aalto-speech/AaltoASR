@@ -5,7 +5,7 @@ ARCH = $(shell uname -p)
 ifeq ($(ARCH),x86_64)
 CXX = /usr/bin/g++
 OPT = -O2
-INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include -I/share/puhe/linux/include/lapackpp
+INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include -I/share/puhe/x86_64/include/lapackpp
 LDFLAGS = -L/share/puhe/x86_64/lib/
 WARNINGS = -Wall
 DEPFLAG = -MM
@@ -15,7 +15,7 @@ endif
 # Linux
 ifeq ($(ARCH),i686)
 CXX = /usr/bin/g++
-OPT = -g
+OPT = -O2
 INCLUDES = -I/share/puhe/rh9/include -I/share/puhe/linux/include
 LDFLAGS =
 WARNINGS = -Wall
