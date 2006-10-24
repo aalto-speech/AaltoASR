@@ -454,7 +454,7 @@ main(int argc, char *argv[])
       }
 
       for (int i = 0; i < (int)occurrences.size(); i++)
-        fprintf(occfile,"%i %i\n", i, occurrences[i]);
+        fprintf(occfile,"%i %i\n", i, (int)occurrences[i]);
       
       fclose(occfile);
     }
