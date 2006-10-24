@@ -228,7 +228,7 @@ TriphoneSet::fill_missing_contexts(bool boundary)
   if (m_info > 0)
   {
     fprintf(stderr, "%d contexts, %d phonemes\n", (int)context.size(),
-            m_tri_centers.size());
+            (int)m_tri_centers.size());
     fprintf(stderr, "Triphones before filling: %d\n", (int)m_triphones.size());
   }
   // Fill the missing ones
