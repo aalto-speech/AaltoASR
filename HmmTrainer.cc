@@ -21,7 +21,9 @@ HmmTrainer::HmmTrainer(FeatureGenerator &fea_gen)
     m_mllt(false),
     m_hlda(false),
     m_set_speakers(false),
-    m_min_var(0.1),
+    m_min_var(0),
+    m_min_eig(0),
+    m_cov_smooth(0),
     m_cov_update(false),
     m_durstat(false),
     m_log_likelihood(0),
@@ -37,6 +39,8 @@ HmmTrainer::~HmmTrainer()
 {
   int i;
   
+  delete [] m_feature_counts;
+
   // Free memory
   if (m_durstat)
   {
@@ -71,8 +75,13 @@ void HmmTrainer::init(HmmSet &model, std::string adafile)
   // Initialize accu structure and reset values to 0
   gk_norm.clear();
   gk_norm.resize(model.num_kernels(), 0.0);
-  model_tmp=model;
+  model_tmp.copy(model);
   model_tmp.reset();
+
+  // Feature counters for covariance smoothing
+  m_feature_counts = new int[model.num_kernels()];
+  for (int i = 0; i < model.num_kernels(); i++)
+    m_feature_counts[i]=0;
 
   if (m_durstat)
   {
@@ -222,6 +231,13 @@ void HmmTrainer::train(PhnReader &phn_reader,
     hmm = model.hmm(model.hmm_index(cur_phn.label[0]));
     state_index = hmm.state(cur_phn.state);
 
+    // Update feature counts for each kernel
+    HmmState &dummy_state=model.state(state_index);
+    for (unsigned int k,i=0; i<dummy_state.weights.size(); i++) {
+      k=dummy_state.weights[i].kernel;
+      m_feature_counts[k]++;
+    }
+
     // Find transitions
     std::vector<int> &trans = hmm.transitions(cur_phn.state);
     int self_transition = -1;
@@ -324,142 +340,179 @@ void
 HmmTrainer::update_parameters(HmmSet &model, HmmSet &model_tmp, 
                               const std::vector<float> &gk_norm)
 {
-  float sum;
+  float sum, smooth, cond;
 //  static float *tmpcov = NULL;
   int i,j;
+  bool singular, spd;
 
   for (int k = 0; k < model.num_kernels(); k++)
-  {
-    // Normalize and update mean and covariance
-    if (gk_norm[k] > 0)
     {
-      for (i = 0; i < model.dim(); i++)
-      {
-        model_tmp.kernel(k).center[i] /= gk_norm[k];
-      }
-
-      if (m_cov_update)
-      {
-        scale(*cov_m[k], 1.0/gk_norm[k]);
-        
-        // Subtract mean squared from the covariance
-        ExtVector mean_vec(&model_tmp.kernel(k).center[0], model.dim());
-        for (i = 0; i < model.dim(); i++)
-        {
-          add(rows(*cov_m[k])[i],scaled(mean_vec,-(mean_vec)[i]),
-              rows(*cov_m[k])[i]);
-        }
-      
-        if (model_tmp.kernel(k).cov.type() == HmmCovariance::SINGLE)
-        {
-          model_tmp.kernel(k).cov.var() = 0;
-          for (i = 0; i < model.dim(); i++) {
-            model_tmp.kernel(k).cov.var() += (*cov_m[k])(i,i);
-          }
-          model_tmp.kernel(k).cov.var() /= model.dim();
-          model_tmp.kernel(k).cov.var() = 
-	    std::max(model_tmp.kernel(k).cov.var(), m_min_var);
-        }
-        else if (model_tmp.kernel(k).cov.type() == HmmCovariance::DIAGONAL)
-        {
-          // Extract diagonal
-          // The worst case scenario for the determinant is when all
-          // the diagonal values are at their minimum. Thus there must
-          // be a limit which ensures that the square root of the
-          // determinant, used in likelihood calculations, is inside
-          // floating point range. sqrt(0.002**26) = 8.192e-36, which
-          // is just enough (1e-38 is the lower limit of a single
-          // precision float).  On the other hand, too small a
-          // variance is pretty much useless, as it usually means the
-          // gaussian is modeling only a few points, and thus is not
-          // affecting the real performance.
-          for (i = 0; i < model.dim(); i++) {
-            model_tmp.kernel(k).cov.diag(i) = std::max((*cov_m[k])(i,i), 
-						       m_min_var);
-          }
-        }
-        else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL
-		 || model_tmp.kernel(k).cov.type() == HmmCovariance::PCGMM) 
+      // Normalize and update mean and covariance
+      if (gk_norm[k] > 0)
 	{
-          for (i = 0; i < model.dim(); i++)
-	    for (j = 0; j < model.dim(); j++)
-	      if (i==j)
-		model_tmp.kernel(k).cov.full(i,j) = std::max((*cov_m[k])(i,i), m_min_var);
-	      else
-		model_tmp.kernel(k).cov.full(i,j) = (*cov_m[k])(i,i); 
-	}
-      }
-      else
-      {
-        if (model_tmp.kernel(k).cov.type() == HmmCovariance::SINGLE)
-          model_tmp.kernel(k).cov.var() = model.kernel(k).cov.var();
-        else if (model_tmp.kernel(k).cov.type() == HmmCovariance::DIAGONAL)
-        {
-          for (i = 0; i < model.dim(); i++)
-          {
-            model_tmp.kernel(k).cov.diag(i) = model.kernel(k).cov.diag(i);
-          }
-        }
-        else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL
-		 || model_tmp.kernel(k).cov.type() == HmmCovariance::PCGMM)
-	  {
-          for (i = 0; i < model.dim(); i++)
-	    for (j = 0; j < model.dim(); j++)
-	      model_tmp.kernel(k).cov.full(i,j) = model.kernel(k).cov.full(i,j);
-	}
-      }
-    }
-    else
-    {
-      // No data for this gaussian, copy the old values
-      for (i = 0; i < model.dim(); i++)
-      {
-        model_tmp.kernel(k).center[i] = model.kernel(k).center[i];
-      }
-      if (model_tmp.kernel(k).cov.type() == HmmCovariance::SINGLE)
-        model_tmp.kernel(k).cov.var() = model.kernel(k).cov.var();
-      else if (model_tmp.kernel(k).cov.type() == HmmCovariance::DIAGONAL)
-      {
-        for (i = 0; i < model.dim(); i++)
-        {
-          model_tmp.kernel(k).cov.diag(i) = model.kernel(k).cov.diag(i);
-        }
-      }
-      else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL 
-	       || model_tmp.kernel(k).cov.type() == HmmCovariance::PCGMM)
-      {
 	  for (i = 0; i < model.dim(); i++)
-	    for (j = 0; i < model.dim(); j++)
-	      model_tmp.kernel(k).cov.full(i,j) = model.kernel(k).cov.full(i,j);
-      }
+	    {
+	      model_tmp.kernel(k).center[i] /= gk_norm[k];
+	    }
+	  
+	  if (m_cov_update)
+	    {
+	      scale(*cov_m[k], 1.0/gk_norm[k]);
+	      
+	      // Subtract mean squared from the covariance
+	      ExtVector mean_vec(&model_tmp.kernel(k).center[0], model.dim());
+	      for (i = 0; i < model.dim(); i++)
+		{
+		  add(rows(*cov_m[k])[i],scaled(mean_vec,-(mean_vec)[i]),
+		      rows(*cov_m[k])[i]);
+		}
+	      
+	      if (model_tmp.kernel(k).cov.type() == HmmCovariance::SINGLE)
+		{
+		  model_tmp.kernel(k).cov.var() = 0;
+		  for (i = 0; i < model.dim(); i++) {
+		    model_tmp.kernel(k).cov.var() += (*cov_m[k])(i,i);
+		  }
+		  model_tmp.kernel(k).cov.var() /= model.dim();
+		  model_tmp.kernel(k).cov.var() = 
+		    std::max(model_tmp.kernel(k).cov.var(), m_min_var);
+		}
+	      else if (model_tmp.kernel(k).cov.type() == HmmCovariance::DIAGONAL)
+		{
+		  // Extract diagonal
+		  // The worst case scenario for the determinant is when all
+		  // the diagonal values are at their minimum. Thus there must
+		  // be a limit which ensures that the square root of the
+		  // determinant, used in likelihood calculations, is inside
+		  // floating point range. sqrt(0.002**26) = 8.192e-36, which
+		  // is just enough (1e-38 is the lower limit of a single
+		  // precision float).  On the other hand, too small a
+		  // variance is pretty much useless, as it usually means the
+		  // gaussian is modeling only a few points, and thus is not
+		  // affecting the real performance.
+		  for (i = 0; i < model.dim(); i++) {
+		    model_tmp.kernel(k).cov.diag(i) = std::max((*cov_m[k])(i,i), 
+							       m_min_var);
+		  }
+		}
+	      else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL)
+		{		  
+		  for (i = 0; i < model.dim(); i++)
+		    for (j = 0; j < model.dim(); j++)
+		      if (i==j)
+			model_tmp.kernel(k).cov.full(i,j) = std::max((*cov_m[k])(i,j), m_min_var);
+		      else {
+			if (m_cov_smooth != 0) {
+			  smooth = m_feature_counts[k]/(m_cov_smooth+m_feature_counts[k]);
+			  model_tmp.kernel(k).cov.full(i,j) = smooth * (*cov_m[k])(i,j); 
+			}
+			else 
+			  model_tmp.kernel(k).cov.full(i,j) = (*cov_m[k])(i,j); 
+		      }
+		  if (m_min_eig != 0)
+		    LinearAlgebra::force_min_eig(model_tmp.kernel(k).cov.full, m_min_eig);
+		}
+	    }
 
+	  // m_cov_update == 0
+	  else
+	    {
+	      if (model_tmp.kernel(k).cov.type() == HmmCovariance::SINGLE)
+		model_tmp.kernel(k).cov.var() = model.kernel(k).cov.var();
+	      else if (model_tmp.kernel(k).cov.type() == HmmCovariance::DIAGONAL)
+		{
+		  for (i = 0; i < model.dim(); i++)
+		    {
+		      model_tmp.kernel(k).cov.diag(i) = model.kernel(k).cov.diag(i);
+		    }
+		}
+	      else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL)
+		{
+		  for (i = 0; i < model.dim(); i++)
+		    for (j = 0; j < model.dim(); j++)
+		      model_tmp.kernel(k).cov.full(i,j) = model.kernel(k).cov.full(i,j);
+		}
+	    }
+	}
+      else
+	{
+	  // No data for this gaussian, copy the old values
+	  for (i = 0; i < model.dim(); i++)
+	    {
+	      model_tmp.kernel(k).center[i] = model.kernel(k).center[i];
+	    }
+	  if (model_tmp.kernel(k).cov.type() == HmmCovariance::SINGLE)
+	    model_tmp.kernel(k).cov.var() = model.kernel(k).cov.var();
+	  else if (model_tmp.kernel(k).cov.type() == HmmCovariance::DIAGONAL)
+	    {
+	      for (i = 0; i < model.dim(); i++)
+		{
+		  model_tmp.kernel(k).cov.diag(i) = model.kernel(k).cov.diag(i);
+		}
+	    }
+	  else if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL)
+	    {
+	      for (i = 0; i < model.dim(); i++)
+		for (j = 0; j < model.dim(); j++)
+		  model_tmp.kernel(k).cov.full(i,j) = model.kernel(k).cov.full(i,j);
+	    }
+	}
+    }  
+
+  // Remove gaussians with bad covariance estimates
+  for (int k = model.num_kernels()-1; k >= 0; k--) 
+    {
+      if (model_tmp.kernel(k).cov.type() == HmmCovariance::FULL)
+	{
+	  // Check that the covariance estimate is ok
+	  singular = LinearAlgebra::is_singular(model_tmp.kernel(k).cov.full);
+	  spd = LinearAlgebra::is_spd(model_tmp.kernel(k).cov.full);
+	  cond = LinearAlgebra::cond(model_tmp.kernel(k).cov.full);
+	  
+	  // Remove singular gaussians
+	  if (singular) {
+	    model_tmp.remove_kernel(k);
+	    fprintf(stderr, "Warning: gaussian %d became singular and was removed\nPerhaps --mineig is what you're looking for?\n", k);
+	  }
+	  
+	  // Remove non-spd gaussians
+	  if (!spd) {
+	    model_tmp.remove_kernel(k);
+	    fprintf(stderr, "Warning: gaussian %d wasn't positive definite and was removed\nPerhaps --mineig is what you're looking for?\n", k);
+	  }	    
+
+	  // Remove ill-conditioned gaussians
+	  else if (cond > 100000) {
+	    model_tmp.remove_kernel(k);
+	    fprintf(stderr, "Warning: gaussian %d became ill-conditioned and was removed\nPerhaps --mineig is what you're looking for?\n", k);
+	  }
+	}      
     }
-  }
-
+  
   if (m_cov_update)
     model_tmp.compute_covariance_determinants();
-
+  
   for (int s = 0; s < model.num_states(); s++) {
     HmmState &tmp_state = model_tmp.state(s);
-
+    
     // Find normalization;
     sum=0.0;
     for (int k = 0; k < (int)tmp_state.weights.size(); k++)
-      sum += tmp_state.weights[k].weight;
-
+	sum += tmp_state.weights[k].weight;
+    
     // Normalize
     if (sum > 0) {
       for (int k = 0; k < (int)tmp_state.weights.size(); k++)
 	tmp_state.weights[k].weight /= sum;
     }
     else
-    {
-      // Copy the old values
-      HmmState &old_state = model.state(s);
-      for (int k = 0; k < (int)tmp_state.weights.size(); k++)
-	tmp_state.weights[k].weight = old_state.weights[k].weight;
+	{
+	  // Copy the old values
+	  HmmState &old_state = model.state(s);
+	  for (int k = 0; k < (int)tmp_state.weights.size(); k++)
+	    tmp_state.weights[k].weight = old_state.weights[k].weight;
+	}
     }
-  }
   update_transition_probabilities(model, model_tmp);
 }
 
@@ -468,7 +521,7 @@ void
 HmmTrainer::update_transition_probabilities(HmmSet &model, HmmSet &model_tmp)
 {
   float sum;
-
+  
   /* transition probabilities */
   for (int h = 0; h < (int)model.num_hmms(); h++) {
     for (int s = 0; s < (int)model.hmm(h).num_states(); s++) {

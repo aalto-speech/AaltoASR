@@ -152,8 +152,9 @@ public:
   inline int num_states() const;
   inline HmmState &state(int state);
 
-  void reserve_kernels(int states);
+  void reserve_kernels(int kernels);
   HmmKernel &add_kernel();
+  void remove_kernel(int kernel);
   inline int num_kernels() const;
   inline HmmKernel &kernel(int kernel);
 
@@ -248,6 +249,7 @@ private:
   Vector m_kernel_temp_s;
   Vector m_kernel_temp_t;
 
+public:
   Pcgmm pcgmm;
   Scgmm scgmm;
 };

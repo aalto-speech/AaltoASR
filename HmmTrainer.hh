@@ -73,6 +73,8 @@ public:
   void set_mllt(bool mllt_flag) { m_mllt = mllt_flag; }
   void set_hlda(bool hlda_flag) { m_hlda = hlda_flag; }
   void set_min_var(float min_var) { m_min_var = min_var; }
+  void set_min_eig(float min_eig) { m_min_eig = min_eig; }
+  void set_cov_smooth(float cov_smooth) { m_cov_smooth = cov_smooth; }
   void set_cov_update(bool cov_update) { m_cov_update = cov_update; }
   void set_duration_statistics(bool durstat) { m_durstat = durstat; }
   
@@ -86,11 +88,14 @@ private:
   bool m_hlda;
   bool m_set_speakers; // Do we need to change speakers?
   float m_min_var;
+  float m_min_eig;
+  float m_cov_smooth;
   bool m_cov_update;
   bool m_durstat;
   double m_log_likelihood;
   
   int **dur_table;
+  int *m_feature_counts;
   int m_num_dur_models;
 
   // MLLT stuff

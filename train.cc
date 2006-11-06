@@ -86,7 +86,9 @@ main(int argc, char *argv[])
       ('o', "out=BASENAME", "arg", "", "base filename for output models")
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "cov", "", "", "update covariance")
-      ('\0', "minvar=FLOAT", "arg", "0.1", "minimum variance value (default 0.1)")
+      ('\0', "minvar=FLOAT", "arg", "0", "minimum variance value (default 0)")
+      ('\0', "mineig=FLOAT", "arg", "0", "minimum eigenvalues for full covariance matrix (default 0)")
+      ('\0', "covsmooth=FLOAT", "arg", "0", "covariance smoothing for full covariances (default 0)")
       ('\0', "mllt=MODULE", "arg", "", "run MLLT estimation for a given module")
       ('\0', "hlda=MODULE", "arg", "", "run HLDA estimation for a given module")
       ('\0', "durstat", "", "", "don't train, just collect duration statistics")
@@ -161,6 +163,8 @@ main(int argc, char *argv[])
     
     trainer.set_cov_update(config["cov"].specified);
     trainer.set_min_var(config["minvar"].get_float());
+    trainer.set_min_eig(config["mineig"].get_float());
+    trainer.set_cov_smooth(config["covsmooth"].get_float());
 
     phn_reader.set_speaker_phns(config["sphn"].specified);
 
