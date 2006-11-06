@@ -22,11 +22,16 @@ The model is stored in four separate text files:
 <h5>gk-file</h5>
 
 The file begins with a line containing the number of kernels,
-dimension, and a string "single_cov" or "diagonal_cov".
+dimension, and a string "single_cov", "diagonal_cov", "full_cov", "pcgmm" or "scgmm".
+If Precision constrained or Subspace constrained GMM (PCGMM or SCGMM) is used, the basis 
+dimension is given last on the first line, and equivalently many next lines are dedicated
+to the basis vectors.
 Then follows each kernel on a separate line. The kernel is represented by
 its mean values and a variance value in case of single_cov, or
-diagonal covariance values in case of diagonal_cov. All these numbers
-are on the same line for one kernel, separated by spaces.
+diagonal covariance values in case of diagonal_cov. Full covariances are in
+the basic rows/columns order (symmetricity). For Pcgmm, the mean values are followed
+by the precision coefficients. For Scgmm, there are only the exponential subspace coefficients
+All these numbers are on the same line for one gaussian, separated by spaces.
 
 <h5>mc-file</h5>
 
