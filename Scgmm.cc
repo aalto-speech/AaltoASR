@@ -770,9 +770,9 @@ Scgmm::eval_linesearch_value(const LaVectorDouble &eigs,
 
   f += step*beta;
   for (int i=0; i<eigs.size(); i++) {
-    f += log(1+step*eigs(i));
-    f -= t(i)*t(i)/(1+step*eigs(i));
-    f += v(i)*v(i);
+    f += 0.5*log(1+step*eigs(i));
+    f -= 0.5*t(i)*t(i)/(1+step*eigs(i));
+    f += 0.5*v(i)*v(i);
   }    
 
   return f;
@@ -792,9 +792,9 @@ Scgmm::eval_linesearch_derivative(const LaVectorDouble &eigs,
 
   d=beta;
   for (int i=0; i<eigs.size(); i++) {
-    d += eigs(i)/(1+step*eigs(i));
-    d -= 2*t(i)*dv(i)/(1+step*eigs(i));
-    d += t(i)*t(i)*eigs(i)/((1+step*eigs(i))*(1+step*eigs(i)));
+    d += 0.5*eigs(i)/(1+step*eigs(i));
+    d -= t(i)*dv(i)/(1+step*eigs(i));
+    d += 0.5*t(i)*t(i)*eigs(i)/((1+step*eigs(i))*(1+step*eigs(i)));
   } 
 
   return d;
