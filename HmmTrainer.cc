@@ -21,7 +21,7 @@ HmmTrainer::HmmTrainer(FeatureGenerator &fea_gen)
     m_mllt(false),
     m_hlda(false),
     m_set_speakers(false),
-    m_min_var(0),
+    m_min_var(0.1),
     m_min_eig(0),
     m_cov_smooth(0),
     m_cov_update(false),
@@ -476,7 +476,7 @@ HmmTrainer::update_parameters(HmmSet &model, HmmSet &model_tmp,
 	  }
 	  
 	  // Remove non-spd gaussians
-	  if (!spd) {
+	  else if (!spd) {
 	    model_tmp.remove_kernel(k);
 	    fprintf(stderr, "Warning: gaussian %d wasn't positive definite and was removed\nPerhaps --mineig is what you're looking for?\n", k);
 	  }	    
