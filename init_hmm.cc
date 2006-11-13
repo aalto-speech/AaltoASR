@@ -125,6 +125,9 @@ void read_kernels(HmmSet &model, const std::string &cb_base, float gwidth,
 
   std::string line;
   line.reserve(4096); // for efficiency
+  std::vector<std::string> line_fields;
+  bool ok = true;
+
 
   if (diag_cov) {
     model.set_covariance_type(HmmCovariance::DIAGONAL);
@@ -140,32 +143,36 @@ void read_kernels(HmmSet &model, const std::string &cb_base, float gwidth,
   }
 
   for (int s=0; s<model.num_states(); s++) {
-
+    
     ifile = cb_base + str::fmt(64, "_%d.cod", s);
-
+    
     int width, height;
-    std::string dummy;
     std::ifstream in(ifile.c_str());
     if (!in) {
       throw std::string("ERROR: cannot open file ") + ifile +
         std::string(" for reading.");
     }
-
+    
     // Read header
     std::getline(in, line);
-    std::istringstream buf(line);
-    buf >> dim >> dummy >> width >> height >> dummy;
-    if (!buf) {
-      throw std::string("Invalid header in file ") + ifile;
-    }
+    str::split(&line, " ", false, &line_fields, 0);
+    dim=str::str2long(line_fields[0].c_str(), &ok);
+    if (!ok)
+      throw std::string("Invalid dim field in header of file ") + ifile;
+    width=str::str2long(line_fields[2].c_str(), &ok);
+    if (!ok)
+      throw std::string("Invalid width field in header of file ") + ifile;
+    height=str::str2long(line_fields[3].c_str(), &ok);
+    if (!ok)
+      throw std::string("Invalid height field in header of file ") + ifile;
     
-      // Set dimension
+    // Set dimension
     if (s == 0)
       model.set_dim(dim);
     else if (model.dim() != dim) {
       throw str::fmt(256, "Conflicting dimensions %d %d",model.dim(),dim);
     }
-
+    
     // Read kernel
     num_of_kernels = width * height;
     float weight = 1.0/num_of_kernels;
@@ -178,12 +185,14 @@ void read_kernels(HmmSet &model, const std::string &cb_base, float gwidth,
 
       // Read center
       std::getline(in, line);
-      std::istringstream buf(line);
-      for (d=0; d<model.dim(); d++)
-        buf >> kernel.center[d];
-      if (!buf) {
-        throw str::fmt(256, "Error while reading kernel %d", k);
-      }
+      str::split(&line, " ", false, &line_fields, 0);
+      double temp;
+      for (d=0; d<model.dim(); d++) {
+	temp = str::str2float(line_fields[d].c_str(), &ok);
+	if (!ok)
+	  throw std::string("Invalid mean parameter field in file ") + ifile;
+        kernel.center[d] = temp;
+      }      
 
       // Set variance
       if (type==HmmCovariance::DIAGONAL)
