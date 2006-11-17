@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <assert.h>
+#include <cmath>
 
 #include "HashCache.hh"
 #include "SimpleHashCache.hh"
