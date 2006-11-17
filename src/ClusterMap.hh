@@ -15,7 +15,7 @@ public:
   inline KT get_cluster2(const int order, const KT cl);  
   virtual int read(FILE *in, const int ord, int read_lines);
   virtual void read_more(FILE *in);
-  virtual void write(FILE *out);
+  virtual void write(FILE *out, int order=0);
   void wv2cv(std::vector<KT> &v); 
   void wg2cg(TreeGram::Gram &g);
   inline int num_clusters(const int o) {return(m_num_cl[o]);}

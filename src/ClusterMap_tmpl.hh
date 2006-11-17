@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "str.hh"
 
 template <typename KT>
 bool ClusterMap<KT>::init_order(const int order) {
@@ -27,22 +28,33 @@ bool ClusterMap<KT>::init_order(const int order) {
 }
 
 template <typename KT>
-void ClusterMap<KT>::write(FILE *out) {
-  fprintf(out,"\\clustermap %d\n",m_map.size()-1);
-  fprintf(out,"\\1-ords %d\n", num_words());
-  for (int j=0;j<num_words();j++) 
-    fprintf(out,"%s %d\n",word(j).c_str(),get_cluster(1,j));
+void ClusterMap<KT>::write(FILE *out, int order) {
+  if (order==0 || order ==1) {
+    if (order==0) fprintf(out,"\\clustermap %d\n",m_map.size()-1);
+    fprintf(out,"\\1-ords %d\n", num_words());
+    for (int j=0;j<num_words();j++) 
+      fprintf(out,"%s %d\n",word(j).c_str(),get_cluster(1,j));
+    if (order==1) return;
+  }
+  
+  int from = order;
+  int to = order+1;
+  if (!order) {
+    from = 2;
+    to = m_map.size();
+  }
 
-  for (int o=2;o<m_map.size();o++) {
+  for (int o=from;o<to;o++) {
     fprintf(out,"\\%d-ords %d\n", o, num_clusters(o));
     const int nc=num_clusters(o-1);
-      for (int j=0;j<nc;j++) {
-	if (o==1) fprintf(out,"%s ",word(j).c_str());
-	else fprintf(out,"%d ",j);
-	fprintf(out,"%d\n",get_cluster2(o,j));
-      }
+    for (int j=0;j<nc;j++) {
+      if (o==1) fprintf(out,"%s ",word(j).c_str());
+      else fprintf(out,"%d ",j);
+      fprintf(out,"%d\n",get_cluster2(o,j));
+    }
   }
-  fprintf(out,"\\endcl\n\n");
+  if (!order)
+    fprintf(out,"\\endcl\n\n");
 }
 
 template <typename KT>
@@ -86,7 +98,7 @@ int ClusterMap<KT>::read(FILE *in, const int ord, int read_lines) {
   
       int tmp=str::str2long(&(split_s[1]),&ok);
       if (tmp>=0) {
-	assert(tmp<num_cl);
+	if (tmp>=num_cl) read_error(read_lines, s);
 	set_cluster(o, wi, 0, tmp);
       }
       if (!str::read_line(&s,in,true)) read_error(read_lines,s);
@@ -236,15 +248,15 @@ bool ClusterFMap<KT>::init_order(const int order) {
 
   if (resize) {
     if (order==1) {
-      m_fmap[order].resize(num_words());
-      m_num_fcl[1]=num_words();
+      m_fmap[order].resize(Vocabulary::num_words());
+      m_num_fcl[1]=Vocabulary::num_words();
     } else {
       m_fmap[order].resize(num_fclusters(order-1));
     }
   }
   if (order!=1 || !resize) return(resize);;
 
-  for (KT i=0;i<num_words();i++) {
+  for (KT i=0;i<Vocabulary::num_words();i++) {
     key_prob &k=m_fmap[1][i];
     k.key=i;
     k.lprob=0.0;
@@ -255,22 +267,22 @@ bool ClusterFMap<KT>::init_order(const int order) {
 
 template <typename KT>
 void ClusterFMap<KT>::write(FILE *out) {
-  fprintf(out,"\\fclustermap %d\n",m_map.size()-1);
+  fprintf(out,"\\fclustermap %d\n",ClusterMap<KT>::m_map.size()-1);
   
-  fprintf(out,"\\1-ords %d %d\n", num_words(), num_words());
-  for (int j=0;j<num_words();j++) {
-    fprintf(out,"%s %d %d %.3f\n",word(j).c_str(),get_cluster(1,j),get_fcluster(1,j), get_fprob(1,j));
+  fprintf(out,"\\1-ords %d %d\n", Vocabulary::num_words(), Vocabulary::num_words());
+  for (int j=0;j<Vocabulary::num_words();j++) {
+    fprintf(out,"%s %d %d %.3f\n",Vocabulary::word(j).c_str(),ClusterMap<KT>::get_cluster(1,j),get_fcluster(1,j), get_fprob(1,j));
   }
 
-  for (int o=2;o<m_map.size();o++) {
-    fprintf(out,"\\%d-ords %d %d\n", o, num_clusters(o), num_fclusters(o));
-    const int nc=num_clusters(o-1);
+  for (int o=2;o<ClusterMap<KT>::m_map.size();o++) {
+    fprintf(out,"\\%d-ords %d %d\n", o, ClusterMap<KT>::num_clusters(o), num_fclusters(o));
+    const int nc=ClusterMap<KT>::num_clusters(o-1);
     const int nfc=num_fclusters(o-1);
     const int looptill=std::max(nc,nfc);
     for (int j=0;j<looptill;j++) {
-      if (o==1) fprintf(out,"%s ",word(j).c_str());
+      if (o==1) fprintf(out,"%s ",Vocabulary::word(j).c_str());
       else fprintf(out,"%d ",j);
-      if (j<nc) fprintf(out,"%d ",get_cluster2(o,j));
+      if (j<nc) fprintf(out,"%d ",ClusterMap<KT>::get_cluster2(o,j));
       else fprintf(out,"-1 ");
       if (j<nfc) fprintf(out,"%d %.3f\n",get_fcluster2(o,j),get_fprob2(o,j));
       else fprintf(out,"-1 0\n");
@@ -290,19 +302,19 @@ int ClusterFMap<KT>::read(FILE *in, const int ord, int read_lines) {
   int num_fcl, old_fcl=0;
   m_fmap.resize(ord+1);
   m_num_fcl.resize(ord+1);
-  m_map.resize(ord+1);
-  m_num_cl.resize(ord+1);
+  ClusterMap<KT>::m_map.resize(ord+1);
+  ClusterMap<KT>::m_num_cl.resize(ord+1);
 
   read_lines++;
-  if (!str::read_line(&s,in,true)) read_error(read_lines,s);
+  if (!str::read_line(&s,in,true)) ClusterMap<KT>::read_error(read_lines,s);
   while (s!="\\endcl") {
     // Read \n-ords %d (%d)
     str::split(&s, " ", true, &split_s, 3);
     int o2;
     sscanf(s.c_str(),"\\%d-ords",&o2);
-    if (++o!=o2) read_error(read_lines,s);
+    if (++o!=o2) ClusterMap<KT>::read_error(read_lines,s);
 
-    if (split_s.size()!=3) read_error(read_lines,s);
+    if (split_s.size()!=3) ClusterMap<KT>::read_error(read_lines,s);
     num_fcl=str::str2long(&(split_s[2]),&ok);
     m_num_fcl[o]=num_fcl;
     if (o==1) old_fcl=num_fcl;
@@ -310,43 +322,43 @@ int ClusterFMap<KT>::read(FILE *in, const int ord, int read_lines) {
     old_fcl=num_fcl;
 
     num_cl=str::str2long(&(split_s[1]),&ok);
-    m_num_cl[o]=num_cl;
+    ClusterMap<KT>::m_num_cl[o]=num_cl;
     if (o==1) old_cl=num_cl;
-    m_map[o].resize(old_cl);
+    ClusterMap<KT>::m_map[o].resize(old_cl);
     old_cl=num_cl;
 
     read_lines++;
-    if (!str::read_line(&s,in,true)) read_error(read_lines,s);
+    if (!str::read_line(&s,in,true)) ClusterMap<KT>::read_error(read_lines,s);
     while (s[0]!='\\') {
       read_lines++;      
       str::split(&s," ",true, &split_s, 4);
-      if (split_s.size()!=4) read_error(read_lines,s);
-      if (o==1) wi=add_word(split_s[0].c_str());
+      if (split_s.size()!=4) ClusterMap<KT>::read_error(read_lines,s);
+      if (o==1) wi=Vocabulary::add_word(split_s[0].c_str());
       else {
 	wi=str::str2long(&(split_s[0]),&ok);
-	assert(wi< std::max(m_map[o-1].size(), m_fmap[o-1].size()));
+	assert(wi< std::max(ClusterMap<KT>::m_map[o-1].size(), m_fmap[o-1].size()));
       }
   
       int tmp=str::str2long(&(split_s[1]),&ok);
       if (tmp>=0) {
 	assert(tmp<num_cl);
-	set_cluster(o, wi, 0, tmp);
-      } else if (wi<m_map[o].size()) {
-	fprintf(stderr,"a ");read_error(read_lines,s);
+	ClusterMap<KT>::set_cluster(o, wi, 0, tmp);
+      } else if (wi<ClusterMap<KT>::m_map[o].size()) {
+	fprintf(stderr,"a ");ClusterMap<KT>::read_error(read_lines,s);
       }
 
       tmp=str::str2long(&(split_s[2]),&ok);
-      if (!ok) read_error(read_lines,s);
+      if (!ok) ClusterMap<KT>::read_error(read_lines,s);
       if (tmp>=0) {
 	assert(tmp<num_fcl);
 	set_fcluster(o, wi, 0, tmp);
 	set_fprob(o, wi, str::str2float(&(split_s[3]),&ok));
-	if (!ok) read_error(read_lines,s);
+	if (!ok) ClusterMap<KT>::read_error(read_lines,s);
       } else if (wi<m_fmap[o].size()) {
-	fprintf(stderr,"b ");read_error(read_lines,s);
+	fprintf(stderr,"b ");ClusterMap<KT>::read_error(read_lines,s);
       }
 
-      if (!str::read_line(&s,in,true)) read_error(read_lines,s);
+      if (!str::read_line(&s,in,true)) ClusterMap<KT>::read_error(read_lines,s);
     }
   }
   return(read_lines);
