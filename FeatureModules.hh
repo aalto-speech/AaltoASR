@@ -352,6 +352,8 @@ private:
 private:
   std::vector<float> m_transform;
   std::vector<float> m_bias;
+  std::vector<float> m_original_transform;
+  std::vector<float> m_original_bias;
   bool m_matrix_defined, m_bias_defined;
   int m_src_dim;
 };

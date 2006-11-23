@@ -839,10 +839,11 @@ LinTransformModule::get_module_config(ModuleConfig &config)
 {
   assert(m_dim > 0);
   config.set("dim", m_dim);
-  if (m_matrix_defined)
-    config.set("matrix", m_transform);
-  if (m_bias_defined)
-    config.set("bias", m_bias);
+  // Save the original transformation
+  if (m_original_transform.size() > 0)
+    config.set("matrix", m_original_transform);
+  if (m_original_bias.size() > 0)
+    config.set("bias", m_original_bias);
 }
 
 void
@@ -856,6 +857,8 @@ LinTransformModule::set_module_config(const ModuleConfig &config)
 
   config.get("matrix", m_transform);
   config.get("bias", m_bias);
+  m_original_transform = m_transform;
+  m_original_bias = m_bias;
   config.get("dim", m_dim);
   if (m_dim < 1)
     throw std::string("LinTransformModule: Dimension must be > 0");
@@ -952,6 +955,7 @@ LinTransformModule::generate(int frame)
 void
 LinTransformModule::set_transformation_matrix(std::vector<float> &t)
 {
+  m_original_transform = t;
   if (t.size() == 0)
   {
     int r, c, index;
@@ -976,6 +980,7 @@ LinTransformModule::set_transformation_matrix(std::vector<float> &t)
 void
 LinTransformModule::set_transformation_bias(std::vector<float> &b)
 {
+  m_original_bias = b;
   if (b.size() == 0)
   {
     m_bias_defined = false;
