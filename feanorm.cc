@@ -42,7 +42,7 @@ main(int argc, char *argv[])
       ('R', "raw-input", "", "", "raw audio input")
       ('M', "module=NAME", "arg", "", "normalization module name")
       ('b', "block=INT", "arg", "1000", "block size (for reducing round-off errors)")
-      ('P', "print", "", "", "print mean and scale to stdout")
+      ('P', "print", "", "", "print mean and variance to stdout")
       ('\0', "cov", "", "", "estimate and print covariance matrix")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('i', "info=INT", "arg", "0", "info level")
@@ -219,13 +219,12 @@ main(int argc, char *argv[])
     {
       printf("mean:\n");
       for (int d = 0; d < dim; d++)
-        printf("%8.2f ", mean[d]);
+        printf("%f ", mean[d]);
       printf("\n");
-      printf("scale:\n");
+      printf("variance:\n");
       for (int d = 0; d < dim; d++)
-        printf("%8.2f ", scale[d]);
+        printf("%f ", 1/(scale[d]*scale[d]));
       printf("\n");
-
     }
 
     if (cov_flag)

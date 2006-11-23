@@ -236,7 +236,7 @@ int
 main(int argc, char *argv[])
 {
   try {
-    config("usage: phone_probs [OPTION...]\n")
+    config("usage: tie [OPTION...]\n")
       ('h', "help", "", "", "display help")
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")

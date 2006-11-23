@@ -73,7 +73,7 @@ open_files(const std::string &audio_file, const std::string &phn_file,
 
 
 void
-set_speaker(std::string speaker, int grid_iter)
+set_speaker(std::string speaker, std::string utterance, int grid_iter)
 {
   float new_warp;
   int i;
@@ -83,6 +83,8 @@ set_speaker(std::string speaker, int grid_iter)
   if (cur_speaker.size() > 0)
   {
     speaker_conf.set_speaker(speaker);
+    if (utterance.size() > 0)
+      speaker_conf.set_utterance(utterance);
     
     SpeakerStatsMap::iterator it = speaker_stats.find(speaker);
     if (it == speaker_stats.end())
@@ -137,9 +139,7 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
 
   for (grid_iter = 0; grid_iter < grid_size; grid_iter++)
   {
-    set_speaker(speaker, grid_iter);
-    if (utterance.size() > 0)
-      speaker_conf.set_utterance(utterance);
+    set_speaker(speaker, utterance, grid_iter);
     
     phn_reader.reset_file();
     
@@ -162,11 +162,7 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
       }
 
       if (phn.speaker.size() > 0 && phn.speaker != cur_speaker)
-      {
-        set_speaker(phn.speaker, grid_iter);
-        if (utterance.size() > 0)
-          speaker_conf.set_utterance(utterance);
-      }
+        set_speaker(phn.speaker, utterance, grid_iter);
 
       if (cur_speaker.size() == 0)
         throw std::string("Speaker ID is missing");

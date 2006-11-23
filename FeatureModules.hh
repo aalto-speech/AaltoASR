@@ -213,6 +213,7 @@ private:
 
   float m_emph_coef; //!< Pre-emphasis filter coefficient
   int m_magnitude; //!< If nonzero, compute magnitude spectrum instead of power
+  int m_log; //!< If nonzero, take logarithms of the output
 
   std::vector<float> m_hamming_window;
   fftw_plan m_coeffs;
@@ -403,6 +404,7 @@ public:
   static const char *type_str() { return "vtln"; }
 
   void set_warp_factor(float factor);
+  void set_slapt_warp(std::vector<float> &params);
   float get_warp_factor(void) { return m_warp_factor; }
   virtual void set_parameters(const ModuleConfig &config);
   virtual void get_parameters(ModuleConfig &config);
@@ -414,17 +416,20 @@ private:
 
   void create_pwlin_bins(void);
   void create_blin_bins(void);
+  void create_slapt_bins(void);
   void create_sinc_coef_table(void);
 
 private:
   int m_use_pwlin;
   float m_pwlin_turn_point;
+  int m_use_slapt;
   int m_sinc_interpolation_rad;
   bool m_lanczos_window;
   std::vector<float> m_vtln_bins;
   std::vector< std::vector<float> > m_sinc_coef;
   std::vector<int> m_sinc_coef_start;
   float m_warp_factor;
+  std::vector<float> m_slapt_params;
 };
 
 
@@ -452,6 +457,5 @@ private:
   std::vector< std::vector<float> > m_coef;
   std::vector<int> m_interpolation_start;
 };
-
 
 #endif /* FEATUREMODULES_HH */

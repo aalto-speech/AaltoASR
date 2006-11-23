@@ -244,6 +244,8 @@ FFTModule::get_module_config(ModuleConfig &config)
   config.set("copy_borders", m_copy_borders);
   config.set("pre_emph_coef", m_emph_coef);
   config.set("magnitude", m_magnitude);
+  if (m_log)
+    config.set("log", m_log);
 }
 
 void
@@ -268,6 +270,8 @@ FFTModule::set_module_config(const ModuleConfig &config)
   config.get("pre_emph_coef", m_emph_coef);
   m_magnitude = 1;
   config.get("magnitude", m_magnitude);
+  m_log = 0;
+  config.get("log", m_log);
 
   m_dim = m_window_width/2+1;
   m_hamming_window.resize(m_window_width);
@@ -355,11 +359,16 @@ FFTModule::generate(int frame)
       m_fftw_dataout[m_window_width-t] * m_fftw_dataout[m_window_width-t];
     if (m_magnitude)
       target[t] = sqrtf(target[t]);
+    if (m_log)
+      target[t] = logf(target[t]);
   }
   // The highest frequency component has zero imaginary part
   target[t] = m_fftw_dataout[t] * m_fftw_dataout[t];
   if (m_magnitude)
     target[t] = sqrtf(target[t]);
+
+  if (m_log)
+    target[t] = logf(target[t]);
   
   if (m_copy_borders && m_first_feature.empty() && frame <= 0)
     target.get(m_first_feature);
@@ -1176,6 +1185,8 @@ VtlnModule::get_module_config(ModuleConfig &config)
     config.set("pwlin_vtln", m_use_pwlin);
     config.set("pwlin_turnpoint", m_pwlin_turn_point);
   }
+  if (m_use_slapt)
+    config.set("slapt", 1);
   if (m_lanczos_window)
     config.set("lanczos_window", 1);
   config.set("sinc_interpolation_rad", m_sinc_interpolation_rad);
@@ -1194,6 +1205,11 @@ VtlnModule::set_module_config(const ModuleConfig &config)
   config.get("pwlin_vtln", m_use_pwlin);
   config.get("pwlin_turnpoint", m_pwlin_turn_point);
 
+  m_use_slapt = 0;
+  config.get("slapt", m_use_slapt);
+  if (m_use_pwlin && m_use_slapt)
+    throw std::string("VtlnModule: Can not use both pwlin_vtln and slapt!");
+
   m_sinc_interpolation_rad = 8;
   config.get("sinc_interpolation_rad", m_sinc_interpolation_rad);
 
@@ -1204,21 +1220,41 @@ VtlnModule::set_module_config(const ModuleConfig &config)
   else
     m_lanczos_window = false;
 
-  set_warp_factor(1.0);
+  if (!m_use_slapt)
+    set_warp_factor(1.0);
+  else
+  {
+    std::vector<float> sparam;
+    sparam.push_back(0.0);
+    set_slapt_warp(sparam);
+  }
 }
 
 void
 VtlnModule::set_parameters(const ModuleConfig &config)
 {
-  float wf = 1.0;
-  config.get("warp_factor", wf);
-  set_warp_factor(wf);
+  if (m_use_slapt)
+  {
+    std::vector<float> sparam;
+    sparam.push_back(0.0);
+    config.get("slapt_coef", sparam);
+    set_slapt_warp(sparam);
+  }
+  else
+  {
+    float wf = 1.0;
+    config.get("warp_factor", wf);
+    set_warp_factor(wf);
+  }
 }
 
 void
 VtlnModule::get_parameters(ModuleConfig &config)
 {
-  config.set("warp_factor", m_warp_factor);
+  if (m_use_slapt)
+    config.set("slapt_coef", m_slapt_params);
+  else
+    config.set("warp_factor", m_warp_factor);
 }
 
 void
@@ -1232,6 +1268,13 @@ VtlnModule::set_warp_factor(float factor)
 }
 
 void
+VtlnModule::set_slapt_warp(std::vector<float> &params)
+{
+  m_slapt_params = params;
+  create_slapt_bins();
+}
+
+void
 VtlnModule::create_pwlin_bins(void)
 {
   int t;
@@ -1240,7 +1283,7 @@ VtlnModule::create_pwlin_bins(void)
 
   border = m_pwlin_turn_point * (float)(m_dim-1);
 
-  m_vtln_bins.reserve(m_dim);
+  m_vtln_bins.resize(m_dim);
   for (t = 0; t < m_dim-1; t++)
   {
     if (!limit)
@@ -1264,7 +1307,7 @@ void
 VtlnModule::create_blin_bins(void)
 {
   int t;
-  m_vtln_bins.reserve(m_dim);
+  m_vtln_bins.resize(m_dim);
   for (t = 0; t < m_dim-1; t++)
   {
     double nf = M_PI * (double)t / (m_dim - 1);
@@ -1272,6 +1315,25 @@ VtlnModule::create_blin_bins(void)
                                  1+(1-m_warp_factor)*cos(nf))/M_PI*(m_dim-1);
   }
   m_vtln_bins[t] = m_dim-1;
+  if (m_sinc_interpolation_rad > 0)
+    create_sinc_coef_table();
+}
+
+void
+VtlnModule::create_slapt_bins(void)
+{
+  int t, i;
+  m_vtln_bins.resize(m_dim);
+  for (t = 0; t < m_dim-1; t++)
+  {
+    double nf = M_PI * (double)t / (m_dim - 1);
+    
+    m_vtln_bins[t] = t;
+    for (i = 0; i < (int)m_slapt_params.size(); i++)
+      m_vtln_bins[t] += m_slapt_params[i]*sin((i+1)*nf)*(m_dim-1);
+  }
+  m_vtln_bins[t] = m_dim-1;
+
   if (m_sinc_interpolation_rad > 0)
     create_sinc_coef_table();
 }
@@ -1459,3 +1521,4 @@ SRNormModule::generate(int frame)
     }
   }
 }
+
