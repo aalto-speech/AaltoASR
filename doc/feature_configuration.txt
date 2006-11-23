@@ -54,6 +54,8 @@ MODULE TYPES
       instead of magnitude values.
     - pre_emph_coef (float, default 0.97) : Coefficient for pre-emphasis
       filter.
+    - log (int, default 0): If nonzero, a logarithm of the spectrum values
+      is returned.
 
 - pre (BASE MODULE)
 
@@ -189,9 +191,13 @@ MODULE TYPES
       table. If zero, uses linear interpolation instead.
     - lanczos_window (int, default 1): If positive, uses lanczos windowing
       instead of pure sinc interpolation.
+    - slapt (int, default 0): If nonzero, uses SLAPT parameterization for
+      the warping curve.
 
     Run-time parameters:
     - warp_factor (float): Warping factor for the transformation.
+    - slapt (float vector): If slapt is in use, the coefficients for the
+      warping curve.
 
 - concat
 
