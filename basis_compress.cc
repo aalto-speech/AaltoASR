@@ -14,6 +14,7 @@ int info_flag;
 int pcgmm_flag;
 int scgmm_flag;
 int kl_flag;
+int old_flag;
 
 int dim;
 int lambda_dim;
@@ -38,7 +39,8 @@ main(int argc, char *argv[])
       ('h', "help", "", "", "display help")
       ('g', "gk=FILE", "arg must", "", "full covariance gaussians")
       ('o', "out=FILE", "arg must", "", "compressed gaussians")
-      ('b', "basis=FILE", "arg must", "", "basis to be used")
+      ('p', "old=FILE", "arg", "", ".gk with old basis coefficients")
+      ('b', "basis=FILE", "arg", "", "basis to be used")
       ('d', "dim", "arg", "", "dimension of untied parameters, default=basis dimension")
       ('k', "kl=FILE", "arg", "", "kullback-leibler divergences for each gaussian")
       ('i', "info=INT", "arg", "0", "info level")
@@ -46,7 +48,8 @@ main(int argc, char *argv[])
       ('\0', "hcl_line_cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
       ;
     config.default_parse(argc, argv);
-    
+
+    old_flag = config["old"].specified;
     info_flag = config["info"].get_int();
     kl_flag = config["kl"].specified;
     
@@ -62,9 +65,11 @@ main(int argc, char *argv[])
     if (!config["out"].specified)
       throw std::string("--out=FILE must be specified");
     
-    if (!config["basis"].specified)
-      throw std::string("--basis=FILE must be specified");
-    
+    if (config["basis"].specified && config["old"].specified)
+      throw std::string("you don't have to define both --basis and --old");
+
+    if (!config["basis"].specified && !config["old"].specified)
+      throw std::string("you have to define either --basis or --old");
   }
   catch (std::exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());
@@ -76,10 +81,18 @@ main(int argc, char *argv[])
   }
   
   // Read parameters from the first line
-  std::ifstream ibasis(config["basis"].get_str().c_str());
   std::string type_line;
-  ibasis >> dim >> type_line >> basis_dim;
-  ibasis.close();
+  if (config["basis"].specified) {
+    std::ifstream ibasis(config["basis"].get_str().c_str());
+    ibasis >> dim >> type_line >> basis_dim;
+    ibasis.close();
+  }
+  else if (config["old"].specified) {
+    std::ifstream iold(config["old"].get_str().c_str());
+    int dummy;
+    iold >> dummy >> dim >> type_line >> basis_dim;
+    iold.close();
+  }
 
   if (config["dim"].specified) {
     lambda_dim=config["dim"].get_int();
@@ -97,7 +110,7 @@ main(int argc, char *argv[])
     pcgmm_flag=0;
     scgmm_flag=1;
   }
-  
+
   // Compress all gaussians
   if (pcgmm_flag)
     compress_pcgmm();
@@ -118,17 +131,27 @@ main(int argc, char *argv[])
 void compress_pcgmm() {
 
   pcgmm.reset(basis_dim, dim, num_gaussians);
-  pcgmm.read_basis(config["basis"].get_str());  
-  LaVectorDouble lambda(lambda_dim);
+  
+  if (old_flag) {
+    pcgmm.read_gk(config["old"].get_str());
+    assert((int)pcgmm.num_gaussians()==fc_model.num_kernels());
+  } else
+    pcgmm.read_basis(config["basis"].get_str());  
+
   LaGenMatDouble sample_cov(dim, dim);
   LaGenMatDouble model_cov(dim, dim);
 
   for (int k=0; k<fc_model.num_kernels(); k++) {
+
+    if (info_flag > 0)
+      printf("Optimizing parameters for gaussian %i\n",k);
     
     // Fetch the next gaussian to be processed
     HmmKernel &fc_kernel=fc_model.kernel(k);
     // Fetch the target pcgmm gaussian
     Pcgmm::Gaussian &pcgmm_gaussian=pcgmm.get_gaussian(k);
+    // Fetch the target lambda
+    LaVectorDouble &lambda=pcgmm_gaussian.lambda;
 
     // Just copy mean    
     for (int i=0; i<dim; i++)
@@ -140,43 +163,61 @@ void compress_pcgmm() {
 	sample_cov(i,j)=fc_kernel.cov.full(i,j);
     
     // Initialize untied parameters
-    lambda(LaIndex())=0;
-    lambda(0)=1;
-    
+    if (!old_flag) {
+      lambda(LaIndex())=0;
+      lambda(0)=1;
+    }
+
+    // Optimize and set the optimized parameters
+    if (config["hcl_bfgs_cfg"].specified)
+      pcgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
+    if (config["hcl_line_cfg"].specified)
+      pcgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
+
     // Optimize and set the optimized parameters
     pcgmm.optimize_lambda(sample_cov, lambda);
-    pcgmm_gaussian.lambda.copy(lambda);
 
     // Save kullback-leibler divergences KL(sample_fc, model_fc)
     if (kl_flag) {
       pcgmm.calculate_covariance(lambda, model_cov);
       kl_divergences[k]=pcgmm.kullback_leibler_covariance(sample_cov, model_cov);
     }
-
-    // Write pcgmm to file
-    pcgmm.write_gk(config["out"].get_str());
   }
+
+  // Write pcgmm to file
+  pcgmm.write_gk(config["out"].get_str());
 }
 
 
 void compress_scgmm() {
 
   scgmm.reset(basis_dim, dim, num_gaussians);
-  scgmm.read_basis(config["basis"].get_str());  
-  LaVectorDouble lambda(lambda_dim);
+
+  if (old_flag) {
+    scgmm.read_gk(config["old"].get_str());
+    assert((int)scgmm.num_gaussians()==fc_model.num_kernels());
+  }
+  else
+    scgmm.read_basis(config["basis"].get_str());
+
   LaVectorDouble sample_mean(dim);
   LaGenMatDouble sample_cov(dim, dim);
   LaVectorDouble model_mean(dim);
   LaGenMatDouble model_cov(dim, dim);
 
   for (int k=0; k<fc_model.num_kernels(); k++) {
+
+    if (info_flag > 0)
+      printf("Optimizing parameters for gaussian %i\n",k);
     
     // Fetch the next gaussian to be processed
     HmmKernel &fc_kernel=fc_model.kernel(k);
     // Fetch the target scgmm gaussian
     Scgmm::Gaussian &scgmm_gaussian=scgmm.get_gaussian(k);
+    // Fetch the target lambda
+    LaVectorDouble &lambda=scgmm_gaussian.lambda;
 
-    // Copy mean to sample_mean    
+    // Copy mean to sample_mean
     for (int i=0; i<dim; i++)
       sample_mean(i)=fc_kernel.center[i];
 
@@ -186,8 +227,10 @@ void compress_scgmm() {
 	sample_cov(i,j)=fc_kernel.cov.full(i,j);
     
     // Initialize untied parameters
-    lambda(LaIndex())=0;
-    lambda(0)=1;
+    if (!old_flag) {
+      lambda(LaIndex())=0;
+      lambda(0)=1;
+    }
     
     // Optimize and set the optimized parameters
     if (config["hcl_bfgs_cfg"].specified)
@@ -196,7 +239,6 @@ void compress_scgmm() {
       scgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
 
     scgmm.optimize_lambda(sample_cov, sample_mean, lambda);
-    scgmm_gaussian.lambda.copy(lambda);
 
     // Save kullback-leibler divergences KL(sample_fc, model_fc)
     if (kl_flag) {
@@ -205,10 +247,10 @@ void compress_scgmm() {
       kl_divergences[k]=scgmm.kullback_leibler(sample_mean, sample_cov,
 					       model_mean, model_cov);
     }
+  }
 
-    // Write scgmm to file
-    scgmm.write_gk(config["out"].get_str());
-  }    
+  // Write scgmm to file
+  scgmm.write_gk(config["out"].get_str());
 }
 
 
