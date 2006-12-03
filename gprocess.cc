@@ -106,24 +106,36 @@ main(int argc, char *argv[])
       HmmKernel &target_kernel=target_model.kernel(k);
       target_kernel.resize(dim, HmmCovariance::FULL);
 
+      // MLLT
       if (mllt_flag) {
 	if (dim != mllt->dim())
 	  throw std::string("Feature dimension doesn't match MLLT dimension!");
 	LaGenMatDouble D=LaGenMatDouble::zeros(dim);
 	LaGenMatDouble t=LaGenMatDouble::zeros(dim);
 	LaGenMatDouble t2=LaGenMatDouble::zeros(dim);
-	for (int i=0; i<dim; i++)
-	  D(i,i)=source_kernel.cov.diag(i);
+	LaVectorDouble t3=LaVectorDouble(dim,1);
+	LaVectorDouble mean=LaVectorDouble(dim,1);
+
+	for (int i=0; i<dim; i++) {
+	  t3(i)=source_kernel.center.at(i);
+	  D(i,i)=source_kernel.cov.diag(i);	  
+	}
 	Blas_Mat_Mat_Mult(H, D, t);
 	Blas_Mat_Mat_Trans_Mult(t, H, t2);
-	for (int i=0; i<dim; i++)
+	Blas_Mat_Vec_Mult(H, t3, mean, 1, 0);
+	for (int i=0; i<dim; i++) {
+	  target_kernel.center.at(i)=mean(i);
 	  for (int j=0; j<dim; j++)
 	    target_kernel.cov.full(i,j)=t2(i,j);
+	}
       }
 
+      // NO MLLT
       else {
-	for (int i=0; i<dim; i++)
+	for (int i=0; i<dim; i++) {
+	  target_kernel.center.at(i)=source_kernel.center.at(i);
 	  target_kernel.cov.full(i,i)=source_kernel.cov.diag(i);
+	}	
       }
       
     }
