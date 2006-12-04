@@ -591,4 +591,6 @@ Pcgmm::optimize_lambda(const LaGenMatDouble &sample_cov,
   
   for (int i=0; i<d; i++)
     lambda(i)=(*x)(i+1);
+
+  HCL_delete(x);
 }

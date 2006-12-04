@@ -28,22 +28,12 @@ Scgmm::copy(const Scgmm &orig)
 void 
 Scgmm::precompute()
 {
-  LaGenMatDouble prec;
-  LaVectorDouble psi;
-  LaVectorDouble mu;
+  LaVectorDouble theta;
   
   // Calculate K for each gaussian
-  // FIXME: use K()
   for (unsigned int i=0; i<num_gaussians(); i++) {
-    calculate_precision(gaussians.at(i).lambda, prec);
-    calculate_psi(gaussians.at(i).lambda, psi);
-    calculate_mu(gaussians.at(i).lambda, mu);
-    
-    gaussians.at(i).K_value=
-      -fea_dim()*log(2*3.1416)
-      +log(LinearAlgebra::determinant(prec))
-      -Blas_Dot_Prod(psi, mu);
-    gaussians.at(i).K_value /= 2;
+    calculate_theta(gaussians.at(i).lambda, theta);    
+    gaussians.at(i).K_value=K(theta);
   }
 }
 
@@ -55,19 +45,23 @@ Scgmm::compute_likelihoods(const FeatureVec &feature,
   lls.resize(num_gaussians());
 
   // Convert feature vector to exponential feature vector in lapackpp format
-  LaVectorDouble f=LaVectorDouble(exp_dim());
-  LaVectorDouble f_precision_part=LaVectorDouble(exp_dim()-fea_dim());
+  LaVectorDouble feature_linear=LaVectorDouble(fea_dim());
+  LaVectorDouble feature_exp=LaVectorDouble(exp_dim());
+  LaVectorDouble feature_second_moment=LaVectorDouble(exp_dim()-fea_dim());
   LaGenMatDouble xxt=LaGenMatDouble::zeros(fea_dim(),fea_dim());
-  for (unsigned int i=0; i<fea_dim(); i++)
-    f(i)=feature[i];
-  Blas_R1_Update(xxt, f(LaIndex(0,fea_dim()-1)), f(LaIndex(0,fea_dim()-1)), -0.5);
-  LinearAlgebra::map_m2v(xxt, f_precision_part);
+  for (unsigned int i=0; i<fea_dim(); i++) {
+    feature_linear(i)=feature[i];
+    feature_exp(i)=feature[i];
+  }
+
+  Blas_R1_Update(xxt, feature_linear, feature_linear, -0.5);
+  LinearAlgebra::map_m2v(xxt, feature_second_moment);
   for (unsigned int i=fea_dim(); i<exp_dim(); i++)
-    f(i)=f_precision_part(i);
+    feature_exp(i)=feature_second_moment(i-fea_dim());
 
   // Compute 'quadratic features'
   for (int i=0; i<basis_dim(); i++)
-    quadratic_feas(i)=Blas_Dot_Prod(basis_theta.at(i), f);
+    quadratic_feas(i)=Blas_Dot_Prod(basis_theta.at(i), feature_exp);
   
   // Compute likelihoods
   for (unsigned int i=0; i<num_gaussians(); i++) {
@@ -113,6 +107,7 @@ Scgmm::reset_basis(const unsigned int basis_dim,
   basis_psi.resize(basis_dim);
   basis_P.resize(basis_dim);
   basis_Pvec.resize(basis_dim);
+  quadratic_feas.resize(basis_dim,1);
 
   for (unsigned int i=0; i<basis_dim; i++) {
     basis_theta.at(i).resize(m_exp_dim, 1);
@@ -995,4 +990,6 @@ Scgmm::optimize_lambda(const LaGenMatDouble &sample_cov,
   
   for (int i=0; i<d; i++)
     lambda(i)=(*x)(i+1);
+
+  HCL_delete(x);
 }
