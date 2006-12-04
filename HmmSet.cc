@@ -639,6 +639,8 @@ HmmSet::compute_observation_log_probs(const FeatureVec &feature)
 
   if (pcgmm.basis_dim() > 0)
     pcgmm.compute_likelihoods(feature, obs_kernel_likelihoods);
+  else if (scgmm.basis_dim() > 0)
+    scgmm.compute_likelihoods(feature, obs_kernel_likelihoods);
   else {
     obs_kernel_likelihoods.resize(num_kernels());
     for (int k = 0; k < num_kernels(); k++) {
