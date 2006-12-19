@@ -340,8 +340,9 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
   LaVectorDouble transformed_mean=LaVectorDouble(d_exp);
   LaGenMatDouble transformed_covariance=LaGenMatDouble::zeros(d_exp);
   LaVectorLongInt pivots(d);
-  std::vector<LaVectorDouble> transformed_psis;
-  std::vector<LaVectorDouble> transformed_precisions;
+  //  std::vector<LaVectorDouble> transformed_psis;
+  //  std::vector<LaVectorDouble> transformed_precisions;
+  LaGenMatDouble transformed_parameters=LaGenMatDouble::zeros(d_exp, c.size());
   total_mean(LaIndex())=0;
   total_psi(LaIndex())=0;
   transformed_mean(LaIndex())=0;
@@ -355,16 +356,14 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
 
   // Calculate total mean
   for (unsigned int i=0; i<c.size(); i++)
-    Blas_Add_Mult(total_mean, c.at(i), means.at(i));
-  Blas_Scale(1/c_sum, total_mean);
+    Blas_Add_Mult(total_mean, c.at(i)/c_sum, means.at(i));
 
   // Calculate total covariance
   LaGenMatDouble identity=LaGenMatDouble::eye(d);
   for (unsigned int i=0; i<c.size(); i++) {
-    Blas_Mat_Mat_Mult(identity, covs.at(i), total_covariance, c.at(i), 1);
-    Blas_R1_Update(total_covariance, means.at(i), means.at(i), c.at(i));
+    Blas_Mat_Mat_Mult(identity, covs.at(i), total_covariance, c.at(i)/c_sum, 1);
+    Blas_R1_Update(total_covariance, means.at(i), means.at(i), c.at(i)/c_sum);
   }
-  Blas_Scale(1/c_sum, total_covariance);
   Blas_R1_Update(total_covariance, total_mean, total_mean, -1);
 
   // Total precision, psi and some powers of P
@@ -376,13 +375,13 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
   LinearAlgebra::matrix_power(total_precision, total_precision_negsqrt, -0.5);
 
   // Transform the full covariance parameters
-  transformed_psis.resize(c.size());
-  transformed_precisions.resize(c.size());
   matrix_t1.resize(d,d);
   matrix_t2.resize(d,d);
   vector_t1.resize(d,1);
   vector_t2.resize(d_exp,1);
 
+  LaVectorDouble transformed_psi=LaVectorDouble(d,1);
+  LaVectorDouble transformed_precision=LaVectorDouble(d_vec,1);
   for (unsigned int i=0; i<c.size(); i++) {
     matrix_t1.copy(covs.at(i));
     LUFactorizeIP(matrix_t1, pivots);
@@ -391,29 +390,25 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
     // At this point P_g = matrix_t1, psi_g = vector_t1
     Blas_Mat_Vec_Mult(matrix_t1, total_mean, vector_t1, -1, 1);
     // Now vector_t1 = psi_g - P_g * total_mean
-    transformed_psis.at(i).resize(d,1);
-    Blas_Mat_Vec_Mult(total_precision_negsqrt, vector_t1, transformed_psis.at(i));
+    Blas_Mat_Vec_Mult(total_precision_negsqrt, vector_t1, transformed_psi);
     Blas_Mat_Mat_Mult(total_precision_negsqrt, matrix_t1, matrix_t2);
     Blas_Mat_Mat_Mult(matrix_t2, total_precision_negsqrt, matrix_t1);
-    LinearAlgebra::map_m2v(matrix_t1, transformed_precisions.at(i));
+    LinearAlgebra::map_m2v(matrix_t1, transformed_precision);
     // SCALED BY 1/SQRT(2) TO GET THE DESIRED FORM FOR INITIALIZATION
-    Blas_Scale(1/sqrt(2), transformed_precisions.at(i));
+    Blas_Scale(1/sqrt(2), transformed_precision);
     
     // Combine psi and P to get theta
     for (int j=0; j<d; j++)
-      vector_t2(j)=transformed_psis.at(i)(j);
+      transformed_parameters(j,i)=transformed_psi(j);
     for (int j=d; j<d_exp; j++)
-      vector_t2(j)=transformed_precisions.at(i)(j);
-    
-    // Calculate mean and covariance of the transformed parameters
-    Blas_Add_Mult(transformed_mean, c.at(i)/c_sum, vector_t2);
-    Blas_R1_Update(transformed_covariance, vector_t2, vector_t2, c.at(i)/c_sum);
+      transformed_parameters(j,i)=transformed_precision(j-d);
   }
-  Blas_R1_Update(transformed_covariance, transformed_mean, transformed_mean, -c_sum);
-  
-  // PCA for covariance of the transformed parameters
-  vector_t1.resize(d_exp, 1);
-  LaEigSolveSymmetricVecIP(transformed_covariance, vector_t1);
+
+  // Do the singular value decomposition
+  LaVectorDouble Sigma=LaVectorDouble(d_exp,1);
+  LaGenMatDouble U=LaGenMatDouble(d_exp,d_exp);
+  LaGenMatDouble VT=LaGenMatDouble(c.size(), c.size());
+  LaSVD_IP(transformed_parameters, Sigma, U, VT);
 
   // Let's initialize the basis itself
   basis_theta.resize(basis_dim);
@@ -445,12 +440,11 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
 	basis_theta.at(i)(j)=vector_t4(j-d);
       vector_t4.resize(d, 1);
     }
-    // Others are top eigenvectors of the transformed_covariance
-    // after inverse transform
+    // Others are top singular vectors of the transformed_parameters
     else {
       // vector_t1 equals i:th eigenvector
       for (int j=0; j<d_exp; j++)
-	vector_t1(j)=transformed_covariance(j, d_exp-i);
+	vector_t1(j)=U(j, i-1);
       
       // matrix_t1 equals precision part of the i:th eigenvector
       LinearAlgebra::map_v2m(vector_t1(LaIndex(d, d_exp-1)), matrix_t1);
