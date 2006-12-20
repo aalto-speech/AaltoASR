@@ -210,14 +210,20 @@ main(int argc, char *argv[])
   
   // Prune components with small weights
   if (prune>0) {
+    std::vector<int> remove_indices;
     for (int s=0; s<target_model.num_states(); s++) {
       HmmState &state=target_model.state(s);
-      for (unsigned int k=state.weights.size()-1; k>0; k--) {
-	if (state.weights[k].weight<prune) {
-	  int remove_index=state.weights[k].kernel;
-	  target_model.remove_kernel(remove_index);	  
-	}
-      }      
+      
+      remove_indices.resize(0);
+      for (unsigned int k=state.weights.size()-1; k>0; k--)
+	if (state.weights[k].weight<prune)
+	  remove_indices.push_back(state.weights[k].kernel);
+      for (unsigned int k=0; k<remove_indices.size(); k++) {
+	// Don't remove the last gaussian for this state
+	if (remove_indices.at(k)==0 && state.weights.size()==1)
+	  continue;
+	target_model.remove_kernel(remove_indices.at(k));
+      }
     }
   }
 
