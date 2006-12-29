@@ -398,7 +398,6 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
   // Do the singular value decomposition
   LaVectorDouble Sigma=LaVectorDouble(d_exp,1);
   LaGenMatDouble U=LaGenMatDouble(d_exp,d_exp);
-  //  LaGenMatDouble VT=LaGenMatDouble(c.size(), c.size());
   LaGenMatDouble VT=LaGenMatDouble(0, 0);
   LaSVD_IP(transformed_parameters, Sigma, U, VT);
 
