@@ -38,8 +38,8 @@ LinearAlgebra::matrix_power(const LaGenMatDouble &A,
   LaGenMatDouble t2=LaGenMatDouble::zeros(A.rows());
   for (int i=0; i<t.rows(); i++)
     t(i,i)=pow(D(i),power);
-  Blas_Mat_Mat_Mult(V, t, t2);
-  Blas_Mat_Mat_Mult(t2, V_inverse, B);
+  Blas_Mat_Mat_Mult(V, t, t2, 1.0, 0.0);
+  Blas_Mat_Mat_Mult(t2, V_inverse, B, 1.0, 0.0);
 }
 
 
@@ -86,8 +86,8 @@ LinearAlgebra::generalized_eigenvalues(const LaGenMatDouble &A,
   eigvecs.resize(A.rows(),A.cols());
   
   matrix_power(B, B_negsqrt, -0.5);
-  Blas_Mat_Mat_Mult(B_negsqrt, A, t);
-  Blas_Mat_Mat_Mult(t, B_negsqrt, eigvecs);
+  Blas_Mat_Mat_Mult(B_negsqrt, A, t, 1.0, 0.0);
+  Blas_Mat_Mat_Mult(t, B_negsqrt, eigvecs, 1.0, 0.0);
   
   LaEigSolveSymmetricVecIP(eigvecs, eigvals);
 }
@@ -373,7 +373,7 @@ LinearAlgebra::force_min_eig(LaGenMatDouble &m, double min_eig)
     eigs(i,i)=std::max(min_eig, eigs_vector(i));
 
   // Calculate EIGV*EIGS*EIGV'
-  Blas_Mat_Mat_Mult(eigv, eigs, temp);
-  Blas_Mat_Mat_Trans_Mult(temp, eigv, m);
+  Blas_Mat_Mat_Mult(eigv, eigs, temp, 1.0, 0.0);
+  Blas_Mat_Mat_Trans_Mult(temp, eigv, m, 1.0, 0.0);
 }
 

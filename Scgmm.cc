@@ -398,7 +398,8 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
   // Do the singular value decomposition
   LaVectorDouble Sigma=LaVectorDouble(d_exp,1);
   LaGenMatDouble U=LaGenMatDouble(d_exp,d_exp);
-  LaGenMatDouble VT=LaGenMatDouble(c.size(), c.size());
+  //  LaGenMatDouble VT=LaGenMatDouble(c.size(), c.size());
+  LaGenMatDouble VT=LaGenMatDouble(0, 0);
   LaSVD_IP(transformed_parameters, Sigma, U, VT);
 
   // Let's initialize the basis itself
@@ -667,7 +668,7 @@ Scgmm::G(const LaVectorDouble &mean,
   Blas_Add_Mult(t, -1, sample_mean);
   Blas_R1_Update(Sigma, t, t, 1);
 
-  Blas_Mat_Mat_Mult(Sigma, precision, C);
+  Blas_Mat_Mat_Mult(Sigma, precision, C, 1.0, 0.0);
   g-=C.trace();
   
   /* debug
@@ -840,7 +841,7 @@ Scgmm::kullback_leibler(const LaVectorDouble &mu1,
   LUFactorizeIP(t1, pivots);
   LaLUInverseIP(t1, pivots);
   
-  Blas_Mat_Mat_Mult(t1, sigma1, t2);
+  Blas_Mat_Mat_Mult(t1, sigma1, t2, 1.0, 0.0);
   Blas_Add_Mult(t3, -1, mu1); 
   Blas_Mat_Vec_Mult(t1, t3, t4);
   

@@ -120,8 +120,8 @@ Pcgmm::initialize_basis_pca(const std::vector<double> &c,
     LaLUInverseIP(sample_precs.at(i), pivots);
     // Normalize by calculating m^(-1/2) * P * m^(-1/2)
     matrix_t1.resize(d,d);
-    Blas_Mat_Mat_Mult(m_neg_sqrt, sample_precs.at(i), matrix_t1, 1, 0);
-    Blas_Mat_Mat_Mult(matrix_t1, m_neg_sqrt, sample_precs.at(i), 1, 0);
+    Blas_Mat_Mat_Mult(m_neg_sqrt, sample_precs.at(i), matrix_t1, 1.0, 0.0);
+    Blas_Mat_Mat_Mult(matrix_t1, m_neg_sqrt, sample_precs.at(i), 1.0, 0.0);
   }
   
   // Map sample precisions to vectors
@@ -158,15 +158,15 @@ Pcgmm::initialize_basis_pca(const std::vector<double> &c,
   matrix_t2.resize(d,d);
 
   // S_0
-  Blas_Mat_Mat_Mult(m_sqrt, mbasis.at(0), matrix_t1, 1, 0);
-  Blas_Mat_Mat_Mult(matrix_t1, m_sqrt, mbasis.at(0), 1, 0);
+  Blas_Mat_Mat_Mult(m_sqrt, mbasis.at(0), matrix_t1, 1.0, 0.0);
+  Blas_Mat_Mat_Mult(matrix_t1, m_sqrt, mbasis.at(0), 1.0, 0.0);
   LinearAlgebra::map_m2v(mbasis.at(0), vbasis.at(0));
   // S_i, i=1,2,3...
   for (unsigned int i=1; i<basis_dim; i++) {
     vector_t1.copy(C.col(C.cols()-i));
     LinearAlgebra::map_v2m(vector_t1, matrix_t1);
-    Blas_Mat_Mat_Mult(m_sqrt, matrix_t1, matrix_t2, 1, 0);
-    Blas_Mat_Mat_Mult(matrix_t2, m_sqrt, mbasis.at(i), 1, 0);
+    Blas_Mat_Mat_Mult(m_sqrt, matrix_t1, matrix_t2, 1.0, 0.0);
+    Blas_Mat_Mat_Mult(matrix_t2, m_sqrt, mbasis.at(i), 1.0, 0.0);
     LinearAlgebra::map_m2v(mbasis.at(i), vbasis.at(i));
   }
 }
@@ -456,7 +456,7 @@ Pcgmm::gradient_untied(const HCL_RnVector_d &lambda,
   
   t.resize(fea_dim(), fea_dim());
   for (int i=0; i<lambda.Dim(); i++) {
-    Blas_Mat_Mat_Mult(mbasis.at(i), curr_cov_estimate, t);
+    Blas_Mat_Mat_Mult(mbasis.at(i), curr_cov_estimate, t, 1.0, 0.0);
     grad(i+1)=t.trace();
   }
 }
@@ -468,7 +468,7 @@ Pcgmm::G(const LaGenMatDouble &precision,
 {
   LaGenMatDouble C(precision.rows(), precision.cols());
   double t=log(LinearAlgebra::determinant(precision));
-  Blas_Mat_Mat_Mult(sample_cov, precision, C);
+  Blas_Mat_Mat_Mult(sample_cov, precision, C, 1.0, 0.0);
   t-=C.trace();
 
   /* debug
@@ -555,7 +555,7 @@ Pcgmm::kullback_leibler_covariance(const LaGenMatDouble &sigma1,
   double value=LinearAlgebra::determinant(sigma2)
     /LinearAlgebra::determinant(sigma1);
   value=log2(value);
-  Blas_Mat_Mat_Mult(t1, sigma1, t2);
+  Blas_Mat_Mat_Mult(t1, sigma1, t2, 1.0, 0.0);
   value += t2.trace();
   value -= sigma1.cols();
   value *= 0.5;

@@ -148,7 +148,7 @@ private:
       LaGenMatDouble t=LaGenMatDouble::zeros(d);
       LaGenMatDouble t2=LaGenMatDouble::zeros(d);
       LinearAlgebra::matrix_power(m_precision, t, -0.5);
-      Blas_Mat_Mat_Mult(m_eigvecs, t, t2);
+      Blas_Mat_Mat_Mult(m_eigvecs, t, t2, 1.0, 0.0);
 
       m_v.resize(d,1);
       m_dv.resize(d,1);

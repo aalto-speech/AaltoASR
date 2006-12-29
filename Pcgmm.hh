@@ -137,7 +137,7 @@ private:
       m_pcgmm->calculate_precision(*m_dir, m_R);
       m_pcgmm->limit_line_search(m_R, m_precision, m_eigs, m_max_step);
       LaGenMatDouble t(m_pcgmm->fea_dim(), m_pcgmm->fea_dim());
-      Blas_Mat_Mat_Mult(m_sample_cov, m_R, t);
+      Blas_Mat_Mat_Mult(m_sample_cov, m_R, t, 1.0, 0.0);
       m_beta=t.trace();
     };
 

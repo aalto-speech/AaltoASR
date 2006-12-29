@@ -120,9 +120,9 @@ main(int argc, char *argv[])
 	  t3(i)=source_kernel.center.at(i);
 	  D(i,i)=source_kernel.cov.diag(i);	  
 	}
-	Blas_Mat_Mat_Mult(H, D, t);
+	Blas_Mat_Mat_Mult(H, D, t, 1.0, 0.0);
 	Blas_Mat_Mat_Trans_Mult(t, H, t2);
-	Blas_Mat_Vec_Mult(H, t3, mean, 1, 0);
+	Blas_Mat_Vec_Mult(H, t3, mean);
 	for (int i=0; i<dim; i++) {
 	  target_kernel.center.at(i)=mean(i);
 	  for (int j=0; j<dim; j++)
