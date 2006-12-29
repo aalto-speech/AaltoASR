@@ -123,8 +123,6 @@ main(int argc, char *argv[])
     for (int g=0; g<num_gaussians; g++)
       klfile << kl_divergences[g] << std::endl;    
   }
-
-  return 1;
 }
 
 
