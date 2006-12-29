@@ -387,19 +387,10 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
     LUFactorizeIP(matrix_t1, pivots);
     LaLUInverseIP(matrix_t1, pivots);
     Blas_Mat_Vec_Mult(matrix_t1, means.at(i), vector_t1);
-    // At this point P_g = matrix_t1, psi_g = vector_t1
-    Blas_Mat_Vec_Mult(matrix_t1, total_mean, vector_t1, -1, 1);
-    // Now vector_t1 = psi_g - P_g * total_mean
-    Blas_Mat_Vec_Mult(total_precision_negsqrt, vector_t1, transformed_psi);
-    Blas_Mat_Mat_Mult(total_precision_negsqrt, matrix_t1, matrix_t2);
-    Blas_Mat_Mat_Mult(matrix_t2, total_precision_negsqrt, matrix_t1);
     LinearAlgebra::map_m2v(matrix_t1, transformed_precision);
-    // SCALED BY 1/SQRT(2) TO GET THE DESIRED FORM FOR INITIALIZATION
-    Blas_Scale(1/sqrt(2), transformed_precision);
-    
-    // Combine psi and P to get theta
+
     for (int j=0; j<d; j++)
-      transformed_parameters(j,i)=transformed_psi(j);
+      transformed_parameters(j,i)=vector_t1(j);
     for (int j=d; j<d_exp; j++)
       transformed_parameters(j,i)=transformed_precision(j-d);
   }
@@ -452,18 +443,8 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
       // vector_t2 equals psi part of the i:th eigenvector
       vector_t2.copy(vector_t1(LaIndex(0, d-1)));
 
-      // Psi_i
-      vector_t3.resize(d,1);
-      Blas_Mat_Vec_Mult(total_precision_sqrt, total_mean, vector_t3, 1, 0);
-      Blas_Mat_Vec_Mult(matrix_t1, vector_t3, vector_t4, 1, 0);
-      Blas_Add_Mult(vector_t2, 1, vector_t4);
-      Blas_Mat_Vec_Mult(total_precision_sqrt, vector_t2, basis_psi.at(i));
-
-      // Precision_i
-      Blas_Mat_Mat_Mult(total_precision_sqrt, matrix_t1, matrix_t2);
-      Blas_Mat_Mat_Mult(matrix_t2, total_precision_sqrt, basis_P.at(i));
-      // SCALED BY SQRT(2) TO GET THE "NORMAL" FORM!!
-      Blas_Scale(sqrt(2), basis_P.at(i));
+      basis_psi.at(i).copy(vector_t2);
+      basis_P.at(i).copy(matrix_t1);
       LinearAlgebra::map_m2v(basis_P.at(i), basis_Pvec.at(i));
 
       // Theta_i
