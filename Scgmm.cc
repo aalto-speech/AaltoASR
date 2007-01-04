@@ -335,6 +335,7 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
   LaVectorDouble total_psi=LaVectorDouble(d,1);
   LaGenMatDouble total_covariance=LaGenMatDouble::zeros(d);
   LaGenMatDouble total_precision=LaGenMatDouble::zeros(d);
+  LaVectorDouble total_precision_vec=LaVectorDouble(d_vec,1);
   LaGenMatDouble total_precision_sqrt=LaGenMatDouble::zeros(d);
   LaGenMatDouble total_precision_negsqrt=LaGenMatDouble::zeros(d);
   LaVectorDouble transformed_mean=LaVectorDouble(d_exp);
@@ -373,6 +374,7 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
   Blas_Mat_Vec_Mult(total_precision, total_mean, total_psi, 1, 0);
   LinearAlgebra::matrix_power(total_precision, total_precision_sqrt, 0.5);
   LinearAlgebra::matrix_power(total_precision, total_precision_negsqrt, -0.5);
+  LinearAlgebra::map_m2v(total_precision, total_precision_vec);
 
   // Transform the full covariance parameters
   matrix_t1.resize(d,d);
@@ -390,10 +392,20 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
     LinearAlgebra::map_m2v(matrix_t1, transformed_precision);
 
     for (int j=0; j<d; j++)
-      transformed_parameters(j,i)=vector_t1(j);
+      transformed_parameters(j,i)=c.at(i)*vector_t1(j);
     for (int j=d; j<d_exp; j++)
-      transformed_parameters(j,i)=transformed_precision(j-d);
+      transformed_parameters(j,i)=c.at(i)*transformed_precision(j-d);
   }
+
+  // Remove average
+  LaVectorDouble average=LaVectorDouble(d_exp,1);
+  average(LaIndex())=0;
+  for (unsigned int i=0; i<c.size(); i++)
+    for (int j=0; j<d_exp; j++)
+      average(j) += transformed_parameters(j,i)/c.size();
+  for (unsigned int i=0; i<c.size(); i++)
+    for (int j=0; j<d_exp; j++)
+      transformed_parameters(j,i) -= average(j);
 
   // Do the singular value decomposition
   LaVectorDouble Sigma=LaVectorDouble(d_exp,1);
