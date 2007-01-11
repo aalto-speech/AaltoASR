@@ -330,10 +330,16 @@ FFTModule::generate(int frame)
 
   // EOF during this frame?
   if (m_eof_frame == INT_MAX && m_reader.eof_sample() < window_end) {
-    if (frame == 0)
-      throw std::string("audio shorter than frame");
     assert(m_reader.eof_sample() >= window_start);
     m_eof_frame = frame;
+
+    if (frame == 0)
+      throw std::string("audio shorter than frame");
+
+    if (m_first_feature.empty())
+      m_first_feature.resize(m_dim, 0);
+    if (m_last_feature.empty())
+      m_last_feature.resize(m_dim, 0);
 
     if (m_copy_borders) {
       assert(!m_last_feature.empty());
