@@ -37,7 +37,7 @@ MllrTrainer::~MllrTrainer()
 }
 
 
-void MllrTrainer::find_probs(HmmState *state, FeatureVec &feature)
+void MllrTrainer::find_probs(HmmState *state, const FeatureVec &feature)
 {
   int k_index; // kernel index
   int kernelcount = (state->weights).size();
@@ -64,7 +64,6 @@ void MllrTrainer::find_probs(HmmState *state, FeatureVec &feature)
 
     probs[k] = m_model.compute_kernel_likelihood(k_index, feature);
     prob_sum = prob_sum + probs[k];
-    
   }
   
   if (prob_sum != 0)
@@ -79,7 +78,6 @@ void MllrTrainer::find_probs(HmmState *state, FeatureVec &feature)
 
   update_stats(state, probs, feature);
 }
-
 
 void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
 {
@@ -136,7 +134,7 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
       for (j = 0; j < m_dim; j++)
 	A(i, j) = trans(i, j+1);
     }
-    
+
     // calculate cofactors
     transpose(A);
     lu_factor(A, pivots);
@@ -159,7 +157,9 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
     scale(p, alpha);
     add(*(k_array[row]), p);
     transpose(*(G_array[row]));
+
     mult(*(G_array[row]), p, w);
+
     for(j = 0; j < m_dim+1; j++)
       trans(row, j) = w[j];
     
@@ -216,6 +216,22 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
   clear_stats();
 }
 
+void MllrTrainer::restore_identity(LinTransformModule *mllr_mod)
+{
+  std::vector<float> new_bias;
+  std::vector<float> new_matrix;
+  int dim = mllr_mod->dim();
+  new_bias.resize(dim, 0);
+  new_matrix.resize(dim * dim, 0);
+  for (int i = 0; i < dim; i++)
+  {
+    new_bias[i] = 0;
+    new_matrix[i*dim+i] = 1;
+  }
+  mllr_mod->set_transformation_matrix(new_matrix);
+  mllr_mod->set_transformation_bias(new_bias);
+}
+
 
 void MllrTrainer::clear_stats()
 {
@@ -229,7 +245,7 @@ void MllrTrainer::clear_stats()
 }
 
 void MllrTrainer::update_stats(HmmState *state, float *probs,
-                              FeatureVec &feature)
+                              const FeatureVec &feature)
 {
   typedef double d;
   int i, j; // rows, columns

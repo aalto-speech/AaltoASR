@@ -33,12 +33,15 @@ public:
    *  \param state current hmm state
    *  \param feature current feature
    */
-  void find_probs(HmmState *state, FeatureVec &feature);
+  void find_probs(HmmState *state, const FeatureVec &feature);
 
   /** calculate the transformation matrix and set the transformation module
    *  \param name name of the transformation module
    */
   void calculate_transform(LinTransformModule *mllr_mod);
+
+  /** Restore transformation to identity transform. */
+  static void restore_identity(LinTransformModule *mllr_mod);
 
   void clear_stats();
 
@@ -49,7 +52,7 @@ private:
    *  \param probs kernel probabilities
    *  \param feature the adjoining feature vector
    */
-  void update_stats(HmmState *state, float *probs, FeatureVec &feature);
+  void update_stats(HmmState *state, float *probs, const FeatureVec &feature);
 
   /** calculats parameter alpha
    *  \param Gi inverse of matrix G
@@ -66,7 +69,6 @@ private:
    */
   double quadratic(d_vector &x, d_matrix &A, d_vector &y);
 
-  
 private:
   HmmSet &m_model;
   FeatureGenerator &m_feagen;
