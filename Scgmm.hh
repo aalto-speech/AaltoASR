@@ -216,7 +216,7 @@ public:
   std::vector<double> likelihoods;
   LaVectorDouble quadratic_feas;
 
-  Scgmm() {};
+  Scgmm() { affine=false; };
   ~Scgmm() {};
   
   inline unsigned int fea_dim() { return m_fea_dim; };
@@ -350,6 +350,10 @@ public:
     hcl_line_cfg=std::string(filename);
   }
 
+  void set_affine() {
+    affine=true;
+  }
+
   double kullback_leibler(const HCL_RnVector_d &lambda1,
 			  const HCL_RnVector_d &lambda2);
 
@@ -375,6 +379,7 @@ private:
 
   bool hcl_grad_set;
   bool hcl_line_set;
+  bool affine;
   std::string hcl_grad_cfg;
   std::string hcl_line_cfg;
 

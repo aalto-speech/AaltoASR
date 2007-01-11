@@ -736,6 +736,9 @@ Scgmm::gradient_untied(const HCL_RnVector_d &lambda,
   // gradient in terms of lambdas
   for (int i=0; i<grad.Dim(); i++)
     grad(i+1)=Blas_Dot_Prod(basis_Pvec.at(i),grad_p_vec)+Blas_Dot_Prod(basis_psi.at(i), grad_psi);
+
+  if (affine)
+    grad(1)=0;
 }
 
 

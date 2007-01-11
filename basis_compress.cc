@@ -44,6 +44,7 @@ main(int argc, char *argv[])
       ('d', "dim", "arg", "", "dimension of untied parameters, default=basis dimension")
       ('k', "kl=FILE", "arg", "", "kullback-leibler divergences for each gaussian")
       ('i', "info=INT", "arg", "0", "info level")
+      ('a', "affine", "", "", "affine subspace")
       ('\0', "hcl_bfgs_cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
       ('\0', "hcl_line_cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
       ;
@@ -57,7 +58,7 @@ main(int argc, char *argv[])
       fc_model.read_gk(config["gk"].get_str());
       num_gaussians=fc_model.num_kernels();
       if (kl_flag)
-	kl_divergences.resize(num_gaussians);     
+	kl_divergences.resize(num_gaussians);
     }
     else
       throw std::string("--gk=FILE must be specified");
@@ -171,6 +172,8 @@ void compress_pcgmm() {
       pcgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
     if (config["hcl_line_cfg"].specified)
       pcgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
+    if (config["affine"].specified)
+      pcgmm.set_affine();
 
     // Optimize and set the optimized parameters
     pcgmm.optimize_lambda(sample_cov, lambda);
@@ -235,6 +238,8 @@ void compress_scgmm() {
       scgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
     if (config["hcl_line_cfg"].specified)
       scgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
+    if (config["affine"].specified)
+      scgmm.set_affine();
 
     scgmm.optimize_lambda(sample_cov, sample_mean, lambda);
 

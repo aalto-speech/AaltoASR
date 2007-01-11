@@ -459,6 +459,9 @@ Pcgmm::gradient_untied(const HCL_RnVector_d &lambda,
     Blas_Mat_Mat_Mult(mbasis.at(i), curr_cov_estimate, t, 1.0, 0.0);
     grad(i+1)=t.trace();
   }
+
+  if (affine)
+    grad(1)=0;
 }
 
 

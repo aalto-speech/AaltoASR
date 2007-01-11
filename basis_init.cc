@@ -1,6 +1,8 @@
+#include <cstdio>
 #include <fstream>
 #include <string>
 #include <iostream>
+
 
 #include "io.hh"
 #include "str.hh"
@@ -17,6 +19,7 @@ int flat;
 
 conf::Config config;
 HmmSet fc_model;
+std::vector<double> counts;
 
 
 void init_pcgmm();
@@ -33,6 +36,7 @@ main(int argc, char *argv[])
       ('m', "mc=FILE", "arg must", "", "kernel indices for states")
       ('o', "out=FILE", "arg must", "", "output filename for basis")
       ('d', "dim=INT", "arg must", "", "subspace dimension")
+      ('c', "counts=FILE", "arg", "", "state feature counts")
       ('i', "info=INT", "arg", "0", "info level")
       ('\0', "pcgmm", "", "", "initialize precision basis")
       ('\0', "scgmm", "", "", "initialize exponential basis")
@@ -62,6 +66,24 @@ main(int argc, char *argv[])
     else
       throw std::string("--gk=FILE must be specified");
     
+    if (config["counts"].specified) {
+      FILE *counts_file=fopen((config["counts"].get_str()).c_str(), "r");
+      std::string counts_line;
+      bool ok;
+      double total=0;
+
+      while(str::read_line(&counts_line, counts_file, true))
+	counts.push_back(str::str2float(counts_line.c_str(), &ok));
+      fclose(counts_file);
+
+      for (unsigned int i=0; i<counts.size(); i++)
+	total+=counts[i];
+      for (unsigned int i=0; i<counts.size(); i++)
+	counts[i]/=total;
+
+      if (fc_model.num_states() != (int)counts.size())
+	throw std::string("number of states in count file is invalid");
+    }
   }
   catch (std::exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());
@@ -104,9 +126,12 @@ void init_pcgmm()
       // Weights
       if (flat)
 	w.at(pos)=1;
-      else
+      else {
 	w.at(pos)=state.weights[k].weight;
-
+	if (counts.size() != 0)
+	  w.at(pos) *= counts[s];
+      }
+      
       // Covariances
       covs.at(pos).resize(fc_model.dim(), fc_model.dim());
       for (d1=0; d1<fc_model.dim(); d1++)
@@ -149,8 +174,11 @@ void init_scgmm()
       // Weights
       if (flat)
 	w.at(pos)=1;
-      else
+      else {
 	w.at(pos)=state.weights[k].weight;
+	if (counts.size() != 0)
+	  w.at(pos) *= counts[s];
+      }
 
       // Covariances
       covs.at(pos).resize(fc_model.dim(), fc_model.dim());

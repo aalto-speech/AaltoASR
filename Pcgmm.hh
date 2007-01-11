@@ -183,7 +183,7 @@ public:
   std::vector<double> likelihoods;
   LaVectorDouble quadratic_feas;
   
-  Pcgmm() {};
+  Pcgmm() { affine=false; };
   ~Pcgmm() {};
   
   inline unsigned int fea_dim() { return mbasis[0].rows(); };
@@ -280,6 +280,10 @@ public:
     hcl_line_cfg=std::string(filename);
   }
 
+  void set_affine() {
+    affine=true;
+  }
+
   double kullback_leibler_covariance(const LaGenMatDouble &sigma1,
 				     const LaGenMatDouble &sigma2);
   
@@ -287,6 +291,7 @@ private:
 
   bool hcl_grad_set;
   bool hcl_line_set;
+  bool affine;
   std::string hcl_grad_cfg;
   std::string hcl_line_cfg;
 
