@@ -392,11 +392,12 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
     LinearAlgebra::map_m2v(matrix_t1, transformed_precision);
 
     for (int j=0; j<d; j++)
-      transformed_parameters(j,i)=c.at(i)*vector_t1(j);
+      transformed_parameters(j,i)=vector_t1(j);
+    
     for (int j=d; j<d_exp; j++)
-      transformed_parameters(j,i)=c.at(i)*transformed_precision(j-d);
+      transformed_parameters(j,i)=transformed_precision(j-d);
   }
-
+  
   // Remove average
   LaVectorDouble average=LaVectorDouble(d_exp,1);
   average(LaIndex())=0;
