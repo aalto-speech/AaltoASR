@@ -814,7 +814,7 @@ Scgmm::limit_line_search(const LaGenMatDouble &R,
   if (min>0)
     max_interval=DBL_MAX;
   else
-    max_interval=0.99*(-1/min);
+    max_interval=0.95*(-1/min);
 }
 
 
