@@ -140,6 +140,14 @@ void compress_pcgmm() {
   LaGenMatDouble sample_cov(dim, dim);
   LaGenMatDouble model_cov(dim, dim);
 
+  // Optimize and set the optimized parameters
+  if (config["hcl_bfgs_cfg"].specified)
+    pcgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
+  if (config["hcl_line_cfg"].specified)
+    pcgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
+  if (config["affine"].specified)
+    pcgmm.set_affine();
+  
   for (int k=0; k<fc_model.num_kernels(); k++) {
 
     if (info_flag > 0)
@@ -166,14 +174,6 @@ void compress_pcgmm() {
       lambda(LaIndex())=0;
       lambda(0)=1;
     }
-
-    // Optimize and set the optimized parameters
-    if (config["hcl_bfgs_cfg"].specified)
-      pcgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
-    if (config["hcl_line_cfg"].specified)
-      pcgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
-    if (config["affine"].specified)
-      pcgmm.set_affine();
 
     // Optimize and set the optimized parameters
     pcgmm.optimize_lambda(sample_cov, lambda);
@@ -206,6 +206,14 @@ void compress_scgmm() {
   LaVectorDouble model_mean(dim);
   LaGenMatDouble model_cov(dim, dim);
 
+  // Optimize and set the optimization parameters
+  if (config["hcl_bfgs_cfg"].specified)
+    scgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
+  if (config["hcl_line_cfg"].specified)
+    scgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
+  if (config["affine"].specified)
+    scgmm.set_affine();
+
   for (int k=0; k<fc_model.num_kernels(); k++) {
 
     if (info_flag > 0)
@@ -233,14 +241,6 @@ void compress_scgmm() {
       lambda(0)=1;
     }
     
-    // Optimize and set the optimized parameters
-    if (config["hcl_bfgs_cfg"].specified)
-      scgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
-    if (config["hcl_line_cfg"].specified)
-      scgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
-    if (config["affine"].specified)
-      scgmm.set_affine();
-
     scgmm.optimize_lambda(sample_cov, sample_mean, lambda);
 
     // Save kullback-leibler divergences KL(sample_fc, model_fc)
