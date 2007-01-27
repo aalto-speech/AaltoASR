@@ -960,24 +960,33 @@ Scgmm::optimize_lambda(const LaGenMatDouble &sample_cov,
 {
   assert(sample_cov.rows()==sample_cov.cols());
   assert(sample_cov.rows()==sample_mean.size());
-
+  
   int d=lambda.size();
   ScgmmLambdaFcnl f(d, this, sample_cov, sample_mean);
-
+  
   HCL_RnVector_d *x=(HCL_RnVector_d*)f.Domain().Member();
-
+  
   for (int i=0; i<d; i++)    
     (*x)(i+1)=lambda(i);
-
+  
   HCL_LineSearch_MT_d ls;
   if (hcl_line_set)
     ls.Parameters().Merge(hcl_line_cfg.c_str());
-
+  
   HCL_UMin_lbfgs_d bfgs(&ls);
   if (hcl_grad_set)
     bfgs.Parameters().Merge(hcl_grad_cfg.c_str());
-
-  bfgs.Minimize(f, *x);
+  
+  int pos=0;
+  int trythese[10]={50,40,30,20,10,8,6,4,2,1};
+  bfgs.Parameters().PutValue("MaxUpdates", trythese[pos]);
+ testpoint:
+  try {
+    bfgs.Minimize(f, *x);
+  } catch(LaException e) {
+    pos++;
+    goto testpoint;
+  }
   
   for (int i=0; i<d; i++)
     lambda(i)=(*x)(i+1);

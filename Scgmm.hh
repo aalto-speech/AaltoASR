@@ -19,6 +19,7 @@
 #include "laslv.h"
 #include "lavli.h"
 #include "spdmd.h"
+#include "laexcp.h"
 
 #include "HCL_LineSearch_d.h"
 #include "HCL_UMin_lbfgs_d.h"
