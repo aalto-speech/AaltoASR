@@ -979,9 +979,9 @@ Scgmm::optimize_lambda(const LaGenMatDouble &sample_cov,
   
   int pos=0;
   int trythese[10]={50,40,30,20,10,8,6,4,2,1};
-  bfgs.Parameters().PutValue("MaxUpdates", trythese[pos]);
  testpoint:
   try {
+    bfgs.Parameters().PutValue("MaxUpdates", trythese[pos]);
     bfgs.Minimize(f, *x);
   } catch(LaException e) {
     pos++;
