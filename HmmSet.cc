@@ -171,7 +171,9 @@ void
 HmmSet::remove_kernel(int k_to_remove)
 {
   std::vector<HmmKernel>::iterator kerIt = m_kernels.begin() + k_to_remove;
-  m_kernels.erase(kerIt);
+  // Remove only if kernels loaded
+  if (m_kernels.size() > (unsigned int)k_to_remove)
+    m_kernels.erase(kerIt);
 
   for (int s=0; s<num_states(); s++) {
 
