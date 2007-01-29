@@ -189,6 +189,12 @@ public:
   inline unsigned int fea_dim() { return mbasis[0].rows(); };
   inline int basis_dim() { return mbasis.size(); };
   inline unsigned int num_gaussians() { return gaussians.size(); };
+  inline void remove_gaussian(unsigned int pos)
+  { 
+    std::vector<Gaussian>::iterator it;
+    if (pos<gaussians.size())
+      gaussians.erase(it+pos);     
+  };
   
   void precompute();
 

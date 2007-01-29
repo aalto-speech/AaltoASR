@@ -224,7 +224,13 @@ public:
   inline unsigned int exp_dim() { return m_exp_dim; };
   inline int basis_dim() { return basis_theta.size(); };
   inline unsigned int num_gaussians() { return gaussians.size(); };
-
+  inline void remove_gaussian(unsigned int pos)
+  { 
+    std::vector<Gaussian>::iterator it;
+    if (pos<gaussians.size())
+      gaussians.erase(it+pos);     
+  };
+  
   void precompute();
   
   void compute_likelihoods(const FeatureVec &feature,
