@@ -440,7 +440,8 @@ Pcgmm::calculate_covariance(const HCL_RnVector_d &lambda,
 void
 Pcgmm::gradient_untied(const HCL_RnVector_d &lambda,
 		       const LaGenMatDouble &sample_cov, 
-		       HCL_RnVector_d &grad)
+		       HCL_RnVector_d &grad,
+		       bool affine)
 {
   assert(sample_cov.rows() == sample_cov.cols());
   assert(lambda.Dim() <= basis_dim());
@@ -567,33 +568,120 @@ Pcgmm::kullback_leibler_covariance(const LaGenMatDouble &sigma1,
 }
 
 
+PcgmmLambdaFcnl::PcgmmLambdaFcnl(HCL_RnSpace_d &vs,
+				 int basis_dim,
+				 Pcgmm &pcgmm,
+				 const LaGenMatDouble &sample_cov,
+				 bool affine)
+  : 
+  m_pcgmm(pcgmm),
+  m_sample_cov(sample_cov),
+  m_vs(vs),
+  m_base(m_vs),
+  m_dir(m_vs)
+{ 
+  assert(sample_cov.rows()==sample_cov.cols());
+
+  m_affine=affine;
+  m_precision.resize(sample_cov.rows(), sample_cov.cols());
+  m_eigs.resize(sample_cov.rows(),1);
+  m_R.resize(sample_cov.rows(), sample_cov.cols());
+}
+
+PcgmmLambdaFcnl::~PcgmmLambdaFcnl() {
+}
+
+
+ostream&
+PcgmmLambdaFcnl::Write(ostream & o) const { 
+  return o; 
+}
+
+
+HCL_VectorSpace_d &
+PcgmmLambdaFcnl::Domain() const { 
+  return m_vs;
+}
+  
+
+double
+PcgmmLambdaFcnl::Value1(const HCL_Vector_d &x) const {
+  double result;
+  LaGenMatDouble t;
+  m_pcgmm.calculate_precision((HCL_RnVector_d&)x, t);
+  assert(LinearAlgebra::is_spd(t));
+  result=m_pcgmm.G(t, m_sample_cov);
+  // RETURN NEGATIVE VALUES BECAUSE HCL DOES MINIMIZATION!
+  return -result;
+}
+
+
 void
-Pcgmm::optimize_lambda(const LaGenMatDouble &sample_cov,
-		       LaVectorDouble &lambda)
+PcgmmLambdaFcnl::Gradient1(const HCL_Vector_d & x,
+			   HCL_Vector_d & g) const {
+  m_pcgmm.gradient_untied((HCL_RnVector_d&)x,
+			  m_sample_cov,
+			  (HCL_RnVector_d&)g,
+			  m_affine);
+  g.Mul(-1);
+}
+
+
+void
+PcgmmLambdaFcnl::HessianImage(const HCL_Vector_d & x,
+			      const HCL_Vector_d & dx,
+			      HCL_Vector_d & dy ) const {
+  fprintf(stderr, "Warning, HessianImage not implemented");
+}
+
+
+double
+PcgmmLambdaFcnl::LineSearchValue(double mu) const {
+  double result;
+  result=m_pcgmm.eval_linesearch_value(m_eigs, mu, m_beta, m_linevalue_const)
+    +m_fval_starting_point;
+  return -result;
+}
+
+
+double
+PcgmmLambdaFcnl::LineSearchDerivative(double mu) const {
+  double result;
+  result = m_pcgmm.eval_linesearch_derivative(m_eigs, mu, m_beta);
+  return -result;
+}
+
+
+void
+PcgmmLambdaFcnl::SetLineSearchStartingPoint(const HCL_Vector_d &base)
 {
-  assert(LinearAlgebra::is_spd(mbasis.at(0)));
-  
-  // Start actual optimization process
-  int d=lambda.size();  
-  PcgmmLambdaFcnl f(d, this, sample_cov);
+  m_base.Copy(base);
+  m_pcgmm.calculate_precision(m_base, m_precision);
+  assert(LinearAlgebra::is_spd(m_precision));
+  m_fval_starting_point=m_pcgmm.G(m_precision, m_sample_cov);
+  m_linevalue_const=-log(LinearAlgebra::determinant(m_precision));
+}
 
-  HCL_RnVector_d *x=(HCL_RnVector_d*)f.Domain().Member();
 
-  for (int i=0; i<d; i++)    
-    (*x)(i+1)=lambda(i);
-  
-  HCL_LineSearch_MT_d ls;
-  if (hcl_line_set)
-    ls.Parameters().Merge(hcl_line_cfg.c_str());
-  
-  HCL_UMin_lbfgs_d bfgs(&ls);
-  if (hcl_grad_set)
-    bfgs.Parameters().Merge(hcl_grad_cfg.c_str());
-  
-  bfgs.Minimize(f, *x);
-  
-  for (int i=0; i<d; i++)
-    lambda(i)=(*x)(i+1);
+void
+PcgmmLambdaFcnl::SetLineSearchDirection(const HCL_Vector_d & dir)
+{
+  m_dir.Copy(dir);
+  m_pcgmm.calculate_precision(m_dir, m_R);
+  m_pcgmm.limit_line_search(m_R, m_precision, m_eigs, m_max_step);
+  LaGenMatDouble t(m_pcgmm.fea_dim(), m_pcgmm.fea_dim());
+  Blas_Mat_Mat_Mult(m_sample_cov, m_R, t, 1.0, 0.0);
+  m_beta=t.trace();
+}
+ 
 
-  HCL_delete(x);
+double
+PcgmmLambdaFcnl::MaxStep(const HCL_Vector_d & x, 
+			 const HCL_Vector_d & dir) const
+{
+  for (int i=1; i<=x.Dim(); i++) {
+    assert(((HCL_RnVector_d&)x)(i)==(m_base)(i));
+    assert(((HCL_RnVector_d&)dir)(i)==(m_dir)(i));
+  }
+  return m_max_step;
 }

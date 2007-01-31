@@ -10,11 +10,14 @@
 #include "Pcgmm.hh"
 #include "Scgmm.hh"
 
+#include "HCL_Rn_d.h"
+
 int info_flag;
 int pcgmm_flag;
 int scgmm_flag;
 int kl_flag;
 int old_flag;
+int affine_flag;
 
 int dim;
 int lambda_dim;
@@ -55,6 +58,7 @@ main(int argc, char *argv[])
     old_flag = config["old"].specified;
     info_flag = config["info"].get_int();
     kl_flag = config["kl"].specified;
+    affine_flag = config["affine"].specified;
     
     if (config["stats"].specified) {
       std::string dummy;
@@ -146,14 +150,19 @@ void compress_pcgmm() {
   LaGenMatDouble sample_cov(dim, dim);
   LaGenMatDouble model_cov(dim, dim);
 
-  // Optimize and set the optimized parameters
-  if (config["hcl_bfgs_cfg"].specified)
-    pcgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
+  // Optimization space
+  HCL_RnSpace_d vs(basis_dim);
+  
+  // Linesearch
+  HCL_LineSearch_MT_d ls;
   if (config["hcl_line_cfg"].specified)
-    pcgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
-  if (config["affine"].specified)
-    pcgmm.set_affine();
-
+    ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());
+  
+  // lmBFGS
+  HCL_UMin_lbfgs_d bfgs(&ls);
+  if (config["hcl_bfgs_cfg"].specified)
+    bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
+  
   // Go through every state
   int kernel_pos=0;
   for (int s=0; s<fc_stats.num_states(); s++) {
@@ -193,9 +202,26 @@ void compress_pcgmm() {
 	lambda(LaIndex())=0;
 	lambda(0)=1;
       }
+
+      PcgmmLambdaFcnl f(vs, basis_dim, pcgmm, sample_cov, affine_flag);
+      HCL_RnVector_d x((HCL_RnSpace_d&)(f.Domain()));
+  
+      for (int i=0; i<basis_dim; i++)
+	x(i+1)=lambda(i);
       
-      // Optimize and set the optimized parameters
-      pcgmm.optimize_lambda(sample_cov, lambda);
+      int trypos=0;
+      double trythese[10]={50,40,30,20,10,8,6,4,2,1};
+    testpoint:
+      try {
+	bfgs.Parameters().PutValue("MaxUpdates", trythese[trypos]);
+	bfgs.Minimize(f, x);
+      } catch(LaException e) {
+	trypos++;
+	goto testpoint;
+      }
+      
+      for (int i=0; i<basis_dim; i++)
+	lambda(i)=x(i+1);
       
       // Save kullback-leibler divergences KL(sample_fc, model_fc)
       if (kl_flag) {
@@ -228,13 +254,18 @@ void compress_scgmm() {
   LaVectorDouble model_mean(dim);
   LaGenMatDouble model_cov(dim, dim);
 
-  // Optimize and set the optimization parameters
-  if (config["hcl_bfgs_cfg"].specified)
-    scgmm.set_hcl_bfgs_cfg_file(config["hcl_bfgs_cfg"].get_str());
+  // Optimization space
+  HCL_RnSpace_d vs(basis_dim);
+
+  // Linesearch
+  HCL_LineSearch_MT_d ls;
   if (config["hcl_line_cfg"].specified)
-    scgmm.set_hcl_line_cfg_file(config["hcl_line_cfg"].get_str());
-  if (config["affine"].specified)
-    scgmm.set_affine();
+    ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());
+  
+  // lmBFGS
+  HCL_UMin_lbfgs_d bfgs(&ls);
+  if (config["hcl_bfgs_cfg"].specified)
+    bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
 
   // Go through every state
   int kernel_pos=0;
@@ -275,8 +306,26 @@ void compress_scgmm() {
 	lambda(LaIndex())=0;
 	lambda(0)=1;
       }
-    
-      scgmm.optimize_lambda(sample_cov, sample_mean, lambda);
+
+      ScgmmLambdaFcnl f(vs, basis_dim, scgmm, sample_cov, sample_mean, affine_flag);
+      HCL_RnVector_d x((HCL_RnSpace_d&)(f.Domain()));
+  
+      for (int i=0; i<basis_dim; i++)
+	x(i+1)=lambda(i);
+      
+      int trypos=0;
+      double trythese[10]={50,40,30,20,10,8,6,4,2,1};
+    testpoint:
+      try {
+	bfgs.Parameters().PutValue("MaxUpdates", trythese[trypos]);
+	bfgs.Minimize(f, x);
+      } catch(LaException e) {
+	trypos++;
+	goto testpoint;
+      }
+      
+      for (int i=0; i<basis_dim; i++)
+	lambda(i)=x(i+1);
 
       // Save kullback-leibler divergences KL(sample_fc, model_fc)
       if (kl_flag) {

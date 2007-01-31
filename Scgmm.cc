@@ -702,7 +702,8 @@ void
 Scgmm::gradient_untied(const HCL_RnVector_d &lambda,
 		       const LaVectorDouble &sample_mean,
 		       const LaGenMatDouble &sample_secondmoment,
-		       HCL_RnVector_d &grad)
+		       HCL_RnVector_d &grad,
+		       bool affine)
 {
   assert(lambda.Dim()<=basis_dim());
   assert(lambda.Dim()==grad.Dim());
@@ -953,43 +954,150 @@ Scgmm::theta_to_gaussian_params(const LaVectorDouble &theta,
 }
 
 
-void
-Scgmm::optimize_lambda(const LaGenMatDouble &sample_cov,
-		       const LaVectorDouble &sample_mean,
-		       LaVectorDouble &lambda)  
-{
-  assert(sample_cov.rows()==sample_cov.cols());
-  assert(sample_cov.rows()==sample_mean.size());
-  
-  int d=lambda.size();
-  ScgmmLambdaFcnl f(d, this, sample_cov, sample_mean);
-  
-  HCL_RnVector_d *x=(HCL_RnVector_d*)f.Domain().Member();
-  
-  for (int i=0; i<d; i++)    
-    (*x)(i+1)=lambda(i);
-  
-  HCL_LineSearch_MT_d ls;
-  if (hcl_line_set)
-    ls.Parameters().Merge(hcl_line_cfg.c_str());
-  
-  HCL_UMin_lbfgs_d bfgs(&ls);
-  if (hcl_grad_set)
-    bfgs.Parameters().Merge(hcl_grad_cfg.c_str());
-  
-  int pos=0;
-  int trythese[10]={50,40,30,20,10,8,6,4,2,1};
- testpoint:
-  try {
-    bfgs.Parameters().PutValue("MaxUpdates", trythese[pos]);
-    bfgs.Minimize(f, *x);
-  } catch(LaException e) {
-    pos++;
-    goto testpoint;
-  }
-  
-  for (int i=0; i<d; i++)
-    lambda(i)=(*x)(i+1);
 
-  HCL_delete(x);
+ScgmmLambdaFcnl::ScgmmLambdaFcnl(HCL_RnSpace_d &vs,
+				 int basis_dim,
+				 Scgmm &scgmm,
+				 const LaGenMatDouble &sample_cov,
+				 const LaVectorDouble &sample_mean,
+				 bool affine)
+  : 
+  m_scgmm(scgmm),
+  m_sample_mean(sample_mean),
+  m_sample_cov(sample_cov),
+  m_vs(vs),
+  m_base(m_vs),
+  m_dir(m_vs)
+{ 
+  assert(sample_cov.rows()==sample_cov.cols());
+  assert(sample_mean.size()==sample_cov.rows());
+
+  m_affine=affine;
+  m_sample_secondmoment.copy(m_sample_cov);
+  Blas_R1_Update(m_sample_secondmoment, m_sample_mean, m_sample_mean, 1);  
+  m_precision.resize(m_sample_cov.rows(), m_sample_cov.cols());
+  m_eigvals.resize(m_sample_cov.rows(),1);
+  m_R.resize(m_sample_cov.rows(), m_sample_cov.cols());
+  m_scgmm.gaussian_params_to_f(m_sample_mean, m_sample_cov, m_f);  
+}
+
+
+ScgmmLambdaFcnl::~ScgmmLambdaFcnl() {
+}
+
+
+ostream & 
+ScgmmLambdaFcnl::Write(ostream & o) const { 
+  return o; 
+}
+
+
+HCL_VectorSpace_d & 
+ScgmmLambdaFcnl::Domain() const { 
+  return m_vs;
+}
+
+
+// RETURN NEGATIVE VALUES BECAUSE HCL DOES MINIMIZATION!
+double
+ScgmmLambdaFcnl::Value1(const HCL_Vector_d &x) const {
+  double result;
+  LaVectorDouble theta;
+  m_scgmm.calculate_theta((HCL_RnVector_d&)x, theta);
+  result = m_scgmm.H(theta, m_f);
+  return -result;
+}
+
+
+void
+ScgmmLambdaFcnl::Gradient1(const HCL_Vector_d & x,
+			   HCL_Vector_d & g) const {
+  m_scgmm.gradient_untied((HCL_RnVector_d&)x,
+			  m_sample_mean,
+			  m_sample_secondmoment,
+			  (HCL_RnVector_d&)g,
+			  m_affine);
+  // RETURN NEGATIVE VALUES BECAUSE HCL DOES MINIMIZATION!
+  g.Mul(-1);
+}
+
+
+void
+ScgmmLambdaFcnl::HessianImage(const HCL_Vector_d & x,
+			      const HCL_Vector_d & dx,
+			      HCL_Vector_d & dy ) const {
+  fprintf(stderr, "Warning, HessianImage not implemented");
+}
+
+
+// RETURN NEGATIVE VALUES BECAUSE HCL DOES MINIMIZATION!
+double
+ScgmmLambdaFcnl::LineSearchValue(double mu) const {
+  double result;
+  result=m_scgmm.eval_linesearch_value(m_eigvals, m_v, m_dv, mu, m_beta)+m_fval_starting_point;
+  return -result;
+}
+
+
+// RETURN NEGATIVE VALUES BECAUSE HCL DOES MINIMIZATION!
+double
+ScgmmLambdaFcnl::LineSearchDerivative(double mu) const {
+  double result=0;
+  result=m_scgmm.eval_linesearch_derivative(m_eigvals, m_v, m_dv, mu, m_beta);
+  return -result;
+}
+
+
+void
+ScgmmLambdaFcnl::SetLineSearchStartingPoint(const HCL_Vector_d &base)
+{
+  m_base.Copy(base);
+  
+  m_scgmm.calculate_precision(m_base, m_precision);
+  assert(LinearAlgebra::is_spd(m_precision));
+  m_scgmm.calculate_psi(m_base, m_psi);
+  m_scgmm.calculate_theta(m_base, m_theta);
+  
+  m_fval_starting_point=m_scgmm.H(m_theta, m_f);
+}
+
+
+// ASSUMES: m_precision and m_psi are set == SetLineSearchStartingPoint() called
+void
+ScgmmLambdaFcnl::SetLineSearchDirection(const HCL_Vector_d & dir)
+{
+  m_dir.Copy(dir);
+  
+  int d=m_scgmm.fea_dim();
+  
+  m_scgmm.calculate_precision(m_dir, m_R);
+  m_scgmm.limit_line_search(m_R, m_precision, m_eigvals, m_eigvecs, m_max_step);
+  
+  LaGenMatDouble t=LaGenMatDouble::zeros(d);
+  LaGenMatDouble t2=LaGenMatDouble::zeros(d);
+  LinearAlgebra::matrix_power(m_precision, t, -0.5);
+  Blas_Mat_Mat_Mult(m_eigvecs, t, t2, 1.0, 0.0);
+  
+  m_v.resize(d,1);
+  m_dv.resize(d,1);
+  LaVectorDouble d_psi;
+  m_scgmm.calculate_psi(m_dir, d_psi);
+  Blas_Mat_Vec_Mult(t2, m_psi, m_v);
+  Blas_Mat_Vec_Mult(t2, d_psi, m_dv);
+  
+  LaVectorDouble d_theta;
+  m_scgmm.calculate_theta(m_dir, d_theta);
+  m_beta = Blas_Dot_Prod(d_theta, m_f);
+}
+
+
+double
+ScgmmLambdaFcnl::MaxStep(const HCL_Vector_d & x, 
+			 const HCL_Vector_d & dir) const
+{
+  for (int i=1; i<=x.Dim(); i++) {
+    assert(((HCL_RnVector_d&)x)(i)==(m_base)(i));
+    assert(((HCL_RnVector_d&)dir)(i)==(m_dir)(i));
+  }
+  return m_max_step;
 }
