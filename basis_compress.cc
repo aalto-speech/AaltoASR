@@ -32,6 +32,9 @@ Scgmm scgmm;
 std::vector<float> kl_divergences;
 std::ifstream stats_file;
 
+void bfgs_set_defaults(HCL_UMin_lbfgs_d &bfgs);
+void line_set_defaults(HCL_LineSearch_MT_d &ls);
+
 void compress_pcgmm();
 void compress_scgmm();
 
@@ -208,16 +211,21 @@ void compress_pcgmm() {
   
       for (int i=0; i<basis_dim; i++)
 	x(i+1)=lambda(i);
-      
-      int trypos=0;
-      double trythese[10]={50,40,30,20,10,8,6,4,2,1};
-    testpoint:
+
+      // Try optimizing normally
       try {
-	bfgs.Parameters().PutValue("MaxUpdates", trythese[trypos]);
 	bfgs.Minimize(f, x);
-      } catch(LaException e) {
-	trypos++;
-	goto testpoint;
+      } catch(LaException &e) {
+	// ..or try optimizing in 'safe mode' if things go bad
+	bfgs_set_defaults(bfgs);
+	line_set_defaults(ls);
+	try {
+	  bfgs.Minimize(f, x);
+	} catch(LaException e) {}	  
+	if (config["hcl_line_cfg"].specified)
+	  ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());  
+	if (config["hcl_bfgs_cfg"].specified)
+	  bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
       }
       
       for (int i=0; i<basis_dim; i++)
@@ -273,7 +281,7 @@ void compress_scgmm() {
     HmmState &fc_state=fc_stats.state(s);
     HmmState &model_state=model_states.state(s);
 
-    // Remove kernels so long that the fc and pcgmm state mixtures match
+    // Remove gaussians so long that the fc and pcgmm state mixtures match
     if (old_flag) {
       while (fc_state.weights.size()<model_state.weights.size()) {
 	scgmm.remove_gaussian(model_state.weights[model_state.weights.size()-1].kernel);
@@ -312,21 +320,26 @@ void compress_scgmm() {
   
       for (int i=0; i<basis_dim; i++)
 	x(i+1)=lambda(i);
-      
-      int trypos=0;
-      double trythese[10]={50,40,30,20,10,8,6,4,2,1};
-    testpoint:
+
+      // Try optimizing normally
       try {
-	bfgs.Parameters().PutValue("MaxUpdates", trythese[trypos]);
 	bfgs.Minimize(f, x);
-      } catch(LaException e) {
-	trypos++;
-	goto testpoint;
+      } catch(LaException &e) {
+	// ..or try optimizing in 'safe mode' if things go bad
+	bfgs_set_defaults(bfgs);
+	line_set_defaults(ls);
+	try {
+	  bfgs.Minimize(f, x);
+	} catch(LaException e) {}	  
+	if (config["hcl_line_cfg"].specified)
+	  ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());  
+	if (config["hcl_bfgs_cfg"].specified)
+	  bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
       }
       
       for (int i=0; i<basis_dim; i++)
 	lambda(i)=x(i+1);
-
+      
       // Save kullback-leibler divergences KL(sample_fc, model_fc)
       if (kl_flag) {
 	scgmm.calculate_mu(lambda, model_mean);
@@ -343,3 +356,24 @@ void compress_scgmm() {
 }
 
 
+
+void bfgs_set_defaults(HCL_UMin_lbfgs_d &bfgs) {
+  bfgs.Parameters().PutValue("MaxItn", 100);
+  bfgs.Parameters().PutValue("Typf", 1.0);
+  bfgs.Parameters().PutValue("TypxNorm", 1.0);
+  bfgs.Parameters().PutValue("GradTol", 1.0e-2);
+  bfgs.Parameters().PutValue("MinStep", 1e-20);
+  bfgs.Parameters().PutValue("MaxStep", 1e+20);
+  bfgs.Parameters().PutValue("CscMaxLimit", 5);
+  bfgs.Parameters().PutValue("MaxUpdates", 4);
+}
+
+
+void line_set_defaults(HCL_LineSearch_MT_d &ls) {
+  ls.Parameters().PutValue("FcnDecreaseTol", 1e-4);
+  ls.Parameters().PutValue("SlopeDecreaseTol", 9e-1);
+  ls.Parameters().PutValue("MinStep", 1e-20);
+  ls.Parameters().PutValue("MaxStep", 1e+20);
+  ls.Parameters().PutValue("MaxSample", 8);
+  ls.Parameters().PutValue("BracketIncrease", 4);
+}
