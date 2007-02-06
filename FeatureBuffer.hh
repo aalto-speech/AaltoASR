@@ -4,6 +4,7 @@
 #include <string>
 #include <assert.h>
 #include <vector>
+#include "util.hh"
 
 /** Class for accessing feature vectors of the \ref FeatureBuffer
  * class with proper const and array-bounds checking. */
@@ -18,6 +19,30 @@ public:
    * \param dim = the dimension of the vector
    */
   FeatureVec(const float *ptr, int dim) : m_ptr(ptr), m_dim(dim) { }
+
+  /** Copy the contents of a feature vector */
+  void copy(const FeatureVec &vec)
+  {
+    assert(vec.dim() == m_dim);
+    for (int i = 0; i < m_dim; i++)
+      const_cast<float*>(m_ptr)[i] = vec[i];
+  }
+
+  /** Set the feature values from a std::vector. */
+  void set(const std::vector<float> &vec)
+  {
+    assert((int)vec.size() == m_dim);
+    for (int i = 0; i < m_dim; i++)
+      const_cast<float*>(m_ptr)[i] = vec[i];
+  }
+
+  /** Fill std::vector with the feature values. */
+  void get(std::vector<float> &vec) const
+  {
+    vec.resize(m_dim);
+    for (int i = 0; i < m_dim; i++)
+      vec[i] = m_ptr[i];
+  }
 
   /** Constant access to feature vector values. */
   const float &operator[](int index) const 
@@ -70,28 +95,18 @@ public:
   /** Constant access to the values in the buffer. */
   const FeatureVec operator[](int frame) const 
   { 
-    int index = modulo(frame, m_num_frames);
+    int index = util::modulo(frame, m_num_frames);
     return FeatureVec(&m_buffer[index * m_dim], m_dim);
   }
 
   /** Mutable access to the values in the buffer. */
   FeatureVec operator[](int frame) 
   { 
-    int index = modulo(frame, m_num_frames);
+    int index = util::modulo(frame, m_num_frames);
     return FeatureVec(&m_buffer[index * m_dim], m_dim);
   }
 
 private:
-
-  /** Compute modulo of two values so that negative arguments are
-   * handled correctly. */
-  int modulo(int a, int b) const
-  {
-    int result = a % b;
-    if (result < 0)
-      result += b;
-    return result;
-  }
 
   int m_dim; //!< The dimension of the feature vectors
   int m_num_frames; //!< The total number of frames in the window
