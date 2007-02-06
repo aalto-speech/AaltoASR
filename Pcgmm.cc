@@ -45,9 +45,6 @@ Pcgmm::offline_computations()
 void 
 Pcgmm::precompute(const FeatureVec &feature)
 {
-  // Save this feature for later checking
-  precomputation_feature=FeatureVec(feature);
- 
  // Convert feature vector to lapackpp vector
   LaVectorDouble f=LaVectorDouble(feature.dim());
   for (int i=0; i<feature.dim(); i++)
@@ -89,10 +86,6 @@ Pcgmm::compute_all_likelihoods(const FeatureVec &feature,
 double
 Pcgmm::compute_likelihood(const int k, const FeatureVec &feature)
 {
-  // Precompute if necessary
-  if (precomputation_feature != feature)
-    precompute(feature);
-
   // Convert feature vector to lapackpp vector
   LaVectorDouble f=LaVectorDouble(feature.dim());
   for (int i=0; i<feature.dim(); i++)

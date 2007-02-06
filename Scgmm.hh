@@ -197,11 +197,6 @@ public:
   void theta_to_gaussian_params(const LaVectorDouble &theta,
 				LaVectorDouble &mu,
 				LaGenMatDouble &sigma);
-  
-private:
-
-  // The feature that has been used in precomputation
-  FeatureVec precomputation_feature;  
 };
 
 

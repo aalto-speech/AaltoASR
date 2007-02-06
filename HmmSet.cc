@@ -304,12 +304,14 @@ HmmSet::read_gk(const std::string &filename)
   else if (cov_str == "pcgmm") {
     m_cov_type = HmmCovariance::PCGMM;
     in.close();
+    reserve_kernels(kernels);
     pcgmm.read_gk(filename);
     return;
   }
   else if (cov_str == "scgmm") {
     m_cov_type = HmmCovariance::SCGMM;
     in.close();
+    reserve_kernels(kernels);
     scgmm.read_gk(filename);
     return;
   }
@@ -728,7 +730,7 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
   
   HmmKernel &kernel = m_kernels[k];
   
-  switch (kernel.cov.type())
+  switch (m_cov_type)
   {
   case HmmCovariance::SINGLE:
     for (int i = 0; i < m_dim; i++)
@@ -782,7 +784,17 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
 }
 
 
-void cholesky_factor(const Matrix &A, Matrix &B)
+void
+HmmSet::precompute(const FeatureVec &feature) {
+  if (m_cov_type==HmmCovariance::PCGMM)
+    pcgmm.precompute(feature);
+  if (m_cov_type==HmmCovariance::SCGMM)
+    scgmm.precompute(feature);
+}
+
+
+void
+cholesky_factor(const Matrix &A, Matrix &B)
 {
   assert(A.nrows() == A.ncols());
   assert(B.nrows() == B.ncols());

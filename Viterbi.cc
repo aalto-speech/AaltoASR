@@ -241,6 +241,7 @@ Viterbi::fill_transition_probs()
 void
 Viterbi::fill_observation_probs(const FeatureVec &fea_vec)
 {
+  m_model.precompute(fea_vec);
   Lattice::Range &range = m_lattice.range(m_current_frame);
   assert(range.end > range.start);
 

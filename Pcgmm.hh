@@ -148,11 +148,6 @@ public:
 
   double kullback_leibler_covariance(const LaGenMatDouble &sigma1,
 				     const LaGenMatDouble &sigma2);
-
-private:
-  
-  // The feature that has been used in precomputation
-  FeatureVec precomputation_feature;
 };
 
 

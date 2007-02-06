@@ -183,7 +183,7 @@ public:
 //  float euclidean_distance(std::vector<float> &a, std::vector<float> &b);
   void compute_observation_log_probs(const FeatureVec&); // SLOW, accurate
 //  void compute_obs_logprobs(const float *feature);
-
+  void precompute(const FeatureVec &feature); // precomputation for subspace gmms
   float compute_kernel_likelihood(const int k, const FeatureVec &feature);
   
   // These work only for scaled probs...

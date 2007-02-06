@@ -41,9 +41,6 @@ Scgmm::offline_computations()
 void
 Scgmm::precompute(const FeatureVec &feature)
 {
-  // Save this feature for later checking
-  precomputation_feature=FeatureVec(feature);  
-
   // Convert feature vector to exponential feature vector in lapackpp format
   LaVectorDouble feature_linear=LaVectorDouble(fea_dim());
   LaVectorDouble feature_exp=LaVectorDouble(exp_dim());
@@ -87,10 +84,6 @@ double
 Scgmm::compute_likelihood(const int k,
 			  const FeatureVec &feature)
 {
-  // Precompute if necessary
-  if (precomputation_feature != feature)
-    precompute(feature);
-
   // Compute likelihood
   double result=gaussians.at(k).K_value
     +Blas_Dot_Prod(gaussians.at(k).lambda,quadratic_feas);
