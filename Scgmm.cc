@@ -26,7 +26,7 @@ Scgmm::copy(const Scgmm &orig)
 
 
 void 
-Scgmm::precompute()
+Scgmm::offline_computations()
 {
   LaVectorDouble theta;
   
@@ -38,11 +38,11 @@ Scgmm::precompute()
 }
 
 
-void 
-Scgmm::compute_likelihoods(const FeatureVec &feature,
-			   std::vector<float> &lls)
+void
+Scgmm::precompute(const FeatureVec &feature)
 {
-  lls.resize(num_gaussians());
+  // Save this feature for later checking
+  precomputation_feature=FeatureVec(feature);  
 
   // Convert feature vector to exponential feature vector in lapackpp format
   LaVectorDouble feature_linear=LaVectorDouble(fea_dim());
@@ -53,15 +53,25 @@ Scgmm::compute_likelihoods(const FeatureVec &feature,
     feature_linear(i)=feature[i];
     feature_exp(i)=feature[i];
   }
-
+  
   Blas_R1_Update(xxt, feature_linear, feature_linear, -0.5);
   LinearAlgebra::map_m2v(xxt, feature_second_moment);
   for (unsigned int i=fea_dim(); i<exp_dim(); i++)
     feature_exp(i)=feature_second_moment(i-fea_dim());
-
+  
   // Compute 'quadratic features'
   for (int i=0; i<basis_dim(); i++)
     quadratic_feas(i)=Blas_Dot_Prod(basis_theta.at(i), feature_exp);
+}
+
+
+void 
+Scgmm::compute_all_likelihoods(const FeatureVec &feature,
+			       std::vector<float> &lls)
+{
+  lls.resize(num_gaussians());
+  
+  precompute(feature);
   
   // Compute likelihoods
   for (unsigned int i=0; i<num_gaussians(); i++) {
@@ -74,9 +84,19 @@ Scgmm::compute_likelihoods(const FeatureVec &feature,
 
 
 double 
-Scgmm::gaussian_likelihood(const int k)
+Scgmm::compute_likelihood(const int k,
+			  const FeatureVec &feature)
 {
-  return likelihoods.at(k);
+  // Precompute if necessary
+  if (precomputation_feature != feature)
+    precompute(feature);
+
+  // Compute likelihood
+  double result=gaussians.at(k).K_value
+    +Blas_Dot_Prod(gaussians.at(k).lambda,quadratic_feas);
+  result=exp(result);
+
+  return result;
 }
 
 
@@ -331,6 +351,7 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
   int d_exp=d+d_vec;
   double c_sum=0;
 
+  // Somewhat meaningful
   LaVectorDouble total_mean=LaVectorDouble(d,1);
   LaVectorDouble total_psi=LaVectorDouble(d,1);
   LaGenMatDouble total_covariance=LaGenMatDouble::zeros(d);
@@ -344,6 +365,15 @@ Scgmm::initialize_basis_pca(const std::vector<double> &c,
   //  std::vector<LaVectorDouble> transformed_psis;
   //  std::vector<LaVectorDouble> transformed_precisions;
   LaGenMatDouble transformed_parameters=LaGenMatDouble::zeros(d_exp, c.size());
+
+  // Pure temporary stuff
+  LaGenMatDouble matrix_t1;
+  LaGenMatDouble matrix_t2;
+  LaVectorDouble vector_t1;
+  LaVectorDouble vector_t2;
+  LaVectorDouble vector_t3;
+  LaVectorDouble vector_t4;
+
   total_mean(LaIndex())=0;
   total_psi(LaIndex())=0;
   transformed_mean(LaIndex())=0;
@@ -511,7 +541,7 @@ Scgmm::read_gk(const std::string &filename)
       in >> gaussians.at(g).lambda(i);
   }
 
-  precompute();
+  offline_computations();
 }
 
 

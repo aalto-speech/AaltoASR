@@ -28,7 +28,7 @@ Pcgmm::copy(const Pcgmm &orig)
 
 
 void 
-Pcgmm::precompute()
+Pcgmm::offline_computations()
 {
   for (unsigned int i=0; i<num_gaussians(); i++) {
     LaGenMatDouble t,t2;
@@ -43,22 +43,37 @@ Pcgmm::precompute()
 
 
 void 
-Pcgmm::compute_likelihoods(const FeatureVec &feature,
-			   std::vector<float> &lls)
+Pcgmm::precompute(const FeatureVec &feature)
 {
-  lls.resize(num_gaussians());
-
-  // Convert feature vector to lapackpp vector
+  // Save this feature for later checking
+  precomputation_feature=FeatureVec(feature);
+ 
+ // Convert feature vector to lapackpp vector
   LaVectorDouble f=LaVectorDouble(feature.dim());
   for (int i=0; i<feature.dim(); i++)
     f(i)=feature[i];
-
+  
   // Compute 'quadratic features'
   for (int i=0; i<basis_dim(); i++) {
     LaVectorDouble y=LaVectorDouble(feature.dim());
     Blas_Mat_Vec_Mult(mbasis.at(i), f, y);
     quadratic_feas(i)=-0.5*Blas_Dot_Prod(f,y);
   }
+}
+
+
+void 
+Pcgmm::compute_all_likelihoods(const FeatureVec &feature,
+			       std::vector<float> &lls)
+{
+  lls.resize(num_gaussians());
+
+  precompute(feature);
+
+  // Convert feature vector to lapackpp vector
+  LaVectorDouble f=LaVectorDouble(feature.dim());
+  for (int i=0; i<feature.dim(); i++)
+    f(i)=feature[i];  
 
   // Compute likelihoods
   for (unsigned int i=0; i<num_gaussians(); i++) {
@@ -71,10 +86,25 @@ Pcgmm::compute_likelihoods(const FeatureVec &feature,
 }
 
 
-double 
-Pcgmm::gaussian_likelihood(const int k)
+double
+Pcgmm::compute_likelihood(const int k, const FeatureVec &feature)
 {
-  return likelihoods.at(k);
+  // Precompute if necessary
+  if (precomputation_feature != feature)
+    precompute(feature);
+
+  // Convert feature vector to lapackpp vector
+  LaVectorDouble f=LaVectorDouble(feature.dim());
+  for (int i=0; i<feature.dim(); i++)
+    f(i)=feature[i];
+
+  // Compute likelihood
+  double result=gaussians.at(k).bias
+    +Blas_Dot_Prod(gaussians.at(k).linear_weight,f)
+    +Blas_Dot_Prod(gaussians.at(k).lambda,quadratic_feas);
+  result=exp(result);
+  
+  return result;
 }
 
 
@@ -84,20 +114,27 @@ Pcgmm::initialize_basis_pca(const std::vector<double> &c,
 			    const unsigned int basis_dim)
 {
   assert(c.size() == sample_covs.size());
-
+  
   unsigned int num_covs=sample_covs.size();
   int d=sample_covs.at(0).rows();
   int d_vec=(int)(d*(d+1)/2);
   double c_sum=0;
-  
+
+  // Some meaning
   LaGenMatDouble m=LaGenMatDouble::zeros(d);
   LaGenMatDouble m_sqrt=LaGenMatDouble::zeros(d);
   LaGenMatDouble m_neg_sqrt=LaGenMatDouble::zeros(d);
   LaGenMatDouble identity=LaGenMatDouble::eye(d);
 
+  // Pure temporary stuff    
+  LaGenMatDouble matrix_t1;
+  LaGenMatDouble matrix_t2;
+  LaVectorDouble vector_t1;
+  LaVectorDouble vector_t2;
+
   // Reset current basis
   reset(basis_dim, d, num_gaussians());
-
+  
   // Calculate c_sum
   for (unsigned int i=0; i<num_covs; i++)
     c_sum+=c.at(i);
@@ -249,7 +286,7 @@ Pcgmm::read_gk(const std::string &filename)
   }
 
   assert(LinearAlgebra::is_spd(mbasis.at(0)));  
-  precompute();
+  offline_computations();
 }
 
 
@@ -360,9 +397,10 @@ void
 Pcgmm::calculate_precision(const LaVectorDouble &lambda,
 			   LaVectorDouble &precision)
 {
-  calculate_precision(lambda, matrix_t1);
-  assert(LinearAlgebra::is_spd(matrix_t1));
-  LinearAlgebra::map_m2v(matrix_t1, precision);
+  LaGenMatDouble precision_matrix;
+  calculate_precision(lambda, precision_matrix);
+  assert(LinearAlgebra::is_spd(precision_matrix));
+  LinearAlgebra::map_m2v(precision_matrix, precision);
 }
 
 
@@ -385,9 +423,10 @@ void
 Pcgmm::calculate_precision(const HCL_RnVector_d &lambda,
 			   LaVectorDouble &precision)
 {
-  calculate_precision(lambda, matrix_t1);
-  assert(LinearAlgebra::is_spd(matrix_t1));
-  LinearAlgebra::map_m2v(matrix_t1, precision);
+  LaGenMatDouble precision_matrix;
+  calculate_precision(lambda, precision_matrix);
+  assert(LinearAlgebra::is_spd(precision_matrix));
+  LinearAlgebra::map_m2v(precision_matrix, precision);
 }
 
 
@@ -407,9 +446,10 @@ void
 Pcgmm::calculate_covariance(const LaVectorDouble &lambda,
 			    LaVectorDouble &covariance)
 {
-  calculate_covariance(lambda, matrix_t1);
-  assert(LinearAlgebra::is_spd(matrix_t1));
-  LinearAlgebra::map_m2v(matrix_t1, covariance);
+  LaGenMatDouble covariance_matrix;
+  calculate_covariance(lambda, covariance_matrix);
+  assert(LinearAlgebra::is_spd(covariance_matrix));
+  LinearAlgebra::map_m2v(covariance_matrix, covariance);
 }
 
 
@@ -417,9 +457,10 @@ void
 Pcgmm::calculate_covariance(const HCL_RnVector_d &lambda,
 			    LaVectorDouble &covariance)
 {
-  calculate_covariance(lambda, matrix_t1);
-  assert(LinearAlgebra::is_spd(matrix_t1));
-  LinearAlgebra::map_m2v(matrix_t1, covariance);
+  LaGenMatDouble covariance_matrix;
+  calculate_covariance(lambda, covariance_matrix);
+  assert(LinearAlgebra::is_spd(covariance_matrix));
+  LinearAlgebra::map_m2v(covariance_matrix, covariance);
 }
 
 

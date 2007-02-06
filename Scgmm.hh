@@ -67,13 +67,11 @@ public:
       gaussians.erase(it+pos);     
   };
   
-  void precompute();
-  
-  void compute_likelihoods(const FeatureVec &feature,
-			   std::vector<float> &lls);
+  void offline_computations();
+  void precompute(const FeatureVec &feature);
+  void compute_all_likelihoods(const FeatureVec &feature, std::vector<float> &lls);
+  double compute_likelihood(const int k, const FeatureVec &feature);
 
-  double gaussian_likelihood(const int k);
-  
   void copy(const Scgmm &orig);
 
   Gaussian &get_gaussian(int k) { return gaussians.at(k); }
@@ -199,20 +197,11 @@ public:
   void theta_to_gaussian_params(const LaVectorDouble &theta,
 				LaVectorDouble &mu,
 				LaGenMatDouble &sigma);
-
-
+  
 private:
 
-  // For temporary stuff
-  LaGenMatDouble matrix_t1;
-  LaGenMatDouble matrix_t2;
-  LaGenMatDouble matrix_t3;
-  LaGenMatDouble matrix_t4;
-
-  LaVectorDouble vector_t1;
-  LaVectorDouble vector_t2;
-  LaVectorDouble vector_t3;
-  LaVectorDouble vector_t4;
+  // The feature that has been used in precomputation
+  FeatureVec precomputation_feature;  
 };
 
 

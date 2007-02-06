@@ -640,9 +640,9 @@ HmmSet::compute_observation_log_probs(const FeatureVec &feature)
   double sum = 0;
 
   if (pcgmm.basis_dim() > 0)
-    pcgmm.compute_likelihoods(feature, obs_kernel_likelihoods);
+    pcgmm.compute_all_likelihoods(feature, obs_kernel_likelihoods);
   else if (scgmm.basis_dim() > 0)
-    scgmm.compute_likelihoods(feature, obs_kernel_likelihoods);
+    scgmm.compute_all_likelihoods(feature, obs_kernel_likelihoods);
   else {
     obs_kernel_likelihoods.resize(num_kernels());
     for (int k = 0; k < num_kernels(); k++) {
@@ -764,11 +764,11 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
     break;  
 
   case HmmCovariance::PCGMM:
-    result = pcgmm.gaussian_likelihood(k);
+    result = pcgmm.compute_likelihood(k, feature);
     break;
 
   case HmmCovariance::SCGMM:
-    result = scgmm.gaussian_likelihood(k);
+    result = scgmm.compute_likelihood(k, feature);
     break;
 
   default:
@@ -780,7 +780,6 @@ HmmSet::compute_kernel_likelihood(const int k, const FeatureVec &feature)
 
   return(result);
 }
-
 
 
 void cholesky_factor(const Matrix &A, Matrix &B)
