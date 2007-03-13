@@ -1,10 +1,11 @@
+// Routines for reading and writing arpa format files from and to the 
+// internal prefix tree format.
 #include <stdlib.h>
 #include <assert.h>
 
 #include "GramSorter.hh"
 #include "TreeGramArpaReader.hh"
 #include "str.hh"
-#include "ClusterMap.hh"
 
 TreeGramArpaReader::TreeGramArpaReader()
   : m_lineno(0)
@@ -42,26 +43,6 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 	      "error on line %d while waiting \\data\\", m_lineno);
       exit(1);
     }
-
-    if (line.substr(0,11) == "\\clustermap") {
-      int ord;
-      if (sscanf(line.c_str(),"\\clustermap %d",&ord)!=1) assert(false);
-      tree_gram->clmap=new ClusterMap<int>;
-      m_lineno=tree_gram->clmap->read(file,ord,m_lineno);
-      for (int i=0;i<tree_gram->clmap->num_words();i++) {
-	tree_gram->add_word(tree_gram->clmap->word(i));
-      }
-    } 
-
-    if (line.substr(0,12) == "\\fclustermap") {
-      int ord;
-      if (sscanf(line.c_str(),"\\fclustermap %d",&ord)!=1) assert(false);
-      tree_gram->clmap=new ClusterFMap<int>;
-      m_lineno=tree_gram->clmap->read(file,ord,m_lineno);
-      for (int i=0;i<tree_gram->clmap->num_words();i++) {
-	tree_gram->add_word(tree_gram->clmap->word(i));
-      }
-    } 
 
     if (line == "\\interpolated")
       tree_gram->set_type(TreeGram::INTERPOLATED);
@@ -156,11 +137,11 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       // Check the number of columns on the line
       if (vec.size() < order + 1 || vec.size() > order + 2) {
 	fprintf(stderr, "TreeGramArpaReader::read(): "
-		"%d columns on line %d\n", vec.size(), m_lineno);
+		"%d columns on line %d\n", (int) vec.size(), m_lineno);
 	exit(1);
       }
       if (order == m_counts.size() && vec.size() != order + 1)
-	fprintf(stderr, "WARNING: %d columns on line %d\n", vec.size(), 
+	fprintf(stderr, "WARNING: %d columns on line %d\n", (int) vec.size(), 
 		m_lineno);
 
       // FIXME: should we deny new words in higher order ngrams?
@@ -175,8 +156,6 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       // Add the gram to sorter
       //fprintf(stderr,"add gram [");
       for (int i = 0; i < order; i++) {
-	if (tree_gram->clmap) gram[i]=atoi(vec[i+1].c_str());
-	else
 	gram[i] = tree_gram->add_word(vec[i + 1]);
 	//fprintf(stderr," %d", gram[i]);
       }
@@ -214,17 +193,6 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 void
 TreeGramArpaReader::write(FILE *out, TreeGram *tree_gram) 
 {
-  if (tree_gram->clmap) {
-    tree_gram->clmap->write(out);
-    tree_gram->clear_words();
-    char ascii_num[10];
-    for (int i=0;i<tree_gram->clmap->num_clusters(1);i++) {
-      //fprintf(stderr,"loop %d/%d\n",i,m_clustermap.num_clusters(1));
-      sprintf(ascii_num,"%d",i);
-      tree_gram->add_word(ascii_num);
-    }
-  }
-  
   if (tree_gram->get_type()==TreeGram::INTERPOLATED) {
     write_interpolated(out,tree_gram);
     return;
@@ -251,7 +219,7 @@ TreeGramArpaReader::write(FILE *out, TreeGram *tree_gram)
 	fprintf(out, " %s", tree_gram->word(iter.node(j).word).c_str());
 
       // Possible backoff
-      if (order != tree_gram->order())
+      if (iter.has_children())
 	fprintf(out, " %g\n", iter.node().back_off);
       else
 	fprintf(out, "\n");
@@ -299,9 +267,8 @@ TreeGramArpaReader::write_interpolated(FILE *out, TreeGram *tree_gram)
 	fprintf(out, " %s", tree_gram->word(indices[j-1]).c_str());
 
       // Possible backoff
-      float bo=iter.node().back_off;
-      if (bo<-0.0000001)
-	fprintf(out, " %g\n", bo);
+      if (iter.has_children()) 
+	fprintf(out, " %g\n", iter.node().back_off);
       else
 	fprintf(out, "\n");
     }

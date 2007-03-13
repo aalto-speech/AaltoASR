@@ -1,3 +1,4 @@
+// Fairly compact prefix tree represantation for n-gram language model
 #ifndef TREEGRAM_HH
 #define TREEGRAM_HH
 
@@ -28,7 +29,7 @@ public:
     bool next_order(int order);
 
     // Return the node from the index stack. (default: the last one)
-    const Node &node(int order = 0);
+    Node &node(int order = 0);
 
     // Order of the current node (1 ... n)
     int order() { return m_index_stack.size(); }
@@ -42,13 +43,14 @@ public:
     // Dive down to first child
     bool down();
 
+    bool has_children();
+
     friend class TreeGram;
   private:
     TreeGram *m_gram;
     std::vector<int> m_index_stack;
   };
 
-  TreeGram() : clmap(NULL) {}
   void reserve_nodes(int nodes); 
   void set_interpolation(const std::vector<float> &interpolation);
 
@@ -69,49 +71,49 @@ public:
 
   inline float log_prob_bo(const std::vector<int> &gram) {
     Gram g(gram.size());
-    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<gram.size();i++) g[i]=gram[i];
     return(log_prob_bo(g));
   }
 
   inline float log_prob_bo_cl(const std::vector<int> &gram) {
     Gram g(gram.size());
-    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<gram.size();i++) g[i]=gram[i];
     return(log_prob_bo_cl(g));
   }
 
   inline float log_prob_i(const std::vector<int> &gram){
     Gram g(gram.size());
-    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<gram.size();i++) g[i]=gram[i];
     return(log_prob_i(g));
   }
 
   inline float log_prob_i_cl(const std::vector<int> &gram){
     Gram g(gram.size());
-    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<gram.size();i++) g[i]=gram[i];
     return(log_prob_i_cl(g));
   }
 
   inline float log_prob_bo(const std::vector<unsigned short> &gram) {
     Gram g(gram.size());
-    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<gram.size();i++) g[i]=gram[i];
     return(log_prob_bo(g));
   }
 
   inline float log_prob_bo_cl(const std::vector<unsigned short> &gram) {
     Gram g(gram.size());
-    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<gram.size();i++) g[i]=gram[i];
     return(log_prob_bo_cl(g));
   }
 
   inline float log_prob_i(const std::vector<unsigned short> &gram){
     Gram g(gram.size());
-    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<gram.size();i++) g[i]=gram[i];
     return(log_prob_i(g));
   }
 
   inline float log_prob_i_cl(const std::vector<unsigned short> &gram){
     Gram g(gram.size());
-    for (int i=0;i<(int)gram.size();i++) g[i]=gram[i];
+    for (int i=0;i<gram.size();i++) g[i]=gram[i];
     return(log_prob_i_cl(g));
   }
 
@@ -128,11 +130,10 @@ public:
                          std::vector<float> &result_buffer);
   void fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
                           std::vector<float> &result_buffer);
-  inline bool using_clmap() {return clmap;}
-  ClusterMap<int> *clmap;
 
   void print_debuglist();
   void finalize();
+  void convert_to_backoff();
 
 private:
   int binary_search(int word, int first, int last);

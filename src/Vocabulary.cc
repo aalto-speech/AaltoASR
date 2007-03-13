@@ -1,7 +1,8 @@
+// Conversion of words to word indices and vice versa.
 #include <errno.h>
-
+#include "io.hh"
 #include "Vocabulary.hh"
-#include "tools.hh"
+#include "str.hh"
 
 Vocabulary::Vocabulary()
 {
@@ -12,7 +13,7 @@ Vocabulary::Vocabulary()
 int
 Vocabulary::add_word(const std::string &word)
 {
-  std::map<std::string,int>::iterator i = m_indices.find(word);
+  const vocabmap::iterator i = m_indices.find(word);
   if (i != m_indices.end())
     return (*i).second;
 
@@ -35,8 +36,7 @@ Vocabulary::read(FILE *file)
 {
   std::string word;
 
-  while (read_line(&word, file)) {
-    chomp(&word);
+  while (str::read_line(&word, file, true)) {
 
     // Remove comments
     int comment = word.find('#');
@@ -49,7 +49,18 @@ Vocabulary::read(FILE *file)
     if (start < 0)
       continue;
     int end = word.find_last_not_of("\t\n\r ");
+    
+    
+    // Check if " " or "(" is present and truncate the word to
+    // that symbol. You can use dictionary files in CMUdict
+    // and Decoder formats this way.
+    int end_2 = word.find_first_of(" (")-1;
+    if ((end_2>-1) and (end_2<end))
+      end=end_2;
     word = word.substr(start, end - start + 1);
+    
+    if (word.compare("_")==0 or word.compare("__")==0)
+      continue;
 
     // Insert word
     add_word(word);
@@ -57,16 +68,10 @@ Vocabulary::read(FILE *file)
 }
 
 void
-Vocabulary::read(const char *filename)
+Vocabulary::read(const std::string &filename)
 {
-  FILE *file = fopen(filename, "r");
-  if (!file) {
-    fprintf(stderr, "Vocabulary::read(): could not open %s: %s\n",
-	    filename, strerror(errno));
-    exit(1);
-  }
-  read(file);
-  fclose(file);
+  io::Stream file(filename, "r");
+  read(file.file);
 }
 
 void

@@ -1,3 +1,4 @@
+// Fairly compact prefix tree represantation for n-gram language model
 #include <errno.h>
 #include <assert.h>
 #include <math.h>
@@ -12,7 +13,6 @@
 #include "str.hh"
 #include "def.hh"
 #include "TreeGramArpaReader.hh"
-#include "ClusterMap.hh"
 
 static std::string format_str("cis-binlm2\n");
 
@@ -55,7 +55,7 @@ TreeGram::check_order(const Gram &gram)
   {
     fprintf(stderr, "TreeGram::check_order(): "
 	    "trying to insert %d-gram after %d-gram\n",
-	    gram.size(), m_last_gram.size());
+	    (int) gram.size(), (int) m_last_gram.size());
     print_gram(stderr, gram);
     exit(1);
   }
@@ -65,7 +65,7 @@ TreeGram::check_order(const Gram &gram)
     if (gram[0] != m_nodes.size()) {
       fprintf(stderr, "TreeGram::check_order(): "
 	      "trying to insert 1-gram %d to node %d\n",
-	      gram[0], m_nodes.size());
+	      gram[0], (int) m_nodes.size());
       exit(1);
     }
   }
@@ -143,7 +143,7 @@ TreeGram::find_child(int word, int node_index)
 {
   if (word < 0 || word >= m_words.size()) {
     fprintf(stderr, "TreeGram::find_child(): "
-	    "index %d out of vocabulary size %d\n", word, m_words.size());
+	    "index %d out of vocabulary size %d\n", word, (int) m_words.size());
     exit(1);
   }
 
@@ -247,20 +247,16 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off)
 
   // Handle unigrams separately
   if (gram.size() == 1) {
-    m_insert_stack.clear();
 
     // OOV can be updated anytime.
     if (gram[0] == 0) {
       m_nodes[0].log_prob = log_prob;
       m_nodes[0].back_off = back_off;
-      m_insert_stack.push_back(0);
     }
 
     // Unigram which is not OOV
-    else {
-      m_insert_stack.push_back(m_nodes.size());
+    else
       m_nodes.push_back(Node(gram[0], log_prob, back_off, -1));
-    }
   }
 
   // 2-grams or higher
@@ -322,7 +318,7 @@ TreeGram::write_real(FILE *file, bool reflip)
     fprintf(file, "%s\n", word(i).c_str());
 
   // Order, number of nodes and order counts
-  fprintf(file, "%d %d\n", m_order, m_nodes.size());
+  fprintf(file, "%d %ld\n", m_order, (long) m_nodes.size());
   for (int i = 0; i < m_order; i++)
     fprintf(file, "%d\n", m_order_count[i]);
 
@@ -333,7 +329,7 @@ TreeGram::write_real(FILE *file, bool reflip)
   // BEGIN fwrite-hack
 
   // Write nodes
-#if 0
+#if 1
   fprintf(stderr, "FIXME: using write() workaround for fwrite().\n"
           "Fix me when cluster machines have been upgraded to SuSE 9.1\n");
 
@@ -350,7 +346,7 @@ TreeGram::write_real(FILE *file, bool reflip)
   }
   if ((size_t)ret != bytes_to_write) {
     fprintf(stderr, "TreeGram::write(): "
-	    "write() system call wrote only %lu of %lu bytes\n",
+	    "write() system call wrote only %zd of %zd bytes\n",
 	    (size_t)ret, bytes_to_write);
     abort();
   }
@@ -439,7 +435,7 @@ TreeGram::read(FILE *file, bool binary)
     sum += m_order_count[i];
   }
 
-   if (sum+1 == number_of_nodes) {
+  if (sum+1 == number_of_nodes) {
     fprintf(stderr, "TreeGram::read(): number of nodes exceeds the sum of order counts by one, probably having a sentinel n-gram. Continuing.\n");
   } else if (sum != number_of_nodes) {
     fprintf(stderr, "TreeGram::read(): "
@@ -512,20 +508,16 @@ TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
   assert(m_type==BACKOFF);
   float back_off_w;
   int i;
-  int child_index, next_child_index, cl_idx=-1;
+  int child_index, next_child_index;
   float *lm_buf = new float[m_words.size()];
   
-  if (clmap) cl_idx=clmap->get_cluster(2,prev_word_id);
-
   // Get backoff weight
-  if (clmap) back_off_w = m_nodes[cl_idx].back_off;
-  else back_off_w = m_nodes[prev_word_id].back_off;
+  back_off_w = m_nodes[prev_word_id].back_off;
   // Fill the unigram probabilities
   for (i = 0; i < m_words.size(); i++)
     lm_buf[i] = back_off_w + m_nodes[i].log_prob;
 
   // Fill the bigram probabilities
-  if (clmap) prev_word_id=cl_idx;
   child_index = m_nodes[prev_word_id].child_index;
   next_child_index = m_nodes[prev_word_id+1].child_index;
   if (child_index != -1 && next_child_index > child_index)
@@ -631,36 +623,6 @@ TreeGram::log_prob_bo(const Gram &gram)
 }
 
 float
-TreeGram::log_prob_bo_cl(const Gram &gram)
-{
-  Gram clgram(gram);
-  clmap->wg2cg(clgram);
-  return(log_prob_bo(clgram));
-
-#if 0
-  while (1) {
-    assert(n < clgram.size());
-    fetch_gram(clgram, n);
-    assert(m_fetch_stack.size() > 0);
-    
-    // Full gram found?
-    if (m_fetch_stack.size() == clgram.size() - n) {
-      log_prob += m_nodes[m_fetch_stack.back()].log_prob;
-      m_last_order = clgram.size() - n;
-      break;
-    }
-    
-    // Back-off found?
-    if (m_fetch_stack.size() == clgram.size() -n -1)
-      log_prob += m_nodes[m_fetch_stack.back()].back_off;
-    
-    n++;
-  }
-  return log_prob;
-#endif
-}
-
-float
 TreeGram::log_prob_i(const Gram &gram) {
   float prob=0.0;
   float bo;
@@ -686,43 +648,6 @@ TreeGram::log_prob_i(const Gram &gram) {
     }
     m_last_order=n;
     prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob);
-  }
-  return(safelogprob(prob));
-}
-
-float
-TreeGram::log_prob_i_cl(const Gram &gram) {
-  float prob=0.0;
-  float bo;
-  m_last_order=0;
-  Gram clgram(gram);
-
-  clgram=gram;
-  clmap->wg2cg(clgram);
-  
-  const int looptill=std::min(gram.size(),(size_t) m_order);
-  
-  for (int n=1;n<=looptill;n++) {
-    clgram.back()=clmap->get_fcluster(n,gram.back());
-    fetch_gram(clgram,clgram.size()-n);
-    if (m_fetch_stack.size() < n-1 || n>m_order) {
-      //return(safelogprob(prob)); 
-      continue;
-    }
-    
-    if (m_fetch_stack.size()==n-1) {
-      bo = pow(10,m_nodes[m_fetch_stack.back()].back_off);
-      prob *= bo;
-      continue;
-    }
-    
-    if (n>1) {
-      bo = pow(10,m_nodes[m_fetch_stack[m_fetch_stack.size()-2]].back_off);
-      prob *= bo;
-    }
-    m_last_order=n;
-    prob += pow(10,m_nodes[m_fetch_stack.back()].log_prob 
-		+ clmap->get_full_emprob(n,gram.back()));
   }
   return(safelogprob(prob));
 }
@@ -824,7 +749,7 @@ TreeGram::Iterator::next_order(int order)
   }
 }
 
-const TreeGram::Node&
+TreeGram::Node&
 TreeGram::Iterator::node(int order)
 {
   assert(m_gram);
@@ -889,6 +814,18 @@ TreeGram::Iterator::down()
   return true;
 }
 
+bool
+TreeGram::Iterator::has_children()
+{
+  Node &node = m_gram->m_nodes[m_index_stack.back()];
+  Node &next = m_gram->m_nodes[m_index_stack.back() + 1];
+  if (node.child_index < 0 || 
+      next.child_index < 0 ||
+      node.child_index == next.child_index)
+    return false;
+  return true;
+}
+
 void TreeGram::print_debuglist() {
   for (int i=0;i<m_nodes.size();i++) {
     fprintf(stderr,"%d: %d %.4f %.4f %d\n", i, m_nodes[i].word, m_nodes[i].log_prob, m_nodes[i].back_off, m_nodes[i].child_index);
@@ -899,4 +836,45 @@ void TreeGram::finalize() {
   if (m_nodes.back().child_index == -1) return;
   Node node;
   m_nodes.push_back(node);
+}
+
+void
+TreeGram::convert_to_backoff()
+{
+  assert(m_type == INTERPOLATED);
+
+  TreeGram::Iterator iter;
+  TreeGram::Gram gram;
+
+  // In-place conversion must proceed from high orders to low
+  // orders.
+  //
+  for (int order = m_order; order > 0; order--) {
+    gram.resize(order);
+    iter.reset(this);
+
+    while (iter.next_order(order)) {
+
+      for (int o = 1; o <= order; o++)
+	gram[o-1] = iter.node(o).word;
+      
+      // We have to use log_prob_i instead of plain log_prob.  In
+      // cluster models, plain log_prob would convert indices to
+      // cluster indices.
+      float log_prob = log_prob_i(gram); 
+
+      // Rounding errors may produce slightly positive values.  
+      if (log_prob > 1e-4) {
+	fprintf(stderr,"WARNING: n-gram [");
+	for (int j = 1; j <= order; j++) 
+	  fprintf(stderr, " %s", word(gram[j-1]).c_str());
+	fprintf(stderr, "] had positive logprob (%e), changed to zero\n", 
+		log_prob);
+	log_prob = 0;
+      }
+
+      iter.node().log_prob = log_prob;
+    }
+  }
+  m_type = BACKOFF;
 }

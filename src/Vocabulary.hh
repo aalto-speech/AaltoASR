@@ -1,13 +1,16 @@
+// Conversion of words to word indices and vice versa.
 #ifndef VOCABULARY_HH
 #define VOCABULARY_HH
 
 #include <string>
 #include <vector>
-#include <map>
 #include <exception>
 #include <stdio.h>
+#include <map>
+typedef std::map<std::string,int> vocabmap;
 
 class Vocabulary {
+  friend class VCluster;
 public:
   Vocabulary();
 
@@ -33,7 +36,7 @@ public:
   // Read vocabulary from a stream: one word per line.  # comments are
   // removed.  Spaces are removed.
   void read(FILE *file);
-  void read(const char *filename);
+  void read(const std::string &filename);
   
   // Write vocabulary to a stream.
   void write(FILE *file) const;
@@ -41,9 +44,12 @@ public:
   // Clears the vocabulary without adding the oov.
   void clear_words();
 
-protected:
+  // Copies vocabulary to Voc, ugly implementation
+  inline void copy_vocab_to(Vocabulary &Voc){Voc.copy_helper(m_indices, m_words);}
+  inline void copy_helper(vocabmap &ind, std::vector<std::string> &w) {m_indices=ind,m_words=w;}
 
-  std::map<std::string,int> m_indices;
+protected:
+  vocabmap m_indices;
   std::vector<std::string> m_words;
 };
 
@@ -61,7 +67,7 @@ Vocabulary::word(int index) const
 int
 Vocabulary::word_index(const std::string &word) const
 {
-  std::map<std::string,int>::const_iterator i = m_indices.find(word);
+  vocabmap::const_iterator i = m_indices.find(word);
   if (i == m_indices.end())
     return 0;
   return (*i).second;

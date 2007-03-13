@@ -1,3 +1,5 @@
+// Routines for reading and writing arpa format files from and to the 
+// internal prefix tree format.
 #ifndef TREEGRAMARPAREADER_HH
 #define TREEGRAMARPAREADER_HH
 
