@@ -45,7 +45,7 @@ main(int argc, char *argv[])
   bool raw_flag;
   int lnabytes;
   int info;
-  std::string out_dir;
+  std::string out_dir = "";
   std::string out_file = "";
   int start_frame, end_frame;
   bool no_overwrite;
@@ -66,6 +66,7 @@ main(int argc, char *argv[])
       ('o', "output-dir=DIR", "arg", "", "output directory (default: use filenames from recipe)")
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "lnabytes=INT", "arg", "2", "number of bytes for probabilities, 2 (default) or 4")
+      ('a', "afname", "", "", "use audio file name")
       ('n', "no-overwrite", "", "", "prevent overwriting existing files")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('i', "info=INT", "arg", "0", "info level")
@@ -131,13 +132,12 @@ main(int argc, char *argv[])
       }
 
       out_file.clear();
-      if (!config["output-dir"].specified)
+      // Default: Use recipe filename for output (normally for phn output..)
+      out_file = out_dir + recipe.infos[recipe_index].phn_out_path;
+
+      if (config["afname"].specified)
       {
-        // Default: Use recipe filename for output (normally for phn output..)
-        out_file = recipe.infos[recipe_index].phn_out_path;
-      }
-      if (out_file.size() == 0)
-      {
+        out_file.clear();
         // Use the audio file name with different directory and extension
         std::string file;
         // Strip the old path (if one exists)
