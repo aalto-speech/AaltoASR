@@ -1201,6 +1201,8 @@ VtlnModule::get_module_config(ModuleConfig &config)
   if (m_lanczos_window)
     config.set("lanczos_window", 1);
   config.set("sinc_interpolation_rad", m_sinc_interpolation_rad);
+  if (m_all_pass > 0)
+    config.set("all-pass", m_all_pass);
 }
 
 void
@@ -1224,13 +1226,21 @@ VtlnModule::set_module_config(const ModuleConfig &config)
   m_sinc_interpolation_rad = 8;
   config.get("sinc_interpolation_rad", m_sinc_interpolation_rad);
 
-  int lanczos = 1;
+  m_all_pass = 0;
+  config.get("all-pass", m_all_pass);
+  if (m_use_pwlin && m_all_pass)
+    throw std::string("VtlnModule: Can not use both pwlin_vtln and all-pass!");
+  
+  int lanczos = (m_all_pass?0:1);
   config.get("lanczos_window", lanczos);
   if (lanczos > 0)
     m_lanczos_window = true;
   else
     m_lanczos_window = false;
 
+  if (m_lanczos_window && m_all_pass)
+    throw std::string("VtlnModule: Can not use both lanczos_window and all-pass!");
+  
   if (!m_use_slapt)
     set_warp_factor(1.0);
   else
@@ -1272,7 +1282,9 @@ void
 VtlnModule::set_warp_factor(float factor)
 {
   m_warp_factor = factor;
-  if (m_use_pwlin)
+  if (m_all_pass)
+    create_all_pass_blin_transform();
+  else if (m_use_pwlin)
     create_pwlin_bins();
   else
     create_blin_bins();
@@ -1282,7 +1294,10 @@ void
 VtlnModule::set_slapt_warp(std::vector<float> &params)
 {
   m_slapt_params = params;
-  create_slapt_bins();
+  if (m_all_pass)
+    create_all_pass_slapt_transform();
+  else
+    create_slapt_bins();
 }
 
 void
@@ -1374,6 +1389,197 @@ VtlnModule::create_sinc_coef_table(void)
       }
       m_sinc_coef[b].push_back(t);
     }
+  }
+}
+
+void
+VtlnModule::create_all_pass_blin_transform(void)
+{
+  std::vector<double> q1, q, qn;
+  MatrixD blin_tr(m_dim, m_dim);
+  double alpha = m_warp_factor-1;
+  double temp;
+  int i, j, k;
+
+  q1.resize(m_dim);
+  q.resize(m_dim);
+  qn.resize(m_dim);
+  q1[0] = -alpha;
+  temp = 1-alpha*alpha;
+  for (i = 1; i < m_dim; i++)
+  {
+    q1[i] = temp;
+    temp *= alpha;
+  }
+  q[0] = 1;
+
+  blin_tr(0, 0) = 1;
+  for (i = 1; i < m_dim; i++)
+    blin_tr(i, 0) = 0;
+
+  for (i = 1; i < m_dim; i++)
+  {
+    for (j = 0; j < m_dim; j++)
+    {
+      temp = 0;
+      for (k = 0; k <= j; k++)
+        temp += q[k]*q1[j-k];
+      qn[j] = temp;
+    }
+    q = qn;
+    blin_tr(0, i) = 2*q[0];
+    for (j = 1; j < m_dim; j++)
+      blin_tr(j, i) = q[j];
+  }
+  set_all_pass_transform(blin_tr);
+}
+
+void
+VtlnModule::create_all_pass_slapt_transform(void)
+{
+  std::vector<double> q1, q, qn, f1, cur_f, fn;
+  int cur_f_center;
+  MatrixD slapt_tr(m_dim, m_dim);
+  int slapt_order = (int)m_slapt_params.size();
+  int i, j, k, len;
+  double cur_m = 1;
+  double temp;
+  int low1, high1, low2, high2;
+
+  f1.resize(2*slapt_order+1);
+  for (i = 0; i < slapt_order; i++)
+  {
+    f1[i] = -m_slapt_params[slapt_order - i - 1]*M_PI/2;
+    f1[i+slapt_order+1] = m_slapt_params[i]*M_PI/2;
+  }
+  f1[slapt_order] = 0;
+
+  q.resize(2*m_dim+1);
+  std::fill(q.begin(), q.end(), 0);
+  cur_f.push_back(1);
+  cur_f_center = 0;
+
+  for (i = 0; i <= 10; i++)
+  {
+    if (i > 0)
+      cur_m = cur_m / (double)i;
+    low1 = std::max(0, m_dim-cur_f_center);
+    high1 = std::min(2*m_dim+1, m_dim+cur_f_center+1);
+    for (j = low1; j < high1; j++)
+      q[j] = q[j] + cur_m*cur_f[j - (m_dim + 1) + cur_f_center + 1];
+    fn.resize(f1.size()+cur_f.size()-1);
+    for (j = 0; j < (int)fn.size(); j++)
+    {
+      high1 = j;
+      if (high1 >= (int)cur_f.size()) {
+        high2 = j - cur_f.size() + 1;
+        high1 = cur_f.size()-1;
+      }
+      else {
+        high2 = 0;
+      }
+      low2 = j;
+      if (low2 >= (int)f1.size()) {
+        low1 = j - f1.size() + 1;
+        low2 = f1.size()-1;
+      }
+      else {
+        low1 = 0;
+      }
+      assert( (high1-low1) == (low2-high2) );
+      len = high1 - low1 + 1;
+      temp = 0;
+      for (k = 0; k < len; k++)
+        temp += cur_f[low1+k]*f1[low2-k];
+      fn[j] = temp;
+    }
+    cur_f = fn;
+    cur_f_center = (cur_f.size()-1)/2;
+  }
+
+  // Make the initial sequence symmetric
+  q.pop_back();
+  q.pop_back();
+
+  q1 = q;
+  slapt_tr(0, 0) = 1;
+  for (i = 1; i < m_dim; i++)
+    slapt_tr(i, 0) = 0;
+
+  qn.resize(2*m_dim-1);
+  for (i = 1; i < m_dim; i++)
+  {
+    slapt_tr(0, i) = 2*q[m_dim-1];
+    for (j = 1; j < m_dim; j++)
+      slapt_tr(j, i) = q[m_dim+j-1]+q[m_dim-j-1];
+
+    for (j = m_dim-1; j < 3*m_dim-2; j++)
+    {
+      high1 = j;
+      if (high1 >= (int)q.size()) {
+        high2 = j - q.size() + 1;
+        high1 = q.size() - 1;
+      }
+      else {
+        high2 = 0;
+      }
+      low2 = j;
+      if (low2 >= (int)q1.size()) {
+        low1 = j - q1.size() + 1;
+        low2 = q1.size()-1;
+      }
+      else {
+        low1 = 0;
+      }
+      assert( (high1-low1) == (low2-high2) );
+      len = high1 - low1 + 1;
+      temp = 0;
+      for (k = 0; k < len; k++)
+        temp += q[low1+k]*q1[low2-k];
+      qn[j - m_dim + 1] = temp;
+    }
+    q = qn;
+  }
+
+  set_all_pass_transform(slapt_tr);
+}
+
+void
+VtlnModule::set_all_pass_transform(MatrixD &trmat)
+{
+  MatrixD dct(m_dim, m_dim);
+  MatrixD final(m_dim, m_dim);
+  MatrixD temp_m(m_dim, m_dim);
+  int i, j;
+  
+  // Make DCT matrix
+  for (i = 0; i < m_dim; i++)
+  {
+    for (j = 0; j < m_dim; j++)
+       dct(i, j) = cos(i*(j+0.5)*M_PI/m_dim);
+  }
+  mtl::set(temp_m, 0);
+  mult(trmat, dct, temp_m);
+
+  // Make inverse DCT matrix
+  for (i = 0; i < m_dim; i++)
+  {
+    dct(i, 0) = 1.0/m_dim;
+    for (j = 1; j < m_dim; j++)
+       dct(i, j) = cos((i+0.5)*j*M_PI/m_dim)*2/m_dim;
+  }
+  mtl::set(final, 0);
+  mult(dct, temp_m, final);
+
+  // Fill the interpolation matrix
+  m_sinc_coef.resize(m_dim);
+  m_sinc_coef_start.resize(m_dim);
+  for (i = 0; i < m_dim; i++)
+  {
+    m_sinc_coef_start[i] = 0;
+    m_sinc_coef[i].clear();
+    for (j = 0; j < m_dim; j++)
+      m_sinc_coef[i].push_back(final(i,j));
   }
 }
 

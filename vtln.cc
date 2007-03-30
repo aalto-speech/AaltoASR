@@ -20,6 +20,7 @@ bool raw_flag;
 float start_time, end_time;
 int start_frame, end_frame;
 bool state_num_labels;
+int phn_deviation = 0;
 
 float grid_start;
 float grid_step;
@@ -59,15 +60,26 @@ open_files(const std::string &audio_file, const std::string &phn_file,
 
   // Open transcription
   phn_reader.open(phn_file);
-  // Note: PHN files always use time multiplied by 16000
-  phn_reader.set_sample_limit((int)(start_time * 16000), 
-			      (int)(end_time * 16000));
-  phn_reader.set_line_limit(first_phn_line, last_phn_line, 
-			    &first_sample);
 
-  if (first_sample > 16000 * start_time) {
+  if (state_num_labels)
+  {
+    phn_deviation = (int)(start_time * fea_gen.frame_rate());
+  }
+  else
+  {
+    phn_deviation = 0;
+    // Note: PHN files always use time multiplied by 16000
+    phn_reader.set_sample_limit((int)(start_time * 16000), 
+                                (int)(end_time * 16000));
+  }
+
+  phn_reader.set_line_limit(first_phn_line, last_phn_line, 
+                            &first_sample);
+  
+  float phn_time = (float)phn_deviation / fea_gen.frame_rate();
+  if (first_sample + 16000 * phn_time > 16000 * start_time) {
     start_time = (float)(first_sample / 16000);
-    start_frame = (int)(fea_gen.frame_rate() * start_time);
+    start_frame = (int)(fea_gen.frame_rate() * start_time) + phn_deviation;
   }
 }
 
@@ -150,6 +162,9 @@ compute_vtln_log_likelihoods(int start_frame, int end_frame,
 
       phn_start_frame = (int)((double)phn.start/16000.0*fea_gen.frame_rate()+0.5);
       phn_end_frame = (int)((double)phn.end/16000.0*fea_gen.frame_rate()+0.5);
+      phn_start_frame += phn_deviation;
+      phn_end_frame += phn_deviation;
+      
       if (phn_start_frame < start_frame)
       {
         assert( phn_end_frame > start_frame );

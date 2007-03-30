@@ -8,6 +8,14 @@
 #include "AudioReader.hh"
 #include "ModuleConfig.hh"
 
+// Matrix definition from Matrix template library
+#include "mtl/mtl_config.h"
+#include "mtl/mtl.h"
+#include "mtl/matrix.h"
+
+typedef mtl::matrix<double, mtl::rectangle<>, mtl::dense<>, 
+		    mtl::row_major>::type MatrixD;
+
 
 class FeatureGenerator;
 
@@ -420,12 +428,16 @@ private:
   void create_blin_bins(void);
   void create_slapt_bins(void);
   void create_sinc_coef_table(void);
+  void create_all_pass_blin_transform(void);
+  void create_all_pass_slapt_transform(void);
+  void set_all_pass_transform(MatrixD &trmat);
 
 private:
   int m_use_pwlin;
   float m_pwlin_turn_point;
   int m_use_slapt;
   int m_sinc_interpolation_rad;
+  int m_all_pass;
   bool m_lanczos_window;
   std::vector<float> m_vtln_bins;
   std::vector< std::vector<float> > m_sinc_coef;

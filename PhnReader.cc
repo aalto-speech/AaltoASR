@@ -71,12 +71,14 @@ PhnReader::set_line_limit(int first_line, int last_line,
 			  int *first_sample) 
 {
   Phn phn;
-  m_first_line = first_line;
-  m_last_line = last_line;
+  if (!m_state_num_labels)
+  {
+    m_first_line = first_line;
+    m_last_line = last_line;
 
-  while (m_current_line < m_first_line) 
-    next(phn);  
-
+    while (m_current_line < m_first_line) 
+      next(phn);
+  }
   *first_sample = phn.start;
 }
 
@@ -84,17 +86,20 @@ void
 PhnReader::set_sample_limit(int first_sample, int last_sample) 
 {
   Phn phn;
-  m_first_sample = first_sample;
-  m_last_sample = last_sample;
-  long oldpos = ftell(m_file);
-  long curpos = oldpos;
-
-  while (next(phn)) {
-    oldpos = curpos;
-    curpos = ftell(m_file);
-    if (phn.end < 0 || phn.end > m_first_sample) {
-      fseek(m_file, oldpos, SEEK_SET);
-      return;
+  if (!m_state_num_labels)
+  {
+    m_first_sample = first_sample;
+    m_last_sample = last_sample;
+    long oldpos = ftell(m_file);
+    long curpos = oldpos;
+    
+    while (next(phn)) {
+      oldpos = curpos;
+      curpos = ftell(m_file);
+      if (phn.end < 0 || phn.end > m_first_sample) {
+        fseek(m_file, oldpos, SEEK_SET);
+        return;
+      }
     }
   }
 }
@@ -123,7 +128,7 @@ PhnReader::next(Phn &phn)
     assert(false);
   }
 
-  if (m_last_line > 0 && m_current_line > m_last_line)
+  if (!m_state_num_labels && m_last_line > 0 && m_current_line > m_last_line)
     return false; 
 
   // Parse the line in fields.
@@ -179,7 +184,7 @@ PhnReader::next(Phn &phn)
   }
 
   // Is the current starting time out of requested range?
-  if (m_last_sample > 0 && phn.start > m_last_sample)
+  if (!m_state_num_labels && m_last_sample > 0 && phn.start > m_last_sample)
     return false;
 
   // Read label and comments

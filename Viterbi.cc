@@ -73,10 +73,13 @@ Viterbi::fill_transcription()
       eof = !m_phn_reader->next(phn);
     while (!eof && (int)m_transcription.size() < m_last_position) {
       // Read the next label and get the hmm of the phoneme
-      std::string label = phn.label[0];
-      phn.label.erase(phn.label.begin()); // Remove the first HMM label
-      add_hmm_to_transcription(m_model.hmm_index(label),phn.comment,
-                               phn.label, phn.speaker);
+      if (phn.state == -1 || phn.state == 0) // No need for state segmentation
+      {
+        std::string label = phn.label[0];
+        phn.label.erase(phn.label.begin()); // Remove the first HMM label
+        add_hmm_to_transcription(m_model.hmm_index(label),phn.comment,
+                                 phn.label, phn.speaker);
+      }
       eof = !m_phn_reader->next(phn);
     }
 
