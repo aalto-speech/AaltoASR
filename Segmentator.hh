@@ -25,6 +25,10 @@ public:
   /** Computes the state probability statistics for the next frame. */
   void next_frame(void) = 0;
 
+  /** Returns true if the previous frame read was the last one. After
+   * that, \ref next_frame() should not be called */
+  bool eof(void) = 0;
+
   /** Returns a reference to a vector of possible states and their
    * probabilities */
   const std::vector<StateProbPair>& state_probs(void) = 0;
