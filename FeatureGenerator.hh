@@ -50,7 +50,7 @@ public:
 
   /** Generates a feature vector for the requested \c frame.
    * Generating frames sequentially is guaranteed to use buffers of
-   * the feature moduls efficiently.  If you need more random access,
+   * the feature modules efficiently.  If you need more random access,
    * you might want to buffer frames yourself.  
    *
    * \note Some feature configurations may allow generating features
