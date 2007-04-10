@@ -143,6 +143,25 @@ private:
 }
 
 
+class FullCovarianceAccumulator {
+public:
+  DiagonalAccumulator(int dim) { 
+    ml_mean.resize(dim);
+    ml_cov.resize(dim,dim);
+    mmi_mean.resize(dim);
+    mmi_cov.resize(dim,dim);
+    ml_mean=0;
+    mmi_mean=0;
+    ml_cov=0;
+    mmi_cov=0;
+  }
+  Vector ml_mean;
+  Vector mmi_mean;
+  Matrix ml_cov;
+  Matrix mmi_cov;
+}
+
+
 class FullCovarianceGaussian : public Gaussian {
 public:
   FullCovarianceGaussian(int dim);
@@ -157,26 +176,25 @@ public:
 
   // Gaussian-specific
   virtual void start_accumulating();
-  virtual void accumulate_ml(double prior, const FeatureVec &f);
+  virtual void accumulate_ml(double prior,
+			     const FeatureVec &f);
   virtual void accumulate_mmi_denominator(std::vector<double> priors,
 					  std::vector<const FeatureVec*> const features);
   virtual void estimate_parameters();
-  virtual vector &get_mean();
-  virtual Matrix &get_covariance();
-  virtual void set_mean(vector &mean) = 0;
-  virtual void set_covariance(Matrix &covariance) = 0;
+  virtual void get_mean(Vector &mean);
+  virtual void get_covariance(Matrix &covariance);
+  virtual void set_mean(const Vector &mean);
+  virtual void set_covariance(const Matrix &covariance);
   
 private:
-  double determinant;
-  double constant;
+  double m_determinant;
+  double m_constant;
 
   // Parameters
-  Vector mean;
-  Matrix covariance;
+  Vector m_mean;
+  Matrix m_covariance;
 
-  // For accumulating, empty when 
-  
-
+  FullAccumulator *m_accum;
 }
 
 

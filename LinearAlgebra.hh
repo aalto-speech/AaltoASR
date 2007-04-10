@@ -70,6 +70,8 @@ public:
 
   static void force_min_eig(Matrix &m, double min_eig);
   static void force_min_eig(LaGenMatDouble &m, double min_eig);
+
+  static void inverse(const Matrix &m, Matrix &inv);
 };
 
 #endif /* LINEARALGEBRA_HH */

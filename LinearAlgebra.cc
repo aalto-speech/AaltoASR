@@ -377,3 +377,12 @@ LinearAlgebra::force_min_eig(LaGenMatDouble &m, double min_eig)
   Blas_Mat_Mat_Trans_Mult(temp, eigv, m, 1.0, 0.0);
 }
 
+
+void
+LinearAlgebra::inverse(const Matrix &m, Matrix &inv)
+{
+  inv.copy(m);
+  LaVectorLongInt pivots(m.rows());
+  LUFactorizeIP(inv, pivots);
+  LaLUInverseIP(inv, pivots);
+}

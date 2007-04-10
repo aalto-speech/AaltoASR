@@ -116,10 +116,6 @@ DiagonalGaussian::DiagonalGaussian(int dim)
 
 
 // FIXME: NOT TRIED
-DiagonalGaussian::~DiagonalGaussian() { }
-
-
-// FIXME: NOT TRIED
 DiagonalGaussian::DiagonalGaussian(const DiagonalGaussian &g)
 {
   reset(g.dim);
@@ -128,6 +124,10 @@ DiagonalGaussian::DiagonalGaussian(const DiagonalGaussian &g)
   for (int i=0; i<dim; i++)
     precision(i)=1/covariance(i);
 }
+
+
+// FIXME: NOT TRIED
+DiagonalGaussian::~DiagonalGaussian() { }
 
 
 // FIXME: NOT TRIED
@@ -306,6 +306,194 @@ void
 DiagonalGaussian::set_covariance(const Vector &covariance)
 {
   assert(covariance.size()==dim());
+  m_covariance.copy(covariance);
+}
+
+
+FULL!!!!!!!
+
+
+// FIXME: NOT TRIED
+FullCovarianceGaussian::FullCovarianceGaussian(int dim)
+{
+  reset(dim);
+}
+
+
+// FIXME: NOT TRIED
+FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
+{
+  reset(g.dim);
+  mean.copy(g.get_mean());
+  covariance.copy(g.get_covariance());
+  for (int i=0; i<dim; i++)
+    precision(i)=1/covariance(i);
+}
+
+
+// FIXME: NOT TRIED
+FullCovarianceGaussian::~FullCovarianceGaussian() { }
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::reset(int dim)
+{
+  mean.resize(dim);
+  covariance.reset(dim);
+  precision.reset(dim);
+  mean=0; covariance=0; precision=0;
+}
+
+
+// FIXME: NOT TRIED
+double
+FullCovarianceGaussian::compute_likelihood(const FeatureVec &f)
+{
+  return exp(compute_log_likelihood(f));
+}
+
+
+// FIXME: NOT TRIED
+double
+FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f)
+{
+  double ll=0;
+  Vector diff(f);
+  Blas_Add_Mult(diff, -1, mean);
+  for (int i=0; i<dim(); i++)
+    ll += diff(i)*diff(i)*precision(i);
+  ll *= -0.5;
+  ll += constant;
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::write(std::ostream &os)
+{
+  os << "diag ";
+  for (int i=0; i<dim(); i++)
+    os << mean(i) << " ";
+  for (int i=0; i<dim()-1; i++)
+    os << covariance(i) << " ";
+  os << covariance(dim()-1);
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::read(std::istream &is)
+{
+  std::string line=is.getline();
+  std::string type;
+  chomp(line);
+
+  type << line;
+  if (type != "diag")
+    throw std::string("Error reading FullCovarianceGaussian parameters from a stream\n");
+  
+  for (int i=0; i<dim(); i++)
+    mean(i) << is;
+  for (int i=0; i<dim()-1; i++)
+    covariance(i) << is;
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::start_accumulating()
+{
+  m_accum = new FullCovarianceAccumulator(dim());
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::accumulate_ml(double prior,
+				const FeatureVec &f)
+{
+  assert(m_accum != NULL);
+
+  for (int i=0; i<dim(); i++) {
+    m_accum->ml_mean += prior*f;    
+    m_accum->ml_cov += prior*f(i)*f(i);
+  }
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::accumulate_mmi_denominator(std::vector<double> priors,
+					     std::vector<const FeatureVec*> const features)
+{
+  assert(m_accum != NULL);
+  
+  for (int i=0; i<dim(); i++)
+    for (int j=0; j<priors.size(); j++) {
+      m_accum->mmi_mean += priors(j)*f(i);
+      m_accum->mmi_cov += priors(j)*f(i)*f(i);
+    }
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::estimate_parameters()
+{
+  assert(m_accum != NULL);
+  
+  if (m_mode == ML) {
+    m_mean.copy(accum.ml_mean);
+    m_covariance.copy(accum.ml_cov);
+  }
+
+  else if (m_mode == MMI) {
+    // Do something smart
+  }
+
+  // Clear the accumulators
+  delete m_accum;
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::get_mean(Vector &mean)
+{
+  mean.resize(dim());
+  mean=0;
+  for (int i=0; i<dim(); i++)
+    mean(i)=m_mean(i);
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::get_covariance(Matrix &covariance)
+{
+  covariance.resize(dim());
+  covariance=0;
+  for (int i=0; i<dim(); i++)
+    covariance(i,i)=m_covariance(i);
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::set_mean(const Vector &mean)
+{
+  assert(mean.size()==dim());
+  m_mean.copy(mean);
+}
+
+
+// FIXME: NOT TRIED
+void
+FullCovarianceGaussian::set_covariance(const Matrix &covariance)
+{
+  assert(covariance.rows()==dim());
+  assert(covariance.cols()==dim());
   m_covariance.copy(covariance);
 }
 
