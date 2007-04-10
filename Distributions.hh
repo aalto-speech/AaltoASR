@@ -150,15 +150,18 @@ public:
     ml_cov.resize(dim,dim);
     mmi_mean.resize(dim);
     mmi_cov.resize(dim,dim);
+    outer.resize(dim,dim);
     ml_mean=0;
     mmi_mean=0;
     ml_cov=0;
     mmi_cov=0;
+    outer=0;
   }
   Vector ml_mean;
   Vector mmi_mean;
   Matrix ml_cov;
   Matrix mmi_cov;
+  Matrix outer;
 }
 
 
@@ -194,7 +197,7 @@ private:
   Vector m_mean;
   Matrix m_covariance;
 
-  FullAccumulator *m_accum;
+  FullCovarianceAccumulator *m_accum;
 }
 
 

@@ -1,5 +1,6 @@
 #include <cassert>
 
+#include "LinearAlgebra.hh"
 #include "Distributions.hh"
 #include "str.hh"
 
@@ -118,16 +119,20 @@ DiagonalGaussian::DiagonalGaussian(int dim)
 // FIXME: NOT TRIED
 DiagonalGaussian::DiagonalGaussian(const DiagonalGaussian &g)
 {
-  reset(g.dim);
-  mean.copy(g.get_mean());
-  covariance.copy(g.get_covariance());
-  for (int i=0; i<dim; i++)
+  reset(g.dim());
+  g.get_mean(m_mean);
+  g.get_covariance(m_covariance);
+  for (int i=0; i<dim(); i++)
     precision(i)=1/covariance(i);
 }
 
 
 // FIXME: NOT TRIED
-DiagonalGaussian::~DiagonalGaussian() { }
+DiagonalGaussian::~DiagonalGaussian()
+{
+  if (m_accum != NULL)
+    delete m_accum; 
+}
 
 
 // FIXME: NOT TRIED
@@ -135,8 +140,8 @@ void
 DiagonalGaussian::reset(int dim)
 {
   mean.resize(dim);
-  covariance.reset(dim);
-  precision.reset(dim);
+  covariance.resize(dim);
+  precision.resize(dim);
   mean=0; covariance=0; precision=0;
 }
 
@@ -256,10 +261,7 @@ DiagonalGaussian::estimate_parameters()
 void
 DiagonalGaussian::get_mean(Vector &mean)
 {
-  mean.resize(dim());
-  mean=0;
-  for (int i=0; i<dim(); i++)
-    mean(i)=m_mean(i);
+  mean.copy(m_mean);
 }
 
 
@@ -310,9 +312,6 @@ DiagonalGaussian::set_covariance(const Vector &covariance)
 }
 
 
-FULL!!!!!!!
-
-
 // FIXME: NOT TRIED
 FullCovarianceGaussian::FullCovarianceGaussian(int dim)
 {
@@ -324,15 +323,18 @@ FullCovarianceGaussian::FullCovarianceGaussian(int dim)
 FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
 {
   reset(g.dim);
-  mean.copy(g.get_mean());
-  covariance.copy(g.get_covariance());
-  for (int i=0; i<dim; i++)
-    precision(i)=1/covariance(i);
+  g.get_mean(m_mean);
+  g.get_covariance(m_covariance);
+  LinearAlgebra::inverse(m_covariance, m_precision);
 }
 
 
 // FIXME: NOT TRIED
-FullCovarianceGaussian::~FullCovarianceGaussian() { }
+FullCovarianceGaussian::~FullCovarianceGaussian()
+{
+  if (m_accum != NULL)
+    delete m_accum;
+}
 
 
 // FIXME: NOT TRIED
@@ -340,8 +342,8 @@ void
 FullCovarianceGaussian::reset(int dim)
 {
   mean.resize(dim);
-  covariance.reset(dim);
-  precision.reset(dim);
+  covariance.reset(dim,dim);
+  precision.reset(dim,dim);
   mean=0; covariance=0; precision=0;
 }
 
@@ -360,9 +362,11 @@ FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f)
 {
   double ll=0;
   Vector diff(f);
+  Vector t(f.dim());
+
   Blas_Add_Mult(diff, -1, mean);
-  for (int i=0; i<dim(); i++)
-    ll += diff(i)*diff(i)*precision(i);
+  Blas_Mat_Vec_Mult(m_precision, diff, t, 1, 0);
+  ll = Blas_Dot_Prod(diff, t);
   ll *= -0.5;
   ll += constant;
 }
@@ -372,12 +376,14 @@ FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f)
 void
 FullCovarianceGaussian::write(std::ostream &os)
 {
-  os << "diag ";
+  os << "full ";
   for (int i=0; i<dim(); i++)
     os << mean(i) << " ";
-  for (int i=0; i<dim()-1; i++)
-    os << covariance(i) << " ";
-  os << covariance(dim()-1);
+  for (int i=0; i<dim(); i++)
+    for (int j=0; j<dim(); j++)
+      if (!(i==dim()-1 && j==dim()-1))
+	os << covariance(i,j) << " ";
+  os << covariance(dim()-1, dim()-1);
 }
 
 
@@ -395,8 +401,9 @@ FullCovarianceGaussian::read(std::istream &is)
   
   for (int i=0; i<dim(); i++)
     mean(i) << is;
-  for (int i=0; i<dim()-1; i++)
-    covariance(i) << is;
+  for (int i=0; i<dim(); i++)
+    for (int j=0; j<dim(); j++)
+    covariance(i,j) << is;
 }
 
 
@@ -411,13 +418,13 @@ FullCovarianceGaussian::start_accumulating()
 // FIXME: NOT TRIED
 void
 FullCovarianceGaussian::accumulate_ml(double prior,
-				const FeatureVec &f)
+				      const FeatureVec &f)
 {
   assert(m_accum != NULL);
 
   for (int i=0; i<dim(); i++) {
     m_accum->ml_mean += prior*f;    
-    m_accum->ml_cov += prior*f(i)*f(i);
+    Blas_R1_Update(m_accum->ml_cov, f, f, prior);
   }
 }
 
@@ -425,14 +432,14 @@ FullCovarianceGaussian::accumulate_ml(double prior,
 // FIXME: NOT TRIED
 void
 FullCovarianceGaussian::accumulate_mmi_denominator(std::vector<double> priors,
-					     std::vector<const FeatureVec*> const features)
+						   std::vector<const FeatureVec*> const features)
 {
   assert(m_accum != NULL);
   
   for (int i=0; i<dim(); i++)
     for (int j=0; j<priors.size(); j++) {
       m_accum->mmi_mean += priors(j)*f(i);
-      m_accum->mmi_cov += priors(j)*f(i)*f(i);
+      Blas_R1_Update(m_accum->mmi_cov, f, f, prior);
     }
 }
 
@@ -461,10 +468,7 @@ FullCovarianceGaussian::estimate_parameters()
 void
 FullCovarianceGaussian::get_mean(Vector &mean)
 {
-  mean.resize(dim());
-  mean=0;
-  for (int i=0; i<dim(); i++)
-    mean(i)=m_mean(i);
+  mean.copy(m_mean);
 }
 
 
@@ -472,10 +476,7 @@ FullCovarianceGaussian::get_mean(Vector &mean)
 void
 FullCovarianceGaussian::get_covariance(Matrix &covariance)
 {
-  covariance.resize(dim());
-  covariance=0;
-  for (int i=0; i<dim(); i++)
-    covariance(i,i)=m_covariance(i);
+  covariance.copy(m_covariance);
 }
 
 
