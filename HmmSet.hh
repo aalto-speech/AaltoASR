@@ -9,6 +9,7 @@
 #include "FeatureModules.hh"
 #include "Pcgmm.hh"
 #include "Scgmm.hh"
+#include "Distributions.hh"
 
 #include "mtl/mtl.h"
 #include "mtl/blais.h"
@@ -17,72 +18,13 @@ typedef mtl::matrix<float, mtl::rectangle<>, mtl::dense<>,
                     mtl::row_major>::type Matrix;
 typedef mtl::dense1D<float> Vector;
 
-// FIXME: precicions in writes!!
-
-//
-// HmmCovariance
-//
-class HmmCovariance {
-public:
-  enum Type { SINGLE = 0, DIAGONAL = 1, FULL = 2, PCGMM = 3, SCGMM = 4, INVALID = 5 };
-
-  HmmCovariance() : m_cov_type(INVALID) { }
-
-  void resize(int dim, Type type);
-  void reset(int value = 0);
-
-  inline Type type() const { return m_cov_type; }
-  inline float &var() { return data[0]; }
-  inline float &diag(int i) { return data[i]; }
-
-  // Single & Diagonal
-  std::vector<float> data;
-
-  // Unrestricted
-  Matrix full;
-  Matrix precision_cholesky_transpose;
-
-  // Determinant for the covariance matrix (FIXME: only for diagonal covariances)
-  // Computed in HmmSet::compute_covariance_determinants, remember to call it
-  // if you modify the covariance!
-  double cov_det;
-  
-private:
-  Type m_cov_type;
-};
-
-//
-// HmmKernel
-//
-struct HmmKernel {
-  void resize(int dim, HmmCovariance::Type cov_type);
-
-  std::vector<float> center;
-  HmmCovariance cov;
-};
-
 
 //
 // HmmState
 //
 struct HmmState {
-  inline void add_weight(int index, float weight);
-
-  struct Weight {
-    Weight() {}
-    Weight(int kernel, float weight) : kernel(kernel), weight(weight) {}
-    int kernel;
-    float weight;
-  };
-
-  std::vector<Weight> weights;
+  Mixture emission_pdf;
 };
-
-void
-HmmState::add_weight(int index, float weight)
-{
-  weights.push_back(Weight(index, weight));
-}
 
 
 //
