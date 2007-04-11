@@ -8,6 +8,9 @@ typedef LaVectorDouble Vector;
 class PDF {
 public:
 
+  /* The feature dimensionality */
+  int dim() { return m_dim; };
+
   /* Different training modes */
   enum EstimationMode { ML, MMI };
   
@@ -27,15 +30,13 @@ public:
 
 private:
   Gaussian::EstimationMode m_mode;
+  int m_dim;
 }
 
 
 class Gaussian : public PDF {
 public:
   
-  /* Returns the feature dimensionality */
-  int dim() { return m_dim; };
-
   // ABSTRACT FUNCTIONS, SHOULD BE OVERWRITTEN IN THE GAUSSIAN IMPLEMENTATIONS
 
   /* Constructor */
@@ -65,12 +66,12 @@ public:
   virtual void get_covariance(Matrix &covariance) const = 0;
   /* Sets the mean vector for this Gaussian */
   virtual void set_mean(const Vector &mean) = 0;
-  /* Sets the covariance matrix  for this Gaussian */
+  /* Sets the covariance matrix for this Gaussian */
   virtual void set_covariance(const Matrix &covariance) = 0;
   
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMANTATION, BUT CAN BE OVERWRITTEN
 
-  /* Splits the current Gaussian to two by */
+  /* Splits the current Gaussian to two by disturbing the mean */
   virtual void split(Gaussian &s1, Gaussian &s2) const;
   /* Sets the parameters for the current Gaussian by merging m1 and m2 */
   virtual void merge(const Gaussian &m1, const Gaussian &m2);
@@ -78,9 +79,6 @@ public:
   virtual void merge(Gaussian &m);
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
-
-private:
-  int m_dim;
 }
 
 
@@ -279,9 +277,12 @@ public:
   Mixture(PDFPool &pool);
   ~Mixture();
   void reset();
-  /* Add a set of new components to the mixture */
-  void add_components(const std::vector<int> &pool_indices,
+  /* Set the mixture components, clear existing mixture */
+  void set_components(const std::vector<int> &pointers,
 		      const std::vector<double> &weights);
+  /* Get the mixture components */
+  void get_components(std::vector<int> &pointers,
+		      std::vector<double> &weights);
   /* Add one new component to the mixture. 
      Doesn't normalize the coefficients in between */
   void add_component(int pool_index, double weight);
@@ -295,16 +296,44 @@ public:
   virtual void read(const std::istream &is);
 
 private:
-  Vector mixture_weights;
-  Vector mixture_pointers;
-  PDFPool &pp;
+  std::vector<int> m_pointers;
+  std::vector<double> m_weights;
+  PDFPool &m_pp;
 }
 
 
 class PDFPool {
 public:
-  PDF &get_pdf(int pdfindex);
-  void set_pdf(int pdfindex, PDF &pdf);
+
+  PDFPool(int dim) { m_dim=dim };
+  ~PDFPool();
+
+  /* The dimensionality of the distributions in this pool */
+  int dim() { return m_dim; };
+
+  /* Get the pdf from the position index */
+  PDF* get_pdf(int index);
+  /* Set the pdf in the position index */
+  void set_pdf(int index, PDF *pdf);
+
+  /* Read the distributions from a .gk -file */
+  void read_gk(const std::string &filename);
+  /* Write the distributions to a .gk -file */
+  void write_gk(const std::string &filename);
+
+  /* Compute all likelihoods to the cache */
+  void cache_likelihood(const FeatureVec &f);
+  /* Compute likelihood of one pdf to the cache */
+  void cache_likelihood(const FeatureVec &f, int index);
+  /* Compute likelihoods of pdfs given in indices to the cache */
+  void cache_likelihood(const FeatureVec &f, std::vector<int> indices);
+  /* Instant computation of pdf at position index */
+  double compute_likelihood(const FeatureVec &f, int index);
+  /* Get the likelihood from the cache */
+  double get_likelihood(int index);
+  
 private:
-  std::vector<PDF> pool;
+  std::vector<PDF*> m_pool;
+  std::vector<double> m_likelihoods;
+  int m_dim;
 }

@@ -499,3 +499,199 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance)
 }
 
 
+Mixture::Mixture(PDFPool &pool)
+  :  pp(pool)
+{
+}
+
+
+Mixture::~Mixture()
+{
+}
+
+
+void
+Mixture::reset()
+{
+  mixture_weights.resize(0);
+  mixture_pointers.resize(0);
+}
+
+
+void
+Mixture::set_components(const std::vector<int> &pointers,
+			const std::vector<double> &weights)
+{
+  assert(pointers.size()==weights.size());
+
+  m_pointers.resize(pointers.size());
+  m_weights.resize(weights.size());
+
+  for (int i=0; i<pointers.size(); i++) {
+    m_pointers[i] = pointers[i];
+    m_weights[i] = weights[i];
+  }
+}
+
+
+void
+Mixture::get_components(std::vector<int> &pointers,
+			std::vector<double> &weights)
+{
+  pointers.resize(m_pointers.size());
+  weights.resize(m_weights.size());
+  
+  for (int i=0; i<m_pointers.size(); i++) {
+    pointers[i] = m_pointers[i];
+    weights[i] = m_weights[i];
+  }
+}
+
+
+void
+Mixture::add_component(int pool_index,
+		       double weight)
+{
+  assert(m_weights.size() == m_pointers.size());
+  m_pointers.push_back(pool_index);
+  m_weights.push_back(weight);
+}
+
+
+void
+Mixture::normalize_weights()
+{
+  double sum=0;
+  for (int i=0; i<m_weights.size(); i++)
+    sum += m_weights[i];
+  for (int i=0; i<m_weights.size(); i++)
+    m_weights[i] /= sum;
+}
+
+
+double
+Mixture::compute_likelihood(const FeatureVec &f)
+{
+  for (int i=0; i<
+  
+}
+
+
+
+double
+Mixture::compute_log_likelihood(const FeatureVec &f)
+{
+  
+  
+}
+
+
+void
+Mixture::write(std::ostream &os)
+{
+
+}
+
+
+void
+Mixture::read(const std::istream &is)
+{
+
+}
+
+
+PDF&
+PDFPool::get_pdf(int index)
+{
+  return pool[index];
+}
+
+
+void
+PDFPool::set_pdf(int pdfindex, PDF &pdf)
+{
+  
+}
+
+
+void
+PDFPool::cache_likelihood(const FeatureVec &f)
+
+{
+  for (int i=0; i<likelihoods.size(); i++)
+    likelihoods[i] = pool[i].compute_likelihood(f);
+}
+
+
+void
+PDFPool::cache_likelihood(const FeatureVec &f,
+			  int index)
+{
+  likelihoods[index] = pool[index].compute_likelihood(f);
+}
+
+
+void
+PDFPool::cache_likelihood(const FeatureVec &f,
+			  std::vector<int> indices)
+{
+  for (int i=0; i<indices.size(); i++)
+    likelihoods[indices[i]] = pool[indices[i]].compute_likelihood(f);
+}
+
+
+double
+PDFPool::get_likelihood(int index)
+{
+  return likelihoods[i];
+}
+
+
+void
+PDFPool::read_gk(const std::string &filename)
+{
+  std::ifstream in(filename.c_str());
+  if (!in) {
+    fprintf(stderr, "PDFPool::read_gk(): could not open %s\n", 
+	    filename.c_str());
+    throw OpenError();
+  }
+  
+  int pdfs = 0;
+  std::string type_str;
+  int dim;
+
+  in >> pdfs >> m_dim >> type_str;
+
+  if (type_str == "single_cov")
+
+  else if (type_str == "diagonal_cov")
+
+  else if (type_str == "full_cov")
+
+  else if (type_str == "pcgmm") {
+
+  else if (cov_str == "scgmm") {
+
+  else if (cov_str == "variable") {
+    for (int i=0; i<m_pool.size(); i++)
+      m_pool[i]->write(out);
+  }
+  else
+    throw std::string("Unknown covariance type");
+
+  if (!in)
+    throw ReadError();
+}
+
+
+void
+PDFPool::write_gk(const std::string &filename)
+{
+  std::ofstream out(filename.c_str());
+  
+  out << m_pool.size() << " " << m_dim << " variable\n";
+
+  for (int i=0; i<m_pool.size(); i++)
+    m_pool[i]->write(out);
+}

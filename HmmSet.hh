@@ -79,8 +79,6 @@ public:
   Hmm &add_hmm(const std::string &label, int num_states);
   void clone_hmm(const std::string &source, const std::string &target);
   void untie_transitions(const std::string &label);
-  inline HmmCovariance::Type covariance_type() const;
-  void set_covariance_type(HmmCovariance::Type type);
 
   void set_dim(int dim);
   inline int dim() const;
@@ -93,12 +91,6 @@ public:
   void reserve_states(int states);
   inline int num_states() const;
   inline HmmState &state(int state);
-
-  void reserve_kernels(int kernels);
-  HmmKernel &add_kernel();
-  void remove_kernel(int kernel);
-  inline int num_kernels() const;
-  inline HmmKernel &kernel(int kernel);
 
   void reserve_transitions(int transitions);
   HmmTransition &add_transition(int h, int source, int target, float prob,
@@ -117,20 +109,14 @@ public:
   void write_ph(const std::string &filename);
   void write_all(const std::string &base);
 
-  void compute_covariance_determinants(void);
-
   // Probs
   void reset_state_probs(); // FAST, unnormalized
   float state_prob(const int s, const FeatureVec&); // FAST, unnormalized 
-//  float euclidean_distance(std::vector<float> &a, std::vector<float> &b);
   void compute_observation_log_probs(const FeatureVec&); // SLOW, accurate
-//  void compute_obs_logprobs(const float *feature);
-  void precompute(const FeatureVec &feature); // precomputation for subspace gmms
-  float compute_kernel_likelihood(const int k, const FeatureVec &feature);
   
   // These work only for scaled probs...
   std::vector<float> obs_log_probs;
-  std::vector<float> obs_kernel_likelihoods;
+  std::vector<float> obs_pdf_likelihoods;
 
   // Exceptions
   struct DuplicateHmm : public std::exception {
@@ -159,15 +145,7 @@ public:
   };
 
 private:
-  /// Dimensionality of the Gaussian densities.
-  int m_dim;
-
-  /// Type of covariance matrix.
-  HmmCovariance::Type m_cov_type;
-
   std::map<std::string,int> m_hmm_map;
-
-  std::vector<HmmKernel> m_kernels;
   std::vector<HmmTransition> m_transitions;
   std::vector<HmmState> m_states;
   std::vector<Hmm> m_hmms;
@@ -180,27 +158,15 @@ private:
   /**
    * Undefined distances are marked with negative values.
    */
-  std::vector<float> m_kernel_likelihoods;
+  std::vector<float> m_pdf_likelihoods;
 
 
   std::vector<int> m_valid_stateprobs;
-  std::vector<int> m_valid_kernel_likelihoods;
+  std::vector<int> m_valid_pdf_likelihoods;
   float m_viterbi_scale_coeff;
 
-  // For computing full covariance kernels
-  Vector m_kernel_temp_s;
-  Vector m_kernel_temp_t;
-
-public:
-  Pcgmm pcgmm;
-  Scgmm scgmm;
 };
 
-HmmCovariance::Type
-HmmSet::covariance_type() const
-{
-  return m_cov_type;
-}
 
 int
 HmmSet::dim() const
@@ -208,11 +174,13 @@ HmmSet::dim() const
   return m_dim;
 }
 
+
 int
 HmmSet::num_hmms() const
 {
   return m_hmms.size();
 }
+
 
 int
 HmmSet::num_states() const
@@ -220,17 +188,13 @@ HmmSet::num_states() const
   return m_states.size();
 }
 
-int
-HmmSet::num_kernels() const
-{
-  return m_kernels.size();
-}
 
 int
 HmmSet::num_transitions() const
 {
   return m_transitions.size();
 }
+
 
 int
 HmmSet::hmm_index(const std::string &label) const
@@ -245,11 +209,13 @@ HmmSet::hmm_index(const std::string &label) const
   return (*it).second;
 }
 
+
 Hmm&
 HmmSet::hmm(int hmm)
 {
   return m_hmms[hmm];
 }
+
 
 Hmm&
 HmmSet::hmm(const std::string &label)
@@ -257,17 +223,13 @@ HmmSet::hmm(const std::string &label)
   return m_hmms[hmm_index(label)];
 }
 
+
 HmmState&
 HmmSet::state(int state)
 {
   return m_states[state];
 }
 
-HmmKernel&
-HmmSet::kernel(int kernel)
-{
-  return m_kernels[kernel];
-}
 
 HmmTransition&
 HmmSet::transition(int transition)
@@ -275,6 +237,5 @@ HmmSet::transition(int transition)
   return m_transitions[transition];
 }
 
-void cholesky_factor(const Matrix &A, Matrix &B);
 
 #endif /* HMMSET_HH */
