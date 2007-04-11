@@ -65,3 +65,39 @@ Recipe::read(FILE *f)
       info.speaker_id = field[8];
   }
 }
+
+
+PhnReader*
+Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
+                              bool out_phn, FeatureGenerator *fea_gen,
+                              bool raw_audio, PhnReader *phn_reader)
+{
+  float frame_rate;
+
+  // Open the audio file
+  fea_gen->open(audio_path, raw_audio);
+
+  // Initialize the PhnReader
+  if (phn_reader == NULL)
+    phn_reader = new PhnReader;
+  if (model == NULL)
+    phn_reader->set_state_num_labels(true);
+  phn_reader->set_relative_sample_numbers(relative_sample_nums);
+  frame_rate = fea_gen->frame_rate();
+  phn_reader->set_frame_rate(frame_rate);
+
+  // Open the segmentation
+  phn_reader->open(out_phn?phn_out_path:phn_path);
+
+  if (start_time > 0 || end_time > 0)
+  {
+    phn_reader->set_frame_limits((int)(start_time * frame_rate), 
+                                (int)(end_time * frame_rate));
+  }
+  if (start_line > 0 || end_line > 0)
+  {
+    phn_reader->set_line_limits(start_line, end_line);
+  }
+  
+  return phn_reader;
+}
