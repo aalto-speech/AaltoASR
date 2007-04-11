@@ -16,11 +16,6 @@
 std::string save_summary_file;
 
 int info;
-bool raw_flag;
-float start_time, end_time;
-int start_frame, end_frame;
-bool state_num_labels;
-int phn_deviation = 0;
 
 float grid_start;
 float grid_step;
@@ -31,7 +26,6 @@ conf::Config config;
 Recipe recipe;
 HmmSet model;
 FeatureGenerator fea_gen;
-PhnReader phn_reader;
 SpeakerConfig speaker_conf(fea_gen);
 
 VtlnModule *vtln_module;
@@ -50,41 +44,6 @@ SpeakerStatsMap speaker_stats;
 
 
 void
-open_files(const std::string &audio_file, const std::string &phn_file, 
-	   int first_phn_line, int last_phn_line)
-{
-  int first_sample;
-
-  // Open sph file
-  fea_gen.open(audio_file, raw_flag);
-
-  // Open transcription
-  phn_reader.open(phn_file);
-
-  if (state_num_labels)
-  {
-    phn_deviation = (int)(start_time * fea_gen.frame_rate());
-  }
-  else
-  {
-    phn_deviation = 0;
-    // Note: PHN files always use time multiplied by 16000
-    phn_reader.set_sample_limit((int)(start_time * 16000), 
-                                (int)(end_time * 16000));
-  }
-
-  phn_reader.set_line_limit(first_phn_line, last_phn_line, 
-                            &first_sample);
-  
-  float phn_time = (float)phn_deviation / fea_gen.frame_rate();
-  if (first_sample + 16000 * phn_time > 16000 * start_time) {
-    start_time = (float)(first_sample / 16000);
-    start_frame = (int)(fea_gen.frame_rate() * start_time) + phn_deviation;
-  }
-}
-
-
-void
 set_speaker(std::string speaker, std::string utterance, int grid_iter)
 {
   float new_warp;
@@ -92,123 +51,75 @@ set_speaker(std::string speaker, std::string utterance, int grid_iter)
   
   cur_speaker = speaker;
 
-  if (cur_speaker.size() > 0)
-  {
-    speaker_conf.set_speaker(speaker);
-    if (utterance.size() > 0)
-      speaker_conf.set_utterance(utterance);
+  assert( cur_speaker.size() > 0 );
+
+  speaker_conf.set_speaker(speaker);
+  if (utterance.size() > 0)
+    speaker_conf.set_utterance(utterance);
     
-    SpeakerStatsMap::iterator it = speaker_stats.find(speaker);
-    if (it == speaker_stats.end())
-    {
-      // New speaker encountered
-      SpeakerStats new_speaker;
+  SpeakerStatsMap::iterator it = speaker_stats.find(speaker);
+  if (it == speaker_stats.end())
+  {
+    // New speaker encountered
+    SpeakerStats new_speaker;
       
-      if (relative_grid)
-        new_speaker.center = vtln_module->get_warp_factor();
-      else
-        new_speaker.center = 1;
-      speaker_stats[cur_speaker] = new_speaker;
-    }
-    
-    new_warp = speaker_stats[cur_speaker].center + grid_start +
-      grid_iter*grid_step;
-    vtln_module->set_warp_factor(new_warp);
-    
-    for (i = 0; i < (int)speaker_stats[cur_speaker].warp_factors.size(); i++)
-    {
-      if (fabs(new_warp - speaker_stats[cur_speaker].warp_factors[i])
-          < TINY)
-        break;
-    }
-    if (i == (int)speaker_stats[cur_speaker].warp_factors.size())
-    {
-      // New warp factor
-      speaker_stats[cur_speaker].warp_factors.push_back(new_warp);
-      speaker_stats[cur_speaker].log_likelihoods.push_back(0);
-    }
-    cur_warp_index = i;
+    if (relative_grid)
+      new_speaker.center = vtln_module->get_warp_factor();
+    else
+      new_speaker.center = 1;
+    speaker_stats[cur_speaker] = new_speaker;
   }
-  else
+    
+  new_warp = speaker_stats[cur_speaker].center + grid_start +
+    grid_iter*grid_step;
+  vtln_module->set_warp_factor(new_warp);
+    
+  for (i = 0; i < (int)speaker_stats[cur_speaker].warp_factors.size(); i++)
   {
-    vtln_module->set_warp_factor(1 + grid_start + grid_iter*grid_step);
-    cur_warp_index = -1;
+    if (fabs(new_warp - speaker_stats[cur_speaker].warp_factors[i])
+        < TINY)
+      break;
   }
+  if (i == (int)speaker_stats[cur_speaker].warp_factors.size())
+  {
+    // New warp factor
+    speaker_stats[cur_speaker].warp_factors.push_back(new_warp);
+    speaker_stats[cur_speaker].log_likelihoods.push_back(0);
+  }
+  cur_warp_index = i;
 }
 
 
 void
-compute_vtln_log_likelihoods(int start_frame, int end_frame,
-                             std::string &speaker, std::string &utterance)
+compute_vtln_log_likelihoods(Segmentator *seg, std::string &speaker,
+                             std::string &utterance)
 {
   int grid_iter;
-  Hmm hmm;
-  HmmState state;
-  PhnReader::Phn phn;
-  int state_index;
-  int phn_start_frame, phn_end_frame;
-  int f;
+  int i;
 
   for (grid_iter = 0; grid_iter < grid_size; grid_iter++)
   {
-    set_speaker(speaker, utterance, grid_iter);
+    set_speaker(speaker, utterance, grid_iter);    
+    seg->reset();
+    seg->init_utterance_segmentation();
     
-    phn_reader.reset_file();
-    
-    while (phn_reader.next(phn))
+    while (!seg->eof())
     {
-      if (phn.state < 0)
-        throw std::string("State segmented phn file is needed");
-
-      phn_start_frame = (int)((double)phn.start/16000.0*fea_gen.frame_rate()+0.5);
-      phn_end_frame = (int)((double)phn.end/16000.0*fea_gen.frame_rate()+0.5);
-      phn_start_frame += phn_deviation;
-      phn_end_frame += phn_deviation;
-      
-      if (phn_start_frame < start_frame)
+      seg->next_frame();
+      const std::vector<Segmentator::StateProbPair> &states =
+        seg->state_probs();
+      model.reset_state_probs();
+      for (i = 0; i < (int)states.size(); i++)
       {
-        assert( phn_end_frame > start_frame );
-        phn_start_frame = start_frame;
-      }
-      if (end_frame > 0 && phn_end_frame > end_frame)
-      {
-        assert( phn_start_frame < end_frame );
-        phn_end_frame = end_frame;
-      }
-
-      if (phn.speaker.size() > 0 && phn.speaker != cur_speaker)
-        set_speaker(phn.speaker, utterance, grid_iter);
-
-      if (cur_speaker.size() == 0)
-        throw std::string("Speaker ID is missing");
-
-      if (state_num_labels)
-      {
-        state_index = phn.state;
-      }
-      else
-      {
-        hmm = model.hmm(model.hmm_index(phn.label[0]));
-        state_index = hmm.state(phn.state);
-      }
-      state = model.state(state_index);
-
-      for (f = phn_start_frame; f < phn_end_frame; f++)
-      {
-        FeatureVec fea_vec = fea_gen.generate(f);
+        FeatureVec fea_vec = fea_gen.generate(seg->current_frame());
         if (fea_gen.eof())
           break;
-      
         // Get probabilities
-        if (cur_warp_index >= 0)
-        {
-          model.reset_state_probs();
-          speaker_stats[cur_speaker].log_likelihoods[cur_warp_index] += 
-            log(model.state_prob(state_index, fea_vec));
-        }
+        speaker_stats[cur_speaker].log_likelihoods[cur_warp_index] += 
+          log(states[i].prob*model.state_prob(states[i].state_index,fea_vec));
       }
-      if (f < phn_end_frame)
-        break; // EOF in FeatureGenerator
+      if (i < (int)states.size()) // EOF in FeatureGenerator
+        break;
     }
   }
 }
@@ -260,6 +171,8 @@ find_best_warp_factors(void)
 int
 main(int argc, char *argv[])
 {
+  PhnReader phn_reader;
+
   try {
     config("usage: vtln [OPTION...]\n")
       ('h', "help", "", "", "display help")
@@ -275,8 +188,8 @@ main(int argc, char *argv[])
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('o', "out=FILE", "arg", "", "output speaker configuration file")
       ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihoods)")
-      ('\0', "sphn", "", "", "phn-files with speaker ID's in use")
       ('\0', "snl", "", "", "phn-files with state number labels")
+      ('\0', "rsamp", "", "", "phn sample numbers are relative to start time")
       ('\0', "grid-size=INT", "arg", "21", "warping grid size (default: 21/5)")
       ('\0', "grid-rad=FLOAT", "arg", "0.1", "radius of warping grid (default: 0.1/0.03)")
       ('\0', "relative", "", "", "relative warping grid (and smaller grid defaults)")
@@ -285,7 +198,6 @@ main(int argc, char *argv[])
     config.default_parse(argc, argv);
     
     info = config["info"].get_int();
-    raw_flag = config["raw-input"].specified;
     fea_gen.load_configuration(io::Stream(config["config"].get_str()));
 
     if (config["base"].specified)
@@ -315,11 +227,6 @@ main(int argc, char *argv[])
     if (vtln_module == NULL)
       throw std::string("Module ") + config["vtln"].get_str() +
         std::string(" is not a VTLN module");
-
-    phn_reader.set_speaker_phns(config["sphn"].specified);
-
-    state_num_labels = config["snl"].specified;
-    phn_reader.set_state_num_labels(state_num_labels);
     
     grid_start = config["grid-rad"].get_float();
     grid_size = std::max(config["grid-size"].get_int(), 1);
@@ -356,24 +263,16 @@ main(int argc, char *argv[])
         fprintf(stderr,"\n");
       }
     
-      start_time = recipe.infos[f].start_time;
-      end_time = recipe.infos[f].end_time;
-      start_frame = (int)(start_time * fea_gen.frame_rate());
-      end_frame = (int)(end_time * fea_gen.frame_rate());
-    
       // Open the audio and phn files from the given list.
-      open_files(recipe.infos[f].audio_path, 
-                 (config["ophn"].specified?recipe.infos[f].phn_out_path:
-                  recipe.infos[f].phn_path),
-                 (config["ophn"].specified?0:recipe.infos[f].start_line),
-                 (config["ophn"].specified?0:recipe.infos[f].end_line));
-
-      if (!config["sphn"].specified &&
-          recipe.infos[f].speaker_id.size() == 0)
+      recipe.infos[f].init_phn_files((config["snl"].specified?NULL:&model),
+                                     config["rsamp"].specified,
+                                     config["ophn"].specified, &fea_gen,
+                                     config["raw-input"].specified,
+                                     &phn_reader);
+      if (recipe.infos[f].speaker_id.size() == 0)
         throw std::string("Speaker ID is missing");
 
-      compute_vtln_log_likelihoods(start_frame, end_frame,
-                                   recipe.infos[f].speaker_id,
+      compute_vtln_log_likelihoods(&phn_reader, recipe.infos[f].speaker_id,
                                    recipe.infos[f].utterance_id);
 
       fea_gen.close();
