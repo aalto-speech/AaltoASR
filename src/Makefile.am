@@ -1,21 +1,27 @@
 SUBDIRS = . swig
 
-noinst_PROGRAMS = arpasort perplexity test_arpa lna arpa2bin test_token_pass
+noinst_PROGRAMS = arpa2bin lexdebug # wgtest lexdebug arpasort perplexity test_arpa lna test_token_pass
 # test_expander 
 # test_lexicon 
 #	test_arpa
 
-test_token_pass_SOURCES = test_token_pass.cc
-test_token_pass_LDADD = libdecoder.a
+#wgtest_SOURCES = wgtest.cc
+#wgtest_LDADD = libdecoder.a
 
-test_arpa_SOURCES = test_arpa.cc
-test_arpa_LDADD = libdecoder.a
+#test_token_pass_SOURCES = test_token_pass.cc
+#test_token_pass_LDADD = libdecoder.a
 
-arpasort_SOURCES = arpasort.cc
-arpasort_LDADD = libdecoder.a
+lexdebug_SOURCES = lexdebug.cc
+lexdebug_LDADD = libdecoder.a
 
-perplexity_SOURCES = perplexity.cc
-perplexity_LDADD = libdecoder.a
+#test_arpa_SOURCES = test_arpa.cc
+#test_arpa_LDADD = libdecoder.a
+
+#arpasort_SOURCES = arpasort.cc
+#arpasort_LDADD = libdecoder.a
+
+#perplexity_SOURCES = perplexity.cc
+#perplexity_LDADD = libdecoder.a
 
 #test_lexicon_SOURCES = test_lexicon.cc
 #test_lexicon_LDADD = libdecoder.a
@@ -23,8 +29,8 @@ perplexity_LDADD = libdecoder.a
 # test_expander_SOURCES = test_expander.cc
 # test_expander_LDADD = libdecoder.a
 
-lna_SOURCES = lna.cc
-lna_LDADD = libdecoder.a
+#lna_SOURCES = lna.cc
+#lna_LDADD = libdecoder.a
 
 arpa2bin_SOURCES = arpa2bin.cc
 arpa2bin_LDADD = libdecoder.a

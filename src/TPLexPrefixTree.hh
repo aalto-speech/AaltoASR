@@ -8,6 +8,7 @@
 #include "HashCache.hh"
 #include "SimpleHashCache.hh"
 
+#include "history.hh"
 #include "Hmm.hh"
 #include "Vocabulary.hh"
 
@@ -36,6 +37,9 @@
 #define NODE_LINKED               0x0100
 #define NODE_SILENCE_FIRST        0x0200
 #define NODE_FIRST_STATE_OF_WORD  0x0400
+#define NODE_FINAL                0x0800
+#define NODE_DEBUG_PRUNED	  0x4000
+#define NODE_DEBUG_PRINTED	  0x8000
 
 
 class TPLexPrefixTree {
@@ -43,50 +47,42 @@ public:
 
   class Node;
 
-  class WordHistory {
-  public:
-    inline WordHistory(int word_id, int lm_id, class WordHistory *prev);
-    inline void link() { m_reference_count++; }
-    inline static void unlink(class WordHistory *hist);
-    inline int get_num_references(void) { return m_reference_count; }
+  struct LMHistory {
+    inline LMHistory(int word_id, int lm_id, LMHistory *previous);
 
     int word_id;
     int lm_id; // Word ID in LM
-    WordHistory *prev_word;
-    bool printed; // TokenPassSearch::print* functions may set this true
+    LMHistory *previous;
+    int reference_count;
+    bool printed;
     int word_start_frame;
-  private:
-    int m_reference_count;
   };
 
-  class StateHistory {
-  public:
-    inline StateHistory(int hmm_model, int start_time,
-                        class StateHistory *prev);
+  struct WordHistory {
+    inline WordHistory(int word_id, int frame, WordHistory *previous);
 
-    inline void link() { m_reference_count++; }
-    inline static void unlink(class StateHistory *hist);
-    
+    int word_id;
+    int end_frame;
+    int lex_node_id; // FIXME: debug info (node where the history was created)
+    float lm_log_prob;
+    float am_log_prob;
+    float cum_lm_log_prob;
+    float cum_am_log_prob;
+    bool printed;
+
+    WordHistory *previous;
+    int reference_count;
+  };
+
+  struct StateHistory {
+    inline StateHistory(int hmm_model, int start_time, StateHistory *previous);
+
     int hmm_model;
     int start_time;
-    StateHistory *prev;
-  private:
-    int m_reference_count;
-  };
+    float log_prob;
 
-  class PathHistory {
-  public:
-    inline PathHistory(float ll, float dll, int depth, class PathHistory *p);
-
-    inline void link() { m_reference_count++; }
-    inline static void unlink(class PathHistory *hist);
-    
-    float ll;
-    float dll;
-    int depth;
-    PathHistory *prev;
-  private:
-    int m_reference_count;
+    StateHistory *previous;
+    int reference_count;
   };
 
   class Token {
@@ -98,8 +94,10 @@ public:
     float cur_am_log_prob; // Used inside nodes
     float cur_lm_log_prob; // Used for LM lookahead
     float total_log_prob;
-    WordHistory *prev_word;
-    int word_hist_code; // Hash code for word history (up to LM order)
+    LMHistory *lm_history;
+    int lm_hist_code; // Hash code for word history (up to LM order)
+    int recent_word_graph_node;
+    WordHistory *word_history;
     int word_start_frame;
 
 #ifdef PRUNING_MEASUREMENT
@@ -107,9 +105,9 @@ public:
 #endif
 
     int word_count;
+
     StateHistory *state_history;
-    
-    //PathHistory *token_path;
+
     unsigned char depth;
     unsigned char dur;
   };
@@ -162,12 +160,16 @@ public:
 
   void set_word_boundary_id(int id) { m_word_boundary_id = id; }
   void set_optional_short_silence(bool state) { m_optional_short_silence = state; }
-  void set_sentence_boundary(int sentence_end_id);
+  void set_sentence_boundary(int sentence_start_id, int sentence_end_id);
 
   void clear_node_token_lists(void);
 
   void print_node_info(int node);
   void print_lookahead_info(int node, const Vocabulary &voc);
+  Node *final_node() { return m_final_node; }
+  void debug_prune_dead_ends(Node *node);
+  void debug_add_silence_loop();
+  
   
 private:
   void expand_lexical_tree(Node *source, Hmm *hmm, HmmTransition &t,
@@ -212,12 +214,10 @@ private:
     const std::string &key,
     std::map< std::string, std::vector<Node*>* > &nmap);
   void add_fan_in_connection_node(Node *node, const std::string &prev_label);
-
   float get_out_transition_log_prob(Node *node);
-  
   void prune_lm_la_buffer(int delta_thr, int depth_thr,
                           Node *node, int last_size, int cur_depth);
-  
+
 private:
   int m_words; // Largest word_id in the nodes plus one
   Node *m_root_node;
@@ -225,6 +225,7 @@ private:
   Node *m_start_node;
   Node *m_silence_node;
   Node *m_last_silence_node;
+  Node *m_final_node;
   std::vector<Node*> node_list;
   int m_verbose;
   int m_lm_lookahead; // 0=None, 1=Only in first subtree nodes,
@@ -251,89 +252,41 @@ private:
 
 //////////////////////////////////////////////////////////////////////
 
-TPLexPrefixTree::WordHistory::WordHistory(int word_id, int lm_id,
-                                          class WordHistory *prev)
+TPLexPrefixTree::LMHistory::LMHistory(int word_id, int lm_id,
+                                          class LMHistory *previous)
   : word_id(word_id),
     lm_id(lm_id),
-    prev_word(prev),
+    previous(previous),
+    reference_count(0),
     printed(false),
-    word_start_frame(0),
-    m_reference_count(0)
+    word_start_frame(0)
 {
-  if (prev)
-    prev->link();
+  if (previous)
+    hist::link(previous);
 }
 
-void
-TPLexPrefixTree::WordHistory::unlink(class WordHistory *hist)
+TPLexPrefixTree::WordHistory::WordHistory(int word_id, int end_frame, 
+					  WordHistory *previous)
+  : word_id(word_id), end_frame(end_frame), printed(false), 
+    lm_log_prob(0), am_log_prob(0), cum_lm_log_prob(0), cum_am_log_prob(0),
+    previous(previous), reference_count(0)
 {
-  if (hist != NULL)
-  {
-    while (hist->m_reference_count == 1) {
-      WordHistory *prev = hist->prev_word;
-      delete hist;
-      hist = prev;
-      if (hist == NULL)
-        return;
-    }
-    hist->m_reference_count--;
-  }
-}
-
-
-TPLexPrefixTree::PathHistory::PathHistory(float ll, float dll, int depth,
-                                          class PathHistory *p)
-  : ll(ll),
-    dll(dll),
-    depth(depth),
-    prev(p),
-    m_reference_count(0)
-{
-  if (p)
-    p->link();
-}
-
-void
-TPLexPrefixTree::PathHistory::unlink(class PathHistory *hist)
-{
-  if (hist != NULL)
-  {
-    while (hist->m_reference_count == 1) {
-      PathHistory *prev = hist->prev;
-      delete hist;
-      hist = prev;
-      if (hist == NULL)
-        return;
-    }
-    hist->m_reference_count--;
+  if (previous) {
+    hist::link(previous);
+    cum_am_log_prob = previous->cum_am_log_prob;
+    cum_lm_log_prob = previous->cum_lm_log_prob;
   }
 }
 
 TPLexPrefixTree::StateHistory::StateHistory(int hmm_model, int start_time,
-                                            class StateHistory *prev)
+                                            StateHistory *previous)
   : hmm_model(hmm_model),
     start_time(start_time),
-    prev(prev),
-    m_reference_count(0)
+    previous(previous),
+    reference_count(0)
 {
-  if (prev)
-    prev->link();
-}
-
-void
-TPLexPrefixTree::StateHistory::unlink(class StateHistory *hist)
-{
-  if (hist != NULL)
-  {
-    while (hist->m_reference_count == 1) {
-      StateHistory *prev = hist->prev;
-      delete hist;
-      hist = prev;
-      if (hist == NULL)
-        return;
-    }
-    hist->m_reference_count--;
-  }
+  if (previous)
+    hist::link(previous);
 }
 
 #endif /* TPLEXPREFIXTREE_HH */

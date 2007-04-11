@@ -43,13 +43,10 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
   m_fan_in_beam = 1e10;
   m_fan_out_beam = 1e10;
   m_state_beam = 1e10;
-
-  m_print_text_result = 1;
+  m_print_text_result = 0;
   m_print_state_segmentation = false;
   m_keep_state_segmentation = false;
-  m_print_frames = false;
-
-  m_similar_word_hist_span = 0;
+  m_similar_lm_hist_span = 0;
   m_lm_scale = 1;
   m_max_num_tokens = 0;
   m_active_token_list = new std::vector<TPLexPrefixTree::Token*>;
@@ -69,6 +66,8 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
   m_use_sentence_boundary = false;
   m_sentence_start_id = -1;
   m_sentence_end_id = -1;
+  m_generate_word_graph = false;
+  m_best_final_token = NULL;
   m_require_sentence_end = false;
 }
 
@@ -78,7 +77,8 @@ TokenPassSearch::set_word_boundary(const std::string &word)
 {
   m_word_boundary_id = m_vocabulary.word_index(word);
   if (m_word_boundary_id <= 0) {
-    fprintf(stderr, "Search::set_word_boundary(): word boundary not in vocabulary\n");
+    fprintf(stderr, "TokenPassSearch::set_word_boundary(): "
+	    "word boundary not in vocabulary: %s\n", word.c_str());
     exit(1);
   }
 }
@@ -99,7 +99,7 @@ TokenPassSearch::set_sentence_boundary(const std::string &start,
     exit(1);
   }
   m_use_sentence_boundary = true;
-  m_lexicon.set_sentence_boundary(m_sentence_end_id);
+  m_lexicon.set_sentence_boundary(m_sentence_start_id, m_sentence_end_id);
 }
 
 
@@ -109,6 +109,7 @@ TokenPassSearch::reset_search(int start_frame)
   TPLexPrefixTree::Token *t;
   m_frame = start_frame;
   m_end_frame = -1;
+  m_best_final_token = NULL;
 
   if (m_word_boundary_id > 0)
     m_word_boundary_lm_id = m_lex2lm[m_word_boundary_id];
@@ -136,20 +137,34 @@ TokenPassSearch::reset_search(int start_frame)
   t->lm_log_prob = 0;
   t->cur_am_log_prob = 0;
   t->cur_lm_log_prob = 0;
-  t->prev_word = new TPLexPrefixTree::WordHistory(-1, -1, NULL);
-  t->prev_word->link();
-  t->word_hist_code = 0;
+  t->lm_history = new TPLexPrefixTree::LMHistory(-1, -1, NULL);
+  hist::link(t->lm_history);
+
+  if (m_generate_word_graph) {
+    t->word_history = new TPLexPrefixTree::WordHistory(-1, -1, NULL);
+    t->word_history->lex_node_id = t->node->node_id;
+    hist::link(t->word_history);
+
+    word_graph.reset();
+    int node_index = word_graph.add_node(-1, -1, t->node->node_id, 0);
+    word_graph.link(node_index);
+    t->recent_word_graph_node = node_index;
+    m_recent_word_graph_info.clear();
+    m_recent_word_graph_info.resize(m_lexicon.words());
+  }
+
+  t->lm_hist_code = 0;
   t->dur = 0;
   t->word_start_frame = -1;
 
   if (m_use_sentence_boundary)
   {
-    TPLexPrefixTree::WordHistory *sentence_start =
-      new TPLexPrefixTree::WordHistory(
-        m_sentence_start_id, m_sentence_start_lm_id, t->prev_word);
-    TPLexPrefixTree::WordHistory::unlink(t->prev_word);
-    t->prev_word = sentence_start;
-    t->prev_word->link();
+    TPLexPrefixTree::LMHistory *sentence_start =
+      new TPLexPrefixTree::LMHistory(
+        m_sentence_start_id, m_sentence_start_lm_id, t->lm_history);
+    hist::unlink(t->lm_history);
+    t->lm_history = sentence_start;
+    hist::link(t->lm_history);
   }
 
 #ifdef PRUNING_MEASUREMENT
@@ -182,7 +197,7 @@ TokenPassSearch::reset_search(int start_frame)
   {
     t->state_history = new TPLexPrefixTree::StateHistory(
       0, 0, NULL);
-    t->state_history->link();
+    hist::link(t->state_history);
   }
   else
   {
@@ -227,27 +242,34 @@ TokenPassSearch::reset_search(int start_frame)
 bool
 TokenPassSearch::run(void)
 {
+  if (m_generate_word_graph) {
+    if (m_similar_lm_hist_span < 2) {
+      fprintf(stderr, "ERROR: similar word history span should be at least 2"
+	      " if word graph requested\n");
+      exit(1);
+    }
+
+    if (!m_use_sentence_boundary) {
+      fprintf(stderr, "ERROR: word graph can be generated only if sentence"
+	      " boundary is used\n");
+      exit(1);
+    }
+  }
+
   if (m_verbose > 1)
     printf("run() in frame %d\n", m_frame);
-  if (m_end_frame != -1 && m_frame >= m_end_frame)
+  if ((m_end_frame != -1 && m_frame >= m_end_frame) ||
+      !m_acoustics->go_to(m_frame))
   {
-    if (m_require_sentence_end)
-      add_sentence_end_to_hypotheses();
+    if (m_generate_word_graph || m_require_sentence_end)
+      update_final_tokens();
+
     if (m_print_text_result)
-      print_best_path(true);
+      print_lm_history(stdout, true);
+
     if (m_print_state_segmentation)
       print_state_history();
 
-    return false;
-  }
-  if (!m_acoustics->go_to(m_frame))
-  {
-    if (m_require_sentence_end)
-      add_sentence_end_to_hypotheses();
-    if (m_print_text_result)
-      print_best_path(true);
-    if (m_print_state_segmentation)
-      print_state_history();
     return false;
   }
 
@@ -258,9 +280,9 @@ TokenPassSearch::run(void)
 #endif
   /*if ((m_frame%5) == 0)
     save_token_statistics(filecount++);*/
-  m_frame++;
   if (m_print_text_result)
-    print_guaranteed_path();
+    print_lm_history(stdout, false);
+  m_frame++;
   return true;
 }
 
@@ -379,7 +401,7 @@ TokenPassSearch::analyze_tokens(void)
 
 void
 TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
-                          TPLexPrefixTree::WordHistory *limit)
+                          TPLexPrefixTree::LMHistory *limit)
 {
   if (m_print_text_result) {
     fprintf(stderr, "TokenPassSearch::get_path() should not be used with "
@@ -406,121 +428,171 @@ TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
   assert(orig_token != NULL);
 
   vec.clear();
-  TPLexPrefixTree::WordHistory *hist = orig_token->prev_word;
+  TPLexPrefixTree::LMHistory *hist = orig_token->lm_history;
   while (hist->word_id >= 0) {
     if (hist == limit)
       break;
     vec.push_back(hist);
-    hist = hist->prev_word;
+    hist = hist->previous;
   }
   assert(limit == NULL || hist->word_id >= 0);
 }
 
 
 void
-TokenPassSearch::print_guaranteed_path(void)
+TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 {
-  // Start from some token and proceed to find those word history records
-  // that belong to every token and has not yet been printed.
-  TPLexPrefixTree::WordHistory *word_hist;
-  int i;
-  std::vector<TPLexPrefixTree::WordHistory*> word_list;
-  bool collecting = false;
-  int min_word_count = 100000;
-
-  for (i = 0; i < m_active_token_list->size(); i++)
-    if ((*m_active_token_list)[i] != NULL)
-    {
-      break;
-    }
-  assert( i < m_active_token_list->size() ); // Must find one token
-  word_hist = (*m_active_token_list)[i]->prev_word;
-  while (word_hist->prev_word != NULL &&
-         !word_hist->printed)
-  {
-    if (word_hist->prev_word->get_num_references() == 1)
-      collecting = true;
-    else if (collecting)
-    {
-      word_list.clear();
-      collecting = false;
-    }
-    if (collecting)
-    {
-      word_list.push_back(word_hist);
-    }
-    word_hist = word_hist->prev_word;
+  if (!m_generate_word_graph) {
+    fprintf(stderr, "ERROR: word history can be printed only if word graph"
+	    " was generated\n");
+    exit(1);
   }
-  if (word_list.size())
-  {
-    // Print the guaranteed path and mark the words printed
-    for (i = word_list.size()-1; i >= 0; i--)
-    {
-      if (m_print_frames)
-        fprintf(stdout, "%d ", word_list[i]->word_start_frame);
-      fprintf(stdout, "%s ",m_vocabulary.word(word_list[i]->word_id).c_str());
-      word_list[i]->printed = true;
-    }
-    fflush(stdout);
-  }
-}
 
+  TPLexPrefixTree::Token *best_token = m_best_final_token;
 
-void
-TokenPassSearch::print_path(TPLexPrefixTree::Token *token)
-{
-  TPLexPrefixTree::WordHistory *cur_word;
-  int i;
+  // Use globally best token if no best final token.
+  if (get_best_path) {
+    if (best_token == NULL) {
+      for (int i = 0; i < m_active_token_list->size(); i++) {
+	TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
 
-  // Determine the word sequence
-  cur_word = token->prev_word;
-  while (cur_word != NULL)
-  {
-    printf("%i ",cur_word->word_id, cur_word);
-    cur_word = cur_word->prev_word;
-  }
-  printf("\n");
-}
-
-
-void
-TokenPassSearch::print_best_path(bool only_not_printed, FILE *out)
-{
-  std::vector<TPLexPrefixTree::WordHistory*> word_hist;
-  TPLexPrefixTree::WordHistory *cur_word;
-  float max_log_prob = -1e20;
-  int i, best_token;
-
-  // Find the best token
-  for (i = 0; i < m_active_token_list->size(); i++)
-  {
-    if ((*m_active_token_list)[i] != NULL)
-    {
-      if ((*m_active_token_list)[i]->total_log_prob > max_log_prob)
-      {
-        best_token = i;
-        max_log_prob = (*m_active_token_list)[i]->total_log_prob;
+	if (token == NULL)
+	  continue;
+      
+	if (best_token == NULL || 
+	    token->total_log_prob > best_token->total_log_prob)
+	  best_token = token;
       }
     }
   }
-  cur_word = (*m_active_token_list)[best_token]->prev_word;
-  // Determine the word sequence
-  while (cur_word->prev_word != NULL)
-  {
-    if (only_not_printed && cur_word->printed)
+
+  // Otherwise, find any active token
+  else {
+    for (int i = 0; i < m_active_token_list->size(); i++) {
+      best_token = (*m_active_token_list)[i];
+      if (best_token != NULL)
+	break;
+    }
+  }
+
+  assert(best_token != NULL);
+
+  // Fetch the best path if requested, otherwise the common path to
+  // all tokens and not printed yet
+
+  std::vector<TPLexPrefixTree::WordHistory*> stack;
+
+  TPLexPrefixTree::WordHistory *word_history = best_token->word_history;
+  bool collect = get_best_path;
+  while (word_history != NULL) {
+
+    // If not getting the whole best path, we want to fetch only the
+    // last continuous sequence of history nodes with reference_count
+    // one.  There might be nodes with reference_count greater than 1
+    // even if we are collecting.
+    if (!get_best_path && collect && word_history->reference_count > 1) {
+      stack.clear();
+      collect = false;
+    }
+
+    if (word_history->printed)
       break;
-    word_hist.push_back(cur_word);
-    cur_word = cur_word->prev_word;
+    if (word_history->previous != NULL &&
+	word_history->previous->reference_count == 1)
+      collect = true;
+    if (collect && word_history->word_id >= 0)
+      stack.push_back(word_history);
+    word_history = word_history->previous;
   }
-  // Print the best path
-  for (i = word_hist.size()-1; i >= 0; i--)
-  {
-    if (m_print_frames)
-      fprintf(out, "%d ", word_hist[i]->word_start_frame);
-    fprintf(out, "%s ",m_vocabulary.word(word_hist[i]->word_id).c_str());
+
+  // Print path
+  for (int i = stack.size() - 1; i >= 0; i--) {
+    stack[i]->printed = true;
+    std::string word(m_vocabulary.word(stack[i]->word_id));
+    fprintf(file, "%s ", word.c_str());
+
+    int spaces = 16 - word.length();
+    if (spaces < 1)
+      spaces = 1;
+    for (int j = 0; j < spaces; j++)
+      fputc(' ', file);
+    fprintf(file, "%d\t%d\t%.3f\t%.3f\t%.3f\n", 
+	    stack[i]->end_frame, stack[i]->lex_node_id,
+	    -stack[i]->am_log_prob, -stack[i]->lm_log_prob, 
+	    -get_token_log_prob(stack[i]->cum_am_log_prob,
+				stack[i]->cum_lm_log_prob));
   }
-  fprintf(out, "\n");
-  //print_token_path((*m_active_token_list)[best_token]->token_path);
+  if (get_best_path)
+    fprintf(file, "\n");
+
+  fflush(file);
+}
+
+void
+TokenPassSearch::print_lm_history(FILE *file, bool get_best_path)
+{
+  TPLexPrefixTree::Token *best_token = NULL;
+
+  // Use globally best token if requested
+  if (get_best_path) {
+    for (int i = 0; i < m_active_token_list->size(); i++) {
+      TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
+	
+      if (token == NULL)
+        continue;
+      
+      if (best_token == NULL || 
+          token->total_log_prob > best_token->total_log_prob)
+        best_token = token;
+    }
+  }
+
+  // Otherwise, find any active token
+  else {
+    for (int i = 0; i < m_active_token_list->size(); i++) {
+      best_token = (*m_active_token_list)[i];
+      if (best_token != NULL)
+	break;
+    }
+  }
+  assert(best_token != NULL);
+
+  // Fetch the best path if requested, otherwise the common path to
+  // all tokens and not printed yet
+
+  std::vector<TPLexPrefixTree::LMHistory*> stack;
+
+  TPLexPrefixTree::LMHistory *lm_history = best_token->lm_history;
+  bool collect = get_best_path;
+  while (lm_history != NULL) {
+
+    // If not getting the whole best path, we want to fetch only the
+    // last continuous sequence of history nodes with reference_count
+    // one.  There might be nodes with reference_count greater than 1
+    // even if we are collecting.
+    if (!get_best_path && collect && lm_history->reference_count > 1) {
+      stack.clear();
+      collect = false;
+    }
+
+    if (lm_history->printed)
+      break;
+    if (lm_history->previous != NULL &&
+	lm_history->previous->reference_count == 1)
+      collect = true;
+    if (collect && lm_history->word_id >= 0)
+      stack.push_back(lm_history);
+    lm_history = lm_history->previous;
+  }
+
+  // Print path
+  for (int i = stack.size() - 1; i >= 0; i--) {
+    stack[i]->printed = true;
+    fprintf(file, "%s ", m_vocabulary.word(stack[i]->word_id).c_str());
+  }
+  if (get_best_path)
+    fprintf(file, "\n");
+
 #ifdef PRUNING_MEASUREMENT
   for (i = 0; i < 6; i++)
     fprintf(out, "meas%i: %.3g\n", i, (*m_active_token_list)[best_token]->meas[i]);
@@ -538,7 +610,8 @@ TokenPassSearch::print_best_path(bool only_not_printed, FILE *out)
   fprintf(out, "WordCount: %d\n", lm_la_word_cache_count);
   fprintf(out, "WordMiss: %d\n", lm_la_word_cache_miss);
 #endif
-  fflush(out);
+
+  fflush(file);
 }
 
 TPLexPrefixTree::Token*
@@ -599,44 +672,12 @@ TokenPassSearch::get_state_history(
   // Determine the state sequence
   stack.clear();
   TPLexPrefixTree::StateHistory *state = token->state_history;
-  while (state != NULL && state->prev != NULL)
+  while (state != NULL && state->previous != NULL)
   {
     stack.push_back(state);
-    state = state->prev;
+    state = state->previous;
   }
 }
-
-
-void
-TokenPassSearch::add_sentence_end_to_hypotheses(void)
-{
-  int i;
-  assert( m_sentence_end_id > -1 );
-  
-  for (i = 0; i < m_active_token_list->size(); i++)
-  {
-    if ((*m_active_token_list)[i] != NULL)
-    {
-      TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
-      if (token->prev_word->word_id != m_sentence_end_id)
-      {
-        token->prev_word =  new TPLexPrefixTree::WordHistory(
-          m_sentence_end_id, m_sentence_end_lm_id, token->prev_word);
-        TPLexPrefixTree::WordHistory::unlink(token->prev_word->prev_word);
-        token->prev_word->word_start_frame = m_frame;
-        token->prev_word->link();
-        token->word_hist_code = compute_word_hist_hash_code(token->prev_word);
-        token->lm_log_prob+=get_lm_score(token->prev_word,
-                                         token->word_hist_code)+
-          m_insertion_penalty;
-      }
-      // Use current AM probability but discard LM lookahead probability.
-      token->total_log_prob =
-        get_token_log_prob(token->cur_am_log_prob, token->lm_log_prob);
-    }
-  }
-}
-
 
 void
 TokenPassSearch::propagate_tokens(void)
@@ -666,11 +707,12 @@ TokenPassSearch::propagate_tokens(void)
   m_worst_log_prob = 0;
   //m_lexicon.clear_node_token_lists();
   clear_active_node_token_lists();
+
   for (i = 0; i < m_active_token_list->size(); i++)
   {
-    if ((*m_active_token_list)[i] != NULL)
-    {
-      propagate_token((*m_active_token_list)[i]);
+    TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
+    if (token) {
+      propagate_token(token);
     }
   }
 }
@@ -689,22 +731,32 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
                        source_node->arcs[i].log_prob);
   }
 
+  if ((source_node->flags & NODE_INSERT_WORD_BOUNDARY) != 0 && 
+      m_generate_word_graph) 
+  {
+    fprintf(stderr, "ERROR: nodes should not have NODE_INSERT_WORD_BOUNRDARY "
+            "when word graphs are used\n");
+    exit(1);
+  }
+
   if (source_node->flags&NODE_INSERT_WORD_BOUNDARY &&
       m_word_boundary_id > 0)
   {
-    if (token->prev_word->word_id != m_word_boundary_id)
+    if (token->lm_history->word_id != m_word_boundary_id)
     {
-      TPLexPrefixTree::WordHistory *temp_prev_word;
+      assert(!m_generate_word_graph);
+      TPLexPrefixTree::LMHistory *temp_lm_history;
       float lm_score;
       // Add word_boundary and propagate the token with new word history
-      temp_prev_word = token->prev_word;
-      token->prev_word = new TPLexPrefixTree::WordHistory(
-        m_word_boundary_id, m_word_boundary_lm_id, token->prev_word);
+      temp_lm_history = token->lm_history;
+      token->lm_history = new TPLexPrefixTree::LMHistory(
+        m_word_boundary_id, m_word_boundary_lm_id, token->lm_history);
       token->word_start_frame = -1; // FIXME? If m_frame, causes an assert
-      token->prev_word->word_start_frame = m_frame;
-      token->word_hist_code = compute_word_hist_hash_code(token->prev_word);
-      token->prev_word->link();
-      lm_score = get_lm_score(token->prev_word, token->word_hist_code);
+      token->lm_history->word_start_frame = m_frame;
+      token->lm_hist_code = compute_lm_hist_hash_code(token->lm_history);
+      hist::link(token->lm_history);
+      lm_score = get_lm_score(token->lm_history, token->lm_hist_code);
+
       token->lm_log_prob += lm_score + m_insertion_penalty;
       token->cur_lm_log_prob = token->lm_log_prob;
 #ifdef PRUNING_MEASUREMENT
@@ -718,8 +770,8 @@ TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
           move_token_to_node(token, source_node->arcs[i].next,
                              source_node->arcs[i].log_prob);
       }
-      TPLexPrefixTree::WordHistory::unlink(token->prev_word);
-      token->prev_word = temp_prev_word;
+      hist::unlink(token->lm_history);
+      token->lm_history = temp_lm_history;
     }
   }
 }
@@ -730,65 +782,113 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
                                     TPLexPrefixTree::Node *node,
                                     float transition_score)
 {
+  // FIXME: remove debug
+//   printf("src: %d\t%d\t(%03.3f, %03.3f, %03.3f, %03.3f)\t", 
+// 	 m_frame, node->node_id,
+// 	 token->am_log_prob, token->lm_log_prob,
+// 	 token->word_history->am_log_prob,
+// 	 token->word_history->lm_log_prob);
+//   debug_print_token_lm_history(0, token);
+
   int new_dur;
   int depth;
   float new_cur_am_log_prob;
   float new_cur_lm_log_prob;
-  float new_real_am_log_prob = token->am_log_prob +
-    m_transition_scale*transition_score;
+  float new_real_am_log_prob = token->am_log_prob + 
+    m_transition_scale * transition_score;
   float new_real_lm_log_prob = token->lm_log_prob;
   float total_token_log_prob;
   int new_word_count = token->word_count;
-  TPLexPrefixTree::WordHistory *new_prev_word = token->prev_word;
-  int new_word_hist_code = token->word_hist_code;
-  bool new_word_linked = false;
   int i;
-  bool new_state_history_linked = false;
+  int new_lm_hist_code = token->lm_hist_code;
+  TPLexPrefixTree::LMHistory *new_lm_history = token->lm_history;
+  TPLexPrefixTree::WordHistory *new_word_history = token->word_history;
   TPLexPrefixTree::StateHistory *new_state_history = token->state_history;
   int word_start_frame = token->word_start_frame;
 
+  // Whenever new history structures are created, they are adopted by
+  // the automatic structures below.  This ensures that the history
+  // structures are destroyed in the end of the scope of the automatic
+  // structres unless other links have been created too.  Now we do
+  // not have to manually take care of whether the histories have been
+  // linked or not.
+  hist::Auto<TPLexPrefixTree::LMHistory> auto_lm_history;
+  hist::Auto<TPLexPrefixTree::WordHistory> auto_word_history;
+  hist::Auto<TPLexPrefixTree::StateHistory> auto_state_history;
+
+  if (m_generate_word_graph && token->word_history->lex_node_id !=
+      word_graph.nodes[token->recent_word_graph_node].lex_node_id)
+  {
+    fprintf(stderr, 
+	    "frame %d: word_history->lex_node_id (%d) != recent (%d)\n",
+	    m_frame,
+	    token->word_history->lex_node_id,
+	    word_graph.nodes[token->recent_word_graph_node].lex_node_id);
+    debug_print_token_lm_history(stderr, token);
+  }
+
   if (node != token->node)
   {
-    // Moving to another node
+    // Store old word id for possible word history generation
+    int old_lm_history_word_id = token->lm_history->word_id;
 
-    if (node->flags & NODE_FIRST_STATE_OF_WORD) {        
+    if (node->flags & NODE_FIRST_STATE_OF_WORD) {
       assert(word_start_frame < 0);
       word_start_frame = m_frame;
     }
 
+    // Moving to another node
     if (!(node->flags&NODE_AFTER_WORD_ID))
     {
+
       if (node->word_id != -1) // Is word ID unique?
       {
+	// Prune two subsequent word boundaries
+	if (node->word_id == m_word_boundary_id &&
+	    token->lm_history->word_id == m_word_boundary_id)
+	{
+	  return;
+	}
+
         // Add LM probability
         assert(word_start_frame >= 0);
-        new_prev_word = new TPLexPrefixTree::WordHistory(
-          node->word_id, m_lex2lm[node->word_id], token->prev_word);
-        new_prev_word->word_start_frame = word_start_frame;
+        new_lm_history = new TPLexPrefixTree::LMHistory(
+          node->word_id, m_lex2lm[node->word_id], token->lm_history);
+        new_lm_history->word_start_frame = word_start_frame;
         word_start_frame = -1;
-        new_prev_word->link();
-        new_word_hist_code = compute_word_hist_hash_code(new_prev_word);
-        new_word_linked = true;
-        new_real_lm_log_prob += get_lm_score(new_prev_word,new_word_hist_code)+
-          m_insertion_penalty;
+	auto_lm_history.adopt(new_lm_history);
+        new_lm_hist_code = compute_lm_hist_hash_code(new_lm_history);
+
+	if (node->word_id != m_sentence_start_id) {
+	  new_real_lm_log_prob += get_lm_score(new_lm_history, 
+					       new_lm_hist_code)
+	    + m_insertion_penalty;
+	}
+
         new_cur_lm_log_prob = new_real_lm_log_prob;
         new_word_count++;
         if (m_use_sentence_boundary && node->word_id == m_sentence_end_id)
         {
+	  // Sentence boundaries not allowed in the middle of the
+	  // recognition segment if we are generating a word graph.
+	  // That is mainly because srilm-toolkit can not rescore such
+	  // lattices.  Other reason is that silences in lattices will
+	  // be filled with <s> <w> </s> branches.
+	  if (m_generate_word_graph)
+	    return;
+
           // Add sentence start and word boundary to the LM history
-          TPLexPrefixTree::WordHistory *temp;
-          temp = new TPLexPrefixTree::WordHistory(
-            m_sentence_start_id, m_sentence_start_lm_id, new_prev_word);
-          temp->word_start_frame = m_frame;
-          TPLexPrefixTree::WordHistory::unlink(new_prev_word);
+          // after sentence_end_id
+          new_lm_history = new TPLexPrefixTree::LMHistory(
+            m_sentence_start_id, m_sentence_start_lm_id, new_lm_history);
+          new_lm_history->word_start_frame = m_frame;
           if (m_word_boundary_id > 0) {
-            temp = new TPLexPrefixTree::WordHistory(
-              m_word_boundary_id, m_word_boundary_lm_id, temp);
-            temp->word_start_frame = m_frame;
+            new_lm_history = new TPLexPrefixTree::LMHistory(
+              m_word_boundary_id, m_word_boundary_lm_id, new_lm_history);
+            new_lm_history->word_start_frame = m_frame;
           }
-          new_prev_word = temp;
-          new_prev_word->link();
-          new_word_hist_code = compute_word_hist_hash_code(new_prev_word);
+          auto_lm_history.adopt(new_lm_history);
+          new_lm_hist_code = compute_lm_hist_hash_code(new_lm_history);
         }
       }
       else
@@ -800,7 +900,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
         {
           // Add language model lookahead
           new_cur_lm_log_prob = new_real_lm_log_prob +
-            get_lm_lookahead_score(token->prev_word, node, depth);
+            get_lm_lookahead_score(token->lm_history, node, depth);
         }
       }
     }
@@ -811,21 +911,40 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     {
       new_state_history = new TPLexPrefixTree::StateHistory(
         node->state->model, m_frame, token->state_history);
-      new_state_history->link();
-      new_state_history_linked = true;
+      auto_state_history.adopt(new_state_history);
     }
     
     // Update duration probability
     new_dur = 0;
     depth = token->depth + 1;
+    float duration_log_prob = 0;
     if (token->node->state != NULL)
     {
       // Add duration probability
       int temp_dur = token->dur+1;
-      new_real_am_log_prob += m_duration_scale*
-        token->node->state->duration.get_log_prob(temp_dur);
+      duration_log_prob = m_duration_scale * 
+	token->node->state->duration.get_log_prob(temp_dur);
+      new_real_am_log_prob += duration_log_prob;
     }
-    
+
+    // Create word history structure for word graph
+    if (m_generate_word_graph && (node->flags & NODE_FIRST_STATE_OF_WORD)) {
+      // Add symbol from the LMHistory
+      new_word_history = 
+	new TPLexPrefixTree::WordHistory(old_lm_history_word_id,
+					 m_frame, new_word_history);
+      new_word_history->lex_node_id = node->node_id;
+      auto_word_history.adopt(new_word_history);
+      new_word_history->cum_am_log_prob = token->am_log_prob +
+	m_transition_scale * transition_score + duration_log_prob;
+      new_word_history->cum_lm_log_prob = token->lm_log_prob;
+      new_word_history->am_log_prob = new_word_history->cum_am_log_prob - 
+	new_word_history->previous->cum_am_log_prob;
+      new_word_history->lm_log_prob = new_word_history->cum_lm_log_prob - 
+	new_word_history->previous->cum_lm_log_prob;
+      new_word_history->end_frame = m_frame;
+    }
+
     new_cur_am_log_prob = new_real_am_log_prob;
   }
   else
@@ -837,7 +956,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
         return; // Maximum state duration exceeded, discard token
     depth = token->depth;
     new_cur_am_log_prob = token->cur_am_log_prob +
-      m_transition_scale*transition_score;
+      m_transition_scale * transition_score;
     new_cur_lm_log_prob = token->cur_lm_log_prob;
   }
 
@@ -847,22 +966,17 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     depth = 0;
   }
 
-  if (node->state == NULL)
-  {
+  if (node->state == NULL) {
+
     // Moving to a node without HMM state, pass through immediately.
 
     // Try beam pruning
     total_token_log_prob =
       get_token_log_prob(new_cur_am_log_prob, new_cur_lm_log_prob);
     if (((node->flags&NODE_USE_WORD_END_BEAM) &&
-         total_token_log_prob < m_best_we_log_prob - m_current_we_beam) ||
-        total_token_log_prob < m_best_log_prob - m_current_glob_beam)
+	 total_token_log_prob < m_best_we_log_prob - m_current_we_beam) ||
+	total_token_log_prob < m_best_log_prob - m_current_glob_beam)
     {
-      if (new_word_linked)
-        TPLexPrefixTree::WordHistory::unlink(new_prev_word);
-      if (new_state_history_linked)
-        TPLexPrefixTree::StateHistory::unlink(new_state_history);
-
       return;
     }
     
@@ -875,12 +989,18 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     temp_token.cur_am_log_prob = new_cur_am_log_prob;
     temp_token.cur_lm_log_prob = new_cur_lm_log_prob;
     temp_token.total_log_prob = total_token_log_prob;
-    temp_token.prev_word = new_prev_word;
-    temp_token.word_hist_code = new_word_hist_code;
+    temp_token.lm_history = new_lm_history;
+    temp_token.lm_hist_code = new_lm_hist_code;
     temp_token.dur = 0;
     temp_token.word_count = new_word_count;
     temp_token.state_history = new_state_history;
+    temp_token.word_history = new_word_history;
     temp_token.word_start_frame = word_start_frame;
+    if (m_generate_word_graph) {
+      copy_word_graph_info(token, &temp_token);
+      if (node->flags & NODE_FIRST_STATE_OF_WORD)
+	build_word_graph(&temp_token);
+    }
 
 #ifdef PRUNING_MEASUREMENT
     for (i = 0; i < 6; i++)
@@ -898,7 +1018,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
   {
     // Normal propagation
     TPLexPrefixTree::Token *new_token;
-    TPLexPrefixTree::Token *similar_word_hist;
+    TPLexPrefixTree::Token *similar_lm_hist;
     float ac_log_prob = m_acoustics->log_prob(node->state->model);
 
     new_real_am_log_prob += ac_log_prob;
@@ -911,10 +1031,6 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     {
       if (total_token_log_prob < m_best_we_log_prob - m_current_we_beam)
       {
-        if (new_word_linked)
-          TPLexPrefixTree::WordHistory::unlink(new_prev_word);
-        if (new_state_history_linked)
-          TPLexPrefixTree::StateHistory::unlink(new_state_history);
         return;
       }
     }
@@ -947,10 +1063,6 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 #endif
       )  
     {
-      if (new_word_linked)
-        TPLexPrefixTree::WordHistory::unlink(new_prev_word);
-      if (new_state_history_linked)
-        TPLexPrefixTree::StateHistory::unlink(new_state_history);
       return;
     }
 
@@ -962,10 +1074,6 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       {
         if (total_token_log_prob < cur_token->total_log_prob - m_state_beam)
         {
-          if (new_word_linked)
-            TPLexPrefixTree::WordHistory::unlink(new_prev_word);
-          if (new_state_history_linked)
-            TPLexPrefixTree::StateHistory::unlink(new_state_history);
           return;
         }
         cur_token = cur_token->next_node_token;
@@ -989,10 +1097,10 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     }
     else
     {
-      similar_word_hist = find_similar_word_history(new_prev_word,
-                                                    new_word_hist_code,
+      similar_lm_hist = find_similar_lm_history(new_lm_history,
+                                                    new_lm_hist_code,
                                                     node->token_list);
-      if (similar_word_hist == NULL)
+      if (similar_lm_hist == NULL)
       {
         // New word history for this node, create new token
         new_token = acquire_token();
@@ -1008,22 +1116,19 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       else
       {
         // Found the same word history, pick the best token.
-        if (total_token_log_prob > similar_word_hist->total_log_prob)
+        if (total_token_log_prob > similar_lm_hist->total_log_prob)
         {
           // Replace the previous token
-          new_token = similar_word_hist;
-          TPLexPrefixTree::WordHistory::unlink(new_token->prev_word);
-          TPLexPrefixTree::StateHistory::unlink(new_token->state_history);
+          new_token = similar_lm_hist;
+          hist::unlink(new_token->lm_history);
+          hist::unlink(new_token->word_history);
+          hist::unlink(new_token->state_history);
 
           //TPLexPrefixTree::PathHistory::unlink(new_token->token_path);
         }
         else
         {
           // Discard this token
-          if (new_word_linked)
-            TPLexPrefixTree::WordHistory::unlink(new_prev_word);
-          if (new_state_history_linked)
-            TPLexPrefixTree::StateHistory::unlink(new_state_history);
           return;
         }
       }
@@ -1089,10 +1194,11 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     
     if (total_token_log_prob < m_worst_log_prob)
       m_worst_log_prob = total_token_log_prob;
-    new_token->prev_word = new_prev_word;
-    if (new_token->prev_word != NULL)
-       new_token->prev_word->link();
-    new_token->word_hist_code = new_word_hist_code;
+
+    new_token->lm_history = new_lm_history;
+    if (new_token->lm_history != NULL)
+      hist::link(new_token->lm_history);
+    new_token->lm_hist_code = new_lm_hist_code;
     new_token->am_log_prob = new_real_am_log_prob;
     new_token->cur_am_log_prob = new_cur_am_log_prob;
     new_token->lm_log_prob = new_real_lm_log_prob;
@@ -1101,9 +1207,18 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     new_token->dur = new_dur;
     new_token->word_count = new_word_count;
     new_token->state_history = new_state_history;
-    if (new_state_history != NULL)
-      new_token->state_history->link();
+    new_token->word_history = new_word_history;
     new_token->word_start_frame = word_start_frame;
+    if (new_word_history != NULL)
+      hist::link(new_token->word_history);
+    if (new_state_history != NULL)
+      hist::link(new_token->state_history);
+
+    if (m_generate_word_graph) {
+      copy_word_graph_info(token, new_token);
+      if ((node->flags & NODE_FIRST_STATE_OF_WORD) && node != token->node)
+	build_word_graph(new_token);
+    }
 
 #ifdef PRUNING_MEASUREMENT
     for (i = 0; i < 6; i++)
@@ -1120,28 +1235,24 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     /*new_token->token_path = token->token_path;
       new_token->token_path->link();*/
   }
-  if (new_word_linked)
-    TPLexPrefixTree::WordHistory::unlink(new_prev_word);
-  if (new_state_history_linked)
-    TPLexPrefixTree::StateHistory::unlink(new_state_history);
 }
 
 
 // Note! Doesn't work if the sentence end is the first one in the word history
 TPLexPrefixTree::Token*
-TokenPassSearch::find_similar_word_history(TPLexPrefixTree::WordHistory *wh,
-                                           int word_hist_code,
+TokenPassSearch::find_similar_lm_history(TPLexPrefixTree::LMHistory *wh,
+                                           int lm_hist_code,
                                            TPLexPrefixTree::Token *token_list)
 {
   TPLexPrefixTree::Token *cur_token = token_list;
   int i, j;
   while (cur_token != NULL)
   {
-    if (word_hist_code == cur_token->word_hist_code)
+    if (lm_hist_code == cur_token->lm_hist_code)
     {
-      TPLexPrefixTree::WordHistory *wh1 = wh;
-      TPLexPrefixTree::WordHistory *wh2 = cur_token->prev_word;
-      for (int j = 0; j < m_similar_word_hist_span; j++)
+      TPLexPrefixTree::LMHistory *wh1 = wh;
+      TPLexPrefixTree::LMHistory *wh2 = cur_token->lm_history;
+      for (int j = 0; j < m_similar_lm_hist_span; j++)
       {
         if (wh1->word_id == -1 || wh1->word_id == m_sentence_end_id)
         {
@@ -1151,11 +1262,11 @@ TokenPassSearch::find_similar_word_history(TPLexPrefixTree::WordHistory *wh,
         }
         if (wh1->word_id != wh2->word_id)
           goto find_similar_skip;
-        wh1 = wh1->prev_word;
-        wh2 = wh2->prev_word;
+        wh1 = wh1->previous;
+        wh2 = wh2->previous;
       }
       return cur_token;
-      //if (is_similar_word_history(wh, cur_token->prev_word))
+      //if (is_similar_lm_history(wh, cur_token->lm_history))
       //  break;
     }
   find_similar_skip:
@@ -1166,10 +1277,10 @@ TokenPassSearch::find_similar_word_history(TPLexPrefixTree::WordHistory *wh,
 
 // Note! Doesn't work if the sentence end is the first one in the word history
 inline bool
-TokenPassSearch::is_similar_word_history(TPLexPrefixTree::WordHistory *wh1,
-                                         TPLexPrefixTree::WordHistory *wh2)
+TokenPassSearch::is_similar_lm_history(TPLexPrefixTree::LMHistory *wh1,
+                                         TPLexPrefixTree::LMHistory *wh2)
 {
-  for (int i = 0; i < m_similar_word_hist_span; i++)
+  for (int i = 0; i < m_similar_lm_hist_span; i++)
   {
     if (wh1->word_id == -1 || wh1->word_id == m_sentence_end_id)
     {
@@ -1179,28 +1290,29 @@ TokenPassSearch::is_similar_word_history(TPLexPrefixTree::WordHistory *wh1,
     }
     if (wh1->word_id != wh2->word_id)
       return false;
-    wh1 = wh1->prev_word;
-    wh2 = wh2->prev_word;
+    wh1 = wh1->previous;
+    wh2 = wh2->previous;
   }
-  return true; // Similar word histories up to m_similar_word_hist_span words
+  return true; // Similar word histories up to m_similar_lm_hist_span words
 }
 
 
 int
-TokenPassSearch::compute_word_hist_hash_code(TPLexPrefixTree::WordHistory *wh)
+TokenPassSearch::compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh)
 {
   unsigned int code = 0;
   
-  for (int i = 0; i < m_similar_word_hist_span; i++)
+  for (int i = 0; i < m_similar_lm_hist_span; i++)
   {
     if (wh->word_id == -1)
       break;
     code += wh->word_id;
     code += (code << 10);
     code ^= (code >> 6);
+
     if (wh->word_id == m_sentence_start_id)
       break;
-    wh = wh->prev_word;
+    wh = wh->previous;
   }
   code += (code << 3);
   code ^= (code >> 11);
@@ -1481,7 +1593,7 @@ TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
 }
 
 float
-TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::WordHistory *word_hist)
+TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::LMHistory *lm_hist)
 {
   float lm_log_prob = 0;
 
@@ -1489,15 +1601,16 @@ TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::WordHistory *word_hist)
   {
     // Create history
     m_history_lm.clear();
-    int last_word = word_hist->word_id;
-    TPLexPrefixTree::WordHistory *word = word_hist;
+    int last_word = lm_hist->word_id;
+    TPLexPrefixTree::LMHistory *word = lm_hist;
     for (int i = 0; i < m_ngram->order(); i++) {
       if (word->word_id == -1)
 	break;
       m_history_lm.push_front(word->lm_id);
+
       if (word->word_id == m_sentence_start_id)
         break;
-      word = word->prev_word;
+      word = word->previous;
     }
 
     lm_log_prob = m_ngram->log_prob(m_history_lm);
@@ -1508,28 +1621,28 @@ TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::WordHistory *word_hist)
 
 
 float
-TokenPassSearch::get_lm_score(TPLexPrefixTree::WordHistory *word_hist,
-                              int word_hist_code)
+TokenPassSearch::get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,
+                              int lm_hist_code)
 {
   float score;
   LMScoreInfo *info, *old;
   bool collision = false;
   int i;
 
-  if (m_lm_score_cache.find(word_hist_code, &info))
+  if (m_lm_score_cache.find(lm_hist_code, &info))
   {
-    // Check this is the correct word history
-    TPLexPrefixTree::WordHistory *wh = word_hist;
-    for (int i = 0; i < info->word_hist.size(); i++)
+    // Check this is correct word history
+    TPLexPrefixTree::LMHistory *wh = lm_hist;
+    for (int i = 0; i < info->lm_hist.size(); i++)
     {
-      if (wh->word_id != info->word_hist[i]) // Also handles 'word_id==-1' case
+      if (wh->word_id != info->lm_hist[i]) // Also handles 'word_id==-1' case
       {
         collision = true;
         goto get_lm_score_no_cached;
       }
-      wh = wh->prev_word;
+      wh = wh->previous;
     }
-    if (info->word_hist.size() <= m_similar_word_hist_span)
+    if (info->lm_hist.size() <= m_similar_lm_hist_span)
     {
       if (wh->word_id != -1 && wh->word_id != m_sentence_end_id)
       {
@@ -1542,24 +1655,24 @@ TokenPassSearch::get_lm_score(TPLexPrefixTree::WordHistory *word_hist,
   get_lm_score_no_cached:
   if (collision)
   {
-    // In case of a collision remove the old item
-    if (!m_lm_score_cache.remove_item(word_hist_code, &old))
+    // In case of collision remove the old item
+    if (!m_lm_score_cache.remove_item(lm_hist_code, &old))
       assert( 0 );
     delete old;
   }
-  score = compute_lm_log_prob(word_hist);
+  score = compute_lm_log_prob(lm_hist);
 
   info = new LMScoreInfo;
   info->lm_score = score;
-  TPLexPrefixTree::WordHistory *wh = word_hist;
-  for (i = 0; i <= m_similar_word_hist_span && wh->word_id != -1; i++)
+  TPLexPrefixTree::LMHistory *wh = lm_hist;
+  for (i = 0; i <= m_similar_lm_hist_span && wh->word_id != -1; i++)
   {
-    info->word_hist.push_back(wh->word_id);
+    info->lm_hist.push_back(wh->word_id);
     if (wh->word_id == m_sentence_start_id)
       break;
-    wh = wh->prev_word;
+    wh = wh->previous;
   }
-  if (m_lm_score_cache.insert(word_hist_code, info, &old))
+  if (m_lm_score_cache.insert(lm_hist_code, info, &old))
     delete old;
 
   return score;
@@ -1569,20 +1682,20 @@ TokenPassSearch::get_lm_score(TPLexPrefixTree::WordHistory *word_hist,
 // Note! Doesn't work if the sentence end is the first one in the word history
 float
 TokenPassSearch::get_lm_lookahead_score(
-  TPLexPrefixTree::WordHistory *word_hist,TPLexPrefixTree::Node *node,
+  TPLexPrefixTree::LMHistory *lm_hist,TPLexPrefixTree::Node *node,
   int depth)
 {
   int w1,w2;
 
-  w2 = word_hist->word_id;
+  w2 = lm_hist->word_id;
   if (w2 == -1 || w2 == m_sentence_end_id)
     return 0;
   if (m_lm_lookahead == 1)
     return get_lm_bigram_lookahead(w2, node, depth);
 
-  if (word_hist->prev_word == NULL)
+  if (lm_hist->previous == NULL)
     return 0;
-  w1 = word_hist->prev_word->word_id;
+  w1 = lm_hist->previous->word_id;
   if (w1 == -1 || w1 == m_sentence_end_id)
     return 0;
 
@@ -1591,7 +1704,7 @@ TokenPassSearch::get_lm_lookahead_score(
 
 
 float
-TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
+TokenPassSearch::get_lm_bigram_lookahead(int lm_history_id,
                                          TPLexPrefixTree::Node *node,
                                          int depth)
 {
@@ -1603,7 +1716,7 @@ TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
   lm_la_cache_count[depth]++;
 #endif
 
-  if (node->lm_lookahead_buffer.find(prev_word_id, &score))
+  if (node->lm_lookahead_buffer.find(lm_history_id, &score))
     return score;
   
 #ifdef COUNT_LM_LA_CACHE_MISS
@@ -1617,7 +1730,7 @@ TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
   lm_la_word_cache_count++;
 #endif
   
-  if (!lm_lookahead_score_list.find(prev_word_id, &score_list))
+  if (!lm_lookahead_score_list.find(lm_history_id, &score_list))
   {
 #ifdef COUNT_LM_LA_CACHE_MISS
   lm_la_word_cache_miss++;
@@ -1626,15 +1739,15 @@ TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
     // FIXME! Is it necessary to compute the scores for all the words?
     if (m_verbose > 2)
       printf("Compute lm lookahead scores for \'%s'\n",
-             m_vocabulary.word(prev_word_id).c_str());
+             m_vocabulary.word(lm_history_id).c_str());
     score_list = new LMLookaheadScoreList;
-    if (lm_lookahead_score_list.insert(prev_word_id, score_list,
+    if (lm_lookahead_score_list.insert(lm_history_id, score_list,
                                        &old_score_list))
       delete old_score_list; // Old list was removed
-    score_list->index = prev_word_id;
+    score_list->index = lm_history_id;
     score_list->lm_scores.insert(score_list->lm_scores.end(),
                                  m_lexicon.words(), 0);    
-    m_lookahead_ngram->fetch_bigram_list(m_lex2lookaheadlm[prev_word_id],
+    m_lookahead_ngram->fetch_bigram_list(m_lex2lookaheadlm[lm_history_id],
                                          m_lex2lookaheadlm,
                                          score_list->lm_scores);
   }
@@ -1648,7 +1761,7 @@ TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
       score = score_list->lm_scores[node->possible_word_id_list[i]];
   }
   // Add the score to the node's buffer
-  node->lm_lookahead_buffer.insert(prev_word_id, score, NULL);
+  node->lm_lookahead_buffer.insert(lm_history_id, score, NULL);
   return score;
 }
 
@@ -1733,6 +1846,8 @@ TokenPassSearch::acquire_token(void)
   }
   t = m_token_pool.back();
   m_token_pool.pop_back();
+  t->recent_word_graph_node = -1;
+  t->word_history = NULL;
   return t;
 }
 
@@ -1740,8 +1855,12 @@ TokenPassSearch::acquire_token(void)
 void
 TokenPassSearch::release_token(TPLexPrefixTree::Token *token)
 {
-  TPLexPrefixTree::WordHistory::unlink(token->prev_word);
-  TPLexPrefixTree::StateHistory::unlink(token->state_history);
+  if (token->recent_word_graph_node >= 0)
+    word_graph.unlink(token->recent_word_graph_node);
+  token->recent_word_graph_node = -1;
+  hist::unlink(token->lm_history);
+  hist::unlink(token->word_history);
+  hist::unlink(token->state_history);
   //TPLexPrefixTree::PathHistory::unlink(token->token_path);
   m_token_pool.push_back(token);
 }
@@ -1768,9 +1887,6 @@ TokenPassSearch::save_token_statistics(int count)
     {
       if ((*m_active_token_list)[i]->depth < MAX_TREE_DEPTH)
       {
-        /*val = 63 - ((m_best_log_prob -
-                     (*m_active_token_list)[i]->total_log_prob)
-                     /m_global_beam*50+0.5);*/
         val = (int) (MAX_TREE_DEPTH-1 - ((m_best_log_prob -
                      (*m_active_token_list)[i]->total_log_prob)
                     /m_global_beam*(MAX_TREE_DEPTH-2)+0.5));
@@ -1791,20 +1907,21 @@ TokenPassSearch::save_token_statistics(int count)
   delete buf;
 }
 
+
 void 
 TokenPassSearch::debug_ensure_all_paths_contain_history(
-  TPLexPrefixTree::WordHistory *limit)
+  TPLexPrefixTree::LMHistory *limit)
 {
   fprintf(stderr, "DEBUG: ensure_all_paths_contain_history\n");
   for (int t = 0; t < m_active_token_list->size(); t++) {
     TPLexPrefixTree::Token *token = (*m_active_token_list)[t];
     if (token == NULL)
       continue;
-    TPLexPrefixTree::WordHistory *hist = token->prev_word;
+    TPLexPrefixTree::LMHistory *hist = token->lm_history;
     while (hist != NULL) {
       if (hist == limit)
         break;
-      hist = hist->prev_word;
+      hist = hist->previous;
     }
 
     if (hist == NULL) {
@@ -1812,17 +1929,89 @@ TokenPassSearch::debug_ensure_all_paths_contain_history(
       fprintf(stderr, "token = %p\n", token);
       fprintf(stderr, "node = %d\n", token->node->node_id);
       fprintf(stderr, "history:");
-      hist = token->prev_word;
+      hist = token->lm_history;
       while (hist->word_id >= 0) {
         fprintf(stderr, " %d %s 0x%p (ref %d)", hist->word_start_frame,
                 m_vocabulary.word(hist->word_id).c_str(), hist,
-                hist->get_num_references());
-        hist = hist->prev_word;
+                hist->reference_count);
+        hist = hist->previous;
       }
       fprintf(stderr, "\n");
       exit(1);
     }
   }
+}
+
+void
+TokenPassSearch::update_final_tokens()
+{
+  assert(m_generate_word_graph || m_require_sentence_end);
+
+  // Add the sentence end symbol to the tokens in the final nodes.
+
+  // FIXME: this is quite a hack, because WordHistory is normally
+  // updated using the LMHistory, when then token moves to the first
+  // state of the next word.  Thus, the tokens in the final nodes do
+  // not have the current word in their word histories.
+
+  m_best_final_token = NULL;
+  for (int i = 0; i < m_active_token_list->size(); i++) {
+    TPLexPrefixTree::Token *token = m_active_token_list->at(i);
+    if (token == NULL)
+      continue;
+
+    if (m_generate_word_graph && token->node->flags & NODE_FINAL) {
+
+      // Update the last word from the LMHistory to the word history.
+      token->word_history = new TPLexPrefixTree::WordHistory(
+	token->lm_history->word_id, m_frame, token->word_history);
+      token->word_history->lex_node_id = token->node->node_id;
+      token->word_history->cum_am_log_prob = token->am_log_prob;
+      token->word_history->cum_lm_log_prob = token->lm_log_prob;
+      token->word_history->am_log_prob = token->word_history->cum_am_log_prob -
+	token->word_history->previous->cum_am_log_prob;
+      token->word_history->lm_log_prob = token->word_history->cum_lm_log_prob -
+	token->word_history->previous->cum_lm_log_prob;
+      token->word_history->end_frame = m_frame;
+      build_word_graph(token);
+    }
+
+    // Add sentence end in LMHistory
+    token->lm_history = new TPLexPrefixTree::LMHistory(
+      m_sentence_end_id, m_sentence_end_lm_id, token->lm_history);
+    token->lm_history->word_start_frame = m_frame;
+    hist::link(token->lm_history);
+    token->lm_hist_code = compute_lm_hist_hash_code(token->lm_history);
+    token->lm_log_prob += get_lm_score(token->lm_history, 
+                                       token->lm_hist_code)
+      + m_insertion_penalty;
+    token->word_count++;
+    token->total_log_prob =
+      get_token_log_prob(token->am_log_prob, token->lm_log_prob);
+
+    if (m_generate_word_graph && token->node->flags & NODE_FINAL) {
+      if (m_best_final_token == NULL || 
+	  token->total_log_prob > m_best_final_token->total_log_prob)
+	m_best_final_token = token;
+
+      // Add sentence end also in WordHistory
+      token->word_history = new TPLexPrefixTree::WordHistory(
+	token->lm_history->word_id, m_frame, token->word_history);
+      token->word_history->lex_node_id = token->node->node_id;
+      token->word_history->cum_am_log_prob = token->am_log_prob;
+      token->word_history->cum_lm_log_prob = token->lm_log_prob;
+      token->word_history->am_log_prob = token->word_history->cum_am_log_prob -
+	token->word_history->previous->cum_am_log_prob;
+      token->word_history->lm_log_prob = token->word_history->cum_lm_log_prob -
+	token->word_history->previous->cum_lm_log_prob;
+      token->word_history->end_frame = m_frame;
+
+      build_word_graph(token);
+    }
+  }
+
+  if (m_generate_word_graph && m_best_final_token == NULL)
+    fprintf(stderr, "WARNING: no tokens in final nodes!\n");
 }
 
 /*void
@@ -1852,3 +2041,301 @@ TokenPassSearch::print_token_path(TPLexPrefixTree::PathHistory *hist)
   fclose(fp);
 }
 */
+
+void
+TokenPassSearch::copy_word_graph_info(TPLexPrefixTree::Token *src_token,
+				      TPLexPrefixTree::Token *tgt_token)
+{
+  tgt_token->recent_word_graph_node = src_token->recent_word_graph_node;
+  word_graph.link(tgt_token->recent_word_graph_node);
+}
+
+void
+TokenPassSearch::build_word_graph_aux(TPLexPrefixTree::Token *new_token,
+				      TPLexPrefixTree::WordHistory *word_history)
+{
+  int word_id = word_history->word_id;
+  if (word_id < 0)
+    return;
+
+  // Check if we have already created a node for (word_id, frame,
+  // node_id) triplet on this frame.  If so, use the old node.
+  // Otherwise, create a new word graph node.
+  int node_index2 = 0;
+  bool create_new_node = true;
+  WordGraphInfo &info = m_recent_word_graph_info[word_id];
+  if (info.frame != m_frame) {
+    info.items.clear();
+    info.frame = m_frame;
+  }
+  for (int i = 0; i < info.items.size(); i++) {
+    if (info.items[i].lex_node_id == word_history->lex_node_id) {
+      node_index2 = info.items[i].graph_node_id;
+      create_new_node = false;
+      break;
+    }
+  }
+  
+  if (create_new_node) {
+    node_index2 = word_graph.add_node(m_frame, word_id, 
+				      word_history->lex_node_id);
+    WordGraphInfo::Item item;
+    item.graph_node_id = node_index2;
+    item.lex_node_id = word_history->lex_node_id;
+    info.items.push_back(item);
+  }
+
+  int node_index1 = new_token->recent_word_graph_node;
+
+  float am = word_history->am_log_prob;
+  float lm = word_history->lm_log_prob;
+  
+  // FIXME: debug
+//  printf("arc %6.3f %6.3f\n", am, lm);
+
+  word_graph.add_arc(node_index1, node_index2, am, lm * m_lm_scale);
+
+  word_graph.unlink(new_token->recent_word_graph_node);
+  new_token->recent_word_graph_node = node_index2;
+  word_graph.link(node_index2);
+}
+
+void
+TokenPassSearch::build_word_graph(TPLexPrefixTree::Token *new_token)
+{
+  if (new_token->word_history->word_id < 0)
+    return;
+
+  // assert(new_token->word_history->word_id == new_token->lm_history->word_id);
+  // WordGraph::Node &node = word_graph.nodes[new_token->recent_word_graph_node];
+  // assert(new_token->word_history->previous == NULL ||
+  // node.symbol == new_token->word_history->previous->word_id);
+  build_word_graph_aux(new_token, new_token->word_history);
+}
+
+void
+TokenPassSearch::write_word_graph(const std::string &file_name) 
+{
+  if (!m_generate_word_graph) {
+    fprintf(stderr, "ERROR: write_word_graph() called even if word graph"
+	    " was not generated\n");
+    exit(1);
+  }
+
+  FILE *file = fopen(file_name.c_str(), "w");
+  if (!file) {
+    fprintf(stderr, "ERROR: could not open file '%s' for writing\n", 
+	    file_name.c_str());
+    perror("");
+    exit(1);
+  }
+  write_word_graph(file);
+  fclose(file);
+}
+
+void
+TokenPassSearch::write_word_graph(FILE *file)
+{
+  if (m_best_final_token == NULL) {
+    fprintf(stderr, "ERROR: trying to write word graph before best final token"
+ 	    "has been decided\n");
+    exit(1);
+  }
+
+  if (1) {
+    word_graph.reset_reachability();
+    word_graph.mark_reachable_nodes(m_best_final_token->recent_word_graph_node); 
+  }
+  else
+    word_graph.reset_reachability(true);
+    
+
+  // Count reachable nodes and arcs
+  int nodes = 0;
+  int arcs = 0;
+  for (int n = 0; n < word_graph.nodes.size(); n++) {
+
+    // Print reachable nodes
+    WordGraph::Node &node = word_graph.nodes[n];
+    if (!node.reachable)
+      continue;
+
+    nodes++;
+    int a = node.first_arc;
+    while (a >= 0) {
+      arcs++;
+      WordGraph::Arc &arc = word_graph.arcs[a];
+      a = arc.sibling_arc;
+    }
+  }
+
+  fprintf(file, "VERSION=1.1\n"
+	  "base=10\n"
+	  "dir=f\n"
+	  "lmscale=%f wdpenalty=%f\n"
+	  "N=%d\tL=%d\n"
+	  "start=0 end=%d\n", m_lm_scale, m_insertion_penalty, nodes, arcs, 
+	  m_best_final_token->recent_word_graph_node);
+  
+  for (int n = 0; n < word_graph.nodes.size(); n++) {
+
+    // Print reachable nodes
+    WordGraph::Node &node = word_graph.nodes[n];
+    if (!node.reachable)
+      continue;
+    
+//    fprintf(file, "I=%d\tt=%.2f,%d,%d\n", n, node.path_weight, node.frame,
+//	    node.lex_node_id);
+    fprintf(file, "I=%d\tt=%d\n", n, node.frame);
+  }
+
+  int arc_count = 0;
+  for (int n = 0; n < word_graph.nodes.size(); n++) {
+
+    // Print reachable nodes
+    WordGraph::Node &node = word_graph.nodes[n];
+    if (!node.reachable)
+      continue;
+
+    // Print arcs
+    int a = node.first_arc;
+    std::string word;
+    while (a >= 0) {
+      WordGraph::Arc &arc = word_graph.arcs[a];
+      float am_log_prob = arc.am_weight;
+      float lm_log_prob = arc.lm_weight / m_lm_scale - m_insertion_penalty;
+
+      word = m_vocabulary.word(node.symbol);
+      if (word == "<s>" || word=="</s>")
+	word = "!NULL";
+
+      fprintf(file, "J=%d\tS=%d\tE=%d\tW=%s\tv=0\ta=%e\tl=%e\n",
+	      arc_count++, arc.source_node_id, n, 
+	      word.c_str(), am_log_prob, lm_log_prob);
+      a = arc.sibling_arc;
+    }
+  }
+}
+
+// void
+// TokenPassSearch::write_word_graph(FILE *file)
+// {
+//   word_graph.reset_reachability();
+//   word_graph.mark_reachable_nodes(m_final_word_graph_node); 
+
+//   int aux_node = word_graph.nodes.size();
+//   for (int n = 0; n < word_graph.nodes.size(); n++) {
+
+//     // Print reachable nodes
+//     WordGraph::Node &node = word_graph.nodes[n];
+//     if (!node.reachable)
+//       continue;
+
+//     // Print arcs
+//     int a = node.first_arc;
+//     while (a >= 0) {
+//       WordGraph::Arc &arc = word_graph.arcs[a];
+//       WordGraph::Node &target_node = word_graph.nodes[arc.target_node];
+
+//       float am_log_prob = arc.aux_weight;
+//       float lm_log_prob = arc.weight - am_log_prob;
+
+//       fprintf(file, "%d %d %s-%d %f\n", arc.target_node, aux_node,
+//  	      m_vocabulary.word(arc.symbol).c_str(), node.frame, -am_log_prob, 
+//  	      target_node.frame, node.frame);
+//       fprintf(file, "%d %d %s %f\n", aux_node, n, "<lm>", -lm_log_prob);
+
+//       aux_node++;
+//       a = arc.sibling_arc;
+//     }
+//   }
+//   fprintf(file, "%d\n", m_final_word_graph_node);
+// }
+
+void
+TokenPassSearch::debug_print_best_lm_history()
+{
+  std::vector<int> word_hist;
+  TPLexPrefixTree::LMHistory *cur_word;
+  float max_log_prob = -1e20;
+  int i, best_token;
+
+  // Find the best token
+  for (i = 0; i < m_active_token_list->size(); i++)
+  {
+    if ((*m_active_token_list)[i] != NULL)
+    {
+      if ((*m_active_token_list)[i]->total_log_prob > max_log_prob)
+      {
+        best_token = i;
+        max_log_prob = (*m_active_token_list)[i]->total_log_prob;
+      }
+    }
+  }
+  // Determine the word sequence
+  cur_word = (*m_active_token_list)[best_token]->lm_history;
+  while (cur_word != NULL)
+  {
+    word_hist.push_back(cur_word->word_id);
+    cur_word = cur_word->previous;
+  }
+  // Print the best path
+  for (i = word_hist.size()-1; i >= 0; i--)
+  {
+    if (word_hist[i] < 0)
+      printf("* ");
+    else
+      printf("%s ",m_vocabulary.word(word_hist[i]).c_str());
+  }
+  printf("\n");
+  //print_token_path((*m_active_token_list)[best_token]->token_path);
+#ifdef PRUNING_MEASUREMENT
+  for (i = 0; i < 6; i++)
+    printf("meas%i: %.3g\n", i, (*m_active_token_list)[best_token]->meas[i]);
+#endif
+  
+#ifdef COUNT_LM_LA_CACHE_MISS
+  printf("Count: ");
+  for (i = 0; i < MAX_LEX_TREE_DEPTH; i++)
+    printf("%i ", lm_la_cache_count[i]);
+  printf("\n");
+  printf("Miss: ");
+  for (i = 0; i < MAX_LEX_TREE_DEPTH; i++)
+    printf("%i ", lm_la_cache_miss[i]);
+  printf("\n");
+  printf("WordCount: %d\n", lm_la_word_cache_count);
+  printf("WordMiss: %d\n", lm_la_word_cache_miss);
+#endif
+}
+
+void
+TokenPassSearch::debug_print_token_lm_history(FILE *file, 
+					      TPLexPrefixTree::Token *token)
+{
+  if (file == NULL)
+    file = stdout;
+
+  std::vector<TPLexPrefixTree::LMHistory*> stack;
+  TPLexPrefixTree::LMHistory *lm_history;
+
+  // Determine the word sequence
+  lm_history = token->lm_history;
+  while (lm_history != NULL)
+  {
+    stack.push_back(lm_history);
+    lm_history = lm_history->previous;
+  }
+
+  // Print words
+  while (!stack.empty()) {
+    lm_history = stack.back();
+    stack.pop_back();
+
+    if (lm_history->word_id < 0)
+      fprintf(file, "* ");
+    else
+      fprintf(file, "%s ", m_vocabulary.word(lm_history->word_id).c_str());
+  }
+  fprintf(file, "%.2f %d\n", token->total_log_prob, 
+	  token->recent_word_graph_node);
+}

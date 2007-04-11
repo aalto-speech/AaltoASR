@@ -7,7 +7,7 @@
 #include "io.hh"
 
 Toolbox::Toolbox()
-  : m_use_stack_decoder(1),
+  : m_use_stack_decoder(0),
 
     m_hmm_reader(),
     m_hmm_map(m_hmm_reader.hmm_map()),
@@ -16,7 +16,6 @@ Toolbox::Toolbox()
     m_lexicon_reader(m_hmm_map, m_hmms),
     m_lexicon(m_lexicon_reader.lexicon()),
     m_vocabulary(m_lexicon_reader.vocabulary()),
-
     m_tp_lexicon_reader(m_hmm_map, m_hmms, m_tp_lexicon, m_tp_vocabulary),
     m_tp_lexicon(m_hmm_map, m_hmms),
     m_tp_search(m_tp_lexicon, m_tp_vocabulary, &m_lna_reader),

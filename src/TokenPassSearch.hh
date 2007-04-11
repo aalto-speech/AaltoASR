@@ -1,6 +1,7 @@
 #ifndef TOKENPASSSEARCH_HH
 #define TOKENPASSSEARCH_HH
 
+#include "WordGraph.hh"
 #include "TPLexPrefixTree.hh"
 #include "TreeGram.hh"
 #include "Acoustics.hh"
@@ -8,7 +9,7 @@
 #define MAX_WC_COUNT 200
 #define MAX_LEX_TREE_DEPTH 60
 
-typedef std::vector<TPLexPrefixTree::WordHistory*> HistoryVector;
+typedef std::vector<TPLexPrefixTree::LMHistory*> HistoryVector;
 
 class TokenPassSearch {
 public:
@@ -23,16 +24,14 @@ public:
   bool run(void);
 
   // Print the best path
+  void write_word_history(FILE *file = stdout, bool get_best_path = true);
+  void print_lm_history(FILE *file = stdout, bool get_best_path = true);
   TPLexPrefixTree::Token *get_best_token();
-  void print_guaranteed_path(void);
-  void print_best_path(bool only_not_printed, FILE *out=stdout);
   void print_state_history(FILE *file = stdout);
   std::string state_history_string();
   void get_state_history(std::vector<TPLexPrefixTree::StateHistory*> &stack);
   void get_path(HistoryVector &vec, bool use_best_token, 
-                TPLexPrefixTree::WordHistory *limit);
-
-  void print_path(TPLexPrefixTree::Token *token);
+                TPLexPrefixTree::LMHistory *limit);
 
   // Options
   void set_acoustics(Acoustics *acoustics) { m_acoustics = acoustics; }
@@ -44,11 +43,12 @@ public:
   void set_fan_out_beam(float beam) { m_fan_out_beam = beam; }
   void set_state_beam(float beam) { m_state_beam = beam; }
   
-  void set_similar_word_history_span(int n) { m_similar_word_hist_span = n; }
+  void set_similar_lm_history_span(int n) { m_similar_lm_hist_span = n; }
   void set_lm_scale(float lm_scale) { m_lm_scale = lm_scale; }
   void set_duration_scale(float dur_scale) { m_duration_scale = dur_scale; }
   void set_transition_scale(float trans_scale) { m_transition_scale = trans_scale; }
   void set_max_num_tokens(int tokens) { m_max_num_tokens = tokens; }
+  void set_print_probs(bool value) { m_print_probs = value; }
   void set_print_text_result(int print) { m_print_text_result = print; }
   void set_print_state_segmentation(int print) 
   { 
@@ -59,7 +59,6 @@ public:
   {
     m_keep_state_segmentation = value;
   }
-  void set_print_frames(int print) { m_print_frames = print; }
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_word_boundary(const std::string &word);
   void set_lm_lookahead(int order) { m_lm_lookahead = order; }
@@ -72,14 +71,25 @@ public:
 
   void set_ngram(TreeGram *ngram);
   void set_lookahead_ngram(TreeGram *ngram);
+  void set_generate_word_graph(bool value) { m_generate_word_graph = value; }
 
   int frame(void) { return m_frame; }
 
-  void debug_ensure_all_paths_contain_history(TPLexPrefixTree::WordHistory *limit);
+  void write_word_graph(const std::string &file_name);
+  void write_word_graph(FILE *file);
+
+  void debug_ensure_all_paths_contain_history(
+    TPLexPrefixTree::LMHistory *limit);
 
 private:
   void add_sentence_end_to_hypotheses(void);
   void propagate_tokens(void);
+  void update_final_tokens();
+  void copy_word_graph_info(TPLexPrefixTree::Token *src_token,
+			    TPLexPrefixTree::Token *tgt_token);
+  void build_word_graph_aux(TPLexPrefixTree::Token *new_token,
+			    TPLexPrefixTree::WordHistory *word_history);
+  void build_word_graph(TPLexPrefixTree::Token *new_token);
   void propagate_token(TPLexPrefixTree::Token *token);
   void move_token_to_node(TPLexPrefixTree::Token *token,
                           TPLexPrefixTree::Node *node,
@@ -90,16 +100,16 @@ private:
   void analyze_tokens(void);
 #endif
   
-  TPLexPrefixTree::Token* find_similar_word_history(
-    TPLexPrefixTree::WordHistory *wh, int word_hist_code,
+  TPLexPrefixTree::Token* find_similar_lm_history(
+    TPLexPrefixTree::LMHistory *wh, int lm_hist_code,
     TPLexPrefixTree::Token *token_list);
-  bool is_similar_word_history(TPLexPrefixTree::WordHistory *wh1,
-                               TPLexPrefixTree::WordHistory *wh2);
-  int compute_word_hist_hash_code(TPLexPrefixTree::WordHistory *wh);
-  float compute_lm_log_prob(TPLexPrefixTree::WordHistory *word_hist);
-  float get_lm_score(TPLexPrefixTree::WordHistory *word_hist,
-                     int word_hist_code);
-  float get_lm_lookahead_score(TPLexPrefixTree::WordHistory *word_hist,
+  bool is_similar_lm_history(TPLexPrefixTree::LMHistory *wh1,
+                               TPLexPrefixTree::LMHistory *wh2);
+  int compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh);
+  float compute_lm_log_prob(TPLexPrefixTree::LMHistory *lm_hist);
+  float get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,
+                     int lm_hist_code);
+  float get_lm_lookahead_score(TPLexPrefixTree::LMHistory *lm_hist,
                                 TPLexPrefixTree::Node *node, int depth);
   float get_lm_bigram_lookahead(int prev_word_id,
                                 TPLexPrefixTree::Node *node, int depth);
@@ -116,6 +126,11 @@ private:
 
   void save_token_statistics(int count);
   //void print_token_path(TPLexPrefixTree::PathHistory *hist);
+
+public:
+
+  /** The word graph of best hypotheses created during the recognition. */
+  WordGraph word_graph;
 
 private:
   TPLexPrefixTree &m_lexicon;
@@ -142,7 +157,7 @@ private:
   class LMScoreInfo {
   public:
     float lm_score;
-    std::vector<int> word_hist;
+    std::vector<int> lm_hist;
   };
   HashCache<LMScoreInfo*> m_lm_score_cache;
   
@@ -153,6 +168,19 @@ private:
   float m_worst_log_prob;
   float m_best_we_log_prob;
 
+  struct WordGraphInfo {
+    struct Item {
+      Item() : lex_node_id(-1), graph_node_id(-1) { }
+      int lex_node_id;
+      int graph_node_id;
+    };
+    WordGraphInfo() : frame(-1) { }
+    int frame;
+    std::vector<Item> items;
+  };
+  std::vector<WordGraphInfo> m_recent_word_graph_info;
+  TPLexPrefixTree::Token *m_best_final_token;
+
   // Ngram
   TreeGram *m_ngram;
   std::vector<int> m_lex2lm;
@@ -161,13 +189,13 @@ private:
   TreeGram *m_lookahead_ngram;
 
   // Options
+  float m_print_probs;
   int m_print_text_result;
   bool m_print_state_segmentation;
   bool m_keep_state_segmentation;
-  bool m_print_frames;
   float m_global_beam;
   float m_word_end_beam;
-  int m_similar_word_hist_span;
+  int m_similar_lm_hist_span;
   float m_lm_scale;
   float m_duration_scale;
   float m_transition_scale; // Temporary scaling used for self transitions
@@ -185,6 +213,7 @@ private:
   int m_sentence_end_id;
   int m_sentence_end_lm_id;
   bool m_use_sentence_boundary;
+  bool m_generate_word_graph;
   bool m_require_sentence_end;
 
   float m_current_glob_beam;
@@ -211,6 +240,12 @@ private:
   int lm_la_cache_miss[MAX_LEX_TREE_DEPTH];
   int lm_la_word_cache_count;
   int lm_la_word_cache_miss;
+
+  // FIXME: remove debug
+public:
+  void debug_print_best_lm_history();
+  void debug_print_token_lm_history(FILE *file, TPLexPrefixTree::Token *token);
+
 };
 
 #endif // TOKENPASSSEARCH_HH

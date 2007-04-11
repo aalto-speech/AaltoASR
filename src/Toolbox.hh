@@ -3,6 +3,8 @@
 
 #include <deque>
 
+#include "io.hh"
+#include "WordGraph.hh"
 #include "NowayHmmReader.hh"
 #include "NowayLexiconReader.hh"
 #include "TPNowayLexReader.hh"
@@ -30,7 +32,11 @@ public:
   const std::string &lex_word() const { return m_lexicon_reader.word(); }
   const std::string &lex_phone() const { return m_lexicon_reader.phone(); }
   const std::string &word(int index) const 
-  { return m_tp_vocabulary.word(index); }
+  { 
+    if (m_use_stack_decoder)
+      return m_vocabulary.word(index); 
+    return m_tp_vocabulary.word(index);
+  }
 
   // Ngram
   void ngram_read(const char *file, float weight, const bool binary=true);
@@ -74,8 +80,14 @@ public:
   bool run() { return (m_use_stack_decoder?m_search.run():m_tp_search.run()); }
 
   // Token pass search
-  void print_best_path(bool only_not_printed, FILE *out=stdout) { m_tp_search.print_best_path(only_not_printed, out); }
-  void print_best_path_to_file(FILE *out) {print_best_path(false, out);}
+  WordGraph &tp_word_graph() { return m_tp_search.word_graph; } 
+  void write_word_graph(const std::string &file_name)
+  { m_tp_search.write_word_graph(file_name); }
+  void print_best_lm_history(FILE *out=stdout) 
+  { 
+    m_tp_search.print_lm_history(out, true); 
+  }
+  void print_best_lm_history_to_file(FILE *out) {print_best_lm_history(out);}
 
   // Miscellaneous
   void segment(const std::string &str, int start_frame, int end_frame);
@@ -93,7 +105,7 @@ public:
   void set_forced_end(bool forced_end) 
   { m_expander.set_forced_end(forced_end); }
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
-  void set_prune_similar(int prune_similar) { m_search.set_prune_similar(prune_similar); m_tp_search.set_similar_word_history_span(prune_similar); } 
+  void set_prune_similar(int prune_similar) { m_search.set_prune_similar(prune_similar); m_tp_search.set_similar_lm_history_span(prune_similar); } 
   void set_word_limit(int word_limit) { m_search.set_word_limit(word_limit); }
   void set_word_beam(float word_beam) { m_search.set_word_beam(word_beam); }
   void set_lm_scale(float lm_scale) { m_search.set_lm_scale(lm_scale); m_tp_search.set_lm_scale(lm_scale); }
@@ -125,14 +137,17 @@ public:
   void set_print_state_segmentation(int print) { m_tp_search.set_print_state_segmentation(print); }
   void set_keep_state_segmentation(int value) { m_tp_search.set_keep_state_segmentation(value); }
   void set_print_probs(bool print_probs) 
-  { m_search.set_print_probs(print_probs); }
+  { 
+    m_search.set_print_probs(print_probs); 
+    m_tp_search.set_print_probs(print_probs);
+  }
   void set_multiple_endings(int multiple_endings) 
   { m_search.set_multiple_endings(multiple_endings); }
   void set_print_indices(bool print_indices) 
   { m_search.set_print_indices(print_indices); }
   void set_print_frames(bool print_frames) 
-  { m_search.set_print_frames(print_frames); 
-  m_tp_search.set_print_frames(print_frames);
+  { 
+    m_search.set_print_frames(print_frames); 
   }
   void set_word_boundary(const std::string &word)
   { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_word_boundary = word; }
@@ -144,12 +159,25 @@ public:
   void set_optional_short_silence(bool state) { m_tp_lexicon.set_optional_short_silence(state); }
 
   void prune_lm_lookahead_buffers(int min_delta, int max_depth) { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
+  void set_generate_word_graph(bool value)
+  { m_tp_search.set_generate_word_graph(value); }
 
   // Debug
   void print_prunings()
   { m_search.print_prunings(); }
   void print_hypo(Hypo &hypo);
   void print_sure() { m_search.print_sure(); }
+  void write_word_history(const std::string file_name) {
+    io::Stream out(file_name, "w");
+    m_tp_search.write_word_history(out.file);
+  }
+  void write_word_history() { m_tp_search.write_word_history(); }
+  void print_lm_history() { m_tp_search.print_lm_history(); }
+
+  TokenPassSearch &debug_get_tp() { return m_tp_search; }
+  TPLexPrefixTree &debug_get_tp_lex() { return m_tp_lexicon; }
+  void debug_print_best_lm_history() 
+  { m_tp_search.debug_print_best_lm_history(); }
 
   struct OpenError : public std::exception {
     virtual const char *what() const throw()
@@ -170,8 +198,8 @@ private:
   Lexicon &m_lexicon;
   const Vocabulary &m_vocabulary;
 
-  TPNowayLexReader m_tp_lexicon_reader;
   TPLexPrefixTree m_tp_lexicon;
+  TPNowayLexReader m_tp_lexicon_reader;
   Vocabulary m_tp_vocabulary;
   TokenPassSearch m_tp_search;
   

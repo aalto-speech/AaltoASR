@@ -119,10 +119,9 @@ public:
   HypoStack &stack(int frame);
   int paths();
 
-	void print_best_path(bool only_not_printed, FILE *out);
-	void print_best_path(bool only_not_printed);
-	void print_best_path_to_file(FILE *out);
-
+	void write_word_graph(const std::string &file_name);
+	void print_best_lm_history();
+	void print_best_lm_history_to_file(FILE *out);
 	void select_decoder(int stack_dec);
 
   void set_forced_end(bool forced_end);
@@ -162,6 +161,7 @@ public:
   void set_word_boundary(const std::string &word);
   void set_sentence_boundary(const std::string &start, const std::string &end);
   void set_dummy_word_boundaries(bool value);
+	void set_generate_word_graph(bool value);
   void set_require_sentence_end(bool s);
 
   void set_optional_short_silence(bool state);
@@ -171,7 +171,11 @@ public:
 	void print_prunings();
   void print_hypo(Hypo &hypo);
   void print_sure();
+	void write_word_history(const std::string &file_name);
+	void print_lm_history();
 	
 	void print_tp_lex_node(int node);
   void print_tp_lex_lookahead(int node);
+
+	void debug_print_best_lm_history();
 };
