@@ -17,8 +17,21 @@ PhnReader::Phn::Phn()
 }
 
 PhnReader::PhnReader()
-  : m_file(NULL), m_speaker_phns(false), m_state_num_labels(false)
+  : m_file(NULL), m_model(NULL),
+    m_state_num_labels(false), m_relative_sample_numbers(false)
 {
+  Segmentator::StateProbPair p;
+  set_frame_rate(125); // Default frame rate
+
+  // Initialize the current state and its probability
+  p.state_index = -1;
+  p.prob = 1;
+  cur_state.push_back(p);
+}
+
+PhnReader::~PhnReader()
+{
+  close();
 }
 
 void
@@ -27,11 +40,12 @@ PhnReader::open(std::string filename)
   m_current_line = 0;
   m_first_line = 0;
   m_last_line = 0;
-  m_first_sample = 0;
-  m_last_sample = 0;
+  m_first_frame = 0;
+  m_last_frame = 0;
+  m_current_frame = -1;
+  m_eof_flag = false;
 
-  if (m_file)
-    fclose(m_file);
+  close();
 
   m_file = fopen(filename.c_str(), "r");
   if (!m_file) {
@@ -39,22 +53,6 @@ PhnReader::open(std::string filename)
 	    filename.c_str());
     perror("error");
     exit(1);
-  }
-}
-
-void
-PhnReader::reset_file(void)
-{
-  assert( m_file != NULL );
-  fseek(m_file, 0, SEEK_SET);
-
-  m_current_line = 0;
-  if (m_first_sample > 0)
-    set_sample_limit(m_first_sample, m_last_sample);
-  if (m_first_line > 0)
-  {
-    int fs;
-    set_line_limit(m_first_line, m_last_line, &fs);
   }
 }
 
@@ -67,36 +65,57 @@ PhnReader::close()
 }
 
 void
-PhnReader::set_line_limit(int first_line, int last_line, 
-			  int *first_sample) 
+PhnReader::reset(void)
+{
+  assert( m_file != NULL );
+  fseek(m_file, 0, SEEK_SET);
+
+  m_current_line = 0;
+  m_current_frame = -1;
+  m_eof_flag = false;
+  if (m_first_frame > 0)
+    set_frame_limits(m_first_frame, m_last_frame);
+  if (m_first_line > 0)
+    set_line_limits(m_first_line, m_last_line, NULL);
+}
+
+
+void
+PhnReader::set_line_limits(int first_line, int last_line, 
+                           int *first_frame) 
 {
   Phn phn;
-  if (!m_state_num_labels)
-  {
-    m_first_line = first_line;
-    m_last_line = last_line;
+  m_first_line = first_line;
+  m_last_line = last_line;
 
-    while (m_current_line < m_first_line) 
-      next(phn);
+  while (m_current_line < m_first_line) 
+    next_phn_line(phn);
+  
+  if (first_frame != NULL)
+  {
+    *first_frame = (int)(phn.start/m_samples_per_frame);
+    if (m_relative_sample_numbers)
+      (*first_frame) += m_first_frame;
   }
-  *first_sample = phn.start;
 }
 
 void
-PhnReader::set_sample_limit(int first_sample, int last_sample) 
+PhnReader::set_frame_limits(int first_frame, int last_frame) 
 {
   Phn phn;
-  if (!m_state_num_labels)
+  
+  m_first_frame = first_frame;
+  m_last_frame = last_frame;
+  if (!m_relative_sample_numbers)
   {
-    m_first_sample = first_sample;
-    m_last_sample = last_sample;
     long oldpos = ftell(m_file);
     long curpos = oldpos;
     
-    while (next(phn)) {
+    while (next_phn_line(phn)) {
       oldpos = curpos;
       curpos = ftell(m_file);
-      if (phn.end < 0 || phn.end > m_first_sample) {
+      if (phn.end < 0 || (int)(phn.end/m_samples_per_frame) > m_first_frame)
+      {
         fseek(m_file, oldpos, SEEK_SET);
         return;
       }
@@ -104,22 +123,77 @@ PhnReader::set_sample_limit(int first_sample, int last_sample)
   }
 }
 
+
 void
-PhnReader::set_speaker_phns(bool sphn)
+PhnReader::init_utterance_segmentation(void)
 {
-  m_speaker_phns = sphn;
+  m_eof_flag = false;
+  if (!next_phn_line(m_cur_phn))
+    m_eof_flag = true;
 }
 
-bool
-PhnReader::next(Phn &phn)
-{  
 
+void
+PhnReader::next_frame(void)
+{
+  if (m_eof_flag)
+    return;
+  
+  if (m_current_frame == -1)
+  {
+    // Initialize the current frame to the beginning of the file
+    m_current_frame = (int)(m_cur_phn.start/m_samples_per_frame);
+    if (m_current_frame < m_first_frame)
+      m_current_frame = m_first_frame;
+    assert( (int)(m_cur_phn.end/m_samples_per_frame) >= m_current_frame );
+  }
+  else
+  {
+    m_current_frame++;
+  }
+
+  assert( m_current_frame >= (int)(m_cur_phn.start/m_samples_per_frame) );
+  assert( m_current_frame <= (int)(m_cur_phn.end/m_samples_per_frame) );
+
+  if (m_state_num_labels)
+    cur_state.back().state_index = m_cur_phn.state;
+  else
+  {
+    if (m_cur_phn.state < 0)
+      throw std::string("PhnReader::next_frame(): A state segmented phn file is required");
+    if (m_model == NULL)
+      throw std::string("PhnReader::next_frame(): If state numbered labels are not used, an HMM model is needed");
+    Hmm &hmm = m_model->hmm(m_model->hmm_index(m_cur_phn.label[0]));
+    cur_state.back().state_index = hmm.state(m_cur_phn.state);
+  }
+
+  if (m_last_frame > 0 && m_current_frame+1 >= m_last_frame) {
+    m_eof_flag = true;
+  }
+  else
+  {
+    // Do we need to load more phn lines?
+    while (m_current_frame+1 >= (int)(m_cur_phn.end/m_samples_per_frame))
+    {
+      if (!next_phn_line(m_cur_phn))
+      {
+        m_eof_flag = true;
+        break;
+      }
+    }
+  }
+}
+
+
+bool
+PhnReader::next_phn_line(Phn &phn)
+{  
   // Read line at time
   if (!str::read_line(&m_line, m_file)) {
     if (ferror(m_file)) {
-      fprintf(stderr, "PhnReader::next(): read error on line %d: %s\n",
-	      m_current_line, strerror(errno));
-      exit(1);
+      throw str::fmt(1024,
+                     "PhnReader::next_phn_line(): read error on line %d: %s\n",
+                     m_current_line, strerror(errno));
     }
 
     if (feof(m_file))
@@ -128,22 +202,16 @@ PhnReader::next(Phn &phn)
     assert(false);
   }
 
-  if (!m_state_num_labels && m_last_line > 0 && m_current_line > m_last_line)
+  if (m_last_line > 0 && m_current_line >= m_last_line)
     return false; 
 
   // Parse the line in fields.
   str::chomp(&m_line);
   std::vector<std::string> fields;
 
-  // If speakered phns are used, there is an additional
-  // field containing the speaker ID.
-  int ID_field = 0;
-  if(m_speaker_phns)
-    ID_field = 1;
-
   // If the first char is digit, we have start and end fields.
   if (isdigit(m_line[0])) {
-    str::split(&m_line, " \t", true, &fields, 4 + ID_field);
+    str::split(&m_line, " \t", true, &fields, 4);
     bool ok = true;
 
     if (fields.size() > 2) {
@@ -167,24 +235,30 @@ PhnReader::next(Phn &phn)
       ok = false;
 
     if (!ok) {
-      fprintf(stderr, 
-	      "PhnReader::next(): invalid start or end time on line %d:\n"
-	      "%s\n", m_current_line, m_line.c_str());
-      exit(1);
+      throw str::fmt(1024,
+                     "PhnReader::next_phn_line(): invalid start or end time on line %d:\n"
+                     "%s\n", m_current_line, m_line.c_str());
     }
 
     fields.erase(fields.begin(), fields.begin() + 2);
   }
 
-  // Otherwise we have just label and comments. (and possibly speaker ID)
+  // Otherwise we have just label and comments.
   else {
-    str::split(&m_line, " \t", true, &fields, 2 + ID_field);
+    str::split(&m_line, " \t", true, &fields, 2);
     phn.start = -1;
     phn.end = -1;
   }
 
+  if (m_relative_sample_numbers)
+  {
+    phn.start += (int)(m_first_frame*m_samples_per_frame);
+    phn.end += (int)(m_first_frame*m_samples_per_frame);
+  }
+  
   // Is the current starting time out of requested range?
-  if (!m_state_num_labels && m_last_sample > 0 && phn.start > m_last_sample)
+  if (m_last_frame > 0 &&
+      (int)(phn.start/m_samples_per_frame) >= m_last_frame)
     return false;
 
   // Read label and comments
@@ -198,18 +272,11 @@ PhnReader::next(Phn &phn)
     str::split(&fields[0], ",", false, &phn.label);
   }
 
-  if ((int)fields.size() > 1 + ID_field)
-    phn.comment = fields[1 + ID_field];
+  if ((int)fields.size() > 1)
+    phn.comment = fields[1];
   else
     phn.comment = "";
   
-  // Read speaker ID
-
-  if (m_speaker_phns)
-    phn.speaker = fields[1]; 
-  else
-    phn.speaker = "";
-
   m_current_line++;
   return true;
 }

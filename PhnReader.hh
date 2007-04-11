@@ -4,22 +4,25 @@
 #include <string>
 #include <vector>
 #include <stdio.h>
+#include "HmmSet.hh"
+#include "Segmentator.hh"
 
-/* 
-
-Format of the phn file.  Optional fields marked with brackets.  The
-first optional two fields exist if the first char on the line is digit.
-
-[start_sample1 end_sample1] label1 [here are possible comments...]
-[start_sample2 end_sample2] label2 [some other comments...]
-...
-
-NOTE: sample numbers refer to 16kHz files, if files in other sample rates
-      are used, the sample numbers for phn files are still computed as
-      16000*time(seconds).
+/** A class for reading phn files
+ *
+ * Format of the phn file.  Optional fields marked with brackets.  The
+ * first optional two fields exist if the first char on the line is digit.
+ *
+ * [start_sample1 end_sample1] label1 [here are possible comments...]
+ * [start_sample2 end_sample2] label2 [some other comments...]
+ * ...
+ *
+ * \note
+ * sample numbers refer to 16kHz files, if files in other sample rates
+ * are used, the sample numbers for phn files are still computed as
+ * 16000*time(seconds).
 */
 
-class PhnReader {
+class PhnReader : public Segmentator {
 public:
   
   class Phn {
@@ -30,61 +33,87 @@ public:
     int end;
     int state;
     std::vector<std::string> label;
-    std::string speaker;
     std::string comment;
   };
 
   PhnReader();
+  virtual ~PhnReader();
 
-  void open(std::string filename);
-  void reset_file(void);
+  void open(std::string ref_file);
   void close();
+  void reset(void);
+  bool eof(void) { return m_eof_flag; }
 
+  void init_utterance_segmentation(void);
+  int current_frame(void) { return m_current_frame; }
+  void next_frame(void);
+  const std::vector<Segmentator::StateProbPair>& state_probs(void) { return cur_state; }
+
+  /** Sets the frame rate for converting phn sample numbers to frame numbers.
+   * \param frame_rate frames per second
+   */
+  void set_frame_rate(float frame_rate) { m_samples_per_frame = 16000/frame_rate; }
+
+  /** Sets the HMM model.
+   * \param model Pointer to \ref HmmSet
+   */
+  void set_hmm_model(HmmSet *model) { m_model = model; }
+
+  
   /** Limits lines to be read from transcription
    * \param first_sample if reference defined, 
    * the first sample corresponding to the defined first_line is set
-   * \param last_sample if reference defined, 
-   * the last sample corresponding to the defined last_line is set
    */
-  void set_line_limit(int first_line, int last_line, 
-		      int *first_sample);
+  void set_line_limits(int first_line, int last_line, 
+                       int *first_sample = NULL);
 
-  void set_sample_limit(int first_sample, int last_sample);
-
-  /** Sets phn type: normal / speakered (sphn = speakered phn)
-   * speakered phns have speaker ID between label and comment
-   */   
-  void set_speaker_phns(bool sphn);
+  void set_frame_limits(int first_frame, int last_frame);
 
   void set_state_num_labels(bool l) { m_state_num_labels = l; }
+  void set_relative_sample_numbers(bool r) { m_relative_sample_numbers = r; }
 
-  bool next(Phn &phn);
+  bool next_phn_line(Phn &phn);
 
 private:
+  float m_samples_per_frame;
 
   /// first line to be included (1-N); if no limits, m_first_line = 0
   int m_first_line;
 
-  /// last line to be included (1-N); if no limits, m_last_line = 0
+  /// last line to be excluded (1-N); if no limits, m_last_line = 0
   int m_last_line;
 
-  /// first sample to be included (0-N)
-  int m_first_sample;
+  /// first frame to be included (0-N)
+  int m_first_frame;
 
-  /// last sample to be included (0-N); if no samplelimit, m_last_sample = 0
-  int m_last_sample;
+  /// last frame to be excluded (0-N); if no limit, m_last_frame = 0
+  int m_last_frame;
 
   /// current line (1-N)
   int m_current_line;
 
+  /// current frame, advanced in \ref next_frame()
+  int m_current_frame;
+
+  /// current phn line
+  Phn m_cur_phn;
+
   std::string m_line;
   FILE *m_file;
-  
-  /// true for speakered phns
-  bool m_speaker_phns;
 
+  HmmSet *m_model;
+
+  // true if eof has been detected, or line/frame limits have been reached
+  bool m_eof_flag;
+  
   /// true if labels are state numbers instead of HMM labels
   bool m_state_num_labels;
+
+  /// true if phn sample numbers are relative to the first frame
+  bool m_relative_sample_numbers;
+
+  /// A vector which holds the current state and its probability
+  std::vector<Segmentator::StateProbPair> cur_state;
 };
 
 #endif /* PHNREADER_HH */
