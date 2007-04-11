@@ -7,16 +7,10 @@
 #include <assert.h>
 
 #include "FeatureModules.hh"
-#include "Pcgmm.hh"
-#include "Scgmm.hh"
 #include "Distributions.hh"
 
 #include "mtl/mtl.h"
 #include "mtl/blais.h"
-
-typedef mtl::matrix<float, mtl::rectangle<>, mtl::dense<>,
-                    mtl::row_major>::type Matrix;
-typedef mtl::dense1D<float> Vector;
 
 
 //
@@ -79,9 +73,6 @@ public:
   Hmm &add_hmm(const std::string &label, int num_states);
   void clone_hmm(const std::string &source, const std::string &target);
   void untie_transitions(const std::string &label);
-
-  void set_dim(int dim);
-  inline int dim() const;
 
   inline int num_hmms() const;
   inline Hmm &hmm(int hmm);

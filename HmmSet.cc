@@ -75,12 +75,6 @@ HmmSet::reserve_states(int states)
   m_states.resize(states);
 }
 
-void
-HmmSet::reserve_kernels(int kernels)
-{
-  m_kernels.resize(kernels);
-}
-
 
 Hmm&
 HmmSet::new_hmm(const std::string &label)
@@ -161,85 +155,6 @@ HmmSet::clone_transition(int index)
   return m_transitions.size() - 1;
 }
 
-void
-HmmSet::read_gk(const std::string &filename)
-{
-  std::ifstream in(filename.c_str());
-  if (!in) {
-    fprintf(stderr, "HmmSet::read_gk(): could not open %s\n", 
-	    filename.c_str());
-    throw OpenError();
-  }
-  
-  int kernels = 0;
-  std::string cov_str;
-  int dim;
-
-  in >> kernels >> dim >> cov_str;
-  set_dim(dim);
-
-  if (cov_str == "single_cov")
-    m_cov_type = HmmCovariance::SINGLE;
-  else if (cov_str == "diagonal_cov")
-    m_cov_type = HmmCovariance::DIAGONAL;
-  else if (cov_str == "full_cov")
-    m_cov_type = HmmCovariance::FULL;
-  else if (cov_str == "pcgmm") {
-    m_cov_type = HmmCovariance::PCGMM;
-    in.close();
-    reserve_kernels(kernels);
-    pcgmm.read_gk(filename);
-    return;
-  }
-  else if (cov_str == "scgmm") {
-    m_cov_type = HmmCovariance::SCGMM;
-    in.close();
-    reserve_kernels(kernels);
-    scgmm.read_gk(filename);
-    return;
-  }
-  else
-    throw std::string("Unknown covariance type");
-
-  assert(m_cov_type != HmmCovariance::INVALID);
-
-  reserve_kernels(kernels);
-  for (int k = 0; k < kernels; k++) {
-    HmmKernel &kernel = m_kernels[k];
-
-    // Read center
-    kernel.resize(m_dim, m_cov_type);
-    for (int d = 0; d < m_dim; d++)
-      in >> kernel.center[d];
-
-    // Read covariance
-    if (m_cov_type == HmmCovariance::SINGLE) {
-      in >> kernel.cov.var();
-    } 
-    else if (m_cov_type == HmmCovariance::DIAGONAL) {
-      for (int d = 0; d < m_dim; d++)
-	in >> kernel.cov.diag(d);
-    } 
-    else if (m_cov_type == HmmCovariance::FULL) {
-      for (int i=0; i<m_dim; i++)
-	for (int j=0; j<m_dim; j++) {
-	  float f = 0;
-	  in >> f;
-	  kernel.cov.full(i,j) = f;
-	  kernel.cov.full(j,i) = f;
-	}
-    }
-    else {
-      throw std::string("Unknown covariance type");
-    }
-  }
-
-  // Covariances have changed, compute the determinants
-  compute_covariance_determinants();
-
-  if (!in)
-    throw ReadError();
-}
 
 void
 HmmSet::read_mc(const std::string &filename)
@@ -348,58 +263,6 @@ HmmSet::read_all(const std::string &base)
   read_ph(base + ".ph");
 }
 
-void
-HmmSet::write_gk(const std::string &filename)
-{
-  std::ofstream out(filename.c_str());
-
-  out << m_kernels.size() << " " << m_dim << " ";
-  if (m_cov_type == HmmCovariance::SINGLE)
-    out << "single_cov";
-  else if (m_cov_type == HmmCovariance::DIAGONAL)
-    out << "diagonal_cov";
-  else if (m_cov_type == HmmCovariance::FULL)
-    out << "full_cov";
-  else if (m_cov_type == HmmCovariance::PCGMM) {
-    pcgmm.write_gk(filename);
-    return;
-  }
-  else if (m_cov_type == HmmCovariance::SCGMM) {
-    scgmm.write_gk(filename);
-    return;
-  }
-  else
-    throw std::string("Unknown covariance type");
-  out << std::endl;
-  
-  // Write kernels
-  for (int k = 0; k < (int)m_kernels.size(); k++) {
-    HmmKernel &kernel = m_kernels[k];
-    
-    // Write centers
-    for (int d = 0; d < m_dim; d++) {
-      if (d > 0)
-	out << " ";
-      out << kernel.center[d];
-    }
-    
-    // Write covariance
-    if (m_cov_type == HmmCovariance::SINGLE) {
-      out << " " << kernel.cov.var() << std::endl;
-    } 
-    else if (m_cov_type == HmmCovariance::DIAGONAL) {
-      for (int d = 0; d < m_dim; d++)
-	out << " " << kernel.cov.diag(d);
-      out << std::endl;
-    }
-    else if (m_cov_type == HmmCovariance::FULL) {
-      for (int i=0; i<m_dim; i++)
-	for (int j=0; j<m_dim; j++)
-	  out << " " << kernel.cov.full(i,j);
-      out << std::endl;
-    }
-  }
-}
 
 void
 HmmSet::write_mc(const std::string &filename)

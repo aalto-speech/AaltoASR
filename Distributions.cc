@@ -659,26 +659,35 @@ PDFPool::read_gk(const std::string &filename)
   
   int pdfs = 0;
   std::string type_str;
-  int dim;
-
   in >> pdfs >> m_dim >> type_str;
+  m_pool.resize(pdfs);
+  m_likelihoods.resize(pdfs);
 
-  if (type_str == "single_cov")
-
-  else if (type_str == "diagonal_cov")
-
-  else if (type_str == "full_cov")
-
-  else if (type_str == "pcgmm") {
-
-  else if (cov_str == "scgmm") {
-
-  else if (cov_str == "variable") {
+  // New implementation
+  if (type_str == "variable") {
     for (int i=0; i<m_pool.size(); i++)
-      m_pool[i]->write(out);
+      m_pool[i]->read(in);
   }
-  else
-    throw std::string("Unknown covariance type");
+  // For compliance
+  else {
+    if (type_str == "single_cov") {
+      
+    }
+    else if (type_str == "diagonal_cov") {
+      
+    }
+    else if (type_str == "full_cov") {
+      
+    }
+    else if (type_str == "pcgmm") {
+      
+    }
+    else if (cov_str == "scgmm") {
+      
+    }    
+    else
+      throw std::string("Unknown covariance type");
+  }
 
   if (!in)
     throw ReadError();

@@ -22,6 +22,8 @@ public:
   virtual void write(std::ostream &os) const = 0;
   /* Read the parameters of this distribution from the stream is */
   virtual void read(const std::istream &is) = 0;
+  /* Read the parameters of this distribution from an old .gk file */
+  virtual void read_compatibility(const std::istream &is) = 0;
 
   /* Set the current estimation mode */
   void set_estimation_mode(const EstimationMode &m) { m_mode = m; };
@@ -29,7 +31,7 @@ public:
   EstimationMode &get_estimation_mode() { return m_mode; };
 
 private:
-  Gaussian::EstimationMode m_mode;
+  EstimationMode m_mode;
   int m_dim;
 }
 
@@ -39,13 +41,7 @@ public:
   
   // ABSTRACT FUNCTIONS, SHOULD BE OVERWRITTEN IN THE GAUSSIAN IMPLEMENTATIONS
 
-  /* Constructor */
-  virtual Gaussian() = 0;
-  /* Copy constructor */
-  virtual Gaussian(const Gaussian &g) = 0;
-  /* Destructor */
-  virtual ~Gaussian() = 0;
-  /* Resets the Gaussian to have dimensionality dim and all values zeroed */
+    /* Resets the Gaussian to have dimensionality dim and all values zeroed */
   virtual void reset(int dim) = 0;
   /* Initializes the accumulator buffers */  
   virtual void start_accumulating() = 0;
@@ -69,7 +65,7 @@ public:
   /* Sets the covariance matrix for this Gaussian */
   virtual void set_covariance(const Matrix &covariance) = 0;
   
-  // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMANTATION, BUT CAN BE OVERWRITTEN
+  // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
 
   /* Splits the current Gaussian to two by disturbing the mean */
   virtual void split(Gaussian &s1, Gaussian &s2) const;
@@ -93,7 +89,7 @@ public:
     mmi_mean=0;
     ml_cov=0;
     mmi_cov=0;
-  }
+  };
   Vector ml_mean;
   Vector mmi_mean;
   Vector ml_cov;
@@ -113,6 +109,7 @@ public:
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
   virtual void read(const std::istream &is);
+  virtual void read_compatibility(const std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -143,7 +140,7 @@ private:
 
 class FullCovarianceAccumulator {
 public:
-  DiagonalAccumulator(int dim) { 
+  FullCovarianceAccumulator(int dim) { 
     ml_mean.resize(dim);
     ml_cov.resize(dim,dim);
     mmi_mean.resize(dim);
@@ -154,7 +151,7 @@ public:
     ml_cov=0;
     mmi_cov=0;
     outer=0;
-  }
+  };
   Vector ml_mean;
   Vector mmi_mean;
   Matrix ml_cov;
@@ -174,6 +171,7 @@ public:
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
   virtual void read(const std::istream &is);
+  virtual void read_compatibility(const std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -206,33 +204,34 @@ public:
   virtual void reset(int dim);
 
   // From pdf
-  double compute_likelihood(const FeatureVec &f);
-  double compute_log_likelihood(const FeatureVec &f);
-  void write(std::ostream &os);
-  void read(const std::istream &is);
-  
+  virtual double compute_likelihood(const FeatureVec &f);
+  virtual double compute_log_likelihood(const FeatureVec &f);
+  virtual void write(std::ostream &os);
+  virtual void read(const std::istream &is);
+  virtual void read_compatibility(const std::istream &is);  
+
   // Gaussian-specific
   virtual void start_accumulating();
   virtual void accumulate_ml(double prior, const FeatureVec &f);
   virtual void accumulate_mmi_denominator(std::vector<double> priors,
 					  std::vector<const FeatureVec*> const features);
   virtual void estimate_parameters();
-  virtual vector &get_mean();
+  virtual Vector &get_mean();
   virtual Matrix &get_covariance();
-  virtual void set_mean(vector &mean);
+  virtual void set_mean(Vector &mean);
   virtual void set_covariance(Matrix &covariance);
 
   // PCGMM-specific
   /* Get the coefficients for the subspace constrained precision matrix */
-  vector &get_precision_coeffs();
+  Vector &get_precision_coeffs();
   /* Set the coefficients for the subspace constrained precision matrix */
-  void set_precision_coeffs(vector &coeffs);
+  void set_precision_coeffs(Vector &coeffs);
 
 private:
-  double determinant;
-  Vector mean;
-  Vector precision_coeffs;
-  PrecisionSubspace &ps;
+  double m_determinant;
+  Vector m_mean;
+  Vector m_precision_coeffs;
+  //  PrecisionSubspace &m_ps;
 }
 
 
@@ -247,28 +246,29 @@ public:
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
   virtual void read(const std::istream &is);
+  virtual void read_compatibility(const std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
   virtual void accumulate_ml(double prior, const FeatureVec &f);
-  virtual void accumulate_mmi_denominator(std::vector<double> priors const,
+  virtual void accumulate_mmi_denominator(std::vector<double> priors,
 					  std::vector<const FeatureVec*> const features);
   virtual void estimate_parameters();
-  virtual vector &get_mean();
+  virtual Vector &get_mean();
   virtual Matrix &get_covariance;
-  virtual void set_mean(vector &mean);
+  virtual void set_mean(Vector &mean);
   virtual void set_covariance(Matrix &covariance);
 
   // SCGMM-specific
   /* Get the coefficients for the subspace constrained exponential parameters */
-  vector &get_subspace_coeffs();
+  Vector &get_subspace_coeffs();
   /* Set the coefficients for the subspace constrained exponential parameters */
-  void set_subspace_coeffs(vector &coeffs);
+  void set_subspace_coeffs(Vector &coeffs);
 
 private:
-  Vector subspace_coeffs;
-  ExponentialSubspace &es;
-}
+  Vector m_subspace_coeffs;
+  ExponentialSubspace &m_es;
+};
 
 
 class Mixture : public PDF {
@@ -294,6 +294,7 @@ public:
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
   virtual void read(const std::istream &is);
+  virtual void read_compatibility(const std::istream &is);
 
 private:
   std::vector<int> m_pointers;
@@ -305,7 +306,7 @@ private:
 class PDFPool {
 public:
 
-  PDFPool(int dim) { m_dim=dim };
+  PDFPool(int dim) { m_dim=dim; };
   ~PDFPool();
 
   /* The dimensionality of the distributions in this pool */
