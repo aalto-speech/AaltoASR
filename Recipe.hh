@@ -28,8 +28,10 @@ public:
   class Info {
   public:
     std::string audio_path;
-    std::string phn_path;
-    std::string phn_out_path;
+    std::string transcript_path;
+    std::string alignment_path;
+    std::string lattice_path;
+    std::string lna_path;
     float start_time;
     float end_time;
     int start_line;
@@ -38,13 +40,16 @@ public:
     std::string utterance_id;
 
     /** Opens the relevant files for \ref PhnReader and \ref FeatureGenerator.
-     * \param model The HMM model. If NULL, assumes state number labels.
+     * \param model                The HMM model. If NULL, assumes state
+     *                             number labels.
      * \param relative_sample_nums If true, the sample numbers in the phn
-     * file are relative to the start time of the audio file.
-     * \param out_phn If true, reads output phns instead of input phns.
-     * \param fea_gen \ref Pointer to FeatureGenerator.
-     * \param phn_reader The existing \ref PhnReader. If NULL, creates a
-     * new instance.
+     *                             file are relative to the start time of
+     *                             the audio file.
+     * \param out_phn              If true, reads alignment phns instead of
+     *                             transcript phns.
+     * \param fea_gen              \ref Pointer to FeatureGenerator.
+     * \param phn_reader           The existing \ref PhnReader. If NULL,
+     *                             creates a new instance.
      * \return The \ref PhnReader initialized, either created or given.
      */
     PhnReader* init_phn_files(HmmSet *model, bool relative_sample_nums,
@@ -55,7 +60,18 @@ public:
   };
 
   void clear();
-  void read(FILE *f);
+
+  /** Reads a recipe file
+   * \param f                A file pointer to a recipe file.
+   * \param num_batches      Number of batch processes for concurrent
+   *                         execution.
+   * \param batch_index      Batch process index. If num_batches > 1, must
+   *                         satisfy 1 <= batch_index <= num_batches.
+   * \param cluster_speakers If true, the recipe file is split to batches
+   *                         so that sequental lines with the same speaker
+   *                         remain in one batch.
+   */
+  void read(FILE *f, int num_batcehs, int batch_index, bool cluster_speakers);
 
   std::vector<Info> infos;
 };

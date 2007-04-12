@@ -16,10 +16,22 @@ Recipe::clear()
 }
 
 void
-Recipe::read(FILE *f)
+Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
 {
   std::string line;
   std::vector<std::string> field;
+  std::vector<std::string> line_buffer;
+  std::map<std::string, std::string> key_value_map;
+  std::vector<std::string> key_value;
+  int cur_index = 1;
+  int cur_line = 0;
+  int target_lines;
+  int i, j;
+  std::map<std::string,std::string>::const_iterator it;
+  std::string cur_speaker = "", new_speaker;
+
+  if (num_batches > 1 && (batch_index < 1 || batch_index > num_batches))
+    throw std::string("Invalid batch index");
 
   while (1) {
     bool ok = str::read_line(&line, f);
@@ -33,36 +45,85 @@ Recipe::read(FILE *f)
       }
 
       if (feof(f))
-	return; // RETURN
+	break;
     }
 
     // Parse string in fields and skip empty or commented lines
     str::clean(&line, "\n\t ");
     if (line.length() == 0 || line[0] == '#')
       continue;
-    str::split(&line, " \t", true, &field);
+    line_buffer.push_back(line);
+  }
+
+  if (num_batches <= 1)
+    target_lines = line_buffer.size();
+  else
+    target_lines = (int)line_buffer.size()/num_batches;
+  if (target_lines < 1)
+    target_lines = 1;
+  
+  for (i = 0; i < (int)line_buffer.size(); i++)
+  {
+    // Parse the recipe line
+    str::split(&line_buffer[i], " \t", true, &field);
+    for (j = 0; j < (int)field.size(); j++)
+    {
+      str::split(&field[j], "=", false, &key_value);
+      if ((int)key_value.size() != 2)
+        throw std::string("Invalid recipe line: ") + line_buffer[i];
+      if ((int)key_value.size() == 2)
+        key_value_map[key_value[0]] = key_value[1];
+    }
+
+    // Check if batch index needs updating
+    if (num_batches > 1 && cur_index < num_batches)
+    {
+      if ((it = key_value_map.find("speaker")) != key_value_map.end())
+        new_speaker = (*it).second;
+      else
+        new_speaker = "";
+      if (cur_line >= target_lines && (!cluster_speakers ||
+                                      cur_speaker.size() == 0 ||
+                                      cur_speaker != new_speaker))
+      {
+        cur_index++;
+        if (cur_index > batch_index)
+          break;
+        cur_line -= target_lines;
+      }
+      cur_speaker = new_speaker;
+    }
     
-    // Add info in the vector
-    infos.push_back(Info());
-    Info &info = infos.back();
-    if (field.size() > 0)
-      info.audio_path = field[0];
-    if (field.size() > 1)
-      info.phn_path = field[1];
-    if (field.size() > 2)
-      info.phn_out_path = field[2];
-    if (field.size() > 3)
-      info.start_time = atof(field[3].c_str());
-    if (field.size() > 4)
-      info.end_time = atof(field[4].c_str());
-    if (field.size() > 5)
-      info.start_line = atoi(field[5].c_str());
-    if (field.size() > 6)
-      info.end_line = atoi(field[6].c_str());
-    if (field.size() > 7)
-      info.speaker_id = field[7];
-    if (field.size() > 8)
-      info.speaker_id = field[8];
+    if (num_batches <= 1 || cur_index == batch_index)
+    {
+      // This line belongs to the current batch, save it
+      infos.push_back(Info());
+      Info &info = infos.back();
+      if ((it = key_value_map.find("audio")) != key_value_map.end())
+        info.audio_path = (*it).second;
+      if ((it = key_value_map.find("transcript")) != key_value_map.end())
+        info.transcript_path = (*it).second;
+      if ((it = key_value_map.find("alignment")) != key_value_map.end())
+        info.alignment_path = (*it).second;
+      if ((it = key_value_map.find("lattice")) != key_value_map.end())
+        info.lattice_path = (*it).second;
+      if ((it = key_value_map.find("lna")) != key_value_map.end())
+        info.lna_path = (*it).second;
+      if ((it = key_value_map.find("start-time")) != key_value_map.end())
+        info.start_time = atof((*it).second.c_str());
+      if ((it = key_value_map.find("end-time")) != key_value_map.end())
+        info.end_time = atof((*it).second.c_str());
+      if ((it = key_value_map.find("start-line")) != key_value_map.end())
+        info.start_line = atoi((*it).second.c_str());
+      if ((it = key_value_map.find("end-line")) != key_value_map.end())
+        info.end_line = atoi((*it).second.c_str());
+      if ((it = key_value_map.find("speaker")) != key_value_map.end())
+        info.speaker_id = (*it).second;
+      if ((it = key_value_map.find("utterance")) != key_value_map.end())
+        info.utterance_id = (*it).second;
+    }
+    
+    cur_line++;
   }
 }
 
@@ -87,7 +148,7 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
   phn_reader->set_frame_rate(frame_rate);
 
   // Open the segmentation
-  phn_reader->open(out_phn?phn_out_path:phn_path);
+  phn_reader->open(out_phn?alignment_path:transcript_path);
 
   if (start_time > 0 || end_time > 0)
   {
