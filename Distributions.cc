@@ -517,6 +517,13 @@ Mixture::reset()
   mixture_pointers.resize(0);
 }
 
+/*
+void
+Mixture::set_pool()
+{
+  pp
+}
+*/
 
 void
 Mixture::set_components(const std::vector<int> &pointers,
@@ -572,8 +579,8 @@ Mixture::normalize_weights()
 double
 Mixture::compute_likelihood(const FeatureVec &f)
 {
-  for (int i=0; i<
-  
+  m_pool->cache_likelihood(f, m_pointers);
+  return compute_likelihood();
 }
 
 
@@ -581,22 +588,67 @@ Mixture::compute_likelihood(const FeatureVec &f)
 double
 Mixture::compute_log_likelihood(const FeatureVec &f)
 {
-  
-  
+  m_pool->cache_likelihood(f, m_pointers);
+  return compute_log_likelihood();
+}
+
+
+double
+Mixture::compute_likelihood()
+{
+  double ll = 0;
+  for (int i=0; i< m_pointers.size(); i++) {
+    ll += m_weights[i]*m_pool->get_likelihood(m_pointers[i]);
+  }
+  return ll;
+}
+
+
+
+double
+Mixture::compute_log_likelihood()
+{
+  double ll = 0;
+  for (int i=0; i< m_pointers.size(); i++) {
+    ll += m_weights[i]*m_pool->get_likelihood(m_pointers[i]);
+  }
+  return util::safe_log(ll);
 }
 
 
 void
 Mixture::write(std::ostream &os)
 {
-
+  os << m_pointers.size();
+  for (int w = 0; w < m_pointers.size(); w++) {
+    out << " " << m_pointers[w]
+	<< " " << m_weights[w];
+  }
+  out << std::endl;
 }
 
 
 void
 Mixture::read(const std::istream &is)
 {
+  int num_weights = 0;
+  is >> num_weights;
+  
+  int index;
+  double weight;
+  for (int w = 0; w < num_weights; w++) {
+    is >> index >> weight;
+    add_component(index, weight);
+  }
+  normalize_weights();
+}
 
+
+void
+PDFPool::reset() {
+  m_dim=0;
+  m_pool.clear();
+  m_likelihoods.clear();
 }
 
 
@@ -615,11 +667,19 @@ PDFPool::set_pdf(int pdfindex, PDF &pdf)
 
 
 void
+PDFPool::reset_cache()
+{
+  for (int i=0; i<m_likelihoods.size(); i++)
+    m_likelihoods[i] = -1;
+}
+
+
+void
 PDFPool::cache_likelihood(const FeatureVec &f)
 
 {
-  for (int i=0; i<likelihoods.size(); i++)
-    likelihoods[i] = pool[i].compute_likelihood(f);
+  for (int i=0; i<m_likelihoods.size(); i++)
+    m_likelihoods[i] = pool[i].compute_likelihood(f);
 }
 
 
@@ -627,7 +687,7 @@ void
 PDFPool::cache_likelihood(const FeatureVec &f,
 			  int index)
 {
-  likelihoods[index] = pool[index].compute_likelihood(f);
+  m_likelihoods[index] = pool[index].compute_likelihood(f);
 }
 
 
@@ -636,14 +696,14 @@ PDFPool::cache_likelihood(const FeatureVec &f,
 			  std::vector<int> indices)
 {
   for (int i=0; i<indices.size(); i++)
-    likelihoods[indices[i]] = pool[indices[i]].compute_likelihood(f);
+    m_likelihoods[indices[i]] = pool[indices[i]].compute_likelihood(f);
 }
 
 
 double
 PDFPool::get_likelihood(int index)
 {
-  return likelihoods[i];
+  return m_likelihoods[i];
 }
 
 
@@ -665,30 +725,54 @@ PDFPool::read_gk(const std::string &filename)
 
   // New implementation
   if (type_str == "variable") {
-    for (int i=0; i<m_pool.size(); i++)
-      m_pool[i]->read(in);
-  }
-  // For compliance
-  else {
-    if (type_str == "single_cov") {
-      
+    for (int i=0; i<m_pool.size(); i++) {
+      in >> type_str;
+
+      if (type_str == "diagonal_cov") {
+	m_pool[i]=new DiagonalGaussian(m_dim);
+      }
+      else if (type_str == "full_cov") {
+	m_pool[i]=new FullCovarianceGaussian(m_dim);
+      }
+      else if (type_str == "pcgmm") {
+	m_pool[i]=new PrecisionConstrainedGaussian(m_dim);
+      }
+      else if (cov_str == "scgmm") {
+	m_pool[i]=new SubspaceConstrainedGaussian(m_dim);
+      }
     }
-    else if (type_str == "diagonal_cov") {
-      
-    }
-    else if (type_str == "full_cov") {
-      
-    }
-    else if (type_str == "pcgmm") {
-      
-    }
-    else if (cov_str == "scgmm") {
-      
-    }    
-    else
-      throw std::string("Unknown covariance type");
   }
 
+  // For compliance
+  else {
+    if (type_str == "diagonal_cov") {
+      for (int i=0; i<m_pool.size(); i++) {
+	m_pool[i]=new DiagonalGaussian(m_dim);
+	m_pool[i]->read(in);
+      }
+    }
+    else if (type_str == "full_cov") {
+      for (int i=0; i<m_pool.size(); i++) {
+	m_pool[i]=new FullCovarianceGaussian(m_dim);
+	m_pool[i]->read(in);
+      }      
+    }
+    else if (type_str == "pcgmm") {
+      for (int i=0; i<m_pool.size(); i++) {
+	m_pool[i]=new PrecisionConstrainedGaussian(m_dim);
+	m_pool[i]->read(in);
+      }      
+    }
+    else if (type_str == "scgmm") {
+      for (int i=0; i<m_pool.size(); i++) {
+	m_pool[i]=new SubspaceConstrainedGaussian(m_dim);
+	m_pool[i]->read(in);
+      }            
+    }
+    else
+      throw std::string("Unknown model type\n");
+  }
+  
   if (!in)
     throw ReadError();
 }

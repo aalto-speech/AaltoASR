@@ -7,9 +7,9 @@ typedef LaVectorDouble Vector;
 
 class PDF {
 public:
-
+  virtual ~PDF() {}
   /* The feature dimensionality */
-  int dim() { return m_dim; };
+  int dim() const { return m_dim; };
 
   /* Different training modes */
   enum EstimationMode { ML, MMI };
@@ -22,8 +22,6 @@ public:
   virtual void write(std::ostream &os) const = 0;
   /* Read the parameters of this distribution from the stream is */
   virtual void read(const std::istream &is) = 0;
-  /* Read the parameters of this distribution from an old .gk file */
-  virtual void read_compatibility(const std::istream &is) = 0;
 
   /* Set the current estimation mode */
   void set_estimation_mode(const EstimationMode &m) { m_mode = m; };
@@ -33,7 +31,7 @@ public:
 private:
   EstimationMode m_mode;
   int m_dim;
-}
+};
 
 
 class Gaussian : public PDF {
@@ -75,7 +73,7 @@ public:
   virtual void merge(Gaussian &m);
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
-}
+};
 
 
 class DiagonalAccumulator {
@@ -94,7 +92,7 @@ public:
   Vector mmi_mean;
   Vector ml_cov;
   Vector mmi_cov;
-}
+};
 
 
 class DiagonalGaussian : public Gaussian {
@@ -109,7 +107,6 @@ public:
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
   virtual void read(const std::istream &is);
-  virtual void read_compatibility(const std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -135,7 +132,7 @@ private:
   Vector m_precision;
 
   DiagonalAccumulator *m_accum;
-}
+};
 
 
 class FullCovarianceAccumulator {
@@ -157,7 +154,7 @@ public:
   Matrix ml_cov;
   Matrix mmi_cov;
   Matrix outer;
-}
+};
 
 
 class FullCovarianceGaussian : public Gaussian {
@@ -171,7 +168,6 @@ public:
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
   virtual void read(const std::istream &is);
-  virtual void read_compatibility(const std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -194,7 +190,18 @@ private:
   Matrix m_covariance;
 
   FullCovarianceAccumulator *m_accum;
-}
+};
+
+
+class PrecisionSubspace {
+public:
+  PrecisionSubspace(int dim);
+  ~PrecisionSubspace();
+  void set_dim(int dim) { m_dim = dim; };
+  int dim() { return m_dim; };
+private:
+  int m_dim;
+};
 
 
 class PrecisionConstrainedGaussian : public Gaussian {
@@ -208,7 +215,6 @@ public:
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
   virtual void read(const std::istream &is);
-  virtual void read_compatibility(const std::istream &is);  
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -216,8 +222,8 @@ public:
   virtual void accumulate_mmi_denominator(std::vector<double> priors,
 					  std::vector<const FeatureVec*> const features);
   virtual void estimate_parameters();
-  virtual Vector &get_mean();
-  virtual Matrix &get_covariance();
+  virtual void get_mean(Vector &mean) const;
+  virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(Vector &mean);
   virtual void set_covariance(Matrix &covariance);
 
@@ -231,8 +237,20 @@ private:
   double m_determinant;
   Vector m_mean;
   Vector m_precision_coeffs;
-  //  PrecisionSubspace &m_ps;
-}
+  PrecisionSubspace m_ps;
+};
+
+
+class ExponentialSubspace {
+public:
+  ExponentialSubspace(int dim);
+  ~ExponentialSubspace();
+  void set_dim(int dim) { m_dim = dim; };
+  int dim() { return m_dim; };
+private:
+  int m_dim;
+};
+
 
 
 class SubspaceConstrainedGaussian : public Gaussian {
@@ -246,7 +264,6 @@ public:
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
   virtual void read(const std::istream &is);
-  virtual void read_compatibility(const std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -254,8 +271,8 @@ public:
   virtual void accumulate_mmi_denominator(std::vector<double> priors,
 					  std::vector<const FeatureVec*> const features);
   virtual void estimate_parameters();
-  virtual Vector &get_mean();
-  virtual Matrix &get_covariance;
+  virtual void get_mean(Vector &mean) const;
+  virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(Vector &mean);
   virtual void set_covariance(Matrix &covariance);
 
@@ -267,16 +284,63 @@ public:
 
 private:
   Vector m_subspace_coeffs;
-  ExponentialSubspace &m_es;
+  ExponentialSubspace m_es;
+};
+
+
+class PDFPool {
+public:
+
+  PDFPool() { m_dim=0; };
+  PDFPool(int dim) { m_dim=dim; };
+  ~PDFPool();
+  /* The dimensionality of the distributions in this pool */
+  int dim() const { return m_dim; };
+  /* The dimensionality of the distributions in this pool */
+  int size() const { return m_pool.size(); };
+  /* Reset everything */
+  void reset() const;
+
+  /* Get the pdf from the position index */
+  PDF* get_pdf(int index);
+  /* Set the pdf in the position index */
+  void set_pdf(int index, PDF *pdf);
+
+  /* Read the distributions from a .gk -file */
+  void read_gk(const std::string &filename);
+  /* Write the distributions to a .gk -file */
+  void write_gk(const std::string &filename) const;
+
+  /* Reset the cache */
+  void reset_cache();
+  /* Compute all likelihoods to the cache */
+  void cache_likelihood(const FeatureVec &f);
+  /* Compute likelihood of one pdf to the cache */
+  void cache_likelihood(const FeatureVec &f, int index);
+  /* Compute likelihoods of pdfs given in indices to the cache */
+  void cache_likelihood(const FeatureVec &f,
+			const std::vector<int> &indices);
+  /* Instant computation of pdf at position index */
+  double compute_likelihood(const FeatureVec &f, int index);
+  /* Get the likelihood from the cache */
+  inline double get_likelihood(int index) const;
+  
+private:
+  std::vector<PDF*> m_pool;
+  std::vector<double> m_likelihoods;
+  int m_dim;
 };
 
 
 class Mixture : public PDF {
 public:
   // Mixture-specific
+  Mixture();
   Mixture(PDFPool &pool);
   ~Mixture();
   void reset();
+    /* Set the distribution pool */
+  void set_pool(PDFPool &pool);
   /* Set the mixture components, clear existing mixture */
   void set_components(const std::vector<int> &pointers,
 		      const std::vector<double> &weights);
@@ -288,53 +352,25 @@ public:
   void add_component(int pool_index, double weight);
   /* Normalize the weights to have a sum of 1 */
   void normalize_weights();
+  /* Compute the likelihood from cached base function likelihoods */
+  double compute_likelihood() const;
+  /* Compute the log likelihood from cached base function likelihoods */
+  double compute_log_likelihood() const;
+
+
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f);
-  virtual double compute_log_likelihood(const FeatureVec &f);
-  virtual void write(std::ostream &os);
+  /* Compute the likelihood in-place, not from cache */
+  virtual double compute_likelihood(const FeatureVec &f) const;
+  /* Compute the likelihood in-place, not from cache */
+  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual void write(std::ostream &os) const;
   virtual void read(const std::istream &is);
-  virtual void read_compatibility(const std::istream &is);
 
 private:
   std::vector<int> m_pointers;
   std::vector<double> m_weights;
-  PDFPool &m_pp;
-}
+  PDFPool *m_pool;
+};
 
 
-class PDFPool {
-public:
-
-  PDFPool(int dim) { m_dim=dim; };
-  ~PDFPool();
-
-  /* The dimensionality of the distributions in this pool */
-  int dim() { return m_dim; };
-
-  /* Get the pdf from the position index */
-  PDF* get_pdf(int index);
-  /* Set the pdf in the position index */
-  void set_pdf(int index, PDF *pdf);
-
-  /* Read the distributions from a .gk -file */
-  void read_gk(const std::string &filename);
-  /* Write the distributions to a .gk -file */
-  void write_gk(const std::string &filename);
-
-  /* Compute all likelihoods to the cache */
-  void cache_likelihood(const FeatureVec &f);
-  /* Compute likelihood of one pdf to the cache */
-  void cache_likelihood(const FeatureVec &f, int index);
-  /* Compute likelihoods of pdfs given in indices to the cache */
-  void cache_likelihood(const FeatureVec &f, std::vector<int> indices);
-  /* Instant computation of pdf at position index */
-  double compute_likelihood(const FeatureVec &f, int index);
-  /* Get the likelihood from the cache */
-  double get_likelihood(int index);
-  
-private:
-  std::vector<PDF*> m_pool;
-  std::vector<double> m_likelihoods;
-  int m_dim;
-}

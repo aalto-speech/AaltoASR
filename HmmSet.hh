@@ -9,14 +9,14 @@
 #include "FeatureModules.hh"
 #include "Distributions.hh"
 
-#include "mtl/mtl.h"
-#include "mtl/blais.h"
-
 
 //
 // HmmState
 //
-struct HmmState {
+class HmmState {
+public:
+  HmmState() {};
+  HmmState(PDFPool &pool) : emission_pdf(pool) { };
   Mixture emission_pdf;
 };
 
@@ -68,6 +68,7 @@ public:
 
   void reset();
   void copy(const HmmSet &hmm_set);
+  int dim() const;
 
   Hmm &new_hmm(const std::string &label);
   Hmm &add_hmm(const std::string &label, int num_states);
@@ -107,7 +108,6 @@ public:
   
   // These work only for scaled probs...
   std::vector<float> obs_log_probs;
-  std::vector<float> obs_pdf_likelihoods;
 
   // Exceptions
   struct DuplicateHmm : public std::exception {
@@ -145,24 +145,16 @@ private:
    * Undefined log-probabilities are marked with positive values.
    */
   std::vector<float> m_state_probs;
-
-  /**
-   * Undefined distances are marked with negative values.
-   */
-  std::vector<float> m_pdf_likelihoods;
-
-
   std::vector<int> m_valid_stateprobs;
-  std::vector<int> m_valid_pdf_likelihoods;
-  float m_viterbi_scale_coeff;
 
+  PDFPool m_pool;
 };
 
 
 int
 HmmSet::dim() const
 {
-  return m_dim;
+  return m_pool.dim();
 }
 
 

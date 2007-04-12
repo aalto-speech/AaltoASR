@@ -21,7 +21,6 @@ Hmm::resize(int states)
 }
 
 HmmSet::HmmSet()
-  : m_dim(0)
 {
 }
 
@@ -35,33 +34,21 @@ HmmSet::HmmSet(const HmmSet &hmm_set)
 void
 HmmSet::copy(const HmmSet &hmm_set)
 {
-  obs_log_probs = hmm_set.obs_log_probs;
-  obs_kernel_likelihoods = hmm_set.obs_kernel_likelihoods;
-  m_dim = hmm_set.m_dim;
-  m_cov_type = hmm_set.m_cov_type;
   m_hmm_map = hmm_set.m_hmm_map;
   m_transitions = hmm_set.m_transitions;
   m_states = hmm_set.m_states;
   m_hmms = hmm_set.m_hmms;
   m_state_probs = hmm_set.m_state_probs;
-  m_kernel_likelihoods = hmm_set.m_kernel_likelihoods;
-  m_valid_stateprobs = hmm_set.m_valid_stateprobs;
-  m_valid_kernel_likelihoods = hmm_set.m_valid_kernel_likelihoods;
-  m_viterbi_scale_coeff = hmm_set.m_viterbi_scale_coeff;
 }
 
 
 void
 HmmSet::reset()
 {
-  for (int k = 0; k < num_kernels(); k++) {
-    std::fill(m_kernels[k].center.begin(), m_kernels[k].center.end(), 0);
-    m_kernels[k].cov.reset();
-  }
+  m_pool.reset();
 
   for (int s = 0; s < num_states(); s++) {
-    for (int w = 0; w < (int)m_states[s].weights.size(); w++)
-      m_states[s].weights[w].weight = 0;
+    m_states[s].emission_pdf.reset();
   }
 
   for (int t = 0; t < num_transitions(); t++)
@@ -72,7 +59,10 @@ HmmSet::reset()
 void
 HmmSet::reserve_states(int states)
 {
+  
   m_states.resize(states);
+  for (int i=0; i<states; i++)
+    m_states[i].emission_pdf.set_pool(m_pool);
 }
 
 
@@ -173,12 +163,7 @@ HmmSet::read_mc(const std::string &filename)
 
   for (int s = 0; s < states; s++) {
     HmmState &state = m_states[s];
-    int weights = 0;
-    in >> weights;
-
-    state.weights.resize(weights);
-    for (int w = 0; w < weights; w++)
-      in >> state.weights[w].kernel >> state.weights[w].weight;
+    state.emission_pdf.read(in);
   }
 
   if (!in)
@@ -271,15 +256,8 @@ HmmSet::write_mc(const std::string &filename)
 
   out << m_states.size() << std::endl;
   
-  // Format: NUM_WEIGHTS  KERNEL WEIGHT  KERNEL WEIGHT...
   for (int s = 0; s < (int)m_states.size(); s++) {
-    HmmState &state = m_states[s];
-    out << state.weights.size();
-    for (int w = 0; w < (int)state.weights.size(); w++) {
-      out << " " << m_states[s].weights[w].kernel 
-	  << " " << m_states[s].weights[w].weight;
-    }
-    out << std::endl;
+    m_states[s].emission_pdf.write(out);
   }
 }
 
@@ -344,26 +322,14 @@ HmmSet::compute_observation_log_probs(const FeatureVec &feature)
 {
   double sum = 0;
 
-  if (pcgmm.basis_dim() > 0)
-    pcgmm.compute_all_likelihoods(feature, obs_kernel_likelihoods);
-  else if (scgmm.basis_dim() > 0)
-    scgmm.compute_all_likelihoods(feature, obs_kernel_likelihoods);
-  else {
-    obs_kernel_likelihoods.resize(num_kernels());
-    for (int k = 0; k < num_kernels(); k++) {
-      obs_kernel_likelihoods[k] = compute_kernel_likelihood(k, feature);
-    }
-  }
+  // Compute all basis pdf likelihoods to the cache
+  m_pool.cache_likelihood(feature);
 
+  
   obs_log_probs.resize(num_states());
   for (int s = 0; s < num_states(); s++) {
     HmmState &state = m_states[s];
-
-    obs_log_probs[s] = 0;
-    for (int w = 0; w < (int)state.weights.size(); w++) {
-      obs_log_probs[s] += (double)state.weights[w].weight * 
-	obs_kernel_likelihoods[state.weights[w].kernel];
-    }
+    obs_log_probs[s] = state.emission_pdf.compute_likelihood(feature);
     sum += obs_log_probs[s];
   }
 
@@ -380,16 +346,11 @@ HmmSet::reset_state_probs()
 {
   if (m_state_probs.size()==0) { // First call to the func
     m_state_probs.resize(m_states.size(),-1.0);
-    m_kernel_likelihoods.resize(m_kernels.size(),-1.0);    
   } 
   // Mark all values uncalculated
   while (!m_valid_stateprobs.empty()) {
     m_state_probs[m_valid_stateprobs.back()]=-1.0;
     m_valid_stateprobs.pop_back();
-  }
-  while (!m_valid_kernel_likelihoods.empty()) {
-    m_kernel_likelihoods[m_valid_kernel_likelihoods.back()]=-1.0;
-    m_valid_kernel_likelihoods.pop_back();
   }
 }
 
@@ -397,7 +358,6 @@ HmmSet::reset_state_probs()
 float 
 HmmSet::state_prob(const int s, const FeatureVec &feature) 
 {
-  int k;
   double temp;
   
   // Is there a valid value ?
@@ -406,17 +366,8 @@ HmmSet::state_prob(const int s, const FeatureVec &feature)
 
   // Calculate the valid value
   HmmState &state = m_states[s];
-  temp = 0;
-  for (int w = 0; w < (int)state.weights.size(); w++) {
-    k = state.weights[w].kernel;
-    // Is there a valid value?
-    if (m_pdf_likelihoods[k] < 0)
-    {
-      m_pdf_likelihoods[k] = compute_kernel_likelihood(k, feature);
-      m_valid_kernel_likelihoods.push_back(k);
-    }
-    temp += state.weights[w].weight * m_kernel_likelihoods[k];
-  }
+  // FIXME should this be done more efficiently?
+  temp=state.emission_pdf.compute_likelihood(feature);
 
   if (temp < MIN_STATE_PROB)
     temp = MIN_STATE_PROB;
