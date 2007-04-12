@@ -182,7 +182,6 @@ main(int argc, char *argv[])
       ('p', "ph=FILE", "arg", "", "HMM definitions")
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
-      ('O', "ophn", "", "", "use output phns for adaptation")
       ('R', "raw-input", "", "", "raw audio input")
       ('v', "vtln=MODULE", "arg must", "", "VTLN module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
@@ -193,6 +192,8 @@ main(int argc, char *argv[])
       ('\0', "grid-size=INT", "arg", "21", "warping grid size (default: 21/5)")
       ('\0', "grid-rad=FLOAT", "arg", "0.1", "radius of warping grid (default: 0.1/0.03)")
       ('\0', "relative", "", "", "relative warping grid (and smaller grid defaults)")
+      ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
+      ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -219,8 +220,13 @@ main(int argc, char *argv[])
     if (config["savesum"].specified)
       save_summary_file = config["savesum"].get_str();
 
+    if (config["batch"].specified^config["bindex"].specified)
+      throw std::string("Must give both --batch and --bindex");
+    
     // Read recipe file
-    recipe.read(io::Stream(config["recipe"].get_str()));
+    recipe.read(io::Stream(config["recipe"].get_str()),
+                config["batch"].get_int(), config["bindex"].get_int(),
+                true);
 
     vtln_module = dynamic_cast< VtlnModule* >
       (fea_gen.module(config["vtln"].get_str()));
@@ -266,7 +272,7 @@ main(int argc, char *argv[])
       // Open the audio and phn files from the given list.
       recipe.infos[f].init_phn_files((config["snl"].specified?NULL:&model),
                                      config["rsamp"].specified,
-                                     config["ophn"].specified, &fea_gen,
+                                     true, &fea_gen,
                                      config["raw-input"].specified,
                                      &phn_reader);
       if (recipe.infos[f].speaker_id.size() == 0)
