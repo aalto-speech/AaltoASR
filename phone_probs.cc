@@ -69,6 +69,8 @@ main(int argc, char *argv[])
       ('a', "afname", "", "", "use audio file name")
       ('n', "no-overwrite", "", "", "prevent overwriting existing files")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
+      ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
+      ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -118,7 +120,11 @@ main(int argc, char *argv[])
 
     // Read recipe file
     Recipe recipe;
-    recipe.read(io::Stream(config["recipe"].get_str()));
+    if (config["batch"].specified^config["bindex"].specified)
+      throw std::string("Must give both --batch and --bindex");
+    recipe.read(io::Stream(config["recipe"].get_str()),
+                config["batch"].get_int(), config["bindex"].get_int(),
+                false);
 
     // Handle each file in the recipe
     for (int recipe_index = 0; recipe_index < (int)recipe.infos.size(); 
@@ -132,8 +138,8 @@ main(int argc, char *argv[])
       }
 
       out_file.clear();
-      // Default: Use recipe filename for output (normally for phn output..)
-      out_file = out_dir + recipe.infos[recipe_index].phn_out_path;
+      // Default: Use recipe filename for output
+      out_file = out_dir + recipe.infos[recipe_index].lna_path;
 
       if (config["afname"].specified)
       {

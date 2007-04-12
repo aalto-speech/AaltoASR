@@ -27,7 +27,7 @@ public:
   /** Sets frame limits for the segmentation. The frame numbers are
    * referenced as they are for \ref FeatureGenerator.
    * \param first_frame Frame number for the first frame
-   * \param last_frame Frame number for the last frame (excluded)
+   * \param last_frame  Frame number for the last frame (excluded)
    */
   virtual void set_frame_limits(int first_frame, int last_frame) = 0;
   
@@ -42,8 +42,10 @@ public:
   /** Computes the state probability statistics for the next frame. */
   virtual void next_frame(void) = 0;
 
-  /** Resets the segmentation to the first frame.
-   * init_utterance_segmentation needs to be called again.
+  /** Resets the segmentation to the first frame. If the probabilities
+   * may have changed from previous call to \ref init_utterance_segmentation
+   * (e.g. features have changed), the segmentation needs to be initialized
+   * again.
    */
   virtual void reset(void) = 0;
 

@@ -389,7 +389,7 @@ main(int argc, char *argv[])
     gen.load_configuration(io::Stream(config["config"].get_str()));
 
     // Read recipe file
-    recipe.read(io::Stream(config["recipe"].get_str()));
+    recipe.read(io::Stream(config["recipe"].get_str()), 0, 0, false);
 
     // Load state configuration
     load_phoneme_state_info(config["bind"].get_str(), pho_info);
@@ -414,8 +414,8 @@ main(int argc, char *argv[])
     for (int fi = 0; fi < (int)recipe.infos.size(); fi++)
     {
       std::string phn_path = (config["ophn"].specified?
-                              recipe.infos[fi].phn_out_path:
-                              recipe.infos[fi].phn_path);
+                              recipe.infos[fi].alignment_path:
+                              recipe.infos[fi].transcript_path);
 
       if (info > 0)
         printf("file %d/%d '%s' '%s'\n", fi+1, (int)recipe.infos.size(),
