@@ -103,9 +103,9 @@ public:
   virtual void reset(int dim);
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f);
-  virtual double compute_log_likelihood(const FeatureVec &f);
-  virtual void write(std::ostream &os);
+  virtual double compute_likelihood(const FeatureVec &f) const;
+  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
 
   // Gaussian-specific
@@ -167,9 +167,9 @@ public:
   virtual void reset(int dim);
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f);
-  virtual double compute_log_likelihood(const FeatureVec &f);
-  virtual void write(std::ostream &os);
+  virtual double compute_likelihood(const FeatureVec &f) const;
+  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
 
   // Gaussian-specific
@@ -199,10 +199,10 @@ private:
 
 class PrecisionSubspace {
 public:
-  PrecisionSubspace(int dim);
+  PrecisionSubspace();
   ~PrecisionSubspace();
-  void set_dim(int dim) { m_dim = dim; };
-  int dim() const { return m_dim; };
+  void set_dim(int dim);
+  int dim() const;
 private:
   int m_dim;
 };
@@ -211,13 +211,14 @@ private:
 class PrecisionConstrainedGaussian : public Gaussian {
 public:
   PrecisionConstrainedGaussian(int dim);
+  PrecisionConstrainedGaussian(const PrecisionConstrainedGaussian& g);
   ~PrecisionConstrainedGaussian();
   virtual void reset(int dim);
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f);
-  virtual double compute_log_likelihood(const FeatureVec &f);
-  virtual void write(std::ostream &os);
+  virtual double compute_likelihood(const FeatureVec &f) const;
+  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
 
   // Gaussian-specific
@@ -228,8 +229,8 @@ public:
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
-  virtual void set_mean(Vector &mean);
-  virtual void set_covariance(Matrix &covariance);
+  virtual void set_mean(const Vector &mean);
+  virtual void set_covariance(const Matrix &covariance);
 
   // PCGMM-specific
   /* Get the coefficients for the subspace constrained precision matrix */
@@ -247,10 +248,10 @@ private:
 
 class ExponentialSubspace {
 public:
-  ExponentialSubspace(int dim);
+  ExponentialSubspace();
   ~ExponentialSubspace();
-  void set_dim(int dim) { m_dim = dim; }
-  int dim() const { return m_dim; }
+  void set_dim(int dim);
+  int dim() const;
 private:
   int m_dim;
 };
@@ -260,13 +261,14 @@ private:
 class SubspaceConstrainedGaussian : public Gaussian {
 public:
   SubspaceConstrainedGaussian(int dim);
+  SubspaceConstrainedGaussian(const SubspaceConstrainedGaussian &g);
   ~SubspaceConstrainedGaussian();
   virtual void reset(int dim);
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f);
-  virtual double compute_log_likelihood(const FeatureVec &f);
-  virtual void write(std::ostream &os);
+  virtual double compute_likelihood(const FeatureVec &f) const;
+  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
 
   // Gaussian-specific
@@ -277,8 +279,8 @@ public:
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
-  virtual void set_mean(Vector &mean);
-  virtual void set_covariance(Matrix &covariance);
+  virtual void set_mean(const Vector &mean);
+  virtual void set_covariance(const Matrix &covariance);
 
   // SCGMM-specific
   /* Get the coefficients for the subspace constrained exponential parameters */

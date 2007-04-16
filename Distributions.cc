@@ -142,12 +142,13 @@ DiagonalGaussian::reset(int dim)
   m_covariance.resize(dim);
   m_precision.resize(dim);
   m_mean=0; m_covariance=0; m_precision=0;
+  m_dim=dim;
 }
 
 
 // FIXME: NOT TRIED
 double
-DiagonalGaussian::compute_likelihood(const FeatureVec &f)
+DiagonalGaussian::compute_likelihood(const FeatureVec &f) const
 {
   return exp(compute_log_likelihood(f));
 }
@@ -155,12 +156,14 @@ DiagonalGaussian::compute_likelihood(const FeatureVec &f)
 
 // FIXME: NOT TRIED
 double
-DiagonalGaussian::compute_log_likelihood(const FeatureVec &f)
+DiagonalGaussian::compute_log_likelihood(const FeatureVec &f) const
 {
   double ll=0;
   // FIXME!
   //  Vector diff(f);
   Vector diff(f.dim());
+  for (int i=0; i<dim(); i++)
+    diff(i)=f[i];
   Blas_Add_Mult(diff, -1, m_mean);
   for (int i=0; i<dim(); i++)
     ll += diff(i)*diff(i)*m_precision(i);
@@ -173,7 +176,7 @@ DiagonalGaussian::compute_log_likelihood(const FeatureVec &f)
 
 // FIXME: NOT TRIED
 void
-DiagonalGaussian::write(std::ostream &os)
+DiagonalGaussian::write(std::ostream &os) const
 {
   os << "diag ";
   for (int i=0; i<dim(); i++)
@@ -188,19 +191,41 @@ DiagonalGaussian::write(std::ostream &os)
 void
 DiagonalGaussian::read(std::istream &is)
 {
-  std::string type;
-  is >> type;
-  if (type != "diag")
-    throw std::string("Error reading DiagonalGaussian parameters from a stream\n");
-
+  /*
   std::string line;
   getline(is, line);
   str::chomp(&line);
+
+  std::vector<std::string> fields;
+  str::split(&line, " ", false, &fields);
   
+  int pos=0;
+  std::string type("diagonal_cov");
+  if (fields[0] == type)
+    pos++;
+
+  bool ok;
+  for (int i=0; i<dim(); i++) {
+    m_mean(i) = str::str2float(&(fields[pos]),&ok);
+    pos++;
+  }
+  for (int i=0; i<dim()-1; i++) {
+    m_covariance(i) = str::str2float(&(fields[pos]),&ok);
+    pos++;
+  }
+  */
+
   for (int i=0; i<dim(); i++)
     is >> m_mean(i);
-  for (int i=0; i<dim()-1; i++)
+  for (int i=0; i<dim(); i++) {
     is >> m_covariance(i);
+    m_precision(i) = 1/m_covariance(i);
+  }
+  m_constant=1;
+  for (int i=0; i<dim(); i++)
+    m_constant *= m_covariance(i);
+  m_constant = 1/sqrt(m_constant);
+  m_constant = log(m_constant);
 }
 
 
@@ -355,7 +380,7 @@ FullCovarianceGaussian::reset(int dim)
 
 // FIXME: NOT TRIED
 double
-FullCovarianceGaussian::compute_likelihood(const FeatureVec &f)
+FullCovarianceGaussian::compute_likelihood(const FeatureVec &f) const
 {
   return exp(compute_log_likelihood(f));
 }
@@ -363,7 +388,7 @@ FullCovarianceGaussian::compute_likelihood(const FeatureVec &f)
 
 // FIXME: NOT TRIED
 double
-FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f)
+FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f) const
 {
   double ll=0;
 
@@ -384,7 +409,7 @@ FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f)
 
 // FIXME: NOT TRIED
 void
-FullCovarianceGaussian::write(std::ostream &os)
+FullCovarianceGaussian::write(std::ostream &os) const
 {
   os << "full ";
   for (int i=0; i<dim(); i++)
@@ -506,6 +531,281 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance)
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
   m_covariance.copy(covariance);
+}
+
+
+PrecisionSubspace::PrecisionSubspace()
+{
+}
+
+
+PrecisionSubspace::~PrecisionSubspace()
+{
+}
+
+
+void
+PrecisionSubspace::set_dim(int dim)
+{
+  m_dim=dim;
+}
+
+
+int
+PrecisionSubspace::dim() const
+{
+  return m_dim;
+}
+
+
+// FIXME: NOT TRIED
+PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(int dim)
+{
+}
+
+
+// FIXME: NOT TRIED
+PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(const PrecisionConstrainedGaussian &g)
+{
+}
+
+
+// FIXME: NOT TRIED
+PrecisionConstrainedGaussian::~PrecisionConstrainedGaussian()
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::reset(int dim)
+{
+}
+
+
+// FIXME: NOT TRIED
+double
+PrecisionConstrainedGaussian::compute_likelihood(const FeatureVec &f) const
+{
+  return 0;
+}
+
+
+// FIXME: NOT TRIED
+double
+PrecisionConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
+{
+  return 0;
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::write(std::ostream &os) const
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::read(std::istream &is)
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::start_accumulating()
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::accumulate_ml(double prior,
+				      const FeatureVec &f)
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::accumulate_mmi_denominator(std::vector<double> priors,
+						   std::vector<const FeatureVec*> const features)
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::estimate_parameters()
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::get_mean(Vector &mean) const
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::get_covariance(Matrix &covariance) const
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::set_mean(const Vector &mean)
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance)
+{
+}
+
+
+ExponentialSubspace::ExponentialSubspace()
+{
+}
+
+
+ExponentialSubspace::~ExponentialSubspace()
+{
+}
+
+
+void
+ExponentialSubspace::set_dim(int dim)
+{
+  m_dim=dim;
+}
+
+
+int
+ExponentialSubspace::dim() const
+{
+  return m_dim;
+}
+
+
+
+// FIXME: NOT TRIED
+SubspaceConstrainedGaussian::SubspaceConstrainedGaussian(int dim)
+{
+}
+
+
+// FIXME: NOT TRIED
+SubspaceConstrainedGaussian::SubspaceConstrainedGaussian(const SubspaceConstrainedGaussian &g)
+{
+}
+
+
+// FIXME: NOT TRIED
+SubspaceConstrainedGaussian::~SubspaceConstrainedGaussian()
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::reset(int dim)
+{
+}
+
+
+// FIXME: NOT TRIED
+double
+SubspaceConstrainedGaussian::compute_likelihood(const FeatureVec &f) const
+{
+  return 0;
+}
+
+
+// FIXME: NOT TRIED
+double
+SubspaceConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
+{
+  return 0;
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::write(std::ostream &os) const
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::read(std::istream &is)
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::start_accumulating()
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::accumulate_ml(double prior,
+				      const FeatureVec &f)
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::accumulate_mmi_denominator(std::vector<double> priors,
+						   std::vector<const FeatureVec*> const features)
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::estimate_parameters()
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::get_mean(Vector &mean) const
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::get_covariance(Matrix &covariance) const
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::set_mean(const Vector &mean)
+{
+}
+
+
+// FIXME: NOT TRIED
+void
+SubspaceConstrainedGaussian::set_covariance(const Matrix &covariance)
+{
 }
 
 
@@ -746,16 +1046,16 @@ PDFPool::read_gk(const std::string &filename)
       in >> type_str;
 
       if (type_str == "diagonal_cov") {
-	//	m_pool[i]=new DiagonalGaussian(m_dim);
+	m_pool[i]=new DiagonalGaussian(m_dim);
       }
       else if (type_str == "full_cov") {
-	//	m_pool[i]=new FullCovarianceGaussian(m_dim);
+	m_pool[i]=new FullCovarianceGaussian(m_dim);
       }
       else if (type_str == "pcgmm") {
-	//	m_pool[i]=new PrecisionConstrainedGaussian(m_dim);
+	m_pool[i]=new PrecisionConstrainedGaussian(m_dim);
       }
       else if (type_str == "scgmm") {
-	//	m_pool[i]=new SubspaceConstrainedGaussian(m_dim);
+	m_pool[i]=new SubspaceConstrainedGaussian(m_dim);
       }
     }
   }
@@ -764,34 +1064,26 @@ PDFPool::read_gk(const std::string &filename)
   else {
     if (type_str == "diagonal_cov") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
-	/*
 	m_pool[i]=new DiagonalGaussian(m_dim);
 	m_pool[i]->read(in);
-	*/
       }
     }
     else if (type_str == "full_cov") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
-	/*
 	m_pool[i]=new FullCovarianceGaussian(m_dim);
 	m_pool[i]->read(in);
-	*/
       }      
     }
     else if (type_str == "pcgmm") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
-	/* FIXME: needs implementation
 	m_pool[i]=new PrecisionConstrainedGaussian(m_dim);
 	m_pool[i]->read(in);
-	*/ 
       }      
     }
     else if (type_str == "scgmm") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
-	/* FIXME: needs implementation
 	m_pool[i]=new SubspaceConstrainedGaussian(m_dim);
 	m_pool[i]->read(in);
-	*/
       }            
     }
     else
