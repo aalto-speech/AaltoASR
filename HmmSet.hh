@@ -68,7 +68,7 @@ public:
 
   void reset();
   void copy(const HmmSet &hmm_set);
-  int dim() const;
+  int dim() const { return m_pool.dim(); }
 
   Hmm &new_hmm(const std::string &label);
   Hmm &add_hmm(const std::string &label, int num_states);
@@ -149,13 +149,6 @@ private:
 
   PDFPool m_pool;
 };
-
-
-int
-HmmSet::dim() const
-{
-  return m_pool.dim();
-}
 
 
 int

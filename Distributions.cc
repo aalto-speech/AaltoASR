@@ -511,6 +511,11 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance)
 }
 
 
+Mixture::Mixture()
+{
+}
+
+
 Mixture::Mixture(PDFPool *pool)
 {
   m_pool=pool;
@@ -529,13 +534,13 @@ Mixture::reset()
   m_pointers.resize(0);
 }
 
-/*
+
 void
-Mixture::set_pool()
+Mixture::set_pool(PDFPool *pool)
 {
-  pp
+  m_pool=pool;
 }
-*/
+
 
 void
 Mixture::set_components(const std::vector<int> &pointers,
@@ -656,6 +661,12 @@ Mixture::read(std::istream &is)
 }
 
 
+PDFPool::~PDFPool() {
+  for (unsigned int i=0; i<m_pool.size(); i++)
+    delete m_pool[i];
+}
+
+
 void
 PDFPool::reset() {
   m_dim=0;
@@ -673,8 +684,7 @@ PDFPool::get_pdf(int index)
 
 void
 PDFPool::set_pdf(int pdfindex, PDF *pdf)
-{
-  
+{  
 }
 
 

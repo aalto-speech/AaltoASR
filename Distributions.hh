@@ -1,3 +1,6 @@
+#ifndef DISTRIBUTIONS_HH
+#define DISTRIBUTIONS_HH
+
 #include "gmd.h"
 #include "lavd.h"
 #include "FeatureBuffer.hh"
@@ -10,7 +13,7 @@ class PDF {
 public:
   virtual ~PDF() {}
   /* The feature dimensionality */
-  int dim() const { return m_dim; };
+  int dim() const { return m_dim; }
 
   /* Different training modes */
   enum EstimationMode { ML, MMI };
@@ -201,7 +204,7 @@ public:
   PrecisionSubspace(int dim);
   ~PrecisionSubspace();
   void set_dim(int dim) { m_dim = dim; };
-  int dim() { return m_dim; };
+  int dim() const { return m_dim; };
 private:
   int m_dim;
 };
@@ -248,8 +251,8 @@ class ExponentialSubspace {
 public:
   ExponentialSubspace(int dim);
   ~ExponentialSubspace();
-  void set_dim(int dim) { m_dim = dim; };
-  int dim() { return m_dim; };
+  void set_dim(int dim) { m_dim = dim; }
+  int dim() const { return m_dim; }
 private:
   int m_dim;
 };
@@ -298,7 +301,7 @@ public:
   PDFPool(int dim) { m_dim=dim; };
   ~PDFPool();
   /* The dimensionality of the distributions in this pool */
-  int dim() const { return m_dim; };
+  int dim() const { return m_dim; }
   /* The dimensionality of the distributions in this pool */
   int size() const { return m_pool.size(); };
   /* Reset everything */
@@ -343,8 +346,7 @@ public:
   ~Mixture();
   int size() { return m_pointers.size(); };
   void reset();
-    /* Set the distribution pool */
-  void set_pool(PDFPool &pool);
+  void set_pool(PDFPool *pool);
   /* Set the mixture components, clear existing mixture */
   void set_components(const std::vector<int> &pointers,
 		      const std::vector<double> &weights);
@@ -378,3 +380,4 @@ private:
 };
 
 
+#endif /* HMMSET_HH */

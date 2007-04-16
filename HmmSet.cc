@@ -33,6 +33,7 @@ HmmSet::HmmSet(const HmmSet &hmm_set)
 void
 HmmSet::copy(const HmmSet &hmm_set)
 {
+  m_pool = hmm_set.m_pool;
   m_hmm_map = hmm_set.m_hmm_map;
   m_transitions = hmm_set.m_transitions;
   m_states = hmm_set.m_states;
@@ -61,7 +62,7 @@ HmmSet::reserve_states(int states)
   
   m_states.resize(states);
   for (int i=0; i<states; i++)
-    m_states[i].emission_pdf.set_pool(m_pool);
+    m_states[i].emission_pdf.set_pool(&m_pool);
 }
 
 
@@ -242,9 +243,9 @@ HmmSet::read_ph(const std::string &filename)
 void
 HmmSet::read_all(const std::string &base)
 {
-  read_gk(base + ".gk");
   read_mc(base + ".mc");
   read_ph(base + ".ph");
+  m_pool.read_gk(base + ".gk");
 }
 
 
@@ -310,9 +311,9 @@ HmmSet::write_ph(const std::string &filename)
 void
 HmmSet::write_all(const std::string &base)
 {
-  write_gk(base + ".gk");
   write_mc(base + ".mc");
   write_ph(base + ".ph");
+  m_pool.write_gk(base + ".gk");
 }
 
 
