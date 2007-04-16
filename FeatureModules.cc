@@ -1415,7 +1415,7 @@ void
 VtlnModule::create_all_pass_blin_transform(void)
 {
   std::vector<double> q1, q, qn;
-  MatrixD blin_tr(m_dim, m_dim);
+  Matrix blin_tr(m_dim, m_dim);
   double alpha = m_warp_factor-1;
   double temp;
   int i, j, k;
@@ -1458,7 +1458,7 @@ VtlnModule::create_all_pass_slapt_transform(void)
 {
   std::vector<double> q1, q, qn, f1, cur_f, fn;
   int cur_f_center;
-  MatrixD slapt_tr(m_dim, m_dim);
+  Matrix slapt_tr(m_dim, m_dim);
   int slapt_order = (int)m_slapt_params.size();
   int i, j, k, len;
   double cur_m = 1;
@@ -1564,11 +1564,11 @@ VtlnModule::create_all_pass_slapt_transform(void)
 }
 
 void
-VtlnModule::set_all_pass_transform(MatrixD &trmat)
+VtlnModule::set_all_pass_transform(Matrix &trmat)
 {
-  MatrixD dct(m_dim, m_dim);
-  MatrixD final(m_dim, m_dim);
-  MatrixD temp_m(m_dim, m_dim);
+  Matrix dct(m_dim, m_dim);
+  Matrix final(m_dim, m_dim);
+  Matrix temp_m(m_dim, m_dim);
   int i, j;
   
   // Make DCT matrix
@@ -1577,8 +1577,7 @@ VtlnModule::set_all_pass_transform(MatrixD &trmat)
     for (j = 0; j < m_dim; j++)
        dct(i, j) = cos(i*(j+0.5)*M_PI/m_dim);
   }
-  mtl::set(temp_m, 0);
-  mult(trmat, dct, temp_m);
+  Blas_Mat_Mat_Mult(trmat, dct, temp_m, 1.0, 0.0);
 
   // Make inverse DCT matrix
   for (i = 0; i < m_dim; i++)
@@ -1587,8 +1586,7 @@ VtlnModule::set_all_pass_transform(MatrixD &trmat)
     for (j = 1; j < m_dim; j++)
        dct(i, j) = cos((i+0.5)*j*M_PI/m_dim)*2/m_dim;
   }
-  mtl::set(final, 0);
-  mult(dct, temp_m, final);
+  Blas_Mat_Mat_Mult(dct, temp_m, final, 1.0, 0.0);
 
   // Fill the interpolation matrix
   m_sinc_coef.resize(m_dim);

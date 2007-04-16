@@ -240,12 +240,20 @@ HmmSet::read_ph(const std::string &filename)
     throw ReadError();
 }
 
+
+void
+HmmSet::read_gk(const std::string &filename)
+{
+  m_pool.read_gk(filename);
+}
+
+
 void
 HmmSet::read_all(const std::string &base)
 {
   read_mc(base + ".mc");
   read_ph(base + ".ph");
-  m_pool.read_gk(base + ".gk");
+  read_gk(base + ".gk");
 }
 
 
@@ -308,12 +316,20 @@ HmmSet::write_ph(const std::string &filename)
   }
 }
 
+
+void
+HmmSet::write_gk(const std::string &filename)
+{
+  m_pool.write_gk(filename);
+}
+
+
 void
 HmmSet::write_all(const std::string &base)
 {
   write_mc(base + ".mc");
   write_ph(base + ".ph");
-  m_pool.write_gk(base + ".gk");
+  write_gk(base + ".gk");
 }
 
 

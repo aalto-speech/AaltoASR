@@ -1,9 +1,7 @@
 #include <cassert>
 
-#include "LinearAlgebra.hh"
 #include "Distributions.hh"
 #include "str.hh"
-
 
 #include "blaspp.h"
 #include "blas1pp.h"

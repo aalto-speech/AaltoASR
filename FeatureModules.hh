@@ -7,14 +7,7 @@
 #include "FeatureBuffer.hh"
 #include "AudioReader.hh"
 #include "ModuleConfig.hh"
-
-// Matrix definition from Matrix template library
-#include "mtl/mtl_config.h"
-#include "mtl/mtl.h"
-#include "mtl/matrix.h"
-
-typedef mtl::matrix<double, mtl::rectangle<>, mtl::dense<>, 
-		    mtl::row_major>::type MatrixD;
+#include "LinearAlgebra.hh"
 
 
 class FeatureGenerator;
@@ -434,7 +427,7 @@ private:
   void create_sinc_coef_table(void);
   void create_all_pass_blin_transform(void);
   void create_all_pass_slapt_transform(void);
-  void set_all_pass_transform(MatrixD &trmat);
+  void set_all_pass_transform(Matrix &trmat);
 
 private:
   int m_use_pwlin;

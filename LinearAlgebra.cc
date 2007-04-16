@@ -2,7 +2,7 @@
 
 
 double
-LinearAlgebra::determinant(const LaGenMatDouble &A)
+LinearAlgebra::determinant(const Matrix &A)
 {
   assert(A.rows()==A.cols());
   assert(is_spd(A));
@@ -19,8 +19,8 @@ LinearAlgebra::determinant(const LaGenMatDouble &A)
 
 
 void 
-LinearAlgebra::matrix_power(const LaGenMatDouble &A,
-			    LaGenMatDouble &B,
+LinearAlgebra::matrix_power(const Matrix &A,
+			    Matrix &B,
 			    double power)
 {
   LaVectorDouble D = LaVectorDouble(A.rows(),1);
@@ -44,8 +44,8 @@ LinearAlgebra::matrix_power(const LaGenMatDouble &A,
 
 
 void
-LinearAlgebra::cholesky_factor(const LaGenMatDouble &A,
-			       LaGenMatDouble &B)
+LinearAlgebra::cholesky_factor(const Matrix &A,
+			       Matrix &B)
 {
   assert(A.rows() == A.cols());
   assert(is_spd(A));
@@ -70,10 +70,10 @@ LinearAlgebra::cholesky_factor(const LaGenMatDouble &A,
 
 
 void
-LinearAlgebra::generalized_eigenvalues(const LaGenMatDouble &A,
-				       const LaGenMatDouble &B,
-				       LaVectorDouble &eigvals,
-				       LaGenMatDouble &eigvecs)
+LinearAlgebra::generalized_eigenvalues(const Matrix &A,
+				       const Matrix &B,
+				       Vector &eigvals,
+				       Matrix &eigvecs)
 {
   assert(A.rows()==A.cols());
   assert(B.rows()==B.cols());
@@ -94,8 +94,8 @@ LinearAlgebra::generalized_eigenvalues(const LaGenMatDouble &A,
 
 
 void
-LinearAlgebra::map_m2v(const LaGenMatDouble &m,
-		       LaVectorDouble &v)
+LinearAlgebra::map_m2v(const Matrix &m,
+		       Vector &v)
 {
   assert(m.rows()==m.cols());
 
@@ -116,8 +116,8 @@ LinearAlgebra::map_m2v(const LaGenMatDouble &m,
 
 
 void
-LinearAlgebra::map_v2m(const LaVectorDouble &v,
-		       LaGenMatDouble &m)
+LinearAlgebra::map_v2m(const Vector &v,
+		       Matrix &m)
 {
   // Deduce the matrix dimensions; numel(v)=dim*(dim+1)/2
   int dim=(int)(0.5*sqrt(1+8*v.size())-0.5);
@@ -142,7 +142,7 @@ LinearAlgebra::map_v2m(const LaVectorDouble &v,
       }
 }
 
-
+/*
 void
 LinearAlgebra::map_mtlm2v(const Matrix &m,
 			  LaVectorDouble &v)
@@ -166,7 +166,7 @@ LinearAlgebra::map_mtlm2v(const Matrix &m,
 
 
 void
-LinearAlgebra::map_v2mtlm(const LaVectorDouble &v,
+LinearAlgebra::map_v2mtlm(const Vector &v,
 			  Matrix &m)
 {
   // Deduce the matrix dimensions; numel(v)=dim*(dim+1)/2
@@ -191,11 +191,11 @@ LinearAlgebra::map_v2mtlm(const LaVectorDouble &v,
 	++pos;
       }
 }
-
+*/
 
 void
 LinearAlgebra::map_hclv2lapackm(const HCL_RnVector_d &v, 
-				LaGenMatDouble &m)
+				Matrix &m)
 {
   // Deduce the matrix dimensions; numel(v)=dim*(dim+1)/2
   int dim=(int)(0.5*sqrt(1+8*v.Dim())-0.5);
@@ -222,7 +222,7 @@ LinearAlgebra::map_hclv2lapackm(const HCL_RnVector_d &v,
 
 
 void
-LinearAlgebra::map_lapackm2hclv(const LaGenMatDouble &m,
+LinearAlgebra::map_lapackm2hclv(const Matrix &m,
 				HCL_RnVector_d &v)
 {
   assert(m.rows()==m.cols());
@@ -242,7 +242,7 @@ LinearAlgebra::map_lapackm2hclv(const LaGenMatDouble &m,
     }
 }
 
-
+/*
 double
 LinearAlgebra::cond(const Matrix &m)
 {
@@ -254,10 +254,10 @@ LinearAlgebra::cond(const Matrix &m)
       temp(i,j)=m(i,j);
   return cond(temp);
 }
-
+*/
 
 double
-LinearAlgebra::cond(const LaGenMatDouble &m)
+LinearAlgebra::cond(const Matrix &m)
 {
   assert(m.rows()==m.cols());
 
@@ -278,7 +278,7 @@ LinearAlgebra::cond(const LaGenMatDouble &m)
   return max/min;
 }
 
-
+/*
 bool
 LinearAlgebra::is_spd(const Matrix &m)
 {
@@ -290,10 +290,10 @@ LinearAlgebra::is_spd(const Matrix &m)
       temp(i,j)=m(i,j);
   return is_spd(temp);
 }
-
+*/
 
 bool
-LinearAlgebra::is_spd(const LaGenMatDouble &m)
+LinearAlgebra::is_spd(const Matrix &m)
 {
   assert(m.rows()==m.cols());
 
@@ -308,7 +308,7 @@ LinearAlgebra::is_spd(const LaGenMatDouble &m)
   return true;
 }
 
-
+/*
 bool
 LinearAlgebra::is_singular(const Matrix &m)
 {
@@ -320,10 +320,10 @@ LinearAlgebra::is_singular(const Matrix &m)
       temp(i,j)=m(i,j);
   return is_singular(temp);
 }
-
+*/
 
 bool
-LinearAlgebra::is_singular(const LaGenMatDouble &m)
+LinearAlgebra::is_singular(const Matrix &m)
 {
   assert(m.rows()==m.cols());
 
@@ -338,7 +338,7 @@ LinearAlgebra::is_singular(const LaGenMatDouble &m)
   return false;
 }
 
-
+/*
 void
 LinearAlgebra::force_min_eig(Matrix &m, double min_eig)
 {
@@ -356,10 +356,10 @@ LinearAlgebra::force_min_eig(Matrix &m, double min_eig)
     for (unsigned int j=0; j<m.ncols(); j++)
       m(i,j)=temp(i,j);  
 }
-
+*/
 
 void
-LinearAlgebra::force_min_eig(LaGenMatDouble &m, double min_eig)
+LinearAlgebra::force_min_eig(Matrix &m, double min_eig)
 {
   assert(m.rows()==m.cols());
 
@@ -379,7 +379,8 @@ LinearAlgebra::force_min_eig(LaGenMatDouble &m, double min_eig)
 
 
 void
-LinearAlgebra::inverse(const Matrix &m, Matrix &inv)
+LinearAlgebra::inverse(const Matrix &m,
+		       Matrix &inv)
 {
   inv.copy(m);
   LaVectorLongInt pivots(m.rows());

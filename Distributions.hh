@@ -4,9 +4,7 @@
 #include "gmd.h"
 #include "lavd.h"
 #include "FeatureBuffer.hh"
-
-typedef LaGenMatDouble Matrix;
-typedef LaVectorDouble Vector;
+#include "LinearAlgebra.hh"
 
 
 class PDF {
