@@ -1,5 +1,6 @@
 #include "gmd.h"
 #include "lavd.h"
+#include "FeatureBuffer.hh"
 
 typedef LaGenMatDouble Matrix;
 typedef LaVectorDouble Vector;
@@ -21,14 +22,14 @@ public:
   /* Write the parameters of this distribution to the stream os */
   virtual void write(std::ostream &os) const = 0;
   /* Read the parameters of this distribution from the stream is */
-  virtual void read(const std::istream &is) = 0;
+  virtual void read(std::istream &is) = 0;
 
   /* Set the current estimation mode */
-  void set_estimation_mode(const EstimationMode &m) { m_mode = m; };
+  void set_estimation_mode(EstimationMode m) { m_mode = m; };
   /* Get the current estimation mode */
-  EstimationMode &get_estimation_mode() { return m_mode; };
+  EstimationMode get_estimation_mode() { return m_mode; };
 
-private:
+protected:
   EstimationMode m_mode;
   int m_dim;
 };
@@ -68,9 +69,7 @@ public:
   /* Splits the current Gaussian to two by disturbing the mean */
   virtual void split(Gaussian &s1, Gaussian &s2) const;
   /* Sets the parameters for the current Gaussian by merging m1 and m2 */
-  virtual void merge(const Gaussian &m1, const Gaussian &m2);
-  /* Sets the parameters for the current Gaussian by merging m and the current one */
-  virtual void merge(Gaussian &m);
+  virtual void merge(double w1, const Gaussian &m1, double w2, const Gaussian &m2);
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
 };
@@ -106,7 +105,7 @@ public:
   virtual double compute_likelihood(const FeatureVec &f);
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
-  virtual void read(const std::istream &is);
+  virtual void read(std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -115,18 +114,20 @@ public:
   virtual void accumulate_mmi_denominator(std::vector<double> priors,
 					  std::vector<const FeatureVec*> const features);
   virtual void estimate_parameters();
-  virtual void get_mean(Vector &mean);
-  virtual void get_covariance(Matrix &covariance);
+  virtual void get_mean(Vector &mean) const;
+  virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance);
 
   // Diagonal-specific
   /* Get the diagonal of the covariance matrix */
-  void get_covariance(Vector &covariance);
+  void get_covariance(Vector &covariance) const;
   /* Set the diagonal of the covariance matrix */
   void set_covariance(const Vector &covariance);
 
 private:
+  double m_constant;
+
   Vector m_mean;
   Vector m_covariance;
   Vector m_precision;
@@ -160,6 +161,7 @@ public:
 class FullCovarianceGaussian : public Gaussian {
 public:
   FullCovarianceGaussian(int dim);
+  FullCovarianceGaussian(const FullCovarianceGaussian &g);
   ~FullCovarianceGaussian();
   virtual void reset(int dim);
 
@@ -167,7 +169,7 @@ public:
   virtual double compute_likelihood(const FeatureVec &f);
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
-  virtual void read(const std::istream &is);
+  virtual void read(std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -176,8 +178,8 @@ public:
   virtual void accumulate_mmi_denominator(std::vector<double> priors,
 					  std::vector<const FeatureVec*> const features);
   virtual void estimate_parameters();
-  virtual void get_mean(Vector &mean);
-  virtual void get_covariance(Matrix &covariance);
+  virtual void get_mean(Vector &mean) const;
+  virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance);
   
@@ -188,6 +190,7 @@ private:
   // Parameters
   Vector m_mean;
   Matrix m_covariance;
+  Matrix m_precision;
 
   FullCovarianceAccumulator *m_accum;
 };
@@ -214,7 +217,7 @@ public:
   virtual double compute_likelihood(const FeatureVec &f);
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
-  virtual void read(const std::istream &is);
+  virtual void read(std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -229,7 +232,7 @@ public:
 
   // PCGMM-specific
   /* Get the coefficients for the subspace constrained precision matrix */
-  Vector &get_precision_coeffs();
+  Vector &get_precision_coeffs() const;
   /* Set the coefficients for the subspace constrained precision matrix */
   void set_precision_coeffs(Vector &coeffs);
 
@@ -263,7 +266,7 @@ public:
   virtual double compute_likelihood(const FeatureVec &f);
   virtual double compute_log_likelihood(const FeatureVec &f);
   virtual void write(std::ostream &os);
-  virtual void read(const std::istream &is);
+  virtual void read(std::istream &is);
 
   // Gaussian-specific
   virtual void start_accumulating();
@@ -278,7 +281,7 @@ public:
 
   // SCGMM-specific
   /* Get the coefficients for the subspace constrained exponential parameters */
-  Vector &get_subspace_coeffs();
+  Vector &get_subspace_coeffs() const;
   /* Set the coefficients for the subspace constrained exponential parameters */
   void set_subspace_coeffs(Vector &coeffs);
 
@@ -299,7 +302,7 @@ public:
   /* The dimensionality of the distributions in this pool */
   int size() const { return m_pool.size(); };
   /* Reset everything */
-  void reset() const;
+  void reset();
 
   /* Get the pdf from the position index */
   PDF* get_pdf(int index);
@@ -336,8 +339,9 @@ class Mixture : public PDF {
 public:
   // Mixture-specific
   Mixture();
-  Mixture(PDFPool &pool);
+  Mixture(PDFPool *pool);
   ~Mixture();
+  int size() { return m_pointers.size(); };
   void reset();
     /* Set the distribution pool */
   void set_pool(PDFPool &pool);
@@ -365,7 +369,7 @@ public:
   /* Compute the likelihood in-place, not from cache */
   virtual double compute_log_likelihood(const FeatureVec &f) const;
   virtual void write(std::ostream &os) const;
-  virtual void read(const std::istream &is);
+  virtual void read(std::istream &is);
 
 private:
   std::vector<int> m_pointers;

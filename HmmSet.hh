@@ -16,7 +16,7 @@
 class HmmState {
 public:
   HmmState() {};
-  HmmState(PDFPool &pool) : emission_pdf(pool) { };
+  HmmState(PDFPool *pool) : emission_pdf(pool) { };
   Mixture emission_pdf;
 };
 

@@ -6,7 +6,6 @@
 
 #include "HmmSet.hh"
 #include "util.hh"
-#include "mtl/lu.h"
 
 #define MIN_STATE_PROB 1e-30
 #define MIN_KERNEL_POS_PROB 1e-30
