@@ -19,9 +19,6 @@ bool raw_flag;
 float overlap;
 bool no_force_end;
 bool set_speakers;
-bool print_speakered;
-float start_time, end_time;
-int start_frame, end_frame;
 
 conf::Config config;
 Recipe recipe;
@@ -32,34 +29,9 @@ SpeakerConfig speaker_config(fea_gen);
 
 
 void
-open_files(const std::string audio_file, const std::string phn_file, 
-	   int first_phn_line, int last_phn_line)
-{
-  int first_sample;
-
-  // Open sph file
-  fea_gen.open(audio_file, raw_flag);
-
-  // Open transcription
-  phn_reader.open(phn_file);
-  // Note: PHN files always use time multiplied by 16000
-  phn_reader.set_sample_limit((int)(start_time * 16000), 
-			      (int)(end_time * 16000));
-  phn_reader.set_line_limit(first_phn_line, last_phn_line, 
-			    &first_sample);
-
-  if (first_sample > 16000 * start_time) {
-    start_time = (float)(first_sample / 16000);
-    start_frame = (int)(fea_gen.frame_rate() * start_time);
-  }
-}
-
-
-void
 print_line(FILE *f, float fr, 
            int start, int end, 
            const std::string &label,
-           const std::string &speaker,
            const std::string &comment)
 {
   int frame_mult = (int)(16000/fr); // NOTE: phn files assume 16kHz sample rate
@@ -67,18 +39,8 @@ print_line(FILE *f, float fr,
   if (start < 0)
     return;
 
-  if (!print_speakered)
-  {
-    // normal phns
-    fprintf(f, "%d %d %s %s\n", start * frame_mult, end * frame_mult, 
-            label.c_str(), comment.c_str());
-  }
-  else
-  {
-    // speakered phns: speaker ID printed between label & comments
-    fprintf(f, "%d %d %s %s %s\n", start * frame_mult, end * frame_mult,
-            label.c_str(), speaker.c_str(), comment.c_str());
-  }
+  fprintf(f, "%d %d %s %s\n", start * frame_mult, end * frame_mult, 
+          label.c_str(), comment.c_str());
 }
 
 
@@ -94,7 +56,6 @@ viterbi_align(Viterbi &viterbi, int start_frame, int end_frame,
   bool last_window = false;
   int print_start = -1;
   std::string print_label;
-  std::string print_speaker;
   std::string print_comment;
  
   viterbi.reset();
@@ -174,7 +135,7 @@ viterbi_align(Viterbi &viterbi, int start_frame, int end_frame,
       {
         // Print pending line
         print_line(phn_out, fea_gen.frame_rate(), print_start,
-                   f + window_start_frame, print_label, print_speaker,
+                   f + window_start_frame, print_label,
                    print_comment);
         
         // Prepare the next print
@@ -183,7 +144,6 @@ viterbi_align(Viterbi &viterbi, int start_frame, int end_frame,
         print_comment = state.comment;
 
         // Speaker ID
-        print_speaker = speaker_config.get_cur_speaker();
         state.printed = true;
       }
     }
@@ -201,7 +161,7 @@ viterbi_align(Viterbi &viterbi, int start_frame, int end_frame,
 
   // FIXME: The end point window_start_frame+1 assumes 50% frame overlap
   print_line(phn_out, fea_gen.frame_rate(), print_start,
-             window_start_frame + 1, print_label, print_speaker,
+             window_start_frame + 1, print_label,
              print_comment);
   return viterbi.best_path_log_prob();
 }
@@ -231,7 +191,8 @@ main(int argc, char *argv[])
       ('\0', "no-force-end", "", "", "do not force to the last state")
       ('\0', "phoseg", "", "", "print phoneme segmentation instead of states")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
-      ('\0', "sphn", "", "", "phns with speaker ID's in use")
+      ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
+      ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -257,7 +218,9 @@ main(int argc, char *argv[])
     }
 
     // Read recipe file
-    recipe.read(io::Stream(config["recipe"].get_str()));
+    recipe.read(io::Stream(config["recipe"].get_str()),
+                config["batch"].get_int(), config["bindex"].get_int(),
+                true);
 
     win_size = config["swins"].get_int();
     Viterbi viterbi(model, fea_gen, &phn_reader);
@@ -268,9 +231,6 @@ main(int argc, char *argv[])
 
     overlap = 1-config["overlap"].get_float();
     no_force_end = config["no-force-end"].specified;
-
-    print_speakered = config["sphn"].specified;
-    phn_reader.set_speaker_phns(config["sphn"].specified);
 
     // Check the dimension
     if (model.dim() != fea_gen.dim()) {
@@ -298,22 +258,18 @@ main(int argc, char *argv[])
                   recipe.infos[f].end_time);
         fprintf(stderr,"\n");
       }
-    
-      start_time = recipe.infos[f].start_time;
-      end_time = recipe.infos[f].end_time;
-      start_frame = (int)(start_time * fea_gen.frame_rate());
-      end_frame = (int)(end_time * fea_gen.frame_rate());
-    
+
       // Open the audio and phn files from the given list.
-      open_files(recipe.infos[f].audio_path, 
-                 recipe.infos[f].phn_path,
-                 recipe.infos[f].start_line,
-                 recipe.infos[f].end_line);
+      recipe.infos[f].init_phn_files(NULL, false, false, &fea_gen,
+                                     config["raw-input"].specified,
+                                     &phn_reader);
+    
+      phn_out_file.open(recipe.infos[f].alignment_path.c_str(), "w");
 
-      phn_out_file.open(recipe.infos[f].phn_out_path.c_str(), "w");
-
-      ll = viterbi_align(viterbi, start_frame, end_frame, phn_out_file,
-                    recipe.infos[f].speaker_id, recipe.infos[f].utterance_id);
+      ll = viterbi_align(viterbi, phn_reader.current_frame(),
+                         (int)(recipe.infos[f].end_time*fea_gen.frame_rate()),
+                         phn_out_file, recipe.infos[f].speaker_id,
+                         recipe.infos[f].utterance_id);
       
       phn_out_file.close();
       fea_gen.close();

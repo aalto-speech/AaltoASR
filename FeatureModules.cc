@@ -234,6 +234,12 @@ FFTModule::eof(int frame)
   return true;
 }
 
+int FFTModule::last_frame(void)
+{
+  // FIXME: NOT TESTED!!!
+  return (int)((m_reader.num_samples()-m_window_width-1)/m_window_advance);
+}
+
 void
 FFTModule::get_module_config(ModuleConfig &config)
 {
@@ -449,6 +455,19 @@ PreModule::eof(int frame)
   if (frame < m_eof_frame)
     return false;
   return true;
+
+}
+int PreModule::last_frame(void)
+{
+  // FIXME: NOT TESTED!!!
+  long cur_pos = ftell(m_fp);
+  int last_frame;
+  
+  if (fseek(m_fp, 0, SEEK_END) < 0)
+    throw std::string("PreModule: Could not seek the file.");
+  last_frame = (ftell(m_fp)-m_file_offset)/(m_dim*sizeof(float));
+  fseek(m_fp, cur_pos, SEEK_SET);
+  return last_frame;
 }
 
 void

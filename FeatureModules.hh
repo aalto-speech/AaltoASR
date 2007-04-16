@@ -179,6 +179,8 @@ public:
   
   virtual int sample_rate(void) = 0;
   virtual float frame_rate(void) = 0;
+
+  virtual int last_frame(void) = 0;
   
   virtual void add_source(FeatureModule *source) 
   { throw std::string("base module FFT can not have sources"); }
@@ -201,6 +203,7 @@ public:
   virtual bool eof(int frame);
   virtual int sample_rate(void) { return m_sample_rate; }
   virtual float frame_rate(void) { return m_frame_rate; }
+  virtual int last_frame(void);
   
 private:
   virtual void get_module_config(ModuleConfig &config);
@@ -248,6 +251,7 @@ public:
   virtual bool eof(int frame);
   virtual int sample_rate(void) { return m_sample_rate; }
   virtual float frame_rate(void) { return m_frame_rate; }
+  virtual int last_frame(void);
   
 private:
   virtual void get_module_config(ModuleConfig &config);

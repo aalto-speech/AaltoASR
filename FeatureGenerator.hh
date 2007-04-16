@@ -60,6 +60,9 @@ public:
    **/
   inline const FeatureVec generate(int frame);
 
+  /** Returns the last frame that does not generate eof */
+  inline int last_frame(void) { return m_base_module->last_frame(); }
+
   /** Returns true if the frame requested from generate() contained
    * end of file. */
   inline bool eof(void) { return m_eof_on_last_frame; }

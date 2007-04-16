@@ -83,6 +83,9 @@ public:
   /** Return the sample rate of the audio file. */
   int sample_rate() const { return sf_info.samplerate; }
 
+  /** Return the number of samples in the file. */
+  int num_samples() const { return sf_info.frames; }
+
   /** The sample format. */
   SF_INFO sf_info;
 
