@@ -228,8 +228,8 @@ private:
    * are requested?  Otherwise, we assume that AudioReader gives zero
    * samples outside the file. */
   int m_copy_borders;
-  std::vector<float> m_first_feature; //!< Feature returned for negative frames
-  std::vector<float> m_last_feature; //!< Feature returned after EOF
+  std::vector<double> m_first_feature; //!< Feature returned for negative frames
+  std::vector<double> m_last_feature; //!< Feature returned after EOF
   int m_last_feature_frame; //!< The frame of the feature returned after EOF
 };
 
@@ -262,8 +262,8 @@ private:
 
   FILE *m_fp;
 
-  std::vector<float> m_first_feature; //!< Feature returned for negative frames
-  std::vector<float> m_last_feature; //!< Feature returned after EOF
+  std::vector<double> m_first_feature; //!< Feature returned for negative frames
+  std::vector<double> m_last_feature; //!< Feature returned after EOF
   int m_last_feature_frame; //!< The frame of the feature returned after EOF
 };
 
