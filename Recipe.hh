@@ -71,7 +71,7 @@ public:
    *                         so that sequental lines with the same speaker
    *                         remain in one batch.
    */
-  void read(FILE *f, int num_batcehs, int batch_index, bool cluster_speakers);
+  void read(FILE *f, int num_batches, int batch_index, bool cluster_speakers);
 
   std::vector<Info> infos;
 };
