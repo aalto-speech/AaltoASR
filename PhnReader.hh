@@ -39,15 +39,15 @@ public:
   PhnReader();
   virtual ~PhnReader();
 
-  void open(std::string ref_file);
-  void close();
-  void reset(void);
-  bool eof(void) { return m_eof_flag; }
+  virtual void open(std::string ref_file);
+  virtual void close();
+  virtual void reset(void);
+  virtual bool eof(void) { return m_eof_flag; }
 
-  void init_utterance_segmentation(void);
-  int current_frame(void) { return m_current_frame; }
-  void next_frame(void);
-  const std::vector<Segmentator::StateProbPair>& state_probs(void) { return cur_state; }
+  virtual void init_utterance_segmentation(void);
+  virtual int current_frame(void) { return m_current_frame; }
+  virtual bool next_frame(void);
+  virtual const std::vector<Segmentator::StateProbPair>& state_probs(void) { return m_cur_state; }
 
   /** Sets the frame rate for converting phn sample numbers to frame numbers.
    * \param frame_rate frames per second
@@ -67,7 +67,7 @@ public:
   void set_line_limits(int first_line, int last_line, 
                        int *first_sample = NULL);
 
-  void set_frame_limits(int first_frame, int last_frame);
+  virtual void set_frame_limits(int first_frame, int last_frame);
 
   void set_state_num_labels(bool l) { m_state_num_labels = l; }
   void set_relative_sample_numbers(bool r) { m_relative_sample_numbers = r; }
@@ -103,7 +103,7 @@ private:
 
   HmmSet *m_model;
 
-  // true if eof has been detected, or line/frame limits have been reached
+  /// true if eof has been detected, or line/frame limits have been reached
   bool m_eof_flag;
   
   /// true if labels are state numbers instead of HMM labels
@@ -113,7 +113,7 @@ private:
   bool m_relative_sample_numbers;
 
   /// A vector which holds the current state and its probability
-  std::vector<Segmentator::StateProbPair> cur_state;
+  std::vector<Segmentator::StateProbPair> m_cur_state;
 };
 
 #endif /* PHNREADER_HH */

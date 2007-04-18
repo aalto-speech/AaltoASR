@@ -20,13 +20,11 @@ PhnReader::PhnReader()
   : m_file(NULL), m_model(NULL),
     m_state_num_labels(false), m_relative_sample_numbers(false)
 {
-  Segmentator::StateProbPair p;
+  Segmentator::StateProbPair p(-1, 1);
   set_frame_rate(125); // Default frame rate
 
   // Initialize the current state and its probability
-  p.state_index = -1;
-  p.prob = 1;
-  cur_state.push_back(p);
+  m_cur_state.push_back(p);
 }
 
 PhnReader::~PhnReader()
@@ -117,6 +115,7 @@ PhnReader::set_frame_limits(int first_frame, int last_frame)
       if (phn.end < 0 || (int)(phn.end/m_samples_per_frame) > m_first_frame)
       {
         fseek(m_file, oldpos, SEEK_SET);
+        m_current_line--;
         return;
       }
     }
@@ -133,11 +132,11 @@ PhnReader::init_utterance_segmentation(void)
 }
 
 
-void
+bool
 PhnReader::next_frame(void)
 {
   if (m_eof_flag)
-    return;
+    return false;
   
   if (m_current_frame == -1)
   {
@@ -152,11 +151,28 @@ PhnReader::next_frame(void)
     m_current_frame++;
   }
 
+  if (m_last_frame > 0 && m_current_frame >= m_last_frame) {
+    m_eof_flag = true;
+    return false;
+  }
+  else
+  {
+    // Do we need to load more phn lines?
+    while (m_current_frame >= (int)(m_cur_phn.end/m_samples_per_frame))
+    {
+      if (!next_phn_line(m_cur_phn))
+      {
+        m_eof_flag = true;
+        return false;
+      }
+    }
+  }
+
   assert( m_current_frame >= (int)(m_cur_phn.start/m_samples_per_frame) );
   assert( m_current_frame <= (int)(m_cur_phn.end/m_samples_per_frame) );
 
   if (m_state_num_labels)
-    cur_state.back().state_index = m_cur_phn.state;
+    m_cur_state.back().state_index = m_cur_phn.state;
   else
   {
     if (m_cur_phn.state < 0)
@@ -164,24 +180,10 @@ PhnReader::next_frame(void)
     if (m_model == NULL)
       throw std::string("PhnReader::next_frame(): If state numbered labels are not used, an HMM model is needed");
     Hmm &hmm = m_model->hmm(m_model->hmm_index(m_cur_phn.label[0]));
-    cur_state.back().state_index = hmm.state(m_cur_phn.state);
+    m_cur_state.back().state_index = hmm.state(m_cur_phn.state);
   }
 
-  if (m_last_frame > 0 && m_current_frame+1 >= m_last_frame) {
-    m_eof_flag = true;
-  }
-  else
-  {
-    // Do we need to load more phn lines?
-    while (m_current_frame+1 >= (int)(m_cur_phn.end/m_samples_per_frame))
-    {
-      if (!next_phn_line(m_cur_phn))
-      {
-        m_eof_flag = true;
-        break;
-      }
-    }
-  }
+  return true;
 }
 
 

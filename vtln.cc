@@ -103,9 +103,8 @@ compute_vtln_log_likelihoods(Segmentator *seg, std::string &speaker,
     seg->reset();
     seg->init_utterance_segmentation();
     
-    while (!seg->eof())
+    while (seg->next_frame())
     {
-      seg->next_frame();
       const std::vector<Segmentator::StateProbPair> &states =
         seg->state_probs();
       model.reset_state_probs();

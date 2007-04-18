@@ -64,14 +64,25 @@ namespace util {
   }
 
   inline float
-  logadd(float a, float b)
+  logaddf(float a, float b)
   {
     float delta = a - b;
-    if (delta > 64.0) {
-      b += 64;
+    if (delta > 0) {
+      b = a;
       delta = -delta;
     }
-    return b + log1pf(exp(delta));
+    return b + log1pf(expf(delta));
+  }
+
+  inline double
+  logadd(double a, double b)
+  {
+    double delta = a - b;
+    if (delta > 0) {
+      b = a;
+      delta = -delta;
+    }
+    return b + log1p(exp(delta));
   }
 
   static const float tiny_for_log = (float)1e-30;

@@ -95,7 +95,8 @@ main(int argc, char *argv[])
 
     // Read recipe file
     Recipe recipe;
-    recipe.read(io::Stream(config["recipe"].get_str()), 1, 1, false);
+    recipe.read(io::Stream(config["recipe"].get_str()),
+                0, 0, false);
 
     // Handle each file in the recipe
     for (int recipe_index = 0; recipe_index < (int)recipe.infos.size(); 

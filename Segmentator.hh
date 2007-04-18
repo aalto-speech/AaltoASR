@@ -12,6 +12,7 @@ public:
   struct StateProbPair {
     int state_index;
     double prob;
+    StateProbPair(int index, double p) : state_index(index), prob(p) { }
   };
 
   virtual ~Segmentator() { }
@@ -39,8 +40,10 @@ public:
    * \ref FeatureGenerator. */
   virtual int current_frame(void) = 0;
 
-  /** Computes the state probability statistics for the next frame. */
-  virtual void next_frame(void) = 0;
+  /** Computes the state probability statistics for the next frame.
+   * \return true if a new frame is available, false if EOF was encountered.
+   */
+  virtual bool next_frame(void) = 0;
 
   /** Resets the segmentation to the first frame. If the probabilities
    * may have changed from previous call to \ref init_utterance_segmentation
@@ -49,8 +52,8 @@ public:
    */
   virtual void reset(void) = 0;
 
-  /** Returns true if the previous frame read was the last one. After
-   * that, \ref next_frame() should not be called */
+  /** Returns true if EOF was encountered during previous call to
+   * \ref next_frame() */
   virtual bool eof(void) = 0;
 
   /** Returns a reference to a vector of possible states and their
