@@ -38,7 +38,6 @@ HmmSet::copy(const HmmSet &hmm_set)
   m_transitions = hmm_set.m_transitions;
   m_states = hmm_set.m_states;
   m_hmms = hmm_set.m_hmms;
-  m_state_probs = hmm_set.m_state_probs;
 }
 
 
@@ -47,9 +46,8 @@ HmmSet::reset()
 {
   m_pool.reset();
 
-  for (int s = 0; s < num_states(); s++) {
+  for (int s = 0; s < num_states(); s++)
     m_states[s].emission_pdf.reset();
-  }
 
   for (int t = 0; t < num_transitions(); t++)
     m_transitions[t].prob = 0;
@@ -59,7 +57,7 @@ HmmSet::reset()
 void
 HmmSet::reserve_states(int states)
 {
-  
+
   m_states.resize(states);
   for (int i=0; i<states; i++)
     m_states[i].emission_pdf.set_pool(&m_pool);
@@ -93,24 +91,6 @@ HmmSet::add_hmm(const std::string &label, int num_states)
   return hmm;
 }
 
-void
-HmmSet::clone_hmm(const std::string &source, const std::string &target)
-{
-  Hmm &target_hmm = new_hmm(target);
-  target_hmm = hmm(source);
-  target_hmm.label = target;
-}
-
-void
-HmmSet::untie_transitions(const std::string &label)
-{
-  Hmm &hmm = this->hmm(label);
-  for (int s = 0; s < hmm.num_states(); s++) {
-    std::vector<int> &transitions = hmm.transitions(s);
-    for (int t = 0; t < (int)transitions.size(); t++)
-      transitions[t] = clone_transition(transitions[t]); 
-  }
-}
 
 HmmTransition&
 HmmSet::add_transition(int h, int source, int target, float prob, int bind_index)
@@ -184,11 +164,15 @@ HmmSet::read_ph(const std::string &filename)
   std::string label;
   int phonemes = 0;
 
+  // Check that the first line is "PHONE"
+  // Second line has the total amount of phonemes
   in >> buf >> phonemes;
   if (buf != "PHONE")
     throw ReadError();
 
+  // Reserve one Hmm for each phoneme
   m_hmms.reserve(phonemes);
+
   for (int h = 0; h < phonemes; h++) {
     // Read phone
     int index = 0;
@@ -201,7 +185,9 @@ HmmSet::read_ph(const std::string &filename)
 
     // Read states
     states -= 2;
-    hmm.resize(states);
+
+    // FIXME: add_hmm does this already(?)
+    //    hmm.resize(states);
     int state;
     in >> state >> state;
     for (int s = 0; s < states; s++)
@@ -333,61 +319,26 @@ HmmSet::write_all(const std::string &base)
 }
 
 
-void
-HmmSet::compute_observation_log_probs(const FeatureVec &feature)
-{
-  double sum = 0;
-
-  // Compute all basis pdf likelihoods to the cache
-  m_pool.cache_likelihood(feature);
-
-  
-  obs_log_probs.resize(num_states());
-  for (int s = 0; s < num_states(); s++) {
-    HmmState &state = m_states[s];
-    obs_log_probs[s] = state.emission_pdf.compute_likelihood(feature);
-    sum += obs_log_probs[s];
-  }
-
-  if (sum == 0)
-    sum = 1;
-  
-  for (int s = 0; s < (int)obs_log_probs.size(); s++)
-    obs_log_probs[s] = util::safe_log(obs_log_probs[s] / sum);
-}
-
-
-void 
-HmmSet::reset_state_probs() 
-{
-  if (m_state_probs.size()==0) { // First call to the func
-    m_state_probs.resize(m_states.size(),-1.0);
-  } 
-  // Mark all values uncalculated
-  while (!m_valid_stateprobs.empty()) {
-    m_state_probs[m_valid_stateprobs.back()]=-1.0;
-    m_valid_stateprobs.pop_back();
-  }
-}
-
-
 float 
-HmmSet::state_prob(const int s, const FeatureVec &feature) 
-{
-  double temp;
-  
-  // Is there a valid value ?
-  if (m_state_probs[s] >= 0.0) 
-    return(m_state_probs[s]);
-
-  // Calculate the valid value
+HmmSet::compute_state_likelihood(const int s, const FeatureVec &feature) 
+{  
   HmmState &state = m_states[s];
-  // FIXME should this be done more efficiently?
-  temp=state.emission_pdf.compute_likelihood(feature);
+  double l = state.emission_pdf.compute_likelihood(feature);
+  if (l < MIN_STATE_PROB)
+    l = MIN_STATE_PROB;
+  return l;
+}
 
-  if (temp < MIN_STATE_PROB)
-    temp = MIN_STATE_PROB;
-  m_state_probs[s] = temp;
-  m_valid_stateprobs.push_back(s);
-  return(m_state_probs[s]);
+
+float
+HmmSet::get_state_likelihood(const int s)
+{
+  return m_states[s].emission_pdf.compute_likelihood();
+}
+
+
+void
+HmmSet::precompute_likelihoods(const FeatureVec &f)
+{
+  m_pool.cache_likelihood(f);
 }

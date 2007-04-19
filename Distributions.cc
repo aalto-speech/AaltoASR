@@ -816,7 +816,7 @@ Mixture::Mixture()
 
 Mixture::Mixture(PDFPool *pool)
 {
-  m_pool=pool;
+  m_pool = pool;
 }
 
 
@@ -836,7 +836,7 @@ Mixture::reset()
 void
 Mixture::set_pool(PDFPool *pool)
 {
-  m_pool=pool;
+  m_pool = pool;
 }
 
 
@@ -899,7 +899,6 @@ Mixture::compute_likelihood(const FeatureVec &f) const
 }
 
 
-
 double
 Mixture::compute_log_likelihood(const FeatureVec &f) const
 {
@@ -917,7 +916,6 @@ Mixture::compute_likelihood() const
   }
   return ll;
 }
-
 
 
 double
