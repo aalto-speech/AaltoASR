@@ -111,12 +111,11 @@ compute_vtln_log_likelihoods(Segmentator *seg, std::string &speaker,
       if (fea_gen.eof())
         break; // EOF in FeatureGenerator
       
-      model.reset_state_probs();
       for (i = 0; i < (int)states.size(); i++)
       {
         // Get probabilities
         speaker_stats[cur_speaker].log_likelihoods[cur_warp_index] += 
-          log(states[i].prob*model.state_prob(states[i].state_index,fea_vec));
+          log(states[i].prob*model.compute_state_likelihood(states[i].state_index,fea_vec));
       }
     }
   }

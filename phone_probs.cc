@@ -24,7 +24,7 @@ conf::Config config;
 FeatureGenerator gen;
 HmmSet model;
 SpeakerConfig speaker_conf(gen);
-
+std::vector<float> obs_log_probs;
 
 void write_int(FILE *fp, unsigned int i)
 {
@@ -204,13 +204,27 @@ main(int argc, char *argv[])
         const FeatureVec fea_vec = gen.generate(f);
         if (gen.eof())
           break;
-        model.compute_observation_log_probs(fea_vec);
+
+        //model.compute_observation_log_probs(fea_vec);
+
+	model.precompute_likelihoods(fea_vec);
+	obs_log_probs.resize(model.num_states());
+	double log_normalizer=0;
+	for (int i = 0; i < model.num_states(); i++) {
+	  obs_log_probs[i] = model.get_state_likelihood(i);
+	  log_normalizer += obs_log_probs[i];
+	}
+	if (log_normalizer == 0)
+	  log_normalizer = 1;
+	for (int i = 0; i < (int)obs_log_probs.size(); i++)
+	  obs_log_probs[i] = util::safe_log(obs_log_probs[i] / log_normalizer);
+
 
         for (int i = 0; i < model.num_states(); i++)
         {
           if (lnabytes == 4)
           {
-            BYTE *p = (BYTE*)&model.obs_log_probs[i];
+            BYTE *p = (BYTE*)&obs_log_probs[i];
             for (int j = 0; j < 4; j++)
               buffer[j] = p[j];
             if (endian::big)
@@ -218,14 +232,14 @@ main(int argc, char *argv[])
           }
           else if (lnabytes == 2)
           {
-            if (model.obs_log_probs[i] < -36.008)
+            if (obs_log_probs[i] < -36.008)
             {
               buffer[0] = 255;
               buffer[1] = 255;
             }
             else
             {
-              int temp = (int)(-1820.0 * model.obs_log_probs[i] + .5);
+              int temp = (int)(-1820.0 * obs_log_probs[i] + .5);
               buffer[0] = (BYTE)((temp>>8)&255);
               buffer[1] = (BYTE)(temp&255);
             }
