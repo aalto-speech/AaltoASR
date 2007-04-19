@@ -1,6 +1,8 @@
 #ifndef SEGMENTATOR_HH
 #define SEGMENTATOR_HH
 
+#include <map>
+#include <vector>
 
 /** Virtual base class for generating or reading segmentations of
  * training utterances.
@@ -21,7 +23,9 @@ public:
     int to;
     StatePair() { }
     StatePair(int f, int t) : from(f), to(t) { }
+  };
 
+  struct StatePairLessThan {
     bool operator()(const StatePair &s1, const StatePair &s2) const
     {
       if (s1.from == s2.from)
@@ -31,7 +35,7 @@ public:
   };
 
   /** Type specification for the map used in \ref transition_probs() */
-  typedef std::map<StatePair, double, StatePair> TransitionMap;
+  typedef std::map<StatePair, double, StatePairLessThan> TransitionMap;
 
   virtual ~Segmentator() { }
 
