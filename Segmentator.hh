@@ -15,6 +15,24 @@ public:
     StateProbPair(int index, double p) : state_index(index), prob(p) { }
   };
 
+  /** Structure for representing state pairs for transitions */
+  struct StatePair {
+    int from;
+    int to;
+    StatePair() { }
+    StatePair(int f, int t) : from(f), to(t) { }
+
+    bool operator()(const StatePair &s1, const StatePair &s2) const
+    {
+      if (s1.from == s2.from)
+        return (s1.to < s2.to);
+      return (s1.from < s2.from);
+    }
+  };
+
+  /** Type specification for the map used in \ref transition_probs() */
+  typedef std::map<StatePair, double, StatePair> TransitionMap;
+
   virtual ~Segmentator() { }
 
   /** Opens the reference transcription/lattice and the audio file
@@ -31,6 +49,12 @@ public:
    * \param last_frame  Frame number for the last frame (excluded)
    */
   virtual void set_frame_limits(int first_frame, int last_frame) = 0;
+
+  /** Defines whether transitions probabilities are collected or not (default).
+   * \param collect If true, the transition probabilities are collected and
+   *                can be retrieved using \ref transition_probs()
+   */
+  virtual void set_collect_transition_probs(bool collect) = 0;
   
   /** Precomputes necessary statistics for generating the segmentation
    * for an utterance. */
@@ -46,7 +70,7 @@ public:
   virtual bool next_frame(void) = 0;
 
   /** Resets the segmentation to the first frame. If the probabilities
-   * may have changed from previous call to \ref init_utterance_segmentation
+   * may have changed from previous call to \ref init_utterance_segmentation()
    * (e.g. features have changed), the segmentation needs to be initialized
    * again.
    */
@@ -59,6 +83,10 @@ public:
   /** Returns a reference to a vector of possible states and their
    * probabilities */
   virtual const std::vector<StateProbPair>& state_probs(void) = 0;
+
+  /** Returns a reference to a map of state pairs (transitions) with
+      probabilities as the values */
+  virtual const TransitionMap& transition_probs(void) = 0;
 };
 
 #endif // SEGMENTATOR_HH

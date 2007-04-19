@@ -48,6 +48,7 @@ public:
   virtual int current_frame(void) { return m_current_frame; }
   virtual bool next_frame(void);
   virtual const std::vector<Segmentator::StateProbPair>& state_probs(void) { return m_cur_state; }
+  virtual const Segmentator::TransitionMap& transition_probs(void) { return m_transition_info; }
 
   /** Sets the frame rate for converting phn sample numbers to frame numbers.
    * \param frame_rate frames per second
@@ -68,6 +69,8 @@ public:
                        int *first_sample = NULL);
 
   virtual void set_frame_limits(int first_frame, int last_frame);
+
+  virtual void set_collect_transition_probs(bool collect) { m_collect_transitions = collect; }
 
   void set_state_num_labels(bool l) { m_state_num_labels = l; }
   void set_relative_sample_numbers(bool r) { m_relative_sample_numbers = r; }
@@ -112,8 +115,14 @@ private:
   /// true if phn sample numbers are relative to the first frame
   bool m_relative_sample_numbers;
 
+  /// true if transitions are to be collected
+  bool m_collect_transitions;
+
   /// A vector which holds the current state and its probability
   std::vector<Segmentator::StateProbPair> m_cur_state;
+
+  /// A map which holds the information about transitions
+  Segmentator::TransitionMap m_transition_info;
 };
 
 #endif /* PHNREADER_HH */

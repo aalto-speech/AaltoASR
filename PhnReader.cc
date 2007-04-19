@@ -151,23 +151,6 @@ PhnReader::next_frame(void)
     m_current_frame++;
   }
 
-  if (m_last_frame > 0 && m_current_frame >= m_last_frame) {
-    m_eof_flag = true;
-    return false;
-  }
-  else
-  {
-    // Do we need to load more phn lines?
-    while (m_current_frame >= (int)(m_cur_phn.end/m_samples_per_frame))
-    {
-      if (!next_phn_line(m_cur_phn))
-      {
-        m_eof_flag = true;
-        return false;
-      }
-    }
-  }
-
   assert( m_current_frame >= (int)(m_cur_phn.start/m_samples_per_frame) );
   assert( m_current_frame <= (int)(m_cur_phn.end/m_samples_per_frame) );
 
@@ -181,6 +164,56 @@ PhnReader::next_frame(void)
       throw std::string("PhnReader::next_frame(): If state numbered labels are not used, an HMM model is needed");
     Hmm &hmm = m_model->hmm(m_model->hmm_index(m_cur_phn.label[0]));
     m_cur_state.back().state_index = hmm.state(m_cur_phn.state);
+  }
+
+  bool new_phn_loaded = false;
+  if (m_last_frame > 0 && m_current_frame+1 >= m_last_frame) {
+    m_eof_flag = true; // For the next call
+  }
+  else
+  {
+    // Do we need to load more phn lines?
+    while (m_current_frame+1 >= (int)(m_cur_phn.end/m_samples_per_frame))
+    {
+      if (!next_phn_line(m_cur_phn))
+      {
+        m_eof_flag = true; // For the next call
+        break;
+      }
+      new_phn_loaded = true;
+    }
+  }
+
+  if (m_collect_transitions)
+  {
+    m_transition_info.clear();
+    if (!m_eof_flag) // Not the last frame
+    {
+      if (new_phn_loaded)
+      {
+        // Out transition
+        int new_state;
+        if (m_state_num_labels)
+          new_state = m_cur_phn.state;
+        else
+        {
+          if (m_cur_phn.state < 0)
+            throw std::string("PhnReader::next_frame(): A state segmented phn file is required");
+          Hmm &hmm = m_model->hmm(m_model->hmm_index(m_cur_phn.label[0]));
+          new_state = hmm.state(m_cur_phn.state);
+        }
+
+        Segmentator::StatePair s(m_cur_state.back().state_index, new_state);
+        m_transition_info[s] = 1;
+      }
+      else
+      {
+        // Self transition
+        Segmentator::StatePair s(m_cur_state.back().state_index,
+                                m_cur_state.back().state_index);
+        m_transition_info[s] = 1;
+      }
+    }
   }
 
   return true;
