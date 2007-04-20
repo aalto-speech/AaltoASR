@@ -244,6 +244,7 @@ DiagonalGaussian::accumulate_ml(double prior,
 {
   assert(m_accum != NULL);
 
+  m_accum->gamma += prior;
   for (int i=0; i<dim(); i++) {
     m_accum->ml_mean += prior*f[i];
     m_accum->ml_cov += prior*f[i]*f[i];
@@ -267,6 +268,56 @@ DiagonalGaussian::accumulate_mmi_denominator(std::vector<double> priors,
 }
 
 
+void 
+DiagonalGaussian::dump_statistics(std::ostream &os) const
+{
+  assert(m_accum != NULL);
+
+  if (m_mode == ML) {
+    os << m_accum->gamma << " ";
+    for (int i=0; i<dim(); i++)
+      os << m_accum->ml_mean(i) << " ";
+    for (int i=0; i<dim()-1; i++)
+      os << m_accum->ml_cov(i) << " ";
+    os << m_accum->ml_cov(dim()-1);
+  }
+}
+
+  
+void 
+DiagonalGaussian::accumulate_from_dumped_statistics(std::istream &is)
+{
+  assert(m_accum != NULL);
+
+  double gamma;
+  Vector mean(dim());
+  Vector cov(dim());
+
+  if (m_mode == ML) {
+    is >> gamma;
+    for (int i=0; i<dim(); i++)
+      is >> mean(i);
+    for (int i=0; i<dim(); i++)
+      is >> cov(i);
+  }
+
+  m_accum->gamma += gamma;
+  for (int i=0; i<dim(); i++) {
+    m_accum->ml_mean(i) += mean(i);
+    m_accum->ml_cov(i) += cov(i);
+  }
+}
+
+
+void
+DiagonalGaussian::stop_accumulating()
+{
+  // Clear the accumulators
+  if (m_accum != NULL)
+    delete m_accum;
+}
+
+
 // FIXME: NOT TRIED
 void
 DiagonalGaussian::estimate_parameters()
@@ -281,9 +332,6 @@ DiagonalGaussian::estimate_parameters()
   else if (m_mode == MMI) {
     // Do something smart
   }
-
-  // Clear the accumulators
-  delete m_accum;
 }
 
 
@@ -479,6 +527,27 @@ FullCovarianceGaussian::accumulate_mmi_denominator(std::vector<double> priors,
 }
 
 
+void 
+FullCovarianceGaussian::dump_statistics(std::ostream &os) const
+{
+}
+
+
+void 
+FullCovarianceGaussian::accumulate_from_dumped_statistics(std::istream &is)
+{
+}
+
+
+void
+FullCovarianceGaussian::stop_accumulating()
+{
+  // Clear the accumulators
+  if (m_accum != NULL)
+    delete m_accum;
+}
+
+
 // FIXME: NOT TRIED
 void
 FullCovarianceGaussian::estimate_parameters()
@@ -623,7 +692,7 @@ PrecisionConstrainedGaussian::start_accumulating()
 // FIXME: NOT TRIED
 void
 PrecisionConstrainedGaussian::accumulate_ml(double prior,
-				      const FeatureVec &f)
+					    const FeatureVec &f)
 {
 }
 
@@ -631,7 +700,24 @@ PrecisionConstrainedGaussian::accumulate_ml(double prior,
 // FIXME: NOT TRIED
 void
 PrecisionConstrainedGaussian::accumulate_mmi_denominator(std::vector<double> priors,
-						   std::vector<const FeatureVec*> const features)
+							 std::vector<const FeatureVec*> const features)
+{
+}
+
+void 
+PrecisionConstrainedGaussian::dump_statistics(std::ostream &os) const
+{
+}
+  
+
+void 
+PrecisionConstrainedGaussian::accumulate_from_dumped_statistics(std::istream &is)
+{
+}
+
+
+void
+PrecisionConstrainedGaussian::stop_accumulating()
 {
 }
 
@@ -774,6 +860,24 @@ SubspaceConstrainedGaussian::accumulate_mmi_denominator(std::vector<double> prio
 }
 
 
+void 
+SubspaceConstrainedGaussian::dump_statistics(std::ostream &os) const
+{
+}
+ 
+
+void 
+SubspaceConstrainedGaussian::accumulate_from_dumped_statistics(std::istream &is)
+{
+}
+
+
+void
+SubspaceConstrainedGaussian::stop_accumulating()
+{
+}
+
+
 // FIXME: NOT TRIED
 void
 SubspaceConstrainedGaussian::estimate_parameters()
@@ -856,6 +960,13 @@ Mixture::set_components(const std::vector<int> &pointers,
 }
 
 
+PDF&
+Mixture::get_basis_pdf(int index)
+{
+  assert(index < size());
+  return m_pool->get_pdf(m_pointers[index]);
+}
+
 void
 Mixture::get_components(std::vector<int> &pointers,
 			std::vector<double> &weights)
@@ -918,6 +1029,91 @@ Mixture::compute_likelihood() const
 }
 
 
+// FIXME: NOT TRIED
+void
+Mixture::start_accumulating()
+{
+  m_accum = new MixtureAccumulator(size());
+}
+
+
+// FIXME: NOT TRIED
+void
+Mixture::accumulate_ml(double prior,
+		       const FeatureVec &f)
+{
+  double total_likelihood, this_likelihood;
+
+  // Compute likelihoods for the basis distributions
+  m_pool->cache_likelihood(f, m_pointers);
+  
+  // Compute the total likelihood for this mixture
+  total_likelihood = compute_likelihood();
+  
+  // Accumulate all basis distributions with some priors
+  for (int i=0; i<size(); i++) {
+    this_likelihood = prior * m_weights[i] * m_pool->get_likelihood(m_pointers[i])/total_likelihood;
+    m_accum->gamma[i] += this_likelihood;
+    get_basis_pdf(i).accumulate_ml(this_likelihood, f);
+  }
+}
+
+
+void
+Mixture::accumulate_mmi_denominator(std::vector<double> priors,
+				    std::vector<const FeatureVec*> const features)
+{
+  // FIXME: do something smart?!
+}
+
+
+void 
+Mixture::dump_statistics(std::ostream &os) const
+{
+  assert(m_accum != NULL);
+
+  for (int i=0; i<size()-1; i++)
+    os << m_pointers[i] << " " << m_accum->gamma[i] << " ";
+  os << m_pointers[size()-1] << " " << m_accum->gamma[size()-1];
+}
+
+
+void 
+Mixture::accumulate_from_dumped_statistics(std::istream &is)
+{
+  assert(m_accum != NULL);
+
+  double acc;
+  for (int i=0; i<size(); i++) {
+    is >> m_pointers[i] >> acc;
+    m_accum->gamma[i] += acc;
+  }
+}
+
+
+void
+Mixture::stop_accumulating()
+{
+  // Clear the accumulators
+  if (m_accum != NULL)
+    delete m_accum;
+}
+
+
+void
+Mixture::estimate_parameters()
+{
+  double total_gamma = 0;
+  for (int i=0; i<size(); i++)
+    total_gamma += m_accum->gamma[i];
+    
+  for (int i=0; i<size(); i++) {
+    m_weights[i] = m_accum->gamma[i]/total_gamma;
+    get_basis_pdf(i).estimate_parameters();
+  }
+}
+
+
 double
 Mixture::compute_log_likelihood() const
 {
@@ -971,10 +1167,10 @@ PDFPool::reset() {
 }
 
 
-PDF*
+PDF&
 PDFPool::get_pdf(int index)
 {
-  return m_pool[index];
+  return *m_pool[index];
 }
 
 
