@@ -83,7 +83,7 @@ FeatureModule::require_init_buffer(void)
 const FeatureVec
 FeatureModule::at(int frame)
 {
-  int buffer_gen_start;
+  int buffer_gen_start, buffer_gen_end;
   
   if (frame <= m_buffer_last_pos &&
       frame > m_buffer_last_pos - m_buffer_size)
@@ -95,16 +95,20 @@ FeatureModule::at(int frame)
     buffer_gen_start = m_buffer_last_pos + 1;
     if (frame >= buffer_gen_start + m_buffer_size)
       buffer_gen_start = frame - m_buffer_size + 1;
+    m_buffer_last_pos = buffer_gen_end = frame;
   }
   else
   {
-    // Moving backwards, recompute the entire buffer
-    buffer_gen_start = frame - m_buffer_size + 1;
+    // Moving backwards, reuse the buffer if possible
+    buffer_gen_start = frame;
+    buffer_gen_end = m_buffer_last_pos - m_buffer_size;
+    if (buffer_gen_end - buffer_gen_start + 1 > m_buffer_size)
+      buffer_gen_end = buffer_gen_start + m_buffer_size - 1;
+    m_buffer_last_pos = buffer_gen_start + m_buffer_size - 1;
   }
-  m_buffer_last_pos = frame;
   
   // Generate the buffer
-  for (int i = buffer_gen_start; i <= m_buffer_last_pos; i++)
+  for (int i = buffer_gen_start; i <= buffer_gen_end; i++)
     generate(i);
   return m_buffer[frame];
 }
@@ -236,7 +240,6 @@ FFTModule::eof(int frame)
 
 int FFTModule::last_frame(void)
 {
-  // FIXME: NOT TESTED!!!
   return (int)((m_reader.num_samples()-m_window_width-1)/m_window_advance);
 }
 
@@ -1073,7 +1076,7 @@ MergerModule::generate(int frame)
 
 
 //////////////////////////////////////////////////////////////////
-// MeanSubtractionModule
+// MeanSubtractorModule
 //////////////////////////////////////////////////////////////////
 
 MeanSubtractorModule::MeanSubtractorModule() :
@@ -1098,17 +1101,18 @@ MeanSubtractorModule::set_module_config(const ModuleConfig &config)
   m_own_offset_left = 75; // Default
   config.get("left", m_own_offset_left);
 
-  // We add 1 to m_own_offset_left so that when generating a new frame
-  // the furthest context on the left is still available from the
-  // previous frame for subtraction from the current mean.
-  m_own_offset_left++;
-
   m_own_offset_right = 75; // Default
   config.get("right", m_own_offset_right);
 
-  if (m_own_offset_left < 1 || m_own_offset_right < 0)
+  // We add 1 to the offsets so that when generating a new frame
+  // the furthest context on the left/right is still available from the
+  // previous frame for subtraction from the current mean.
+  m_own_offset_left++;
+  m_own_offset_right++;
+
+  if (m_own_offset_left < 1 || m_own_offset_right < 1)
     throw std::string("MeanSubtractorModule: context widths must be >= 0");
-  m_width = m_own_offset_left+m_own_offset_right;
+  m_width = m_own_offset_left+m_own_offset_right-1; // +2(extension)-1(center)
 }
 
 void
@@ -1128,14 +1132,23 @@ MeanSubtractorModule::generate(int frame)
   {
     // Update the current mean quickly
     const FeatureVec r = m_sources.back()->at(frame-m_own_offset_left);
-    const FeatureVec a = m_sources.back()->at(frame+m_own_offset_right);
+    const FeatureVec a = m_sources.back()->at(frame+(m_own_offset_right-1));
     for (d = 0; d < m_dim; d++)
       m_cur_mean[d] += (a[d] - r[d])/m_width;
+  }
+  else if (frame == m_cur_frame-1)
+  {
+    const FeatureVec r = m_sources.back()->at(frame-(m_own_offset_left-1));
+    const FeatureVec a = m_sources.back()->at(frame+m_own_offset_right);
+    for (d = 0; d < m_dim; d++)
+      m_cur_mean[d] += (r[d] - a[d])/m_width;
   }
   else
   {
     // Must go through the entire buffer to determine the mean
-    for (i = -m_own_offset_left+1; i<=m_own_offset_right; i++)
+    for (d = 0; d < m_dim; d++)
+      m_cur_mean[d] = 0;
+    for (i = -m_own_offset_left+1; i<=m_own_offset_right-1; i++)
     {
       const FeatureVec v = m_sources.back()->at(frame+i);
       for (d = 0; d < m_dim; d++)
