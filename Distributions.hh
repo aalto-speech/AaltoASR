@@ -31,7 +31,7 @@ public:
 					  std::vector<const FeatureVec*> const features) = 0;
   /* Writes the currently accumulated statistics to a file */
   virtual void dump_statistics(std::ostream &os) const = 0;
-  /* Accumulates from file dump */
+  /* Accumulates from a file dump */
   virtual void accumulate_from_dumped_statistics(std::istream &is) = 0;
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating() = 0;
@@ -63,9 +63,11 @@ protected:
 };
 
 
+
+
 class PDFPool {
 public:
-
+  
   PDFPool() { m_dim=0; };
   PDFPool(int dim) { m_dim=dim; };
   ~PDFPool();
@@ -75,36 +77,40 @@ public:
   int size() const { return m_pool.size(); };
   /* Reset everything */
   void reset();
-
+  
   /* Get the pdf from the position index */
   PDF& get_pdf(int index);
   /* Set the pdf in the position index */
   void set_pdf(int index, PDF *pdf);
-
+  
   /* Read the distributions from a .gk -file */
   void read_gk(const std::string &filename);
   /* Write the distributions to a .gk -file */
   void write_gk(const std::string &filename) const;
-
+  
   /* Reset the cache */
   void reset_cache();
-  /* Compute all likelihoods to the cache */
-  void cache_likelihood(const FeatureVec &f);
-  /* Compute likelihood of one pdf to the cache */
-  void cache_likelihood(const FeatureVec &f, int index);
-  /* Compute likelihoods of pdfs given in indices to the cache */
-  void cache_likelihood(const FeatureVec &f,
-			const std::vector<int> &indices);
-  /* Instant computation of pdf at position index */
+
+  /** Compute the likelihood of a feature for pdf in the pool. Uses cache.
+   * \param f the feature vector
+   * \param index the pdf index
+   * \return the likelihood of the given feature for some pdf
+   */
   double compute_likelihood(const FeatureVec &f, int index);
-  /* Get the likelihood from the cache */
-  inline double get_likelihood(int index) const;
+
+  /** Computes likelihoods for all distributions to the cache
+   * \param f the feature vector
+   */
+  void precompute_likelihoods(const FeatureVec &f);
   
 private:
   std::vector<PDF*> m_pool;
   std::vector<double> m_likelihoods;
+  std::vector<int> m_valid_likelihoods;
   int m_dim;
 };
+
+
 
 
 class Gaussian : public PDF {
@@ -417,11 +423,6 @@ public:
   void add_component(int pool_index, double weight);
   /* Normalize the weights to have a sum of 1 */
   void normalize_weights();
-  /* Compute the likelihood from cached base function likelihoods */
-  double compute_likelihood() const;
-  /* Compute the log likelihood from cached base function likelihoods */
-  double compute_log_likelihood() const;
-
 
   // From pdf
   virtual void start_accumulating();
@@ -432,9 +433,7 @@ public:
   virtual void accumulate_from_dumped_statistics(std::istream &is);
   virtual void stop_accumulating();
   virtual void estimate_parameters();
-  /* Compute the likelihood in-place, not from cache */
   virtual double compute_likelihood(const FeatureVec &f) const;
-  /* Compute the likelihood in-place, not from cache */
   virtual double compute_log_likelihood(const FeatureVec &f) const;
   virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
@@ -453,7 +452,6 @@ private:
   PDFPool *m_pool;
   MixtureAccumulator *m_accum;
 };
-
 
 
 

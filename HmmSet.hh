@@ -17,7 +17,17 @@ class HmmState {
 public:
   HmmState() {};
   HmmState(PDFPool *pool) : emission_pdf(pool) { };
+
+  /** Get the transitions for this state
+   * \param state the number of state for which transitions are wanted
+   * \return a vector of transitions
+   */
+  inline std::vector<int> &transitions() { return m_transitions; }
+
+  // NOTE: The formalism is changed to couple states and transitions
+  // instead of phonemes and transitions, mavarjok 20.04.2007
   Mixture emission_pdf;
+  std::vector<int> m_transitions;
 };
 
 
@@ -26,10 +36,10 @@ public:
 //
 struct HmmTransition {
   HmmTransition() {}
-  HmmTransition(int target, float prob) : target(target), prob(prob), bind_index(-1) {}
+  HmmTransition(int target, double prob) : target(target), prob(prob), bind_index(-1) {}
   int target; // Relative state index
-  float prob;
-  int bind_index;
+  double prob; // Transition probability
+  int bind_index; // Link to the source HmmState
 };
 
 
@@ -39,24 +49,30 @@ struct HmmTransition {
 //
 class Hmm {
 public:
+
+  // Label for this Hmm/phoneme
   std::string label;
 
+  /** Set the number of states for this Hmm/phoneme
+   * \param states the number of states
+   */
   void resize(int states);
 
+  /** 
+   * \return the number of states
+   */
   inline int num_states() const { return m_states.size(); }
+
+  /** Get the state index to HmmSet for some state
+   * \param index the index to a state of this Hmm
+   * \return the HmmSet index to the desired state. see \ref HmmSet::state()
+   */
   inline int &state(int index) { return m_states[index]; }
-  inline std::vector<int> &transitions(int state);
 
 private:
   std::vector<int> m_states;
-  std::vector<std::vector<int> > m_transitions;
 };
 
-std::vector<int>&
-Hmm::transitions(int state)
-{
-  return m_transitions[state + 1];
-}
 
 
 /// Set of hidden Markov models.
@@ -141,13 +157,11 @@ public:
   inline HmmState &state(int state);
 
   /** Adds a new transition to the HmmSet
-   * \param h number of the source phoneme/\ref Hmm
-   * \param source relative state index of the untied source phoneme state (0-2)
-   * \param target relative state index of the untied target phoneme state (0-2)
+   * \param bind_index index of the source tied state
+   * \param target relative state index of the untied target phoneme state (0-1)
    * \param prob state transition probability
-   * \param bind_index index of the source tied state (equals source_hmm.state(source))
    */
-  HmmTransition &add_transition(int h, int source, int target, float prob, int bind_index);
+  HmmTransition &add_transition(int bind_index, int target, double prob);
 
   /** Makes a copy of a transition into \ref m_transitions
    * \param index index of the transition to be copied in \ref m_transitions
@@ -213,26 +227,48 @@ public:
    */
   void write_all(const std::string &base);
 
-  /** Instant computation of a state likelihood
+
+  /** Clears the state likelihood cache */
+  void reset_cache();
+
+  /** Compute a state likelihood, use cache
    * \param s the state index
    * \param f the feature
    * \return the state probability
    */
-  float compute_state_likelihood(const int s, const FeatureVec& f);
+  double state_likelihood(const int s, const FeatureVec& f);
 
-  /** Get a precomputed state likelihood from the buffer
-   * precompute_likelihood(X) should be called beforehand for the state!
-   * If this isn't the case, the result is arbitrary
-   * \param s the state index
-   * \return the state probability
-   */
-  float get_state_likelihood(const int s);
-
-  /** 
-   * Compute all state likelihoods to the buffer
+  /** Compute all state likelihoods to the cache
    * \param f the feature
    */
   void precompute_likelihoods(const FeatureVec &f);
+
+  /** Prepares the HmmSet for parameter training. 
+   * Should be called before \ref accumulate_ml() or \ref accumulate_from_dumped_statistics()
+   */
+  void start_accumulating();
+
+  /** Accumulates maximum likelihood statistics with a new frame
+   * \param f the feature in the current frame
+   * \param state the hmm state index
+   * \param transition indicates whether a state transition occurred (0-1)
+   */
+  void accumulate_ml(const FeatureVec &f, int state, int transition);
+
+  /** Dumps the accumulated statistics to a file
+   * \param base basename for the temporary files (base+gks/phs/mcs)
+   */
+  void dump_all_statistics(const std::string base) const;
+
+  /** Accumulates the statistics from a dump file
+   * \param base basename for the temporary files (base+gks/phs/mcs)
+   */
+  void accumulate_from_dumped_statistics(const std::string base);
+
+  /** Stops parameter training. Sets parameters to the inferred ones.
+   */
+  void stop_accumulating();
+
   
   
   // Exceptions
@@ -262,10 +298,21 @@ public:
   };
 
 private:
+  // Map with phoneme label as key and index to m_hmms as value
   std::map<std::string,int> m_hmm_map;
+  // Container for all transitions in the system
   std::vector<HmmTransition> m_transitions;
+  // Container for all Hmm states
   std::vector<HmmState> m_states;
+  // Buffer of state likelihoods for the current feature
+  std::vector<double> m_state_likelihoods;
+  // List of the valid
+  std::vector<int> m_valid_state_likelihoods;
+  
   std::vector<Hmm> m_hmms;
+
+  // For accumulating transition probabilities
+  std::vector<HmmTransition> m_transition_accum;
 
   PDFPool m_pool;
 };

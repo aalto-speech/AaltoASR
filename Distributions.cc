@@ -1005,27 +1005,23 @@ Mixture::normalize_weights()
 double
 Mixture::compute_likelihood(const FeatureVec &f) const
 {
-  m_pool->cache_likelihood(f, m_pointers);
-  return compute_likelihood();
+  double l = 0;
+  for (unsigned int i=0; i< m_pointers.size(); i++) {
+    l += m_weights[i]*m_pool->compute_likelihood(f, m_pointers[i]);
+  }
+  return l;
 }
 
 
 double
 Mixture::compute_log_likelihood(const FeatureVec &f) const
 {
-  m_pool->cache_likelihood(f, m_pointers);
-  return compute_log_likelihood();
-}
-
-
-double
-Mixture::compute_likelihood() const
-{
   double ll = 0;
   for (unsigned int i=0; i< m_pointers.size(); i++) {
-    ll += m_weights[i]*m_pool->get_likelihood(m_pointers[i]);
+    ll += m_weights[i]*m_pool->compute_likelihood(f, m_pointers[i]);
   }
-  return ll;
+  return util::safe_log(ll);
+
 }
 
 
@@ -1034,6 +1030,8 @@ void
 Mixture::start_accumulating()
 {
   m_accum = new MixtureAccumulator(size());
+  for (int i=0; i<size(); i++)
+    m_pool->get_pdf(m_pointers[i]).start_accumulating();
 }
 
 
@@ -1044,15 +1042,12 @@ Mixture::accumulate_ml(double prior,
 {
   double total_likelihood, this_likelihood;
 
-  // Compute likelihoods for the basis distributions
-  m_pool->cache_likelihood(f, m_pointers);
-  
   // Compute the total likelihood for this mixture
-  total_likelihood = compute_likelihood();
+  total_likelihood = compute_likelihood(f);
   
   // Accumulate all basis distributions with some priors
   for (int i=0; i<size(); i++) {
-    this_likelihood = prior * m_weights[i] * m_pool->get_likelihood(m_pointers[i])/total_likelihood;
+    this_likelihood = prior * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i])/total_likelihood;
     m_accum->gamma[i] += this_likelihood;
     get_basis_pdf(i).accumulate_ml(this_likelihood, f);
   }
@@ -1114,17 +1109,6 @@ Mixture::estimate_parameters()
 }
 
 
-double
-Mixture::compute_log_likelihood() const
-{
-  double ll = 0;
-  for (unsigned int i=0; i< m_pointers.size(); i++) {
-    ll += m_weights[i]*m_pool->get_likelihood(m_pointers[i]);
-  }
-  return util::safe_log(ll);
-}
-
-
 void
 Mixture::write(std::ostream &os) const
 {
@@ -1183,41 +1167,31 @@ PDFPool::set_pdf(int pdfindex, PDF *pdf)
 void
 PDFPool::reset_cache()
 {
-  for (unsigned int i=0; i<m_likelihoods.size(); i++)
-    m_likelihoods[i] = -1;
-}
-
-
-void
-PDFPool::cache_likelihood(const FeatureVec &f)
-
-{
-  for (unsigned int i=0; i<m_likelihoods.size(); i++)
-    m_likelihoods[i] = m_pool[i]->compute_likelihood(f);
-}
-
-
-void
-PDFPool::cache_likelihood(const FeatureVec &f,
-			  int index)
-{
-  m_likelihoods[index] = m_pool[index]->compute_likelihood(f);
-}
-
-
-void
-PDFPool::cache_likelihood(const FeatureVec &f,
-			  const std::vector<int> &indices)
-{
-  for (unsigned int i=0; i<indices.size(); i++)
-    m_likelihoods[indices[i]] = m_pool[indices[i]]->compute_likelihood(f);
+  while (!m_valid_likelihoods.empty()) {
+    m_likelihoods[m_valid_likelihoods.back()]=-1.0;
+    m_valid_likelihoods.pop_back();
+  }
 }
 
 
 double
-PDFPool::get_likelihood(int index) const
+PDFPool::compute_likelihood(const FeatureVec &f, int index)
 {
+  if (m_likelihoods[index] > 0)
+    return m_likelihoods[index];
+  m_likelihoods[index] = m_pool[index]->compute_likelihood(f);
+  m_valid_likelihoods.push_back(index);
   return m_likelihoods[index];
+}
+
+
+void
+PDFPool::precompute_likelihoods(const FeatureVec &f)
+{
+  for (int i=0; i<size(); i++) {
+    m_likelihoods[i] = m_pool[i]->compute_likelihood(f);
+    m_valid_likelihoods.push_back(i);
+  }
 }
 
 

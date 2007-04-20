@@ -205,13 +205,12 @@ main(int argc, char *argv[])
         if (gen.eof())
           break;
 
-        //model.compute_observation_log_probs(fea_vec);
-
+	model.reset_cache();
 	model.precompute_likelihoods(fea_vec);
 	obs_log_probs.resize(model.num_states());
 	double log_normalizer=0;
 	for (int i = 0; i < model.num_states(); i++) {
-	  obs_log_probs[i] = model.get_state_likelihood(i);
+	  obs_log_probs[i] = model.state_likelihood(i, fea_vec);
 	  log_normalizer += obs_log_probs[i];
 	}
 	if (log_normalizer == 0)

@@ -16,7 +16,6 @@ void
 Hmm::resize(int states)
 {
   m_states.resize(states);
-  m_transitions.resize(states+1);
 }
 
 HmmSet::HmmSet()
@@ -59,6 +58,7 @@ HmmSet::reserve_states(int states)
 {
 
   m_states.resize(states);
+  m_state_likelihoods.resize(states);
   for (int i=0; i<states; i++)
     m_states[i].emission_pdf.set_pool(&m_pool);
 }
@@ -93,9 +93,9 @@ HmmSet::add_hmm(const std::string &label, int num_states)
 
 
 HmmTransition&
-HmmSet::add_transition(int h, int source, int target, float prob, int bind_index)
+HmmSet::add_transition(int bind_index, int target, double prob)
 {
-  std::vector<int> &hmm_transitions = m_hmms[h].transitions(source);
+  std::vector<int> hmm_transitions = m_states[bind_index].m_transitions;
   int index;
   if (bind_index >= 0)
   {
@@ -201,11 +201,9 @@ HmmSet::read_ph(const std::string &filename)
       in >> source >> transitions;
       source -= 2;
 
-      if (source >= 0)
-	hmm.transitions(source).reserve(transitions);
       for (int t = 0; t < transitions; t++) {
 	int target;
-	float prob;
+	double prob;
 	in >> target >> prob;
 
         assert(target > 0);
@@ -217,7 +215,7 @@ HmmSet::read_ph(const std::string &filename)
 	  target -= 2;
 
 	if (source >= 0)
-	  add_transition(h, source, target, prob, hmm.state(source));
+	  add_transition(hmm.state(source), target, prob);
       }
     }
   }
@@ -279,8 +277,9 @@ HmmSet::write_ph(const std::string &filename)
     out << "0 1 2 1" << std::endl;
     out << "1 0" << std::endl;
     for (int s = 0; s < hmm.num_states(); s++) {
-      std::vector<int> &hmm_transitions = hmm.transitions(s);
 
+      std::vector<int> &hmm_transitions = m_states[hmm.state(s)].transitions();
+      
       int source = s + 2;
       if (source == 1)
 	source = 0;
@@ -319,26 +318,124 @@ HmmSet::write_all(const std::string &base)
 }
 
 
-float 
-HmmSet::compute_state_likelihood(const int s, const FeatureVec &feature) 
-{  
-  HmmState &state = m_states[s];
-  double l = state.emission_pdf.compute_likelihood(feature);
-  if (l < MIN_STATE_PROB)
-    l = MIN_STATE_PROB;
-  return l;
+void
+HmmSet::reset_cache()
+{
+  // Mark all values uncalculated
+  while (!m_valid_state_likelihoods.empty()) {
+    m_state_likelihoods[m_valid_state_likelihoods.back()]=-1.0;
+    m_valid_state_likelihoods.pop_back();
+  }
+  // Clear also cache for base distributions
+  m_pool.reset_cache();
 }
 
 
-float
-HmmSet::get_state_likelihood(const int s)
+double
+HmmSet::state_likelihood(const int s, const FeatureVec &feature) 
 {
-  return m_states[s].emission_pdf.compute_likelihood();
+  if (m_state_likelihoods[s] > 0)
+    return m_state_likelihoods[s];
+
+  HmmState &state = m_states[s];
+  m_state_likelihoods[s] = state.emission_pdf.compute_likelihood(feature);
+  if (m_state_likelihoods[s] < MIN_STATE_PROB)
+    m_state_likelihoods[s] = MIN_STATE_PROB;
+  m_valid_state_likelihoods.push_back(s);
+
+  return m_state_likelihoods[s];
 }
 
 
 void
 HmmSet::precompute_likelihoods(const FeatureVec &f)
 {
-  m_pool.cache_likelihood(f);
+  // Precompute base distribution likelihoods
+  m_pool.precompute_likelihoods(f);
+
+  // Precompute state likelihoods
+  for (int s=0; s<num_states(); s++) {
+    m_state_likelihoods[s] = m_states[s].emission_pdf.compute_likelihood(f);
+    if (m_state_likelihoods[s] < MIN_STATE_PROB)
+      m_state_likelihoods[s] = MIN_STATE_PROB;
+    m_valid_state_likelihoods.push_back(s);
+  }
+}
+
+
+void
+HmmSet::start_accumulating()
+{
+  m_transition_accum = m_transitions;
+  for (unsigned int i=0; i<m_transition_accum.size(); i++)
+    m_transition_accum[i].prob=0;
+  for (int s=0; s<num_states(); s++)
+    m_states[s].emission_pdf.start_accumulating();
+}
+
+
+void
+HmmSet::accumulate_ml(const FeatureVec &f, int state, int transition)
+{
+  assert(m_transition_accum.size() > 0);
+  
+  // Accumulate state transition probabilities
+  int transition_index = m_states[state].transitions().at(transition);
+  m_transition_accum[transition_index].prob++;
+
+  // Accumulate state pdf
+  m_states[state].emission_pdf.accumulate_ml(1, f);
+}
+
+
+void
+HmmSet::dump_all_statistics(const std::string base) const
+{
+  assert(m_transition_accum.size() > 0);
+}
+
+
+void
+HmmSet::accumulate_from_dumped_statistics(const std::string base)
+{
+  assert(m_transition_accum.size() > 0);
+
+}
+
+ 
+void 
+HmmSet::stop_accumulating()
+{
+  assert(m_transition_accum.size() > 0);
+
+  float sum;
+  
+  /* Update transition probabilities */
+  for (int s = 0; s < num_states(); s++) {
+    sum = 0.0;
+    
+    std::vector<int> &state_transitions = m_states[s].transitions();
+    for (int t = 0; t < (int)state_transitions.size(); t++)
+      sum += m_transition_accum[state_transitions[t]].prob;
+    
+    // If no data, do nothing
+    if (sum != 0.0) {
+      for (int t = 0; t < (int)state_transitions.size(); t++) {
+	
+	m_transition_accum[state_transitions[t]].prob = 
+	  m_transition_accum[state_transitions[t]].prob/sum;
+	if (m_transition_accum[state_transitions[t]].prob < .001)
+	  m_transition_accum[state_transitions[t]].prob = .001;
+      }
+    }
+  }
+  
+  // Stop accumulation also for state distributions
+  for (int s=0; s<num_states(); s++) {
+    HmmState &curr_state = state(s);
+    curr_state.emission_pdf.stop_accumulating();
+  }
+ 
+  // Clear accumulator
+  m_transition_accum.clear();
 }
