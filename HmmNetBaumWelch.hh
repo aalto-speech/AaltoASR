@@ -15,7 +15,7 @@ public:
   enum { EPSILON = -1, FINAL_PDF = -2 };
 
   static struct {
-    double zero(void) { return -1e4; }
+    double zero(void) { return -1e10; }
     double one(void) { return 0; }
     double add(double a, double b) { return util::logadd(a,b); }
     double times(double a, double b) { return a + b; }
@@ -33,8 +33,11 @@ public:
     struct FrameBlock {
       int start;
       int end;
-      double *prob_ptr; //!< Probabilities are in reverse order
-      FrameBlock(int s, int e, double *p) : start(s), end(e), prob_ptr(p) { }
+
+      /// Start index to log_prob_table. Probabilities are in reverse order.
+      int buf_start;
+      
+      FrameBlock(int s, int e, int b) : start(s), end(e), buf_start(b) { }
     };
     std::vector<FrameBlock> frame_blocks; //!< Blocks are in reverse order
     double *log_prob_table;
@@ -76,7 +79,9 @@ public:
   /** Read the network from a file in mitfst ascii format. */
   void read_fst(FILE *file);
 
-  /// Set the pruning thresholds
+  /** Set the pruning thresholds.
+   * If the threshold is zero, the current value will not be changed.
+   */
   void set_pruning_thresholds(double backward, double forward);
 
   // Segmentator interface
@@ -99,6 +104,7 @@ private:
   double propagate_node_arcs(int node_id, bool forward,
                              double cur_score, int target_buffer,
                              FeatureVec &fea_vec);
+  double compute_sum_bw_loglikelihoods(int node_id);
   void add_transition_probabilities(int source_pdf_id, double fw_score,
                                     int next_node_id);
   void clear_bw_scores(void);
@@ -134,7 +140,7 @@ private:
   int m_cur_buffer;
 
   /// Sum of loglikelihoods of all paths (computed after backward phase)
-  double m_sum_total_likelihood;
+  double m_sum_total_loglikelihood;
 
   /// Table of PDF occupancy probabilities in the forward phase
   std::vector<double> m_pdf_prob;

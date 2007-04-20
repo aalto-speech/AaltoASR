@@ -10,6 +10,11 @@ HmmNetBaumWelch::HmmNetBaumWelch(FeatureGenerator &fea_gen, HmmSet &model)
   m_epsilon_string = ",";
   m_first_frame = m_last_frame = 0;
   m_eof_flag = false;
+  m_cur_buffer = 0;
+
+  // Default pruning thresholds
+  m_forward_beam = 15;
+  m_backward_beam = 100;
 }
 
 HmmNetBaumWelch::~HmmNetBaumWelch()
@@ -54,7 +59,6 @@ HmmNetBaumWelch::read_fst(FILE *file)
       if (!ok || m_initial_node_id < 0)
         throw std::string("invalid initial node specification: ") + line;
     }
-
     // Final node
     //
     else if (fields[0] == "F") {
@@ -157,8 +161,10 @@ HmmNetBaumWelch::set_frame_limits(int first_frame, int last_frame)
 void
 HmmNetBaumWelch::set_pruning_thresholds(double backward, double forward)
 {
-  m_backward_beam = backward;
-  m_forward_beam = forward;
+  if (backward > 0)
+    m_backward_beam = backward;
+  if (forward > 0)
+    m_forward_beam = forward;
 }
 
 
@@ -167,6 +173,11 @@ HmmNetBaumWelch::reset(void)
 {
   m_eof_flag = false;
   m_current_frame = -1;
+  // Clear the probabilities of possible active nodes
+  for (int i = 0; i < (int)m_active_node_table[m_cur_buffer].size(); i++)
+    m_nodes[m_active_node_table[m_cur_buffer][i]].prob[m_cur_buffer] =
+      loglikelihoods.zero();
+  m_active_node_table[m_cur_buffer].clear();
 }
 
 void
@@ -184,8 +195,8 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
 
   // Initialize the final node
   m_nodes[m_final_node_id].prob[target_buffer] = loglikelihoods.one();
-  m_active_node_table[0].clear();
-  m_active_node_table[1].clear();
+  assert( m_active_node_table[0].empty() );
+  assert( m_active_node_table[1].empty() );
   m_active_node_table[target_buffer].push_back(m_final_node_id);
 
   while (m_current_frame > m_first_frame)
@@ -196,7 +207,7 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
 
     max_prob = loglikelihoods.zero();
 
-    m_model.reset_state_probs();
+    //m_model.reset_state_probs(); // FIXME!!!
 
     // Iterate through active nodes and fill the backward probabilities
     // for the arcs. The probability of a node is the log sum of all arcs
@@ -205,7 +216,7 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     {
       double cur_node_score =
         m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer];
-      if (loglikelihoods.divide(cur_node_score, prev_max_prob) <
+      if (loglikelihoods.divide(cur_node_score, prev_max_prob) >
           -m_backward_beam)
       {
         double temp = propagate_node_arcs(
@@ -214,10 +225,16 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
         if (temp > max_prob)
           max_prob = temp;
       }
+
+      // Reset the probability
+      m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer] =
+        loglikelihoods.zero();
     }
 
     if (m_active_node_table[target_buffer].empty())
+    {
       throw std::string("Baum-Welch failed during backward phase, try increasing the beam");
+    }
 
     // Use previous maximum probability for pruning
     prev_max_prob = max_prob;
@@ -227,6 +244,9 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
   }
 
   // Clear the active nodes
+  for (int i = 0; i < (int)m_active_node_table[target_buffer].size(); i++)
+    m_nodes[m_active_node_table[target_buffer][i]].prob[target_buffer] =
+      loglikelihoods.zero();
   m_active_node_table[target_buffer].clear();
   
   // Reset the current frame for the forward phase
@@ -245,8 +265,8 @@ HmmNetBaumWelch::next_frame(void)
   {
     // Initialize forward phase
     m_current_frame = m_first_frame;
-    m_active_node_table[0].clear();
-    m_active_node_table[1].clear();
+    assert( m_active_node_table[0].empty() );
+    assert( m_active_node_table[1].empty() );
     m_cur_buffer = 0;
     for (int i = 0; i < (int)m_pdf_prob.size(); i++)
       m_pdf_prob[i] = 0;
@@ -254,11 +274,7 @@ HmmNetBaumWelch::next_frame(void)
     m_active_node_table[m_cur_buffer].push_back(m_initial_node_id);
 
     // Compute the total loglikelihood
-    double temp = 0;
-    for (int i = 0; i < (int)m_nodes[m_initial_node_id].out_arcs.size(); i++)
-      temp += exp(m_arcs[m_nodes[m_initial_node_id].out_arcs[i]].bw_scores.
-                  get_log_prob(m_current_frame));
-    m_sum_total_likelihood = log(temp);
+    m_sum_total_loglikelihood=compute_sum_bw_loglikelihoods(m_initial_node_id);
   }
   else
   {
@@ -282,7 +298,7 @@ HmmNetBaumWelch::next_frame(void)
     return false;
   }
 
-  m_model.reset_state_probs();
+  //m_model.reset_state_probs(); // FIXME!!!
   m_sum_transition_likelihoods = 0;
   m_transition_info.clear();
 
@@ -294,6 +310,9 @@ HmmNetBaumWelch::next_frame(void)
       m_active_node_table[source_buffer][i], true,
       m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer],
       m_cur_buffer, fea_vec);
+    // Clear the source probability of the active node
+    m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer] =
+      loglikelihoods.zero();
   }
 
   if (m_active_node_table[m_cur_buffer].empty())
@@ -302,18 +321,16 @@ HmmNetBaumWelch::next_frame(void)
   // Clear the old active nodes
   m_active_node_table[source_buffer].clear();
 
-  
   // SANITY CHECK: Total likelihood must match
   double total_prob = 0;
   for (int i = 0; i < (int)m_active_pdf_table.size(); i++)
     total_prob += m_pdf_prob[m_active_pdf_table[i]];
-  if (fabs(log(total_prob)-m_sum_total_likelihood) > 0.05) // ~5% deviation
+  if (fabs(1-total_prob)> 0.02) // Allow small deviation
   {
-    fprintf(stderr, "Total loglikelihood does not match: It is %f, it should be %f\n", log(total_prob), m_sum_total_likelihood);
+    fprintf(stderr, "Total likelihood does not match, sum of PDF probabilities equals %g\n", total_prob);
     exit(1);
   }
-  // END OF SANITY CHECK
-  
+  // END OF SANITY CHECK  
   
   // Fill the state probabilities and clear the active PDF probabilities
   m_state_prob_pairs.clear();
@@ -327,7 +344,7 @@ HmmNetBaumWelch::next_frame(void)
   m_active_pdf_table.clear();
 
   // Normalize the transition probabilities
-  // FIXME: Is m_sum_transition_likelihoods same as m_sum_total_likelihood?
+  // FIXME: Is m_sum_transition_likelihoods same as m_sum_total_loglikelihood?
   if (m_collect_transitions && m_sum_transition_likelihoods > 0)
   {
     for (TransitionMap::iterator it = m_transition_info.begin();
@@ -353,7 +370,7 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
   double cur_max_prob = loglikelihoods.zero();
   int num_arcs = (int)(forward?m_nodes[node_id].out_arcs.size():
                        m_nodes[node_id].in_arcs.size());
-  
+
   for (int a = 0; a < num_arcs; a++)
   {
     int arc_id = (forward?m_nodes[node_id].out_arcs[a]:
@@ -372,7 +389,7 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
     else
     {
       double arc_score = loglikelihoods.times(
-        log(m_model.state_prob(m_arcs[arc_id].pdf_id, fea_vec)),
+        log(m_model.compute_state_likelihood(m_arcs[arc_id].pdf_id, fea_vec)),
         m_arcs[arc_id].score);
       double total_score = loglikelihoods.times(cur_score, arc_score);
 
@@ -390,11 +407,12 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
           // is worse than the forward beam compared to the sum of
           // likelihoods of all paths, discard this path.
           // NOTE: This handles also the case when backward score is zero
-          if (cur_arc_likelihood < m_sum_total_likelihood - m_forward_beam)
+          if (cur_arc_likelihood < m_sum_total_loglikelihood - m_forward_beam)
             continue;
 
           double cur_arc_prob = exp(
-            loglikelihoods.divide(cur_arc_likelihood, m_sum_total_likelihood));
+            loglikelihoods.divide(cur_arc_likelihood,
+                                  m_sum_total_loglikelihood));
           
           if (m_pdf_prob[pdf_id] <= 0)
           {
@@ -445,6 +463,29 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
   return cur_max_prob;
 }
 
+
+double
+HmmNetBaumWelch::compute_sum_bw_loglikelihoods(int node_id)
+{
+  double sum = 0;
+
+  for (int i = 0; i < (int)m_nodes[node_id].out_arcs.size(); i++)
+  {
+    int arc_id = m_nodes[node_id].out_arcs[i];
+    if (m_arcs[arc_id].epsilon())
+    {
+      sum += loglikelihoods.times(
+        m_arcs[arc_id].score,
+        compute_sum_bw_loglikelihoods(m_arcs[arc_id].target));
+    }
+    else
+    {
+      double temp = m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame);
+      sum += temp;
+    }
+  }
+  return sum;
+}
 
 void
 HmmNetBaumWelch::add_transition_probabilities(int source_pdf_id,
@@ -497,10 +538,13 @@ HmmNetBaumWelch::FrameProbs::add_log_prob(int frame, double prob)
   if (num_probs == prob_table_size)
   {
     // Increase the size of the probability table
-    int new_size = std::max(prob_table_size*2, prob_table_size+8);
+    int new_size = std::max(prob_table_size*2, prob_table_size+4);
     double *new_table = new double[new_size];
-    memcpy(new_table, log_prob_table, prob_table_size*sizeof(double));
-    delete log_prob_table;
+    if (prob_table_size > 0)
+    {
+      memcpy(new_table, log_prob_table, prob_table_size*sizeof(double));
+      delete log_prob_table;
+    }
     log_prob_table = new_table;
     prob_table_size = new_size;
   }
@@ -513,10 +557,9 @@ HmmNetBaumWelch::FrameProbs::add_log_prob(int frame, double prob)
   else
   {
     // Create a new block
-    FrameBlock b(frame, frame, &log_prob_table[num_probs]);
+    FrameBlock b(frame, frame, num_probs);
     frame_blocks.push_back(b);
-    *b.prob_ptr = prob;
-    num_probs++;
+    log_prob_table[num_probs++] = prob;
   }
 }
 
@@ -529,7 +572,8 @@ HmmNetBaumWelch::FrameProbs::get_log_prob(int frame)
     if (frame >= frame_blocks[i].start && frame <= frame_blocks[i].end)
     {
       // Found the block
-      return frame_blocks[i].prob_ptr[frame-frame_blocks[i].end];
+      return log_prob_table[frame_blocks[i].buf_start +
+                            frame_blocks[i].end-frame];
     }
   }
   return HmmNetBaumWelch::loglikelihoods.zero(); // There is no probability for this frame
@@ -538,7 +582,8 @@ HmmNetBaumWelch::FrameProbs::get_log_prob(int frame)
 void
 HmmNetBaumWelch::FrameProbs::clear(void)
 {
-  if (log_prob_table != NULL)
+  if (prob_table_size > 0)
     delete log_prob_table;
+  prob_table_size = 0;
   frame_blocks.clear();
 }
