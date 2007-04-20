@@ -105,8 +105,8 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
         info.transcript_path = (*it).second;
       if ((it = key_value_map.find("alignment")) != key_value_map.end())
         info.alignment_path = (*it).second;
-      if ((it = key_value_map.find("lattice")) != key_value_map.end())
-        info.lattice_path = (*it).second;
+      if ((it = key_value_map.find("hmmnet")) != key_value_map.end())
+        info.hmmnet_path = (*it).second;
       if ((it = key_value_map.find("lna")) != key_value_map.end())
         info.lna_path = (*it).second;
       if ((it = key_value_map.find("start-time")) != key_value_map.end())
@@ -161,4 +161,33 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
   }
   
   return phn_reader;
+}
+
+
+HmmNetBaumWelch*
+Recipe::Info::init_hmmnet_files(HmmSet *model, FeatureGenerator *fea_gen,
+                                bool raw_audio, HmmNetBaumWelch *hnbw)
+{
+  // Open the audio file
+  fea_gen->open(audio_path, raw_audio);
+
+  // Initialize the HmmNetBaumWelch
+  if (hnbw == NULL)
+  {
+    if (model == NULL)
+      throw std::string("Recipe::Info::init_hmmnet_files: HMM model is required if hnbw==NULL");
+     hnbw= new HmmNetBaumWelch(*fea_gen, *model);
+  }
+
+  // Open the HMM network
+  hnbw->open(hmmnet_path);
+
+  if (start_time > 0 || end_time > 0)
+  {
+    float frame_rate = fea_gen->frame_rate();
+    hnbw->set_frame_limits((int)(start_time * frame_rate), 
+                           (int)(end_time * frame_rate));
+  }
+
+  return hnbw;
 }

@@ -5,6 +5,7 @@
 #include <vector>
 #include <stdio.h>
 #include "PhnReader.hh"
+#include "HmmNetBaumWelch.hh"
 #include "FeatureGenerator.hh"
 
 /** A class for handling recipe files.
@@ -30,7 +31,7 @@ public:
     std::string audio_path;
     std::string transcript_path;
     std::string alignment_path;
-    std::string lattice_path;
+    std::string hmmnet_path;
     std::string lna_path;
     float start_time;
     float end_time;
@@ -47,7 +48,8 @@ public:
      *                             the audio file.
      * \param out_phn              If true, reads alignment phns instead of
      *                             transcript phns.
-     * \param fea_gen              \ref Pointer to FeatureGenerator.
+     * \param fea_gen              Pointer to \ref FeatureGenerator.
+     * \param raw_audio            true if audio files are of raw format.
      * \param phn_reader           The existing \ref PhnReader. If NULL,
      *                             creates a new instance.
      * \return The \ref PhnReader initialized, either created or given.
@@ -55,6 +57,18 @@ public:
     PhnReader* init_phn_files(HmmSet *model, bool relative_sample_nums,
                               bool out_phn, FeatureGenerator *fea_gen,
                               bool raw_audio, PhnReader *phn_reader);
+    /** Open the relevant files for \ref HmmNetBaumWelch and
+     * \ref FeatureGenerator.
+     * \param model           Pointer to the \ref HmmSet. Required if
+     *                        hnbw is != NULL.
+     * \param fea_gen         Pointer to \ref FeatureGenerator.
+     * \param raw_audio       true if audio files are of raw format.
+     * \param hnbw            The existing \ref HmmNetBaumWelch. If NULL,
+     *                        creates a new instance.
+     * \return The \ref HmmNetBaumWelch initialized, either created or given.
+     */
+    HmmNetBaumWelch* init_hmmnet_files(HmmSet *model,FeatureGenerator *fea_gen,
+                                       bool raw_audio, HmmNetBaumWelch *hnbw);
 
     Info();
   };
