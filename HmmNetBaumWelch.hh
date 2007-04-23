@@ -56,7 +56,7 @@ public:
     FrameProbs bw_scores; //!< Log likelihoods computed in backward phase
     
     Arc(int id_, int source_, int target_, int pdf_id_, std::string &str_,
-        float score_)
+        double score_)
       : id(id_), source(source_), target(target_), pdf_id(pdf_id_),
         out_str(str_), score(score_) { }
     ~Arc() { bw_scores.clear(); }
@@ -83,6 +83,9 @@ public:
    * If the threshold is zero, the current value will not be changed.
    */
   void set_pruning_thresholds(double backward, double forward);
+
+  /// Set the scaling for acoustic log likelihoods
+  void set_acoustic_scaling(double scale) { m_acoustic_scale = scale; }
 
   // Segmentator interface
   virtual void open(std::string ref_file);
@@ -136,6 +139,9 @@ private:
   /// Beam for pruning the arc occupancies in the forward phase
   double m_forward_beam;
 
+  /// Scaling value for acoustic log likelihoods
+  double m_acoustic_scale;
+
   /// Target buffer number in the forward phase
   int m_cur_buffer;
 
@@ -156,9 +162,6 @@ private:
 
   /// true if transitions are to be collected
   bool m_collect_transitions;
-
-  /// Sum of transition likelihoods during one frame
-  double m_sum_transition_likelihoods;
 
   /// A map which holds the information about transitions
   Segmentator::TransitionMap m_transition_info;
