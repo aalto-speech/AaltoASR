@@ -14,7 +14,7 @@ public:
   /** Special pdf_id values used in arcs. */
   enum { EPSILON = -1, FINAL_PDF = -2 };
 
-  static struct {
+  static struct LLType {
     double zero(void) { return -1e10; }
     double one(void) { return 0; }
     double add(double a, double b) { return util::logadd(a,b); }

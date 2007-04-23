@@ -2,6 +2,9 @@
 #include "str.hh"
 
 
+HmmNetBaumWelch::LLType HmmNetBaumWelch::loglikelihoods;
+
+
 HmmNetBaumWelch::HmmNetBaumWelch(FeatureGenerator &fea_gen, HmmSet &model)
   : m_fea_gen(fea_gen), m_model(model)
 {
@@ -389,7 +392,7 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
     else
     {
       double arc_score = loglikelihoods.times(
-        log(m_model.compute_state_likelihood(m_arcs[arc_id].pdf_id, fea_vec)),
+        log(m_model.state_likelihood(m_arcs[arc_id].pdf_id, fea_vec)),
         m_arcs[arc_id].score);
       double total_score = loglikelihoods.times(cur_score, arc_score);
 
