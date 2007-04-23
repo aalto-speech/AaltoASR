@@ -385,7 +385,7 @@ HmmSet::accumulate(const FeatureVec &f, int state, int transition)
   m_transition_accum[transition_index].prob++;
 
   // Accumulate state pdf
-  m_states[state].emission_pdf.accumulate_ml(1, f);
+  m_states[state].emission_pdf.accumulate(1, f);
 }
 
 
