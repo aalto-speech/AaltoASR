@@ -34,7 +34,7 @@ CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	ModuleConfig.cc HmmSet.cc \
 	PhnReader.cc TriphoneSet.cc SpeakerConfig.cc \
 	Recipe.cc conf.cc io.cc str.cc endian.cc Distributions.cc \
-	LinearAlgebra.cc
+	LinearAlgebra.cc HmmNetBaumWelch.cc
 #MllrTrainer.cc HmmTrainer.cc Viterbi.cc Lattice.cc \
 
 #HmmTrainer.cc SphereReader.cc Lattice.cc Viterbi.cc StateGenerator.cc FeatureBuffer.cc HmmSet.cc PhnReader.cc StateProbCache.cc FeatureGenerator.cc Recipe.cc tools.cc TriphoneSet.cc Changeling.cc AdaReader.cc Warpster.cc
