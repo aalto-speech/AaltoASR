@@ -22,17 +22,16 @@ public:
   enum EstimationMode { ML, MMI };
   /* Initializes the accumulator buffers */  
   virtual void start_accumulating() = 0;
-  /* Accumulates the maximum likelihood statistics for this pdf */
+  /* Accumulates the statistics for this pdf */
   virtual void accumulate_ml(double prior, const FeatureVec &f) = 0;
   /* Accumulates the maximum mutual information denominator statistics
      weighed with priors. The numerator statistics should be accumulated
      using the accumulate_ml function */
-  virtual void accumulate_mmi_denominator(std::vector<double> priors,
-					  std::vector<const FeatureVec*> const features) = 0;
+  virtual void accumulate_mmi_denominator(double prior, const FeatureVec &f) = 0;
   /* Writes the currently accumulated statistics to a file */
   virtual void dump_statistics(std::ostream &os) const = 0;
   /* Accumulates from a file dump */
-  virtual void accumulate_from_dumped_statistics(std::istream &is) = 0;
+  virtual void accumulate_from_dump(std::istream &is) = 0;
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating() = 0;
   /* Use the accumulated statistics to update the current model parameters. */
@@ -79,7 +78,7 @@ public:
   void reset();
   
   /* Get the pdf from the position index */
-  PDF& get_pdf(int index);
+  PDF& get_pdf(int index) const;
   /* Set the pdf in the position index */
   void set_pdf(int index, PDF *pdf);
   
@@ -128,12 +127,11 @@ public:
   /* Accumulates the maximum mutual information denominator statistics
      weighed with priors. The numerator statistics should be accumulated
      using the accumulate_ml function */
-  virtual void accumulate_mmi_denominator(std::vector<double> priors,
-					  std::vector<const FeatureVec*> const features) = 0;
+  virtual void accumulate_mmi_denominator(double prior, const FeatureVec &f) = 0;
   /* Writes the currently accumulated statistics to a file */
   virtual void dump_statistics(std::ostream &os) const = 0;
   /* Accumulates from file dump */
-  virtual void accumulate_from_dumped_statistics(std::istream &is) = 0;
+  virtual void accumulate_from_dump(std::istream &is) = 0;
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating() = 0;
   /* Use the accumulated statistics to update the current model parameters. */
@@ -178,10 +176,10 @@ public:
   virtual void start_accumulating();
   virtual void accumulate_ml(double prior,
 			     const FeatureVec &f);
-  virtual void accumulate_mmi_denominator(std::vector<double> priors,
-					  std::vector<const FeatureVec*> const features);
+  virtual void accumulate_mmi_denominator(double prior,
+					  const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;
-  virtual void accumulate_from_dumped_statistics(std::istream &is);
+  virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
@@ -247,10 +245,10 @@ public:
   virtual void start_accumulating();
   virtual void accumulate_ml(double prior,
 			     const FeatureVec &f);
-  virtual void accumulate_mmi_denominator(std::vector<double> priors,
-					  std::vector<const FeatureVec*> const features);
+  virtual void accumulate_mmi_denominator(double prior,
+					  const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;
-  virtual void accumulate_from_dumped_statistics(std::istream &is);
+  virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
@@ -321,11 +319,12 @@ public:
 
   // Gaussian-specific
   virtual void start_accumulating();
-  virtual void accumulate_ml(double prior, const FeatureVec &f);
-  virtual void accumulate_mmi_denominator(std::vector<double> priors,
-					  std::vector<const FeatureVec*> const features);
+  virtual void accumulate_ml(double prior,
+			     const FeatureVec &f);
+  virtual void accumulate_mmi_denominator(double prior,
+					  const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;
-  virtual void accumulate_from_dumped_statistics(std::istream &is);
+  virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
@@ -375,10 +374,9 @@ public:
   // Gaussian-specific
   virtual void start_accumulating();
   virtual void accumulate_ml(double prior, const FeatureVec &f);
-  virtual void accumulate_mmi_denominator(std::vector<double> priors,
-					  std::vector<const FeatureVec*> const features);
+  virtual void accumulate_mmi_denominator(double prior, const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;  
-  virtual void accumulate_from_dumped_statistics(std::istream &is);
+  virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
@@ -427,10 +425,10 @@ public:
   // From pdf
   virtual void start_accumulating();
   virtual void accumulate_ml(double prior, const FeatureVec &f);
-  virtual void accumulate_mmi_denominator(std::vector<double> priors,
-					  std::vector<const FeatureVec*> const features);
+  virtual void accumulate_mmi_denominator(double prior,
+					  const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;
-  virtual void accumulate_from_dumped_statistics(std::istream &is);
+  virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
   virtual void estimate_parameters();
   virtual double compute_likelihood(const FeatureVec &f) const;

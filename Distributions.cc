@@ -9,7 +9,6 @@
 #include "blas3pp.h"
 
 
-// FIXME: NOT TRIED
 void
 Gaussian::split(Gaussian &g1, Gaussian &g2) const
 {
@@ -39,7 +38,6 @@ Gaussian::split(Gaussian &g1, Gaussian &g2) const
 // f1=n1/(n1+n2) ; f2=n2/(n1+n2)
 // mu=f1*mu1+f2*mu2
 // sigma=f1*sigma1+f2*sigma2+f1*f2*(mu1-mu2)^2
-// FIXME: NOT TRIED
 void
 Gaussian::merge(double weight1, const Gaussian &m1, 
 		double weight2, const Gaussian &m2)
@@ -73,8 +71,6 @@ Gaussian::merge(double weight1, const Gaussian &m1,
 }
 
 
-
-// FIXME: NOT TRIED
 double
 Gaussian::kullback_leibler(Gaussian &g) const
 {
@@ -87,8 +83,7 @@ Gaussian::kullback_leibler(Gaussian &g) const
   LaVectorDouble t4; g.get_mean(t4);
   LUFactorizeIP(t1, pivots);
   LaLUInverseIP(t1, pivots);
-  
-  
+    
   LaGenMatDouble cov; get_covariance(cov);
   LaVectorDouble mean; get_mean(mean);
   Blas_Mat_Mat_Mult(t1, cov, t2, 1.0, 0.0);
@@ -108,14 +103,12 @@ Gaussian::kullback_leibler(Gaussian &g) const
 }
 
 
-// FIXME: NOT TRIED
 DiagonalGaussian::DiagonalGaussian(int dim)
 {
   reset(dim);
 }
 
 
-// FIXME: NOT TRIED
 DiagonalGaussian::DiagonalGaussian(const DiagonalGaussian &g)
 {
   reset(g.dim());
@@ -126,7 +119,6 @@ DiagonalGaussian::DiagonalGaussian(const DiagonalGaussian &g)
 }
 
 
-// FIXME: NOT TRIED
 DiagonalGaussian::~DiagonalGaussian()
 {
   if (m_accum != NULL)
@@ -134,7 +126,6 @@ DiagonalGaussian::~DiagonalGaussian()
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::reset(int dim)
 {
@@ -146,7 +137,6 @@ DiagonalGaussian::reset(int dim)
 }
 
 
-// FIXME: NOT TRIED
 double
 DiagonalGaussian::compute_likelihood(const FeatureVec &f) const
 {
@@ -154,7 +144,6 @@ DiagonalGaussian::compute_likelihood(const FeatureVec &f) const
 }
 
 
-// FIXME: NOT TRIED
 double
 DiagonalGaussian::compute_log_likelihood(const FeatureVec &f) const
 {
@@ -174,7 +163,6 @@ DiagonalGaussian::compute_log_likelihood(const FeatureVec &f) const
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::write(std::ostream &os) const
 {
@@ -187,34 +175,9 @@ DiagonalGaussian::write(std::ostream &os) const
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::read(std::istream &is)
 {
-  /*
-  std::string line;
-  getline(is, line);
-  str::chomp(&line);
-
-  std::vector<std::string> fields;
-  str::split(&line, " ", false, &fields);
-  
-  int pos=0;
-  std::string type("diagonal_cov");
-  if (fields[0] == type)
-    pos++;
-
-  bool ok;
-  for (int i=0; i<dim(); i++) {
-    m_mean(i) = str::str2float(&(fields[pos]),&ok);
-    pos++;
-  }
-  for (int i=0; i<dim()-1; i++) {
-    m_covariance(i) = str::str2float(&(fields[pos]),&ok);
-    pos++;
-  }
-  */
-
   for (int i=0; i<dim(); i++)
     is >> m_mean(i);
   for (int i=0; i<dim(); i++) {
@@ -229,7 +192,6 @@ DiagonalGaussian::read(std::istream &is)
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::start_accumulating()
 {
@@ -237,7 +199,6 @@ DiagonalGaussian::start_accumulating()
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::accumulate_ml(double prior,
 				const FeatureVec &f)
@@ -252,21 +213,16 @@ DiagonalGaussian::accumulate_ml(double prior,
 }
 
 
-// FIXME: NOT TRIED
 void
-DiagonalGaussian::accumulate_mmi_denominator(std::vector<double> priors,
-					     std::vector<const FeatureVec*> const features)
+DiagonalGaussian::accumulate_mmi_denominator(double prior, const FeatureVec &f)
 {
   assert(m_accum != NULL);
   
-  for (int i=0; i<dim(); i++)
-    for (unsigned int j=0; j<priors.size(); j++) {
-      // FIXME
-      //      m_accum->mmi_mean += priors[j]*features[j]->[i];
-      //      m_accum->mmi_cov += priors[j]*features[j]->[i]*features[j]->[i];
-    }
+  for (int d=0; d<dim(); d++) {
+    m_accum->mmi_mean(d) += priors[i]* (features[i])->[d];
+    m_accum->mmi_cov(d) += priors[i]*(features[i])->[d]*(features[i])->[d];
+  }
 }
-
 
 void 
 DiagonalGaussian::dump_statistics(std::ostream &os) const
@@ -285,7 +241,7 @@ DiagonalGaussian::dump_statistics(std::ostream &os) const
 
   
 void 
-DiagonalGaussian::accumulate_from_dumped_statistics(std::istream &is)
+DiagonalGaussian::accumulate_from_dump(std::istream &is)
 {
   assert(m_accum != NULL);
 
@@ -303,8 +259,8 @@ DiagonalGaussian::accumulate_from_dumped_statistics(std::istream &is)
 
   m_accum->gamma += gamma;
   for (int i=0; i<dim(); i++) {
-    m_accum->ml_mean(i) += mean(i);
-    m_accum->ml_cov(i) += cov(i);
+    m_accum->ml_mean(i) += gamma*mean(i);
+    m_accum->ml_cov(i) += gamma*cov(i);
   }
 }
 
@@ -318,24 +274,16 @@ DiagonalGaussian::stop_accumulating()
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::estimate_parameters()
 {
-  assert(m_accum != NULL);
-  
-  if (m_mode == ML) {
-    m_mean.copy(m_accum->ml_mean);
-    m_covariance.copy(m_accum->ml_cov);
-  }
-
-  else if (m_mode == MMI) {
-    // Do something smart
-  }
+  m_mean.copy(m_accum->ml_mean);
+  m_covariance.copy(m_accum->ml_cov);
+  Blas_Scale(m_accum->gamma, m_mean);
+  Blas_Scale(m_accum->gamma, m_covariance);
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::get_mean(Vector &mean) const
 {
@@ -343,7 +291,6 @@ DiagonalGaussian::get_mean(Vector &mean) const
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::get_covariance(Matrix &covariance) const
 {
@@ -354,7 +301,6 @@ DiagonalGaussian::get_covariance(Matrix &covariance) const
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::set_mean(const Vector &mean)
 {
@@ -363,7 +309,6 @@ DiagonalGaussian::set_mean(const Vector &mean)
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::set_covariance(const Matrix &covariance)
 {
@@ -373,7 +318,6 @@ DiagonalGaussian::set_covariance(const Matrix &covariance)
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::get_covariance(Vector &covariance) const
 {
@@ -381,7 +325,6 @@ DiagonalGaussian::get_covariance(Vector &covariance) const
 }
 
 
-// FIXME: NOT TRIED
 void
 DiagonalGaussian::set_covariance(const Vector &covariance)
 {
@@ -390,14 +333,12 @@ DiagonalGaussian::set_covariance(const Vector &covariance)
 }
 
 
-// FIXME: NOT TRIED
 FullCovarianceGaussian::FullCovarianceGaussian(int dim)
 {
   reset(dim);
 }
 
 
-// FIXME: NOT TRIED
 FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
 {
   reset(g.dim());
@@ -407,7 +348,6 @@ FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
 }
 
 
-// FIXME: NOT TRIED
 FullCovarianceGaussian::~FullCovarianceGaussian()
 {
   if (m_accum != NULL)
@@ -415,7 +355,6 @@ FullCovarianceGaussian::~FullCovarianceGaussian()
 }
 
 
-// FIXME: NOT TRIED
 void
 FullCovarianceGaussian::reset(int dim)
 {
@@ -426,7 +365,6 @@ FullCovarianceGaussian::reset(int dim)
 }
 
 
-// FIXME: NOT TRIED
 double
 FullCovarianceGaussian::compute_likelihood(const FeatureVec &f) const
 {
@@ -434,7 +372,6 @@ FullCovarianceGaussian::compute_likelihood(const FeatureVec &f) const
 }
 
 
-// FIXME: NOT TRIED
 double
 FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f) const
 {
@@ -455,7 +392,6 @@ FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f) const
 }
 
 
-// FIXME: NOT TRIED
 void
 FullCovarianceGaussian::write(std::ostream &os) const
 {
@@ -470,7 +406,6 @@ FullCovarianceGaussian::write(std::ostream &os) const
 }
 
 
-// FIXME: NOT TRIED
 void
 FullCovarianceGaussian::read(std::istream &is)
 {
@@ -491,7 +426,6 @@ FullCovarianceGaussian::read(std::istream &is)
 }
 
 
-// FIXME: NOT TRIED
 void
 FullCovarianceGaussian::start_accumulating()
 {
@@ -499,28 +433,39 @@ FullCovarianceGaussian::start_accumulating()
 }
 
 
-// FIXME: NOT TRIED
 void
 FullCovarianceGaussian::accumulate_ml(double prior,
 				      const FeatureVec &f)
 {
   assert(m_accum != NULL);
   
-  // FIXME!
+  m_accum->gamma += prior;
+  for (int i=0; i<dim(); i++) {
+    m_accum->ml_mean += prior*f[i];
+    m_accum->ml_cov += prior*f[i]*f[i];
+  }
+
   //  m_accum->ml_mean(i) += prior*f;
   //  Blas_R1_Update(m_accum->ml_cov, f, f, prior);
 }
 
 
-// FIXME: NOT TRIED
 void
-FullCovarianceGaussian::accumulate_mmi_denominator(std::vector<double> priors,
-						   std::vector<const FeatureVec*> const features)
+FullCovarianceGaussian::accumulate_mmi_denominator(double prior, const FeatureVec &f)
 {
   assert(m_accum != NULL);
+
+
+  assert(priors.size() == features.size());
+  for (unsigned int i=0; i<priors.size(); i++)
+    for (int d=0; d<dim(); d++) {
+      Blas_Add_Mult(m_accum->mmi_mean, priors[i], *(features[i].get_vector));
+      Blas_R1_Update(m_accum->mmi_cov, *(features[i].get_vector()),
+		     *(features[i].get_vector()), priors[i]);
+    }
+
   
   for (unsigned int i=0; i<priors.size(); i++) {
-    // FIXME!
     //    m_accum->mmi_mean += priors[i]*features[i];
     //    Blas_R1_Update(m_accum->mmi_cov, features[i], features[i], priors[i]);
   }
@@ -534,7 +479,7 @@ FullCovarianceGaussian::dump_statistics(std::ostream &os) const
 
 
 void 
-FullCovarianceGaussian::accumulate_from_dumped_statistics(std::istream &is)
+FullCovarianceGaussian::accumulate_from_dump(std::istream &is)
 {
 }
 
@@ -699,8 +644,7 @@ PrecisionConstrainedGaussian::accumulate_ml(double prior,
 
 // FIXME: NOT TRIED
 void
-PrecisionConstrainedGaussian::accumulate_mmi_denominator(std::vector<double> priors,
-							 std::vector<const FeatureVec*> const features)
+PrecisionConstrainedGaussian::accumulate_mmi_denominator(double prior, const FeatureVec &f)
 {
 }
 
@@ -711,7 +655,7 @@ PrecisionConstrainedGaussian::dump_statistics(std::ostream &os) const
   
 
 void 
-PrecisionConstrainedGaussian::accumulate_from_dumped_statistics(std::istream &is)
+PrecisionConstrainedGaussian::accumulate_from_dump(std::istream &is)
 {
 }
 
@@ -854,8 +798,7 @@ SubspaceConstrainedGaussian::accumulate_ml(double prior,
 
 // FIXME: NOT TRIED
 void
-SubspaceConstrainedGaussian::accumulate_mmi_denominator(std::vector<double> priors,
-						   std::vector<const FeatureVec*> const features)
+SubspaceConstrainedGaussian::accumulate_mmi_denominator(double prior, const FeatureVec &f)
 {
 }
 
@@ -867,7 +810,7 @@ SubspaceConstrainedGaussian::dump_statistics(std::ostream &os) const
  
 
 void 
-SubspaceConstrainedGaussian::accumulate_from_dumped_statistics(std::istream &is)
+SubspaceConstrainedGaussian::accumulate_from_dump(std::istream &is)
 {
 }
 
@@ -1025,7 +968,6 @@ Mixture::compute_log_likelihood(const FeatureVec &f) const
 }
 
 
-// FIXME: NOT TRIED
 void
 Mixture::start_accumulating()
 {
@@ -1035,7 +977,6 @@ Mixture::start_accumulating()
 }
 
 
-// FIXME: NOT TRIED
 void
 Mixture::accumulate_ml(double prior,
 		       const FeatureVec &f)
@@ -1055,10 +996,9 @@ Mixture::accumulate_ml(double prior,
 
 
 void
-Mixture::accumulate_mmi_denominator(std::vector<double> priors,
-				    std::vector<const FeatureVec*> const features)
+Mixture::accumulate_mmi_denominator(double prior, const FeatureVec &f)
 {
-  // FIXME: do something smart?!
+
 }
 
 
@@ -1074,7 +1014,7 @@ Mixture::dump_statistics(std::ostream &os) const
 
 
 void 
-Mixture::accumulate_from_dumped_statistics(std::istream &is)
+Mixture::accumulate_from_dump(std::istream &is)
 {
   assert(m_accum != NULL);
 
@@ -1152,7 +1092,7 @@ PDFPool::reset() {
 
 
 PDF&
-PDFPool::get_pdf(int index)
+PDFPool::get_pdf(int index) const
 {
   return *m_pool[index];
 }
@@ -1200,7 +1140,7 @@ PDFPool::read_gk(const std::string &filename)
 {
   std::ifstream in(filename.c_str());
   if (!in)
-    throw std::string("PDFPool::read_gk(): could not open %s\n");
+    throw std::string("PDFPool::read_gk(): could not open %s\n", filename.c_str());
   
   int pdfs = 0;
   std::string type_str;
@@ -1267,9 +1207,14 @@ void
 PDFPool::write_gk(const std::string &filename) const
 {
   std::ofstream out(filename.c_str());
+  if (!out)
+    throw std::string("PDFPool::write_gk(): could not open %s\n", filename.c_str());
   
   out << m_pool.size() << " " << m_dim << " variable\n";
 
   for (unsigned int i=0; i<m_pool.size(); i++)
     m_pool[i]->write(out);
+
+  if (!out)
+    throw std::string("PDFPool::write_gk(): error writing file: %s\n", filename.c_str());
 }

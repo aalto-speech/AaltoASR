@@ -64,6 +64,8 @@ public:
   /** The dimension of the vector. */
   int dim() const { return m_dim; }
 
+  const Vector* get_vector() const { return m_ptr; }
+
 private:
   const Vector *m_ptr; //!< Pointer to the feature vector values
   int m_dim; //!< The dimension of the vector

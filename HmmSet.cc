@@ -118,6 +118,7 @@ HmmSet::add_transition(int bind_index, int target, double prob)
   return m_transitions[index];
 }
 
+
 int
 HmmSet::clone_transition(int index)
 {
@@ -375,7 +376,7 @@ HmmSet::start_accumulating()
 
 
 void
-HmmSet::accumulate_ml(const FeatureVec &f, int state, int transition)
+HmmSet::accumulate(const FeatureVec &f, int state, int transition)
 {
   assert(m_transition_accum.size() > 0);
   
@@ -389,20 +390,181 @@ HmmSet::accumulate_ml(const FeatureVec &f, int state, int transition)
 
 
 void
-HmmSet::dump_all_statistics(const std::string base) const
+HmmSet::dump_statistics(const std::string base) const
 {
   assert(m_transition_accum.size() > 0);
+
+  dump_ph_statistics(base+".phs");
+  dump_mc_statistics(base+".mcs");
+  dump_gk_statistics(base+".gks");
 }
 
 
 void
-HmmSet::accumulate_from_dumped_statistics(const std::string base)
+HmmSet::dump_ph_statistics(const std::string filename) const
+{
+  std::ofstream phs(filename.c_str());
+  if (!phs) {
+    fprintf(stderr, "HmmSet::dump_ph_statistics(): could not open %s\n", filename.c_str());
+    throw OpenError();
+  }
+  
+  // Write out every transition as "state relative_target occ_count"
+  phs << m_transition_accum.size() << std::endl;
+  for (unsigned int t=0; t<m_transition_accum.size(); t++) {
+    phs << m_transition_accum[t].bind_index << " ";
+    phs << m_transition_accum[t].target << " ";
+    phs << m_transition_accum[t].prob << std::endl;
+  }
+  
+  if (!phs)
+    throw WriteError();  
+  phs.close();
+}
+
+
+void
+HmmSet::dump_mc_statistics(const std::string filename) const
+{
+  std::ofstream mcs(filename.c_str());
+  if (!mcs) {
+    fprintf(stderr, "HmmSet::dump_mc_statistics(): could not open %s\n", filename.c_str());
+    throw OpenError();
+  }  
+  
+  mcs << num_states() << std::endl;
+  for (int s=0; s<num_states(); s++) {
+    mcs << s << " ";
+    m_states[s].emission_pdf.dump_statistics(mcs);
+    mcs << std::endl;
+  }
+  
+  if (!mcs)
+    throw WriteError();  
+  mcs.close();
+}
+
+
+void
+HmmSet::dump_gk_statistics(const std::string filename) const
+{
+  std::ofstream gks(filename.c_str());
+  if (!gks) {
+    fprintf(stderr, "HmmSet::dump_gk_statistics(): could not open %s\n", filename.c_str());
+    throw OpenError();
+  }  
+
+  gks << m_pool.size() << std::endl;
+  for (int g=0; g<m_pool.size(); g++) {
+    gks << g << " ";
+    m_pool.get_pdf(g).dump_statistics(gks);
+    gks << std::endl;
+  }
+  
+  if (!gks)
+    throw WriteError();  
+  gks.close();
+}
+
+
+void
+HmmSet::accumulate_from_dump(const std::string base)
 {
   assert(m_transition_accum.size() > 0);
 
+  accumulate_ph_from_dump(base+".phs");
+  accumulate_mc_from_dump(base+".mcs");
+  accumulate_gk_from_dump(base+".gks");
 }
 
+
+void
+HmmSet::accumulate_ph_from_dump(const std::string filename)
+{
+  std::ifstream phs(filename.c_str());
+  if (!phs) {
+    fprintf(stderr, "HmmSet::accumulate_ph_from_dump(): could not open %s\n", filename.c_str());
+    throw OpenError();
+  }
+  
+  unsigned int num_transitions;
+  phs >> num_transitions;
+  if (m_transition_accum.size() != num_transitions)
+    throw std::string("HmmSet::accumulate_ph_from_dump: the number of transitions in: %s doesn't match the earlier accumulations\n", filename.c_str());
+  
+  int bind_index, target, pos; double occ;
+  for (unsigned int t=0; t<num_transitions; t++) {
+    phs >> bind_index >> target >> occ;
+    pos=-1;
+    // Find this transition in m_transition_accum
+    for (unsigned int tsearch=0; tsearch<m_transition_accum.size(); tsearch++)
+      if (m_transition_accum[tsearch].bind_index == bind_index && m_transition_accum[tsearch].target == target) {
+	pos=tsearch;
+	break;
+      }
+    if (pos==-1)
+      throw std::string("HmmSet::accumulate_ph_from_dump: the transition %i could not be accumulated", t);
+    
+    // Accumulate the statistics
+    m_transition_accum[pos].prob += occ;
+  }
+  
+  if (!phs)
+    throw ReadError();  
+  phs.close();
+}
+
+
+void
+HmmSet::accumulate_mc_from_dump(const std::string filename)
+{
+  std::ifstream mcs(filename.c_str());
+  if (!mcs) {
+    fprintf(stderr, "HmmSet::accumulate_mc_from_dump(): could not open %s\n", filename.c_str());
+    throw OpenError();
+  }
+
+  int n, state;
+  mcs >> n;
+  if (n != num_states())
+    throw std::string("HmmSet::accumulate_mc_from_dump: the number of states in: %s is wrong\n", filename.c_str());
+  for (int s=0; s<num_states(); s++) {
+    mcs >> state;
+    m_states[s].emission_pdf.accumulate_from_dump(mcs);
+  }
+  
+  if (!mcs)
+    throw ReadError();  
+  mcs.close();
+}
+
+
+void
+HmmSet::accumulate_gk_from_dump(const std::string filename)
+{
+  std::ifstream gks(filename.c_str());
+  if (!gks) {
+    fprintf(stderr, "HmmSet::accumulate_gk_from_dump(): could not open %s\n", filename.c_str());
+    throw OpenError();
+  }
+
+  int num_pdfs, pdf;
+  gks >> num_pdfs;
+  if (num_pdfs != m_pool.size())
+    throw std::string("HmmSet::accumulate_gk_from_dump: the number of mixture base distributions in: %s is wrong\n", filename.c_str());
+  for (int b=0; b<num_pdfs; b++) {
+    gks >> pdf;
+    m_pool.get_pdf(b).accumulate_from_dump(gks);
+  }
+  
+  if (!gks)
+    throw ReadError();  
+  gks.close();
+
+}
  
+
+
 void 
 HmmSet::stop_accumulating()
 {

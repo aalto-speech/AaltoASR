@@ -248,22 +248,52 @@ public:
    */
   void start_accumulating();
 
-  /** Accumulates maximum likelihood statistics with a new frame
+  /** Accumulates statistics with a new frame
    * \param f the feature in the current frame
    * \param state the hmm state index
    * \param transition indicates whether a state transition occurred (0-1)
    */
-  void accumulate_ml(const FeatureVec &f, int state, int transition);
+  void accumulate(const FeatureVec &f, int state, int transition);
 
   /** Dumps the accumulated statistics to a file
    * \param base basename for the temporary files (base+gks/phs/mcs)
    */
-  void dump_all_statistics(const std::string base) const;
+  void dump_statistics(const std::string base) const;
+
+  /** Dumps the state transition probabilities to a file
+   * \param filename name of the dump file, preferably .phs
+   */
+  void dump_ph_statistics(const std::string filename) const;
+
+  /** Dumps the mixture coefficient statistics
+   * \param filename name of the dump file, preferably .mcs
+   */
+  void dump_mc_statistics(const std::string filename) const;
+
+  /** Dumps the base distribution probabilities to a file
+   * \param filename name of the dump file, preferably .gks
+   */
+  void dump_gk_statistics(const std::string filename) const;
 
   /** Accumulates the statistics from a dump file
    * \param base basename for the temporary files (base+gks/phs/mcs)
    */
-  void accumulate_from_dumped_statistics(const std::string base);
+  void accumulate_from_dump(const std::string base);
+
+  /** Accumulates the state transition probabilities from a dump file
+   * \param filename name of the dump file, preferably .phs
+   */
+  void accumulate_ph_from_dump(const std::string filename);
+
+  /** Accumulates the mixture coefficient statistics from a dump file
+   * \param filename name of the dump file, preferably .mcs
+   */
+  void accumulate_mc_from_dump(const std::string filename);
+
+  /** Accumulates the base distribution statistics from a dump file
+   * \param filename name of the dump file, preferably .gks
+   */
+  void accumulate_gk_from_dump(const std::string filename);
 
   /** Stops parameter training. Sets parameters to the inferred ones.
    */
