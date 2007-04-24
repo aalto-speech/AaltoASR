@@ -32,6 +32,7 @@ public:
     std::string transcript_path;
     std::string alignment_path;
     std::string hmmnet_path;
+    std::string den_hmmnet_path;
     std::string lna_path;
     float start_time;
     float end_time;
@@ -61,13 +62,15 @@ public:
      * \ref FeatureGenerator.
      * \param model           Pointer to the \ref HmmSet. Required if
      *                        hnbw is != NULL.
+     * \param den_hmmnet      Use denominator HMM network
      * \param fea_gen         Pointer to \ref FeatureGenerator.
      * \param raw_audio       true if audio files are of raw format.
      * \param hnbw            The existing \ref HmmNetBaumWelch. If NULL,
      *                        creates a new instance.
      * \return The \ref HmmNetBaumWelch initialized, either created or given.
      */
-    HmmNetBaumWelch* init_hmmnet_files(HmmSet *model,FeatureGenerator *fea_gen,
+    HmmNetBaumWelch* init_hmmnet_files(HmmSet *model, bool den_hmmnet,
+                                       FeatureGenerator *fea_gen,
                                        bool raw_audio, HmmNetBaumWelch *hnbw);
 
     Info();

@@ -73,9 +73,9 @@ main(int argc, char *argv[])
     // Load also mmi if needed
     if (config["mmi"].specified) {
       if (config["base"].specified)
-	{
-	  mmi_model.read_all(config["base"].get_str());
-	}
+      {
+        mmi_model.read_all(config["base"].get_str());
+      }
       else if (config["gk"].specified && config["mc"].specified &&
 	       config["ph"].specified)
 	{

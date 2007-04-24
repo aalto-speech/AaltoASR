@@ -107,6 +107,8 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
         info.alignment_path = (*it).second;
       if ((it = key_value_map.find("hmmnet")) != key_value_map.end())
         info.hmmnet_path = (*it).second;
+      if ((it = key_value_map.find("den-hmmnet")) != key_value_map.end())
+        info.den_hmmnet_path = (*it).second;
       if ((it = key_value_map.find("lna")) != key_value_map.end())
         info.lna_path = (*it).second;
       if ((it = key_value_map.find("start-time")) != key_value_map.end())

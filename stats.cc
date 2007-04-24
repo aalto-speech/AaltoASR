@@ -23,8 +23,7 @@ int start_frame, end_frame;
 
 conf::Config config;
 Recipe recipe;
-HmmSet ml_model;
-HmmSet mmi_model;
+HmmSet model;
 FeatureGenerator fea_gen;
 
 
@@ -69,7 +68,7 @@ train(HmmSet *model, Segmentator *segmentator)
 int
 main(int argc, char *argv[])
 {
-
+  Segmentator *segmentator;
   try {
     config("usage: stats [OPTION...]\n")
       ('h', "help", "", "", "display help")
@@ -80,6 +79,8 @@ main(int argc, char *argv[])
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for training")
+      ('H', "hmmnet", "", "", "use HMM networks for training")
+      ('D', "den-hmmnet", "", "", "use denominator HMM networks for training")
       ('o', "out=BASENAME", "arg must", "", "base filename for output statistics")
       ('R', "raw-input", "", "", "raw audio input")
       ('t', "transitions", "", "", "collect also state transition statistics")
@@ -99,18 +100,17 @@ main(int argc, char *argv[])
     raw_flag = config["raw-input"].specified;
     fea_gen.load_configuration(io::Stream(config["config"].get_str()));
 
-
     // Initialize the model for accumulating ML statistics
     if (config["base"].specified)
     {
-      ml_model.read_all(config["base"].get_str());
+      model.read_all(config["base"].get_str());
     }
     else if (config["gk"].specified && config["mc"].specified &&
              config["ph"].specified)
     {
-      ml_model.read_gk(config["gk"].get_str());
-      ml_model.read_mc(config["mc"].get_str());
-      ml_model.read_ph(config["ph"].get_str());
+      model.read_gk(config["gk"].get_str());
+      model.read_mc(config["mc"].get_str());
+      model.read_ph(config["ph"].get_str());
     }
     else
     {
@@ -135,10 +135,10 @@ main(int argc, char *argv[])
       fprintf(stderr, "You have defined --durstat option: duration statistics will be collected as well\n");
     
     // Check the dimension
-    if (ml_model.dim() != fea_gen.dim()) {
+    if (model.dim() != fea_gen.dim()) {
       throw str::fmt(128, 
 		     "gaussian dimension is %d but feature dimension is %d",
-                     ml_model.dim(), fea_gen.dim());
+                     model.dim(), fea_gen.dim());
     }
 
     // Read recipe file
@@ -161,68 +161,48 @@ main(int argc, char *argv[])
                   recipe.infos[f].end_time);
         fprintf(stderr,"\n");
       }
-          
-      // If lattice path set, let's do MMI
-      if (recipe.infos[f].hmmnet_path != "") {
 
-	// If this is the first recipe line, initialize the model for training
-	if (mmi_model.dim() == 0) {
-	  if (config["base"].specified)
-	    {
-	      mmi_model.read_all(config["base"].get_str());
-	    }
-	  else if (config["gk"].specified && config["mc"].specified &&
-		   config["ph"].specified)
-	    {
-	      mmi_model.read_gk(config["gk"].get_str());
-	      mmi_model.read_mc(config["mc"].get_str());
-	      mmi_model.read_ph(config["ph"].get_str());
-	    }
-	}
-
-	// Open files and configure
-	HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(&mmi_model, &fea_gen,
-								     raw_flag, NULL);
-	lattice->set_collect_transition_probs(transtat);
-	lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
-	if (config["ac-scale"].specified)
-	  lattice->set_acoustic_scaling(config["ac-scale"].get_float());
-	
-	// Train MMI
-	mmi_model.start_accumulating();
-	train(&mmi_model, lattice);
-	
-	// Clean up
-	delete lattice;
-	fea_gen.close();
+      if (config["hmmnet"].specified || config["den-hmmnet"].specified)
+      {
+        // Open files and configure
+        HmmNetBaumWelch* lattice =
+          recipe.infos[f].init_hmmnet_files(&model,
+                                            config["den-hmmnet"].specified,
+                                            &fea_gen, raw_flag, NULL);
+        lattice->set_collect_transition_probs(transtat);
+        lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
+        if (config["ac-scale"].specified)
+          lattice->set_acoustic_scaling(config["ac-scale"].get_float());
+        segmentator = lattice;
       }
-
-      // ML statistics should be accumulated anyway
-      PhnReader* phnreader = 
-	recipe.infos[f].init_phn_files(&ml_model, true, config["ophn"].specified, &fea_gen,
-				       config["raw-input"].specified, NULL);
-      phnreader->set_collect_transition_probs(transtat);
+      else
+      {
+        PhnReader* phnreader = 
+          recipe.infos[f].init_phn_files(&model, true,
+                                         config["ophn"].specified, &fea_gen,
+                                         config["raw-input"].specified, NULL);
+        phnreader->set_collect_transition_probs(transtat);
+        segmentator = phnreader;
+      }
       
-      // Train ML
-      ml_model.start_accumulating();
-      train(&ml_model, phnreader);
-      
+      // Train
+      model.start_accumulating();
+      train(&model, segmentator);
+	
       // Clean up
-      delete phnreader;
+      delete segmentator;
       fea_gen.close();
     }
     
     if (info > 0)
+    {
       fprintf(stderr, "Finished collecting statistics (%i/%i), writing models\n",
 	      config["batch"].get_int(), config["bindex"].get_int());
+    }
 
     // Write statistics to file dump and clean up
-    if (mmi_model.dim() != 0) {
-      mmi_model.dump_statistics(out_file+"_mmi");
-      mmi_model.stop_accumulating();
-    }
-    ml_model.dump_statistics(out_file);
-    ml_model.stop_accumulating();
+    model.dump_statistics(out_file);
+    model.stop_accumulating();
   }
 
 

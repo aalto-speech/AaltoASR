@@ -24,7 +24,8 @@
 
 class PhnReader : public Segmentator {
 public:
-  
+
+  /// Structure for the information on one line of phn transcription.
   class Phn {
   public:
     Phn();
@@ -75,6 +76,14 @@ public:
   void set_state_num_labels(bool l) { m_state_num_labels = l; }
   void set_relative_sample_numbers(bool r) { m_relative_sample_numbers = r; }
 
+  /** Reads one line from phn transcription.
+   * \note \ref next_frame() is a wrapper for next_phn_line() and should
+   * be used whenever possible.
+   * \warning Do not mix calls to \ref next_frame() and next_phn_line()!!!
+   * \param phn Reference to a \ref Phn structure to be filled
+   * \return false if EOF (or frame/line limits) were encountered,
+   *         true otherwise.
+   */
   bool next_phn_line(Phn &phn);
 
 private:
