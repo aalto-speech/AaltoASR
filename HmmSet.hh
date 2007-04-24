@@ -37,7 +37,7 @@ public:
 struct HmmTransition {
   HmmTransition() {}
   HmmTransition(int target, double prob) : target(target), prob(prob), bind_index(-1) {}
-  int target; // Relative state index
+  int target; // 0 = Self-transition 1 = Out-transition
   double prob; // Transition probability
   int bind_index; // Link to the source HmmState
 };
@@ -227,7 +227,6 @@ public:
    */
   void write_all(const std::string &base);
 
-
   /** Clears the state likelihood cache */
   void reset_cache();
 
@@ -244,16 +243,23 @@ public:
   void precompute_likelihoods(const FeatureVec &f);
 
   /** Prepares the HmmSet for parameter training. 
-   * Should be called before \ref accumulate_ml() or \ref accumulate_from_dumped_statistics()
+   * Should be called before \ref accumulate() or \ref accumulate_from_dump()
    */
   void start_accumulating();
 
-  /** Accumulates statistics with a new frame
+  /** Accumulates emission pdf statistics with a new frame
    * \param f the feature in the current frame
    * \param state the hmm state index
-   * \param transition indicates whether a state transition occurred (0-1)
+   * \param prior prior probability for this emission
    */
-  void accumulate(const FeatureVec &f, int state, int transition);
+  void accumulate_distribution(const FeatureVec &f, int state, double prior);
+
+  /** Accumulates state transition statistics
+   * \param state the source state index
+   * \param transition relative state index for this transition
+   * \param prior prior probability for this transition
+   */
+  void accumulate_transition(int state, int transition, double prior);
 
   /** Dumps the accumulated statistics to a file
    * \param base basename for the temporary files (base+gks/phs/mcs)
@@ -343,6 +349,8 @@ private:
 
   // For accumulating transition probabilities
   std::vector<HmmTransition> m_transition_accum;
+  // For marking which transitions have been accumulated
+  std::vector<bool> m_accumulated;
 
   PDFPool m_pool;
 };

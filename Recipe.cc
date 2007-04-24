@@ -146,6 +146,7 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
   phn_reader->set_relative_sample_numbers(relative_sample_nums);
   frame_rate = fea_gen->frame_rate();
   phn_reader->set_frame_rate(frame_rate);
+  phn_reader->set_hmm_model(model);
 
   // Open the segmentation
   phn_reader->open(out_phn?alignment_path:transcript_path);

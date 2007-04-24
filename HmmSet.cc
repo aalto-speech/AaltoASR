@@ -95,7 +95,7 @@ HmmSet::add_hmm(const std::string &label, int num_states)
 HmmTransition&
 HmmSet::add_transition(int bind_index, int target, double prob)
 {
-  std::vector<int> hmm_transitions = m_states[bind_index].m_transitions;
+  std::vector<int> &hmm_transitions = m_states[bind_index].m_transitions;
   int index;
   if (bind_index >= 0)
   {
@@ -210,13 +210,8 @@ HmmSet::read_ph(const std::string &filename)
         assert(target > 0);
         assert(prob > 0);
 
-	if (target == 1)
-	  target = -2;
-	else
-	  target -= 2;
-
 	if (source >= 0)
-	  add_transition(hmm.state(source), target, prob);
+	  add_transition(hmm.state(source), t, prob);
       }
     }
   }
@@ -368,32 +363,39 @@ void
 HmmSet::start_accumulating()
 {
   m_transition_accum = m_transitions;
-  for (unsigned int i=0; i<m_transition_accum.size(); i++)
+  m_accumulated.resize(m_transition_accum.size());
+  for (unsigned int i=0; i<m_transition_accum.size(); i++) {
     m_transition_accum[i].prob=0;
+    m_accumulated[i]=false;
+  }
   for (int s=0; s<num_states(); s++)
     m_states[s].emission_pdf.start_accumulating();
 }
 
 
 void
-HmmSet::accumulate(const FeatureVec &f, int state, int transition)
+HmmSet::accumulate_distribution(const FeatureVec &f, int state, double prior)
+{
+  m_states[state].emission_pdf.accumulate(prior, f);
+}
+
+
+void
+HmmSet::accumulate_transition(int state, int transition, double prior)
 {
   assert(m_transition_accum.size() > 0);
-  
-  // Accumulate state transition probabilities
-  int transition_index = m_states[state].transitions().at(transition);
-  m_transition_accum[transition_index].prob++;
 
-  // Accumulate state pdf
-  m_states[state].emission_pdf.accumulate(1, f);
+  // Accumulate state transition probabilities
+  std::vector<int> &transitions = m_states[state].transitions();
+  int transition_index = transitions[transition];
+  m_transition_accum[transition_index].prob += prior;
+  m_accumulated[transition_index] = true;
 }
 
 
 void
 HmmSet::dump_statistics(const std::string base) const
 {
-  assert(m_transition_accum.size() > 0);
-
   dump_ph_statistics(base+".phs");
   dump_mc_statistics(base+".mcs");
   dump_gk_statistics(base+".gks");
@@ -403,23 +405,27 @@ HmmSet::dump_statistics(const std::string base) const
 void
 HmmSet::dump_ph_statistics(const std::string filename) const
 {
-  std::ofstream phs(filename.c_str());
-  if (!phs) {
-    fprintf(stderr, "HmmSet::dump_ph_statistics(): could not open %s\n", filename.c_str());
-    throw OpenError();
-  }
+  if (m_transition_accum.size() > 0) {
+    std::ofstream phs(filename.c_str());
+    if (!phs) {
+      fprintf(stderr, "HmmSet::dump_ph_statistics(): could not open %s\n", filename.c_str());
+      throw OpenError();
+    }
   
-  // Write out every transition as "state relative_target occ_count"
-  phs << m_transition_accum.size() << std::endl;
-  for (unsigned int t=0; t<m_transition_accum.size(); t++) {
-    phs << m_transition_accum[t].bind_index << " ";
-    phs << m_transition_accum[t].target << " ";
-    phs << m_transition_accum[t].prob << std::endl;
+    // Write out every transition as "state relative_target occ_count"
+    phs << m_transition_accum.size() << std::endl;
+    for (unsigned int t=0; t<m_transition_accum.size(); t++) {
+      if (m_accumulated[t]) {
+	phs << m_transition_accum[t].bind_index << " ";
+	phs << m_transition_accum[t].target << " ";
+	phs << m_transition_accum[t].prob << std::endl;
+      }
+    }
+    
+    if (!phs)
+      throw WriteError();  
+    phs.close();
   }
-  
-  if (!phs)
-    throw WriteError();  
-  phs.close();
 }
 
 
@@ -434,9 +440,11 @@ HmmSet::dump_mc_statistics(const std::string filename) const
   
   mcs << num_states() << std::endl;
   for (int s=0; s<num_states(); s++) {
-    mcs << s << " ";
-    m_states[s].emission_pdf.dump_statistics(mcs);
-    mcs << std::endl;
+    if (m_states[s].emission_pdf.accumulated()) {
+      mcs << s << " ";
+      m_states[s].emission_pdf.dump_statistics(mcs);
+      mcs << std::endl;
+    }
   }
   
   if (!mcs)
@@ -456,9 +464,11 @@ HmmSet::dump_gk_statistics(const std::string filename) const
 
   gks << m_pool.size() << std::endl;
   for (int g=0; g<m_pool.size(); g++) {
-    gks << g << " ";
-    m_pool.get_pdf(g).dump_statistics(gks);
-    gks << std::endl;
+    if (m_pool.get_pdf(g).accumulated()) {      
+      gks << g << " ";
+      m_pool.get_pdf(g).dump_statistics(gks);
+      gks << std::endl;
+    }
   }
   
   if (!gks)
@@ -563,7 +573,6 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
 
 }
  
-
 
 void 
 HmmSet::stop_accumulating()

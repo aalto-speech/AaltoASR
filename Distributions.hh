@@ -28,6 +28,8 @@ public:
   virtual void accumulate_from_dump(std::istream &is) = 0;
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating() = 0;
+  /* Tells if this pdf has been accumulated */
+  virtual bool accumulated() const = 0;
   /* Use the accumulated statistics to update the current model parameters. */
   virtual void estimate_parameters() = 0;
 
@@ -119,6 +121,8 @@ public:
   virtual void accumulate_from_dump(std::istream &is) = 0;
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating() = 0;
+  /* Tells if this Gaussian has been accumulated */
+  virtual bool accumulated() const = 0;
   /* Use the accumulated statistics to update the current model parameters. */
   virtual void estimate_parameters() = 0;
   /* Returns the mean vector for this Gaussian */
@@ -164,6 +168,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
+  virtual bool accumulated() const { if (m_accum != NULL) return m_accum->accumulated; return false; }
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
@@ -181,21 +186,17 @@ private:
   class DiagonalAccumulator {
   public:
     DiagonalAccumulator(int dim) { 
-      ml_mean.resize(dim);
-      ml_cov.resize(dim);
-      mmi_mean.resize(dim);
-      mmi_cov.resize(dim);
-      ml_mean=0;
-      mmi_mean=0;
-      ml_cov=0;
-      mmi_cov=0;
+      mean.resize(dim);
+      cov.resize(dim);
+      mean=0;
+      cov=0;
       gamma=0;
+      accumulated=false;
     };
+    bool accumulated;
     double gamma;
-    Vector ml_mean;
-    Vector mmi_mean;
-    Vector ml_cov;
-    Vector mmi_cov;
+    Vector mean;
+    Vector cov;
   };
   
   double m_constant;
@@ -231,6 +232,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
+  virtual bool accumulated() const { if (m_accum != NULL) return m_accum->accumulated; return false; }
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
@@ -242,27 +244,23 @@ private:
   class FullCovarianceAccumulator {
   public:
     FullCovarianceAccumulator(int dim) { 
-      ml_mean.resize(dim);
-      ml_cov.resize(dim,dim);
-      mmi_mean.resize(dim);
-      mmi_cov.resize(dim,dim);
+      mean.resize(dim);
+      cov.resize(dim,dim);
       outer.resize(dim,dim);
-      ml_mean=0;
-      mmi_mean=0;
-      ml_cov=0;
-      mmi_cov=0;
+      mean=0;
+      cov=0;
       outer=0;
       gamma=0;
+      accumulated=false;
     };
     double gamma;
-    Vector ml_mean;
-    Vector mmi_mean;
-    Matrix ml_cov;
-    Matrix mmi_cov;
+    Vector mean;
+    Matrix cov;
     Matrix outer;
+    bool accumulated;
   };
 
-  double m_determinant;
+  //  double m_determinant;
   double m_constant;
   
   // Parameters
@@ -305,6 +303,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
+  virtual bool accumulated() const { return false; }
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
@@ -356,6 +355,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const;  
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
+  virtual bool accumulated() const { return false; }
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
@@ -406,6 +406,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
+  virtual bool accumulated() const { if (m_accum != NULL) return m_accum->accumulated; return false; }
   virtual void estimate_parameters();
   virtual double compute_likelihood(const FeatureVec &f) const;
   virtual double compute_log_likelihood(const FeatureVec &f) const;
@@ -416,8 +417,9 @@ private:
 
   class MixtureAccumulator {
   public:
-    MixtureAccumulator(int mixture_size){ gamma.resize(mixture_size,0); };
+    inline MixtureAccumulator(int mixture_size);
     std::vector<double> gamma;
+    bool accumulated;
   };
 
   std::vector<int> m_pointers;
@@ -428,5 +430,11 @@ private:
 };
 
 
+Mixture::MixtureAccumulator::MixtureAccumulator(int mixture_size) {
+  gamma.resize(mixture_size); 
+  for (int i=0; i<mixture_size; i++)
+    gamma[i]=0.0;
+  accumulated = false;
+}
 
 #endif /* DISTRIBUTIONS_HH */

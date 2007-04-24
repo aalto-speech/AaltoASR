@@ -205,10 +205,11 @@ DiagonalGaussian::accumulate(double prior,
 {
   assert(m_accum != NULL);
 
+  m_accum->accumulated = true;
   m_accum->gamma += prior;
-  for (int i=0; i<dim(); i++) {
-    m_accum->ml_mean += prior*f[i];
-    m_accum->ml_cov += prior*f[i]*f[i];
+  for (int d=0; d<dim(); d++) {
+    m_accum->mean(d) += prior*f[d];
+    m_accum->cov(d) += prior*f[d]*f[d];
   }
 }
 
@@ -218,12 +219,14 @@ DiagonalGaussian::dump_statistics(std::ostream &os) const
 {
   assert(m_accum != NULL);
 
-  os << m_accum->gamma << " ";
-  for (int i=0; i<dim(); i++)
-    os << m_accum->ml_mean(i) << " ";
-  for (int i=0; i<dim()-1; i++)
-    os << m_accum->ml_cov(i) << " ";
-  os << m_accum->ml_cov(dim()-1);
+  if (m_accum->accumulated) {
+    os << m_accum->gamma << " ";
+    for (int i=0; i<dim(); i++)
+      os << m_accum->mean(i) << " ";
+    for (int i=0; i<dim()-1; i++)
+      os << m_accum->cov(i) << " ";
+    os << m_accum->cov(dim()-1);
+  }
 }
 
   
@@ -244,9 +247,11 @@ DiagonalGaussian::accumulate_from_dump(std::istream &is)
 
   m_accum->gamma += gamma;
   for (int i=0; i<dim(); i++) {
-    m_accum->ml_mean(i) += gamma*mean(i);
-    m_accum->ml_cov(i) += gamma*cov(i);
+    m_accum->mean(i) += gamma*mean(i);
+    m_accum->cov(i) += gamma*cov(i);
   }
+
+  m_accum->accumulated = true;
 }
 
 
@@ -262,8 +267,8 @@ DiagonalGaussian::stop_accumulating()
 void
 DiagonalGaussian::estimate_parameters()
 {
-  m_mean.copy(m_accum->ml_mean);
-  m_covariance.copy(m_accum->ml_cov);
+  m_mean.copy(m_accum->mean);
+  m_covariance.copy(m_accum->cov);
   Blas_Scale(m_accum->gamma, m_mean);
   Blas_Scale(m_accum->gamma, m_covariance);
 }
@@ -423,11 +428,12 @@ FullCovarianceGaussian::accumulate(double prior,
 				   const FeatureVec &f)
 {
   assert(m_accum != NULL);
-  
+
+  m_accum->accumulated = true;  
   m_accum->gamma += prior;
   for (int i=0; i<dim(); i++) {
-    m_accum->ml_mean += prior*f[i];
-    m_accum->ml_cov += prior*f[i]*f[i];
+    m_accum->mean(i) += prior*f[i];
+    m_accum->cov(i,i) += prior*f[i]*f[i];
   }
 }
 
@@ -458,8 +464,8 @@ FullCovarianceGaussian::estimate_parameters()
 {
   assert(m_accum != NULL);
   
-  m_mean.copy(m_accum->ml_mean);
-  m_covariance.copy(m_accum->ml_cov);
+  m_mean.copy(m_accum->mean);
+  m_covariance.copy(m_accum->cov);
 
   // Clear the accumulators
   delete m_accum;
@@ -521,25 +527,21 @@ PrecisionSubspace::dim() const
 }
 
 
-// FIXME: NOT TRIED
 PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(int dim)
 {
 }
 
 
-// FIXME: NOT TRIED
 PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(const PrecisionConstrainedGaussian &g)
 {
 }
 
 
-// FIXME: NOT TRIED
 PrecisionConstrainedGaussian::~PrecisionConstrainedGaussian()
 {
 }
 
 
-// FIXME: NOT TRIED
 void
 PrecisionConstrainedGaussian::reset(int dim)
 {
@@ -901,6 +903,7 @@ Mixture::accumulate(double prior,
     m_accum->gamma[i] += this_likelihood;
     get_basis_pdf(i).accumulate(this_likelihood, f);
   }
+  m_accum->accumulated = true;
 }
 
 
@@ -908,10 +911,12 @@ void
 Mixture::dump_statistics(std::ostream &os) const
 {
   assert(m_accum != NULL);
-
-  for (int i=0; i<size()-1; i++)
-    os << m_pointers[i] << " " << m_accum->gamma[i] << " ";
-  os << m_pointers[size()-1] << " " << m_accum->gamma[size()-1];
+  
+  if (m_accum->accumulated) {
+    for (int i=0; i<size()-1; i++)
+      os << m_pointers[i] << " " << m_accum->gamma[i] << " ";
+    os << m_pointers[size()-1] << " " << m_accum->gamma[size()-1];
+  }
 }
 
 
@@ -925,6 +930,7 @@ Mixture::accumulate_from_dump(std::istream &is)
     is >> m_pointers[i] >> acc;
     m_accum->gamma[i] += acc;
   }
+  m_accum->accumulated = true;
 }
 
 
