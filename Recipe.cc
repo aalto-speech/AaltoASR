@@ -168,7 +168,8 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
 
 
 HmmNetBaumWelch*
-Recipe::Info::init_hmmnet_files(HmmSet *model, FeatureGenerator *fea_gen,
+Recipe::Info::init_hmmnet_files(HmmSet *model, bool den_hmmnet,
+                                FeatureGenerator *fea_gen,
                                 bool raw_audio, HmmNetBaumWelch *hnbw)
 {
   // Open the audio file
@@ -183,7 +184,10 @@ Recipe::Info::init_hmmnet_files(HmmSet *model, FeatureGenerator *fea_gen,
   }
 
   // Open the HMM network
-  hnbw->open(hmmnet_path);
+  if (den_hmmnet)
+    hnbw->open(den_hmmnet_path);
+  else
+    hnbw->open(hmmnet_path);
 
   if (start_time > 0 || end_time > 0)
   {
