@@ -392,6 +392,7 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
                   m_nodes[node_id].in_arcs[a]);
     int next_node_id = (forward?m_arcs[arc_id].target:
                         m_arcs[arc_id].source);
+
     
     if (m_arcs[arc_id].epsilon())
     {
@@ -495,22 +496,23 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
 double
 HmmNetBaumWelch::compute_sum_bw_loglikelihoods(int node_id)
 {
-  double sum = 0;
+  double sum = loglikelihoods.zero();
 
   for (int i = 0; i < (int)m_nodes[node_id].out_arcs.size(); i++)
   {
     int arc_id = m_nodes[node_id].out_arcs[i];
+    double cur_addition;
     if (m_arcs[arc_id].epsilon())
     {
-      sum += loglikelihoods.times(
+      cur_addition = loglikelihoods.times(
         m_arcs[arc_id].score,
         compute_sum_bw_loglikelihoods(m_arcs[arc_id].target));
     }
     else
     {
-      double temp = m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame);
-      sum += temp;
+      cur_addition = m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame);
     }
+    sum = loglikelihoods.add(sum, cur_addition);
   }
   return sum;
 }
