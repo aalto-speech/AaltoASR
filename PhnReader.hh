@@ -37,7 +37,7 @@ public:
     std::string comment;
   };
 
-  PhnReader();
+  PhnReader(HmmSet &model);
   virtual ~PhnReader();
 
   virtual void open(std::string ref_file);
@@ -48,19 +48,13 @@ public:
   virtual void init_utterance_segmentation(void);
   virtual int current_frame(void) { return m_current_frame; }
   virtual bool next_frame(void);
-  virtual const std::vector<Segmentator::StateProbPair>& state_probs(void) { return m_cur_state; }
-  virtual const Segmentator::TransitionMap& transition_probs(void) { return m_transition_info; }
+  virtual const std::vector<Segmentator::IndexProbPair>& pdf_probs(void) { return m_cur_pdf; }
+  virtual const std::vector<Segmentator::IndexProbPair>& transition_probs(void) { return m_transition_info; }
 
   /** Sets the frame rate for converting phn sample numbers to frame numbers.
    * \param frame_rate frames per second
    */
   void set_frame_rate(float frame_rate) { m_samples_per_frame = 16000/frame_rate; }
-
-  /** Sets the HMM model.
-   * \param model Pointer to \ref HmmSet
-   */
-  void set_hmm_model(HmmSet *model) { m_model = model; }
-
   
   /** Limits lines to be read from transcription
    * \param first_sample if reference defined, 
@@ -113,7 +107,7 @@ private:
   std::string m_line;
   FILE *m_file;
 
-  HmmSet *m_model;
+  HmmSet &m_model;
 
   /// true if eof has been detected, or line/frame limits have been reached
   bool m_eof_flag;
@@ -127,11 +121,11 @@ private:
   /// true if transitions are to be collected
   bool m_collect_transitions;
 
-  /// A vector which holds the current state and its probability
-  std::vector<Segmentator::StateProbPair> m_cur_state;
+  /// A vector which holds the current pdf and its probability
+  std::vector<Segmentator::IndexProbPair> m_cur_pdf;
 
   /// A map which holds the information about transitions
-  Segmentator::TransitionMap m_transition_info;
+  std::vector<Segmentator::IndexProbPair> m_transition_info;
 };
 
 #endif /* PHNREADER_HH */

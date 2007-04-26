@@ -16,15 +16,15 @@ PhnReader::Phn::Phn()
 {
 }
 
-PhnReader::PhnReader()
-  : m_file(NULL), m_model(NULL),
+PhnReader::PhnReader(HmmSet &model)
+  : m_file(NULL), m_model(model),
     m_state_num_labels(false), m_relative_sample_numbers(false)
 {
-  Segmentator::StateProbPair p(-1, 1);
+  Segmentator::IndexProbPair p(-1, 1);
   set_frame_rate(125); // Default frame rate
 
   // Initialize the current state and its probability
-  m_cur_state.push_back(p);
+  m_cur_pdf.push_back(p);
 }
 
 PhnReader::~PhnReader()
@@ -135,6 +135,8 @@ PhnReader::init_utterance_segmentation(void)
 bool
 PhnReader::next_frame(void)
 {
+  int cur_state_index = -1;
+  
   if (m_eof_flag)
     return false;
   
@@ -155,18 +157,20 @@ PhnReader::next_frame(void)
   assert( m_current_frame <= (int)(m_cur_phn.end/m_samples_per_frame) );
 
   if (m_state_num_labels)
-    m_cur_state.back().state_index = m_cur_phn.state;
+  {
+    cur_state_index = m_cur_phn.state;
+  }
   else
   {
     if (m_cur_phn.state < 0)
       throw std::string("PhnReader::next_frame(): A state segmented phn file is required");
-    if (m_model == NULL)
-      throw std::string("PhnReader::next_frame(): If state numbered labels are not used, an HMM model is needed");
-    Hmm &hmm = m_model->hmm(m_model->hmm_index(m_cur_phn.label[0]));
-    m_cur_state.back().state_index = hmm.state(m_cur_phn.state);
+    Hmm &hmm = m_model.hmm(m_model.hmm_index(m_cur_phn.label[0]));
+    cur_state_index = hmm.state(m_cur_phn.state);
   }
+  m_cur_pdf.back().index = m_model.emission_pdf_index(cur_state_index);
 
   bool new_phn_loaded = false;
+  Phn prev_phn = m_cur_phn;
   if (m_last_frame > 0 && m_current_frame+1 >= m_last_frame) {
     m_eof_flag = true; // For the next call
   }
@@ -189,29 +193,62 @@ PhnReader::next_frame(void)
     m_transition_info.clear();
     if (!m_eof_flag) // Not the last frame
     {
+      std::vector<int> &tr_index=m_model.state(cur_state_index).transitions();
+      int transition_index = -1;
+      
       if (new_phn_loaded)
       {
         // Out transition
-        int new_state;
         if (m_state_num_labels)
-          new_state = m_cur_phn.state;
+        {
+          // We don't have information which transition it is, select the first
+          // out transition
+          for (int i = 0; i < (int)tr_index.size(); i++)
+            if (m_model.transition(tr_index[i]).target_offset != 0)
+            {
+              transition_index = tr_index[i];
+              break;
+            }
+        }
         else
         {
-          if (m_cur_phn.state < 0)
-            throw std::string("PhnReader::next_frame(): A state segmented phn file is required");
-          Hmm &hmm = m_model->hmm(m_model->hmm_index(m_cur_phn.label[0]));
-          new_state = hmm.state(m_cur_phn.state);
-        }
+          int cur_relative_state = prev_phn.state;
+          int cur_hmm_index = m_model.hmm_index(prev_phn.label[0]);
+          Hmm &cur_hmm = m_model.hmm(cur_hmm_index);
 
-        Segmentator::StatePair s(m_cur_state.back().state_index, new_state);
-        m_transition_info[s] = 1;
+          // Find the correct transition
+          for (int i = 0; i < (int)tr_index.size(); i++)
+          {
+            int relative_next_state =
+              m_model.transition(tr_index[i]).target_offset+cur_relative_state;
+            int new_hmm_index = m_model.hmm_index(m_cur_phn.label[0]);
+            
+            if ((relative_next_state > cur_hmm.num_states() &&
+                 cur_hmm_index != new_hmm_index) ||
+                (relative_next_state == m_cur_phn.state))
+            {
+              transition_index = tr_index[i];
+              break;
+            }
+          }
+        }
       }
       else
       {
         // Self transition
-        Segmentator::StatePair s(m_cur_state.back().state_index,
-                                m_cur_state.back().state_index);
-        m_transition_info[s] = 1;
+        for (int i = 0; i < (int)tr_index.size(); i++)
+          if (m_model.transition(tr_index[i]).target_offset == 0)
+          {
+            transition_index = tr_index[i];
+            break;
+          }
+      }
+      if (transition_index == -1)
+        throw std::string("PhnReader::next_frame(): Correct transition was not found");
+      if (transition_index != -1)
+      {
+        Segmentator::IndexProbPair new_transition(transition_index, 1);
+        m_transition_info.push_back(new_transition);
       }
     }
   }

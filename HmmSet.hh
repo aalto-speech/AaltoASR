@@ -16,7 +16,7 @@
 class HmmState {
 public:
   HmmState() {};
-  HmmState(PDFPool *pool) : emission_pdf(pool) { };
+  HmmState(int pdf_index) : emission_pdf(pdf_index) { };
 
   /** Get the transitions for this state
    * \param state the number of state for which transitions are wanted
@@ -26,7 +26,7 @@ public:
 
   // NOTE: The formalism is changed to couple states and transitions
   // instead of phonemes and transitions, mavarjok 20.04.2007
-  Mixture emission_pdf;
+  int emission_pdf; //!< Index to the emission PDF
   std::vector<int> m_transitions;
 };
 
@@ -36,10 +36,10 @@ public:
 //
 struct HmmTransition {
   HmmTransition() {}
-  HmmTransition(int target, double prob) : target(target), prob(prob), bind_index(-1) {}
-  int target; // 0 = Self-transition 1 = Out-transition
-  double prob; // Transition probability
-  int bind_index; // Link to the source HmmState
+  HmmTransition(int source, int target, double prob) : source_index(source), target_offset(target), prob(prob) {}
+  int source_index;  //!< Index of the source state
+  int target_offset; //!< Relative target offset
+  double prob;       //!< Transition probability
 };
 
 
@@ -111,8 +111,8 @@ public:
   Hmm &new_hmm(const std::string &label);
 
   /** Creates a new Hmm and adds it to this HmmSet
-   * \param label the phoneme label
-   * \param the number of states for this Hmm
+   * \param label      the phoneme label
+   * \param num_states the number of states for this Hmm
    * \return reference to the newly created Hmm
    */
   Hmm &add_hmm(const std::string &label, int num_states);
@@ -140,15 +140,16 @@ public:
    */
   inline int hmm_index(const std::string &label) const;
 
-  /** Reserves space for tied states and sets pointers to the correct PDFPool
-   * \param states the amount of tied states
-   */
-  void reserve_states(int states);
 
   /**
-   * \return the number of tied states in the HmmSet
+   * \return the number of states in the HmmSet
    */
   inline int num_states() const;
+
+  /**
+   * \return the number of emission PDFs in the HmmSet
+   */
+  inline int num_emission_pdfs() const;
 
   /** Gives a reference to a tied state
    * \param state index of the tied state
@@ -156,18 +157,26 @@ public:
    */ 
   inline HmmState &state(int state);
 
+  /**
+   * \param state state index
+   * \return the emission pdf index of the state
+   */
+  inline int emission_pdf_index(int state);
+  
   /** Adds a new transition to the HmmSet
-   * \param bind_index index of the source tied state
-   * \param target relative state index of the untied target phoneme state (0-1)
-   * \param prob state transition probability
+   * \param source index of the source state
+   * \param target target state index within a HMM, relative to the current
+   *               state (must be positive for left-to-right HMMs).
+   * \param prob   state transition probability
+   * \return index to the \ref m_transitions
    */
-  HmmTransition &add_transition(int bind_index, int target, double prob);
+  int add_transition(int source, int target, double prob);
 
-  /** Makes a copy of a transition into \ref m_transitions
-   * \param index index of the transition to be copied in \ref m_transitions
-   * \return index of the transition copy
+  /** Adds a new state to HmmSet
+   * \param pdf_index PDF index of the state
+   * \return index to \ref m_states
    */
-  int clone_transition(int index);
+  int add_state(int pdf_index);
 
   /** 
    * \return number of transitions in \ref m_transitions
@@ -192,11 +201,18 @@ public:
    */
   void read_mc(const std::string &filename);
 
-  /** Reads the phonemes from a file
-   *  Creates a Hmm for each phoneme, transitions and tied states
+  /** Reads the HMM definition file. Handles both the legacy and the
+   * current fileformat.
    * \param filename the .ph file to be read
+   * \return true if the file was of legacy format (and no separate state
+   * information needs to be loaded).
    */
-  void read_ph(const std::string &filename);
+  bool read_ph(const std::string &filename);
+
+  /** Reads the HMM definitions in legacy file format, after the header.
+   * \param in File stream
+   */
+  void read_legacy_ph(std::ifstream &in);
   
   /** Opens all (.gk/.mc/.ph) files with a common base filename
    * Calls \ref read_gk(), \ref read_mc(), \ref read_ph()
@@ -221,13 +237,15 @@ public:
    */
   void write_ph(const std::string &filename);
 
+  void write_legacy_ph(const std::string &filename);
+
   /** Writes all (.gk/.mc/.ph) files with a common base filename
    * Calls \ref write_gk(), \ref write_mc(), \ref write_ph()
    * \param base the base filename
    */
   void write_all(const std::string &base);
 
-  /** Clears the state likelihood cache */
+  /** Clears the PDF likelihood cache */
   void reset_cache();
 
   /** Compute a state likelihood, use cache
@@ -235,9 +253,16 @@ public:
    * \param f the feature
    * \return the state probability
    */
-  double state_likelihood(const int s, const FeatureVec& f);
+  double state_likelihood(const int s, const FeatureVec& f) { return pdf_likelihood(m_states[s].emission_pdf, f); }
 
-  /** Compute all state likelihoods to the cache
+  /** Compute a PDF likelihood, use cache
+   * \param p index of the PDF
+   * \param f the feature
+   * \return the PDF probability
+   */
+  double pdf_likelihood(const int p, const FeatureVec& f);
+
+  /** Compute all PDF likelihoods to the cache
    * \param f the feature
    */
   void precompute_likelihoods(const FeatureVec &f);
@@ -259,7 +284,7 @@ public:
    * \param transition relative state index for this transition
    * \param prior prior probability for this transition
    */
-  void accumulate_transition(int state, int transition, double prior);
+  void accumulate_transition(int transition_index, double prior);
 
   /** Dumps the accumulated statistics to a file
    * \param base basename for the temporary files (base+gks/phs/mcs)
@@ -305,7 +330,14 @@ public:
    */
   void stop_accumulating();
 
-  
+private:
+  /** Helper function for loading legacy ph-files
+   * \param pdf_index pdf index to look for
+   * \return state index with the required pdf, or -1 if not found
+   */
+  int get_state_with_pdf(int pdf_index);
+
+public:
   
   // Exceptions
   struct DuplicateHmm : public std::exception {
@@ -334,16 +366,23 @@ public:
   };
 
 private:
-  // Map with phoneme label as key and index to m_hmms as value
+  /// Map with phoneme label as key and index to m_hmms as value
   std::map<std::string,int> m_hmm_map;
-  // Container for all transitions in the system
+  
+  /// Container for all transitions in the system
   std::vector<HmmTransition> m_transitions;
-  // Container for all Hmm states
+  
+  /// Container for all Hmm states
   std::vector<HmmState> m_states;
-  // Buffer of state likelihoods for the current feature
-  std::vector<double> m_state_likelihoods;
-  // List of the valid
-  std::vector<int> m_valid_state_likelihoods;
+
+  /// Container for the emission PDFs
+  std::vector<Mixture> m_emission_pdfs;
+  
+  /// Buffer of PDF likelihoods for the current feature
+  std::vector<double> m_pdf_likelihoods;
+  
+  /// List of the PDFs with valid likelihoods in the cache
+  std::vector<int> m_valid_pdf_likelihoods;
   
   std::vector<Hmm> m_hmms;
 
@@ -367,6 +406,13 @@ int
 HmmSet::num_states() const
 {
   return m_states.size();
+}
+
+
+int
+HmmSet::num_emission_pdfs() const
+{
+  return m_emission_pdfs.size();
 }
 
 
@@ -409,6 +455,13 @@ HmmState&
 HmmSet::state(int state)
 {
   return m_states[state];
+}
+
+
+int
+HmmSet::emission_pdf_index(int state)
+{
+  return m_states[state].emission_pdf;
 }
 
 

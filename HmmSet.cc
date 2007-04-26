@@ -6,6 +6,7 @@
 
 #include "HmmSet.hh"
 #include "util.hh"
+#include "str.hh"
 
 #define MIN_STATE_PROB 1e-30
 #define MIN_KERNEL_POS_PROB 1e-30
@@ -36,6 +37,7 @@ HmmSet::copy(const HmmSet &hmm_set)
   m_hmm_map = hmm_set.m_hmm_map;
   m_transitions = hmm_set.m_transitions;
   m_states = hmm_set.m_states;
+  m_emission_pdfs = hmm_set.m_emission_pdfs;
   m_hmms = hmm_set.m_hmms;
 }
 
@@ -45,23 +47,13 @@ HmmSet::reset()
 {
   m_pool.reset();
 
-  for (int s = 0; s < num_states(); s++)
-    m_states[s].emission_pdf.reset();
+  for (int i = 0; i < num_emission_pdfs(); i++)
+    m_emission_pdfs[i].reset();
 
   for (int t = 0; t < num_transitions(); t++)
     m_transitions[t].prob = 0;
 }
 
-
-void
-HmmSet::reserve_states(int states)
-{
-
-  m_states.resize(states);
-  m_state_likelihoods.resize(states);
-  for (int i=0; i<states; i++)
-    m_states[i].emission_pdf.set_pool(&m_pool);
-}
 
 
 Hmm&
@@ -92,38 +84,22 @@ HmmSet::add_hmm(const std::string &label, int num_states)
 }
 
 
-HmmTransition&
-HmmSet::add_transition(int bind_index, int target, double prob)
+int
+HmmSet::add_transition(int source, int target, double prob)
 {
-  std::vector<int> &hmm_transitions = m_states[bind_index].m_transitions;
-  int index;
-  if (bind_index >= 0)
-  {
-    for (index = 0; index < (int)m_transitions.size(); index++)
-    {
-      if (m_transitions[index].bind_index == bind_index &&
-          m_transitions[index].target == target)
-        break;
-    }
-  }
-  else
-    index = (int)m_transitions.size();
-  if (index == (int)m_transitions.size())
-  {
-    m_transitions.push_back(HmmTransition(target, prob));
-    m_transitions.back().bind_index = bind_index;
-  }
-
-  hmm_transitions.push_back(index);
-  return m_transitions[index];
+  int index = (int)m_transitions.size();
+  m_transitions.push_back(HmmTransition(source, target, prob));
+  m_states[source].m_transitions.push_back(index);  
+  return index;
 }
 
 
 int
-HmmSet::clone_transition(int index)
+HmmSet::add_state(int pdf_index)
 {
-  m_transitions.push_back(m_transitions[index]);
-  return m_transitions.size() - 1;
+  int index = (int)m_states.size();
+  m_states.push_back(HmmState(pdf_index));
+  return index;
 }
 
 
@@ -137,23 +113,28 @@ HmmSet::read_mc(const std::string &filename)
     throw OpenError();
   }
 
-  int states = 0;
+  int pdfs = 0;
 
-  in >> states;
-  reserve_states(states);
+  in >> pdfs;
 
-  for (int s = 0; s < states; s++) {
-    HmmState &state = m_states[s];
-    state.emission_pdf.read(in);
+  m_emission_pdfs.resize(pdfs);
+  m_pdf_likelihoods.resize(pdfs);
+  
+  for (int i = 0; i < pdfs; i++) {
+    Mixture &pdf = m_emission_pdfs[i];
+    pdf.set_pool(&m_pool);
+    pdf.read(in);
   }
 
   if (!in)
     throw ReadError();
 }
 
-void
+bool
 HmmSet::read_ph(const std::string &filename)
 {
+  std::string buf;
+  bool legacy_mode = false;
   std::ifstream in(filename.c_str());
   if (!in) {
     fprintf(stderr, "HmmSet::read_ph(): could not open %s\n", 
@@ -161,21 +142,37 @@ HmmSet::read_ph(const std::string &filename)
     throw OpenError();
   }
 
-  std::string buf;
-  std::string label;
-  int phonemes = 0;
-
   // Check that the first line is "PHONE"
-  // Second line has the total amount of phonemes
-  in >> buf >> phonemes;
-  if (buf != "PHONE")
+  in >> buf;
+  if (buf == "PHONE")
+  {
+    legacy_mode = true;
+    read_legacy_ph(in);
+  }
+  else
     throw ReadError();
 
+  if (!in)
+    throw ReadError();
+  return legacy_mode;
+}
+
+
+void
+HmmSet::read_legacy_ph(std::ifstream &in)
+{
+  std::string label;
+  int phonemes = 0;
+  std::vector<std::vector<HmmTransition> > state_info;
+  
+  // Second line has the total amount of phonemes
+  in >> phonemes;
+  
   // Reserve one Hmm for each phoneme
   m_hmms.reserve(phonemes);
 
   for (int h = 0; h < phonemes; h++) {
-    // Read phone
+    // Read a phone HMM
     int index = 0;
     int states = 0;
     in >> index >> states >> label; 
@@ -187,12 +184,33 @@ HmmSet::read_ph(const std::string &filename)
     // Read states
     states -= 2;
 
-    // FIXME: add_hmm does this already(?)
-    //    hmm.resize(states);
+    // In legacy ph-files the states are tied according to the emission pdfs.
+    // If the state with the same emission pdf already exists, the transition
+    // information is ignored.
     int state;
+    int pdf;
+    std::vector<bool> load_transitions;
     in >> state >> state;
     for (int s = 0; s < states; s++)
-      in >> hmm.state(s);
+    {
+      in >> pdf;
+      if (pdf >= (int)state_info.size())
+        state_info.resize(pdf+1); // Reserve more states
+
+      hmm.state(s) = pdf; // Assign the state (same index as with PDFs)
+      
+      if ((int)state_info[pdf].size() == 0)
+      {
+        // New state, load transitions
+        hmm.state(s) = pdf;
+        load_transitions.push_back(true);
+      }
+      else
+      {
+        // The state already exists, do not load the transitions
+        load_transitions.push_back(false);
+      }
+    }
 
     // Read transitions
     for (int s = -2; s < states; s++) {
@@ -202,6 +220,11 @@ HmmSet::read_ph(const std::string &filename)
       in >> source >> transitions;
       source -= 2;
 
+      if (source >= states)
+      {
+        throw str::fmt(128, "HmmSet::read_legacy_ph: Invalid source state number %i (only %i states)", source, states);
+      }
+
       for (int t = 0; t < transitions; t++) {
 	int target;
 	double prob;
@@ -210,14 +233,63 @@ HmmSet::read_ph(const std::string &filename)
         assert(target > 0);
         assert(prob > 0);
 
-	if (source >= 0)
-	  add_transition(hmm.state(source), t, prob);
+        if (source >= 0 && load_transitions[source])
+        {
+          if (target == 1)
+            target = states - source; // Sink state
+          else
+          {
+            target -= 2;
+            if (target > states)
+              throw str::fmt(128, "HmmSet::read_legacy_ph: Invalid target state number %i (only %i states)", source, states);
+            target -= source; // Make it relative
+          }
+
+          state_info[hmm.state(source)].push_back(
+            HmmTransition(hmm.state(source), target, prob));
+        }
+      }
+
+      if (!load_transitions[source])
+      {
+        // Check the transitions are valid
+        if (source >= 0)
+        {
+          for (int i = 0; i < (int)state_info[hmm.state(source)].size(); i++)
+          {
+            if (source+state_info[hmm.state(source)][i].target_offset > states)
+              throw str::fmt(128, "HmmSet::read_legacy_ph: Invalid target state number %i on existing state %i (only %i states)", source, hmm.state(source), states);
+          }
+        }
       }
     }
   }
 
-  if (!in)
-    throw ReadError();
+  // Fill the HmmSet with states and transitions in correct order.
+  // The states and PDFs share the same indices and the transitions are
+  // numbered sequentially.
+  for (int s = 0; s < (int)state_info.size(); s++)
+  {
+    int index = add_state(s);
+    assert( index == s );
+
+    for (int i = 0; i < (int)state_info[s].size(); i++)
+    {
+      add_transition(s, state_info[s][i].target_offset, state_info[s][i].prob);
+    }
+  }
+}
+
+
+int
+HmmSet::get_state_with_pdf(int pdf_index)
+{
+  for (int i = 0; i < (int)m_states.size(); i++)
+  {
+    if (m_states[i].emission_pdf == pdf_index)
+      return i;
+  }
+  return -1;
 }
 
 
@@ -242,15 +314,22 @@ HmmSet::write_mc(const std::string &filename)
 {
   std::ofstream out(filename.c_str());
 
-  out << m_states.size() << std::endl;
+  out << m_emission_pdfs.size() << std::endl;
   
-  for (int s = 0; s < (int)m_states.size(); s++) {
-    m_states[s].emission_pdf.write(out);
+  for (int i = 0; i < (int)m_states.size(); i++) {
+    m_emission_pdfs[i].write(out);
   }
 }
 
+
 void
 HmmSet::write_ph(const std::string &filename)
+{
+  write_legacy_ph(filename);
+}
+
+void
+HmmSet::write_legacy_ph(const std::string &filename)
 {
   std::ofstream out(filename.c_str());
 
@@ -285,8 +364,8 @@ HmmSet::write_ph(const std::string &filename)
       for (int t = 0; t < (int)hmm_transitions.size(); t++) {
 	HmmTransition &transition = this->transition(hmm_transitions[t]);
 
-	int target = transition.target + 2;
-	if (target == 0)
+	int target = transition.target_offset + 2 + s;
+	if (target == hmm.num_states())
 	  target = 1;
 
 	out << " " << target 
@@ -318,9 +397,9 @@ void
 HmmSet::reset_cache()
 {
   // Mark all values uncalculated
-  while (!m_valid_state_likelihoods.empty()) {
-    m_state_likelihoods[m_valid_state_likelihoods.back()]=-1.0;
-    m_valid_state_likelihoods.pop_back();
+  while (!m_valid_pdf_likelihoods.empty()) {
+    m_pdf_likelihoods[m_valid_pdf_likelihoods.back()]=-1.0;
+    m_valid_pdf_likelihoods.pop_back();
   }
   // Clear also cache for base distributions
   m_pool.reset_cache();
@@ -328,18 +407,17 @@ HmmSet::reset_cache()
 
 
 double
-HmmSet::state_likelihood(const int s, const FeatureVec &feature) 
+HmmSet::pdf_likelihood(const int p, const FeatureVec &feature) 
 {
-  if (m_state_likelihoods[s] > 0)
-    return m_state_likelihoods[s];
+  if (m_pdf_likelihoods[p] > 0)
+    return m_pdf_likelihoods[p];
 
-  HmmState &state = m_states[s];
-  m_state_likelihoods[s] = state.emission_pdf.compute_likelihood(feature);
-  if (m_state_likelihoods[s] < MIN_STATE_PROB)
-    m_state_likelihoods[s] = MIN_STATE_PROB;
-  m_valid_state_likelihoods.push_back(s);
+  m_pdf_likelihoods[p] = m_emission_pdfs[p].compute_likelihood(feature);
+  if (m_pdf_likelihoods[p] < MIN_STATE_PROB)
+    m_pdf_likelihoods[p] = MIN_STATE_PROB;
+  m_valid_pdf_likelihoods.push_back(p);
 
-  return m_state_likelihoods[s];
+  return m_pdf_likelihoods[p];
 }
 
 
@@ -350,11 +428,11 @@ HmmSet::precompute_likelihoods(const FeatureVec &f)
   m_pool.precompute_likelihoods(f);
 
   // Precompute state likelihoods
-  for (int s=0; s<num_states(); s++) {
-    m_state_likelihoods[s] = m_states[s].emission_pdf.compute_likelihood(f);
-    if (m_state_likelihoods[s] < MIN_STATE_PROB)
-      m_state_likelihoods[s] = MIN_STATE_PROB;
-    m_valid_state_likelihoods.push_back(s);
+  for (int i = 0; i < num_emission_pdfs(); i++) {
+    m_pdf_likelihoods[i] = m_emission_pdfs[i].compute_likelihood(f);
+    if (m_pdf_likelihoods[i] < MIN_STATE_PROB)
+      m_pdf_likelihoods[i] = MIN_STATE_PROB;
+    m_valid_pdf_likelihoods.push_back(i);
   }
 }
 
@@ -368,26 +446,24 @@ HmmSet::start_accumulating()
     m_transition_accum[i].prob=0;
     m_accumulated[i]=false;
   }
-  for (int s=0; s<num_states(); s++)
-    m_states[s].emission_pdf.start_accumulating();
+  for (int i = 0; i < num_emission_pdfs(); i++)
+    m_emission_pdfs[i].start_accumulating();
 }
 
 
 void
-HmmSet::accumulate_distribution(const FeatureVec &f, int state, double prior)
+HmmSet::accumulate_distribution(const FeatureVec &f, int pdf, double prior)
 {
-  m_states[state].emission_pdf.accumulate(prior, f);
+  m_emission_pdfs[pdf].accumulate(prior, f);
 }
 
 
 void
-HmmSet::accumulate_transition(int state, int transition, double prior)
+HmmSet::accumulate_transition(int transition_index, double prior)
 {
   assert(m_transition_accum.size() > 0);
 
   // Accumulate state transition probabilities
-  std::vector<int> &transitions = m_states[state].transitions();
-  int transition_index = transitions[transition];
   m_transition_accum[transition_index].prob += prior;
   m_accumulated[transition_index] = true;
 }
@@ -416,8 +492,8 @@ HmmSet::dump_ph_statistics(const std::string filename) const
     phs << m_transition_accum.size() << std::endl;
     for (unsigned int t=0; t<m_transition_accum.size(); t++) {
       if (m_accumulated[t]) {
-	phs << m_transition_accum[t].bind_index << " ";
-	phs << m_transition_accum[t].target << " ";
+	phs << m_transition_accum[t].source_index << " ";
+	phs << m_transition_accum[t].target_offset << " ";
 	phs << m_transition_accum[t].prob << std::endl;
       }
     }
@@ -439,10 +515,10 @@ HmmSet::dump_mc_statistics(const std::string filename) const
   }  
   
   mcs << num_states() << std::endl;
-  for (int s=0; s<num_states(); s++) {
-    if (m_states[s].emission_pdf.accumulated()) {
-      mcs << s << " ";
-      m_states[s].emission_pdf.dump_statistics(mcs);
+  for (int i = 0; i < num_emission_pdfs(); i++) {
+    if (m_emission_pdfs[i].accumulated()) {
+      mcs << i << " ";
+      m_emission_pdfs[i].dump_statistics(mcs);
       mcs << std::endl;
     }
   }
@@ -502,18 +578,22 @@ HmmSet::accumulate_ph_from_dump(const std::string filename)
   if (m_transition_accum.size() != num_transitions)
     throw std::string("HmmSet::accumulate_ph_from_dump: the number of transitions in: %s doesn't match the earlier accumulations\n", filename.c_str());
   
-  int bind_index, target, pos; double occ;
+  int source, target, pos; double occ;
   for (unsigned int t=0; t<num_transitions; t++) {
-    phs >> bind_index >> target >> occ;
+    phs >> source >> target >> occ;
     pos=-1;
     // Find this transition in m_transition_accum
     for (unsigned int tsearch=0; tsearch<m_transition_accum.size(); tsearch++)
-      if (m_transition_accum[tsearch].bind_index == bind_index && m_transition_accum[tsearch].target == target) {
+    {
+      if (m_transition_accum[tsearch].source_index == source &&
+          m_transition_accum[tsearch].target_offset == target)
+      {
 	pos=tsearch;
 	break;
       }
+    }
     if (pos==-1)
-      throw std::string("HmmSet::accumulate_ph_from_dump: the transition %i could not be accumulated", t);
+      throw str::fmt(128, "HmmSet::accumulate_ph_from_dump: the transition %i could not be accumulated", t);
     
     // Accumulate the statistics
     m_transition_accum[pos].prob += occ;
@@ -534,13 +614,15 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
     throw OpenError();
   }
 
-  int n, state;
+  int n, pdf;
   mcs >> n;
-  if (n != num_states())
-    throw std::string("HmmSet::accumulate_mc_from_dump: the number of states in: %s is wrong\n", filename.c_str());
-  for (int s=0; s<num_states(); s++) {
-    mcs >> state;
-    m_states[s].emission_pdf.accumulate_from_dump(mcs);
+  if (n != num_emission_pdfs())
+    throw str::fmt(128, "HmmSet::accumulate_mc_from_dump: the number of PDFs in: %s is wrong\n", filename.c_str());
+  for (int i = 0; i < num_emission_pdfs(); i++) {
+    mcs >> pdf;
+    if (pdf != i)
+      throw std::string("HmmSet::accumulate_mc_from_dump: Invalid dump");
+    m_emission_pdfs[i].accumulate_from_dump(mcs);
   }
   
   if (!mcs)
@@ -602,9 +684,8 @@ HmmSet::stop_accumulating()
   }
   
   // Stop accumulation also for state distributions
-  for (int s=0; s<num_states(); s++) {
-    HmmState &curr_state = state(s);
-    curr_state.emission_pdf.stop_accumulating();
+  for (int i = 0; i < num_emission_pdfs(); i++) {
+    m_emission_pdfs[i].stop_accumulating();
   }
  
   // Clear accumulator

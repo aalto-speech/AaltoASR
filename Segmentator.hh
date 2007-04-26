@@ -10,32 +10,12 @@
 class Segmentator {
 public:
 
-  /** Structure for representing states and their probabilities */
-  struct StateProbPair {
-    int state_index;
+  /** Structure for representing PDFs and their prior probabilities */
+  struct IndexProbPair {
+    int index;
     double prob;
-    StateProbPair(int index, double p) : state_index(index), prob(p) { }
+    IndexProbPair(int i, double p) : index(i), prob(p) { }
   };
-
-  /** Structure for representing state pairs for transitions */
-  struct StatePair {
-    int from;
-    int to;
-    StatePair() { }
-    StatePair(int f, int t) : from(f), to(t) { }
-  };
-
-  struct StatePairLessThan {
-    bool operator()(const StatePair &s1, const StatePair &s2) const
-    {
-      if (s1.from == s2.from)
-        return (s1.to < s2.to);
-      return (s1.from < s2.from);
-    }
-  };
-
-  /** Type specification for the map used in \ref transition_probs() */
-  typedef std::map<StatePair, double, StatePairLessThan> TransitionMap;
 
   virtual ~Segmentator() { }
 
@@ -68,7 +48,7 @@ public:
    * \ref FeatureGenerator. */
   virtual int current_frame(void) = 0;
 
-  /** Computes the state probability statistics for the next frame.
+  /** Computes the PDF probability statistics for the next frame.
    * \return true if a new frame is available, false if EOF was encountered.
    */
   virtual bool next_frame(void) = 0;
@@ -84,13 +64,13 @@ public:
    * \ref next_frame() */
   virtual bool eof(void) = 0;
 
-  /** Returns a reference to a vector of possible states and their
+  /** Returns a reference to a vector of possible PDFs and their
    * probabilities */
-  virtual const std::vector<StateProbPair>& state_probs(void) = 0;
+  virtual const std::vector<IndexProbPair>& pdf_probs(void) = 0;
 
-  /** Returns a reference to a map of state pairs (transitions) with
-      probabilities as the values */
-  virtual const TransitionMap& transition_probs(void) = 0;
+  /** Returns a reference to a vector of possible transitions and their
+   * probabilities */
+  virtual const std::vector<IndexProbPair>& transition_probs(void) = 0;
 };
 
 #endif // SEGMENTATOR_HH

@@ -105,18 +105,18 @@ compute_vtln_log_likelihoods(Segmentator *seg, std::string &speaker,
 
     while (seg->next_frame())
     {
-      const std::vector<Segmentator::StateProbPair> &states =
-        seg->state_probs();
+      const std::vector<Segmentator::IndexProbPair> &pdfs =
+        seg->pdf_probs();
       FeatureVec fea_vec = fea_gen.generate(seg->current_frame());
       if (fea_gen.eof())
         break; // EOF in FeatureGenerator
       model.reset_cache();
 
-      for (i = 0; i < (int)states.size(); i++)
+      for (i = 0; i < (int)pdfs.size(); i++)
       {
         // Get probabilities
         speaker_stats[cur_speaker].log_likelihoods[cur_warp_index] += 
-          log(states[i].prob*model.state_likelihood(states[i].state_index,fea_vec));
+          log(pdfs[i].prob*model.pdf_likelihood(pdfs[i].index,fea_vec));
       }
     }
   }
@@ -169,7 +169,7 @@ find_best_warp_factors(void)
 int
 main(int argc, char *argv[])
 {
-  PhnReader phn_reader;
+  PhnReader *phn_reader;
 
   try {
     config("usage: vtln [OPTION...]\n")
@@ -180,6 +180,7 @@ main(int argc, char *argv[])
       ('p', "ph=FILE", "arg", "", "HMM definitions")
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
+      ('O', "ophn", "", "", "use output phns for VTLN")
       ('R', "raw-input", "", "", "raw audio input")
       ('v', "vtln=MODULE", "arg must", "", "VTLN module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
@@ -268,19 +269,19 @@ main(int argc, char *argv[])
       }
     
       // Open the audio and phn files from the given list.
-      recipe.infos[f].init_phn_files((config["snl"].specified?NULL:&model),
-                                     config["rsamp"].specified,
-                                     true, &fea_gen,
-                                     config["raw-input"].specified,
-                                     &phn_reader);
+      phn_reader = recipe.infos[f].init_phn_files(
+        &model, config["rsamp"].specified, config["snl"].specified,
+        config["ophn"].specified, &fea_gen, config["raw-input"].specified,
+        NULL);
       if (recipe.infos[f].speaker_id.size() == 0)
         throw std::string("Speaker ID is missing");
 
-      compute_vtln_log_likelihoods(&phn_reader, recipe.infos[f].speaker_id,
+      compute_vtln_log_likelihoods(phn_reader, recipe.infos[f].speaker_id,
                                    recipe.infos[f].utterance_id);
 
       fea_gen.close();
-      phn_reader.close();
+      phn_reader->close();
+      delete phn_reader;
     }
 
     // Find the best warp factors from statistics

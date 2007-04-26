@@ -42,11 +42,12 @@ public:
     std::string utterance_id;
 
     /** Opens the relevant files for \ref PhnReader and \ref FeatureGenerator.
-     * \param model                The HMM model. If NULL, assumes state
-     *                             number labels.
+     * \param *model               The HMM model. Required if phn_reader==NULL.
      * \param relative_sample_nums If true, the sample numbers in the phn
      *                             file are relative to the start time of
      *                             the audio file.
+     * \param state_num_labels     True if phn file contains state numbers
+     *                             instead of phonemes and relative states.
      * \param out_phn              If true, reads alignment phns instead of
      *                             transcript phns.
      * \param fea_gen              Pointer to \ref FeatureGenerator.
@@ -56,12 +57,13 @@ public:
      * \return The \ref PhnReader initialized, either created or given.
      */
     PhnReader* init_phn_files(HmmSet *model, bool relative_sample_nums,
-                              bool out_phn, FeatureGenerator *fea_gen,
+                              bool state_num_labels, bool out_phn,
+                              FeatureGenerator *fea_gen,
                               bool raw_audio, PhnReader *phn_reader);
     /** Open the relevant files for \ref HmmNetBaumWelch and
      * \ref FeatureGenerator.
      * \param model           Pointer to the \ref HmmSet. Required if
-     *                        hnbw is != NULL.
+     *                        hnbw is == NULL.
      * \param den_hmmnet      Use denominator HMM network
      * \param fea_gen         Pointer to \ref FeatureGenerator.
      * \param raw_audio       true if audio files are of raw format.

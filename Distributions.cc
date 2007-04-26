@@ -105,6 +105,7 @@ Gaussian::kullback_leibler(Gaussian &g) const
 
 DiagonalGaussian::DiagonalGaussian(int dim)
 {
+  m_accum = NULL;
   reset(dim);
 }
 
@@ -325,6 +326,7 @@ DiagonalGaussian::set_covariance(const Vector &covariance)
 
 FullCovarianceGaussian::FullCovarianceGaussian(int dim)
 {
+  m_accum = NULL;
   reset(dim);
 }
 
@@ -769,6 +771,7 @@ SubspaceConstrainedGaussian::set_covariance(const Matrix &covariance)
 
 Mixture::Mixture()
 {
+  m_accum = NULL;
 }
 
 

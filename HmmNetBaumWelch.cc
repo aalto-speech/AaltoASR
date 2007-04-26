@@ -47,7 +47,6 @@ HmmNetBaumWelch::read_fst(FILE *file)
   std::string line;
   std::vector<std::string> fields;
   bool ok = true;
-  int max_pdf_index = -1;
 
   while (str::read_line(&line, file, true)) {
     str::split(&line, " \t", true, &fields);
@@ -103,8 +102,6 @@ HmmNetBaumWelch::read_fst(FILE *file)
           else
           {
             in = str::str2long(&fields[3], &ok);
-            if (in > max_pdf_index)
-              max_pdf_index = in;
           }
         }
         if (fields.size() > 4) {
@@ -131,10 +128,6 @@ HmmNetBaumWelch::read_fst(FILE *file)
       target_node.in_arcs.push_back(arc_index);
     }
   }
-
-  // Reserve a table for pdf occupancy probabilities
-  if (max_pdf_index >= 0)
-    m_pdf_prob.resize(max_pdf_index+1);
 
   if (m_initial_node_id < 0)
     throw std::string("initial node not specified");
@@ -184,6 +177,21 @@ HmmNetBaumWelch::reset(void)
       loglikelihoods.zero();
   m_active_node_table[m_cur_buffer].clear();
 }
+
+
+void
+HmmNetBaumWelch::init_utterance_segmentation(void)
+{
+  // Reserve a table for pdf occupancy probabilities
+  m_pdf_prob.resize(m_model.num_emission_pdfs());
+
+  if (m_collect_transitions)
+    m_transition_prob.resize(m_model.num_transitions());
+
+  // Fill the backward probabilities
+  fill_backward_probabilities();
+}
+
 
 void
 HmmNetBaumWelch::fill_backward_probabilities(void)
@@ -275,6 +283,11 @@ HmmNetBaumWelch::next_frame(void)
     m_cur_buffer = 0;
     for (int i = 0; i < (int)m_pdf_prob.size(); i++)
       m_pdf_prob[i] = 0;
+    if (m_collect_transitions)
+    {
+      for (int i = 0; i < (int)m_transition_prob.size(); i++)
+        m_transition_prob[i] = 0;
+    }
     m_nodes[m_initial_node_id].prob[m_cur_buffer] = loglikelihoods.one();
     m_active_node_table[m_cur_buffer].push_back(m_initial_node_id);
 
@@ -304,9 +317,8 @@ HmmNetBaumWelch::next_frame(void)
   }
 
   m_model.reset_cache();
-  m_transition_info.clear();
 
-  // Iterate through active nodes and compute the state occupancy
+  // Iterate through active nodes and compute the PDF occupancy
   // probabilities
   for (int i = 0; i < (int)m_active_node_table[source_buffer].size(); i++)
   {
@@ -336,16 +348,30 @@ HmmNetBaumWelch::next_frame(void)
   }
   // END OF SANITY CHECK  
   
-  // Fill the state probabilities and clear the active PDF probabilities
-  m_state_prob_pairs.clear();
+  // Fill the PDF probabilities and clear the active PDF probabilities
+  m_pdf_prob_pairs.clear();
   for (int i = 0; i < (int)m_active_pdf_table.size(); i++)
   {
-    Segmentator::StateProbPair new_state_prob(
+    Segmentator::IndexProbPair new_pdf_prob(
       m_active_pdf_table[i], m_pdf_prob[m_active_pdf_table[i]] / total_prob);
-    m_state_prob_pairs.push_back(new_state_prob);
+    m_pdf_prob_pairs.push_back(new_pdf_prob);
     m_pdf_prob[m_active_pdf_table[i]] = 0;
   }
   m_active_pdf_table.clear();
+
+  if (m_collect_transitions)
+  {
+    m_transition_prob_pairs.clear();
+    for (int i = 0; i < (int)m_active_transition_table.size(); i++)
+    {
+      Segmentator::IndexProbPair new_transition_prob(
+        m_active_transition_table[i],
+        m_transition_prob[m_active_transition_table[i]] / total_prob);
+      m_transition_prob_pairs.push_back(new_transition_prob);
+      m_transition_prob[m_active_transition_table[i]] = 0;
+    }
+    m_active_transition_table.clear();
+  }
 
   return true;
 }
@@ -378,36 +404,22 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
     }
     else
     {
+      HmmTransition &tr = m_model.transition(m_arcs[arc_id].transition_id);
       double arc_score = loglikelihoods.times(
-        m_acoustic_scale*log(m_model.state_likelihood(m_arcs[arc_id].pdf_id,
-                                                      fea_vec)),
+        m_acoustic_scale*(log(m_model.state_likelihood(tr.source_index,
+                                                       fea_vec)) + tr.prob),
         m_arcs[arc_id].score);
       double total_score = loglikelihoods.times(cur_score, arc_score);
-
-      // DEBUG
-//       if ((!forward && (node_id == 558 || node_id == 561)) ||
-//           (forward && (node_id == 557 || node_id == 559)))
-//       {
-//        fprintf(stderr,"Traversing %i -> %i (PDF %i, arc score %g, total %g)\n",
-//                node_id, next_node_id, m_arcs[arc_id].pdf_id, arc_score, total_score);
-//       }
 
       if (total_score > loglikelihoods.zero())
       {
         if (forward)
         {
-          int pdf_id = m_arcs[arc_id].pdf_id;
+          int pdf_id = m_model.emission_pdf_index(tr.source_index);
           double backward_likelihood =
             m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame);
           double cur_arc_likelihood =
             loglikelihoods.times(cur_score, backward_likelihood);
-
-          // DEBUG
-//           if (node_id == 557 || node_id == 559)
-//           {
-//             fprintf(stderr, "  backward-score: %g  cur_score %g\n",
-//                     backward_likelihood, cur_arc_likelihood);
-//           }
 
           // If the total likelihood (forward+backward) of the path
           // is worse than the forward beam compared to the sum of
@@ -434,8 +446,18 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
 
           if (m_collect_transitions)
           {
-            add_transition_probabilities(m_arcs[arc_id].pdf_id, total_score,
-                                         next_node_id);
+            int tr_id = m_arcs[arc_id].transition_id;
+            if (m_transition_prob[tr_id] <= 0)
+            {
+              // Transition didn't have probability for this frame
+              m_transition_prob[tr_id] = cur_arc_prob;
+              m_active_transition_table.push_back(tr_id);
+            }
+            else
+            {
+              // Add the probability to previous one
+              m_transition_prob[tr_id] += cur_arc_prob;
+            }
           }
         }
         else // !forward
@@ -491,40 +513,6 @@ HmmNetBaumWelch::compute_sum_bw_loglikelihoods(int node_id)
     }
   }
   return sum;
-}
-
-void
-HmmNetBaumWelch::add_transition_probabilities(int source_pdf_id,
-                                              double fw_score,int next_node_id)
-{
-  for (int t = 0; t < (int)m_nodes[next_node_id].out_arcs.size(); t++)
-  {
-    int arc_id = m_nodes[next_node_id].out_arcs[t];
-    if (m_arcs[arc_id].epsilon())
-    {
-      add_transition_probabilities(source_pdf_id,
-                                   loglikelihoods.times(fw_score,
-                                                        m_arcs[arc_id].score),
-                                   m_arcs[arc_id].target);
-    }
-    else
-    {
-      double cur_ll = loglikelihoods.times(
-        fw_score, m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame+1));
-
-      if (cur_ll >= m_sum_total_loglikelihood - m_forward_beam)
-      {
-        double total_likelihood =
-          exp(loglikelihoods.divide(cur_ll, m_sum_total_loglikelihood));
-        Segmentator::StatePair s(source_pdf_id, m_arcs[arc_id].pdf_id);
-        Segmentator::TransitionMap::iterator it = m_transition_info.find(s);
-        if (it == m_transition_info.end())
-          m_transition_info[s] = total_likelihood;
-        else
-          (*it).second += total_likelihood;
-      }
-    }
-  }
 }
 
 

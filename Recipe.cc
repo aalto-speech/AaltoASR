@@ -132,8 +132,9 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
 
 PhnReader*
 Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
-                              bool out_phn, FeatureGenerator *fea_gen,
-                              bool raw_audio, PhnReader *phn_reader)
+                             bool state_num_labels, bool out_phn,
+                             FeatureGenerator *fea_gen,
+                             bool raw_audio, PhnReader *phn_reader)
 {
   float frame_rate;
 
@@ -142,13 +143,15 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
 
   // Initialize the PhnReader
   if (phn_reader == NULL)
-    phn_reader = new PhnReader;
-  if (model == NULL)
-    phn_reader->set_state_num_labels(true);
+  {
+    if (model == NULL)
+      throw std::string("recipe::Info::init_phn_files: HMM model is required if phn_reader==NULL");
+    phn_reader = new PhnReader(*model);
+  }
+  phn_reader->set_state_num_labels(state_num_labels);
   phn_reader->set_relative_sample_numbers(relative_sample_nums);
   frame_rate = fea_gen->frame_rate();
   phn_reader->set_frame_rate(frame_rate);
-  phn_reader->set_hmm_model(model);
 
   // Open the segmentation
   phn_reader->open(out_phn?alignment_path:transcript_path);

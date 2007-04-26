@@ -27,11 +27,10 @@ HmmSet model;
 FeatureGenerator fea_gen;
 
 
-// FIXME: does this go correctly?
 void
 train(HmmSet *model, Segmentator *segmentator)
 {
-  int frame, relative_target;
+  int frame;
   
   segmentator->init_utterance_segmentation();
 
@@ -42,24 +41,21 @@ train(HmmSet *model, Segmentator *segmentator)
     FeatureVec feature = fea_gen.generate(frame);    
     
     // Accumulate all possible states distributions for this frame
-    const std::vector<Segmentator::StateProbPair> &states
-      = segmentator->state_probs();
-    for (int i = 0; i < (int)states.size(); i++)
-      model->accumulate_distribution(feature, states[i].state_index, states[i].prob);
+    const std::vector<Segmentator::IndexProbPair> &pdfs
+      = segmentator->pdf_probs();
+    for (int i = 0; i < (int)pdfs.size(); i++)
+      model->accumulate_distribution(feature, pdfs[i].index,
+                                     pdfs[i].prob);
     
     // Accumulate also transition probabilities if desired
     if (transtat) {
+
+      const std::vector<Segmentator::IndexProbPair> &transitions
+        = segmentator->transition_probs();
       
-      const Segmentator::TransitionMap &transitions
-	= segmentator->transition_probs();
-      
-      for (Segmentator::TransitionMap::const_iterator it = transitions.begin();
-	   it != transitions.end(); it++)
-	{
-	  relative_target = 0;
-	  if ((*it).first.from != (*it).first.to) relative_target = 1;
-	  model->accumulate_transition((*it).first.from, relative_target, (*it).second);
-	}
+      for (int i = 0; i < (int)transitions.size(); i++)
+        model->accumulate_transition(transitions[i].index,
+                                     transitions[i].prob);
     }
   }
 }
@@ -178,7 +174,7 @@ main(int argc, char *argv[])
       else
       {
         PhnReader* phnreader = 
-          recipe.infos[f].init_phn_files(&model, true,
+          recipe.infos[f].init_phn_files(&model, false, false,
                                          config["ophn"].specified, &fea_gen,
                                          config["raw-input"].specified, NULL);
         phnreader->set_collect_transition_probs(transtat);

@@ -5,14 +5,14 @@
 #include "FeatureGenerator.hh"
 #include "HmmSet.hh"
 
-/** A class for generating state probabilities for a HMM network.
+/** A class for generating PDF probabilities for a HMM network.
  * The network is represented in FST format.
  */
 class HmmNetBaumWelch : public Segmentator {
 public:
 
-  /** Special pdf_id values used in arcs. */
-  enum { EPSILON = -1, FINAL_PDF = -2 };
+  /** Special transition_id values used in arcs. */
+  enum { EPSILON = -1, FINAL_TRANSITION = -2 };
 
   static struct LLType {
     double zero(void) { return -1e10; }
@@ -50,18 +50,25 @@ public:
     int id;
     int source; //!< Index of the source node 
     int target; //!< Index of the target node
-    int pdf_id; //!< Input symbol indentifying a pdf in the HMM model
-    std::string out_str; //!< Output string 
-    double score; //!< Score of the arc (should be negative)
+
+    /// Input symbol identifying a transition in the HMM model
+    int transition_id;
+    
+    std::string out_str; //!< Output string (currently not in use)
+
+    /// Log score of the arc (should be negative). Does not include the
+    /// transition probability.
+    double score;
+    
     FrameProbs bw_scores; //!< Log likelihoods computed in backward phase
     
-    Arc(int id_, int source_, int target_, int pdf_id_, std::string &str_,
+    Arc(int id_, int source_, int target_, int tr_id_, std::string &str_,
         double score_)
-      : id(id_), source(source_), target(target_), pdf_id(pdf_id_),
+      : id(id_), source(source_), target(target_), transition_id(tr_id_),
         out_str(str_), score(score_) { }
     ~Arc() { bw_scores.clear(); }
-    bool epsilon() { return pdf_id == EPSILON; }
-    bool final() { return pdf_id == FINAL_PDF; }
+    bool epsilon() { return transition_id == EPSILON; }
+    bool final() { return transition_id == FINAL_TRANSITION; }
   };
   
   /** Network node */
@@ -92,24 +99,22 @@ public:
   virtual void close();
   virtual void set_frame_limits(int first_frame, int last_frame);
   virtual void set_collect_transition_probs(bool collect) { m_collect_transitions = collect; }
-  virtual void init_utterance_segmentation(void) { fill_backward_probabilities(); }
+  virtual void init_utterance_segmentation(void);
   virtual int current_frame(void) { return m_current_frame; }
   virtual bool next_frame(void);
   virtual void reset(void);
   virtual bool eof(void) { return m_eof_flag; }
-  virtual const std::vector<Segmentator::StateProbPair>& state_probs(void) { return m_state_prob_pairs; }
-  virtual const Segmentator::TransitionMap& transition_probs(void) { return m_transition_info; }
+  virtual const std::vector<Segmentator::IndexProbPair>& pdf_probs(void) { return m_pdf_prob_pairs; }
+  virtual const std::vector<Segmentator::IndexProbPair>& transition_probs(void) { return m_transition_prob_pairs; }
 
 private:
-  /** Compute the backward probabilities. */
+  /** Computes the backward probabilities. */
   void fill_backward_probabilities(void);
 
   double propagate_node_arcs(int node_id, bool forward,
                              double cur_score, int target_buffer,
                              FeatureVec &fea_vec);
   double compute_sum_bw_loglikelihoods(int node_id);
-  void add_transition_probabilities(int source_pdf_id, double fw_score,
-                                    int next_node_id);
   void clear_bw_scores(void);
   
 private:
@@ -154,8 +159,14 @@ private:
   /// Table of active PDFs in the forward phase
   std::vector<int> m_active_pdf_table;
 
-  /// A vector which holds the possible states and their probabilities
-  std::vector<Segmentator::StateProbPair> m_state_prob_pairs;
+  /// Table of transition probabilities in the forward phase
+  std::vector<double> m_transition_prob;
+
+  /// Table of active transitions in the forward phase
+  std::vector<int> m_active_transition_table;
+
+  /// A vector which holds the possible PDFs and their probabilities
+  std::vector<Segmentator::IndexProbPair> m_pdf_prob_pairs;
 
   /// true if eof has been detected or frame limits have been reached
   bool m_eof_flag;
@@ -164,7 +175,7 @@ private:
   bool m_collect_transitions;
 
   /// A map which holds the information about transitions
-  Segmentator::TransitionMap m_transition_info;
+  std::vector<Segmentator::IndexProbPair> m_transition_prob_pairs;
 };
 
 #endif // HMMNETBAUMWELCH_HH
