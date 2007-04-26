@@ -514,12 +514,21 @@ HmmSet::dump_mc_statistics(const std::string filename) const
     throw OpenError();
   }  
   
-  mcs << num_states() << std::endl;
+  mcs << num_emission_pdfs() << std::endl;
+
   for (int i = 0; i < num_emission_pdfs(); i++) {
-    if (m_emission_pdfs[i].accumulated()) {
-      mcs << i << " ";
-      m_emission_pdfs[i].dump_statistics(mcs);
+    if (m_emission_pdfs[i].accumulated(0)) {
+      mcs << i << " num ";
+      m_emission_pdfs[i].dump_statistics(mcs, 0);
       mcs << std::endl;
+    }
+
+    if (m_emission_pdfs[i].estimation_mode() == PDF::MMI) {
+      if (m_emission_pdfs[i].accumulated(1)) {
+	mcs << i << " den ";
+	m_emission_pdfs[i].dump_statistics(mcs, 1);
+	mcs << std::endl;
+      }
     }
   }
   
@@ -538,12 +547,20 @@ HmmSet::dump_gk_statistics(const std::string filename) const
     throw OpenError();
   }  
 
-  gks << m_pool.size() << std::endl;
+  gks << m_pool.size() << m_pool.dim() << std::endl;
   for (int g=0; g<m_pool.size(); g++) {
-    if (m_pool.get_pdf(g).accumulated()) {      
-      gks << g << " ";
-      m_pool.get_pdf(g).dump_statistics(gks);
+    if (m_pool.get_pdf(g).accumulated(0)) {
+      gks << g << " num ";
+      m_pool.get_pdf(g).dump_statistics(gks, 0);
       gks << std::endl;
+    }
+
+    if (m_pool.get_pdf(g).estimation_mode() == PDF::MMI) {
+      if (m_pool.get_pdf(g).accumulated(1)) {
+	gks << g << " den ";
+	m_pool.get_pdf(g).dump_statistics(gks, 1);
+	gks << std::endl;
+      }
     }
   }
   
@@ -616,14 +633,12 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
 
   int n, pdf;
   mcs >> n;
+
   if (n != num_emission_pdfs())
     throw str::fmt(128, "HmmSet::accumulate_mc_from_dump: the number of PDFs in: %s is wrong\n", filename.c_str());
-  for (int i = 0; i < num_emission_pdfs(); i++) {
-    mcs >> pdf;
-    if (pdf != i)
-      throw std::string("HmmSet::accumulate_mc_from_dump: Invalid dump");
-    m_emission_pdfs[i].accumulate_from_dump(mcs);
-  }
+
+  while(mcs >> pdf)
+    m_emission_pdfs[pdf].accumulate_from_dump(mcs);
   
   if (!mcs)
     throw ReadError();  
@@ -640,19 +655,20 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
     throw OpenError();
   }
 
-  int num_pdfs, pdf;
-  gks >> num_pdfs;
+  int num_pdfs, dim, pdf;
+  gks >> num_pdfs >> dim;
   if (num_pdfs != m_pool.size())
     throw std::string("HmmSet::accumulate_gk_from_dump: the number of mixture base distributions in: %s is wrong\n", filename.c_str());
-  for (int b=0; b<num_pdfs; b++) {
-    gks >> pdf;
-    m_pool.get_pdf(b).accumulate_from_dump(gks);
-  }
+
+  if (dim != m_pool.dim())
+    throw std::string("HmmSet::accumulate_gk_from_dump: the dimensionality of mixture base distributions in: %s is wrong\n", filename.c_str());
+
+  while(gks >> pdf)
+    m_pool.get_pdf(pdf).accumulate_from_dump(gks);
   
   if (!gks)
     throw ReadError();  
   gks.close();
-
 }
  
 
@@ -661,6 +677,18 @@ HmmSet::stop_accumulating()
 {
   assert(m_transition_accum.size() > 0);
 
+  // Stop accumulation also for state distributions
+  for (int i=0; i<num_emission_pdfs(); i++)
+    m_emission_pdfs[i].stop_accumulating();
+ 
+  // Clear accumulator
+  m_transition_accum.clear();
+}
+
+
+void
+HmmSet::estimate_parameters()
+{
   float sum;
   
   /* Update transition probabilities */
@@ -681,13 +709,7 @@ HmmSet::stop_accumulating()
 	  m_transition_accum[state_transitions[t]].prob = .001;
       }
     }
+
+    m_emission_pdfs[state(s).emission_pdf].estimate_parameters();
   }
-  
-  // Stop accumulation also for state distributions
-  for (int i = 0; i < num_emission_pdfs(); i++) {
-    m_emission_pdfs[i].stop_accumulating();
-  }
- 
-  // Clear accumulator
-  m_transition_accum.clear();
 }

@@ -10,28 +10,39 @@
 class PDF {
 public:
 
+  enum EstimationMode { ML, MMI };
+
   // COMMON
 
   virtual ~PDF() {}
   /* The feature dimensionality */
   int dim() const { return m_dim; }
-
+  
   // TRAINING
 
   /* Initializes the accumulator buffers */  
   virtual void start_accumulating() = 0;
   /* Accumulates the statistics for this pdf */
-  virtual void accumulate(double prior, const FeatureVec &f) = 0;
+  virtual void accumulate(double prior,
+			  const FeatureVec &f, 
+			  int accum_pos = 0) = 0;
   /* Writes the currently accumulated statistics to a file */
-  virtual void dump_statistics(std::ostream &os) const = 0;
+  virtual void dump_statistics(std::ostream &os,
+			       int accum_pos = 0) const = 0;
   /* Accumulates from a file dump */
   virtual void accumulate_from_dump(std::istream &is) = 0;
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating() = 0;
   /* Tells if this pdf has been accumulated */
-  virtual bool accumulated() const = 0;
+  virtual bool accumulated(int accum_pos = 0) const = 0;
   /* Use the accumulated statistics to update the current model parameters. */
   virtual void estimate_parameters() = 0;
+  /* Sets the training mode for this pdf */
+  void set_estimation_mode(EstimationMode mode) { m_mode = mode; }
+  /* Sets the training mode for this pdf */
+  EstimationMode estimation_mode() const { return m_mode; }
+  /* Returns the correct accumulator for these statistics */
+  int accumulator_position(std::string type);
 
   // LIKELIHOODS
   
@@ -50,6 +61,7 @@ public:
 
 protected:
   int m_dim;
+  EstimationMode m_mode;
 };
 
 
@@ -114,15 +126,17 @@ public:
   virtual void start_accumulating() = 0;
   /* Accumulates the maximum likelihood statistics for the Gaussian
      weighed with a prior. */
-  virtual void accumulate(double prior, const FeatureVec &f) = 0;
-  /* Writes the currently accumulated statistics to a file */
-  virtual void dump_statistics(std::ostream &os) const = 0;
-  /* Accumulates from file dump */
+  virtual void accumulate(double prior, const FeatureVec &f, 
+			  int accum_pos = 0) = 0;
+  /* Writes the currently accumulated statistics to a stream */
+  virtual void dump_statistics(std::ostream &os,
+			       int accum_pos = 0) const = 0;
+  /* Accumulates from dump */
   virtual void accumulate_from_dump(std::istream &is) = 0;
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating() = 0;
   /* Tells if this Gaussian has been accumulated */
-  virtual bool accumulated() const = 0;
+  virtual bool accumulated(int accum_pos = 0) const = 0;
   /* Use the accumulated statistics to update the current model parameters. */
   virtual void estimate_parameters() = 0;
   /* Returns the mean vector for this Gaussian */
@@ -163,12 +177,13 @@ public:
 
   // Gaussian-specific
   virtual void start_accumulating();
-  virtual void accumulate(double prior,
-			     const FeatureVec &f);
-  virtual void dump_statistics(std::ostream &os) const;
+  virtual void accumulate(double prior, const FeatureVec &f, 
+			  int accum_pos = 0);
+  virtual void dump_statistics(std::ostream &os,
+			       int accum_pos = 0) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
-  virtual bool accumulated() const { if (m_accum != NULL) return m_accum->accumulated; return false; }
+  virtual bool accumulated(int accum_pos = 0) const;
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
@@ -205,7 +220,7 @@ private:
   Vector m_covariance;
   Vector m_precision;
   
-  DiagonalAccumulator *m_accum;
+  std::vector<DiagonalAccumulator*> m_accums;
 };
 
 
@@ -228,11 +243,13 @@ public:
   // Gaussian-specific
   virtual void start_accumulating();
   virtual void accumulate(double prior,
-			  const FeatureVec &f);
-  virtual void dump_statistics(std::ostream &os) const;
+			  const FeatureVec &f, 
+			  int accum_pos = 0);
+  virtual void dump_statistics(std::ostream &os,
+			       int accum_pos = 0) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
-  virtual bool accumulated() const { if (m_accum != NULL) return m_accum->accumulated; return false; }
+  virtual bool accumulated(int accum_pos = 0) const;
   virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
@@ -268,112 +285,8 @@ private:
   Matrix m_covariance;
   Matrix m_precision;
   
-  FullCovarianceAccumulator *m_accum;
+  std::vector<FullCovarianceAccumulator*> m_accums;
 };
-
-
-class PrecisionSubspace {
-public:
-  PrecisionSubspace();
-  ~PrecisionSubspace();
-  void set_dim(int dim);
-  int dim() const;
-private:
-  int m_dim;
-};
-
-
-class PrecisionConstrainedGaussian : public Gaussian {
-public:
-  PrecisionConstrainedGaussian(int dim);
-  PrecisionConstrainedGaussian(const PrecisionConstrainedGaussian& g);
-  ~PrecisionConstrainedGaussian();
-  virtual void reset(int dim);
-
-  // From pdf
-  virtual double compute_likelihood(const FeatureVec &f) const;
-  virtual double compute_log_likelihood(const FeatureVec &f) const;
-  virtual void write(std::ostream &os) const;
-  virtual void read(std::istream &is);
-
-  // Gaussian-specific
-  virtual void start_accumulating();
-  virtual void accumulate(double prior,
-			  const FeatureVec &f);
-  virtual void dump_statistics(std::ostream &os) const;
-  virtual void accumulate_from_dump(std::istream &is);
-  virtual void stop_accumulating();
-  virtual bool accumulated() const { return false; }
-  virtual void estimate_parameters();
-  virtual void get_mean(Vector &mean) const;
-  virtual void get_covariance(Matrix &covariance) const;
-  virtual void set_mean(const Vector &mean);
-  virtual void set_covariance(const Matrix &covariance);
-
-  // PCGMM-specific
-  /* Get the coefficients for the subspace constrained precision matrix */
-  Vector &get_precision_coeffs() const;
-  /* Set the coefficients for the subspace constrained precision matrix */
-  void set_precision_coeffs(Vector &coeffs);
-
-private:
-  double m_determinant;
-  Vector m_mean;
-  Vector m_precision_coeffs;
-  PrecisionSubspace m_ps;
-};
-
-
-class ExponentialSubspace {
-public:
-  ExponentialSubspace();
-  ~ExponentialSubspace();
-  void set_dim(int dim);
-  int dim() const;
-private:
-  int m_dim;
-};
-
-
-
-class SubspaceConstrainedGaussian : public Gaussian {
-public:
-  SubspaceConstrainedGaussian(int dim);
-  SubspaceConstrainedGaussian(const SubspaceConstrainedGaussian &g);
-  ~SubspaceConstrainedGaussian();
-  virtual void reset(int dim);
-
-  // From pdf
-  virtual double compute_likelihood(const FeatureVec &f) const;
-  virtual double compute_log_likelihood(const FeatureVec &f) const;
-  virtual void write(std::ostream &os) const;
-  virtual void read(std::istream &is);
-
-  // Gaussian-specific
-  virtual void start_accumulating();
-  virtual void accumulate(double prior, const FeatureVec &f);
-  virtual void dump_statistics(std::ostream &os) const;  
-  virtual void accumulate_from_dump(std::istream &is);
-  virtual void stop_accumulating();
-  virtual bool accumulated() const { return false; }
-  virtual void estimate_parameters();
-  virtual void get_mean(Vector &mean) const;
-  virtual void get_covariance(Matrix &covariance) const;
-  virtual void set_mean(const Vector &mean);
-  virtual void set_covariance(const Matrix &covariance);
-
-  // SCGMM-specific
-  /* Get the coefficients for the subspace constrained exponential parameters */
-  Vector &get_subspace_coeffs() const;
-  /* Set the coefficients for the subspace constrained exponential parameters */
-  void set_subspace_coeffs(Vector &coeffs);
-
-private:
-  Vector m_subspace_coeffs;
-  ExponentialSubspace m_es;
-};
-
-
 
 
 
@@ -402,11 +315,14 @@ public:
 
   // From pdf
   virtual void start_accumulating();
-  virtual void accumulate(double prior, const FeatureVec &f);
-  virtual void dump_statistics(std::ostream &os) const;
+  virtual void accumulate(double prior,
+			  const FeatureVec &f,
+			  int accum_pos = 0);
+  virtual void dump_statistics(std::ostream &os,
+			       int accum_pos = 0) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
-  virtual bool accumulated() const { if (m_accum != NULL) return m_accum->accumulated; return false; }
+  virtual bool accumulated(int accum_pos = 0) const;
   virtual void estimate_parameters();
   virtual double compute_likelihood(const FeatureVec &f) const;
   virtual double compute_log_likelihood(const FeatureVec &f) const;
@@ -426,7 +342,7 @@ private:
   std::vector<double> m_weights;
 
   PDFPool *m_pool;
-  MixtureAccumulator *m_accum;
+  std::vector<MixtureAccumulator*> m_accums;
 };
 
 

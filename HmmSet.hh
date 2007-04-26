@@ -326,11 +326,16 @@ public:
    */
   void accumulate_gk_from_dump(const std::string filename);
 
-  /** Stops parameter training. Sets parameters to the inferred ones.
+  /** Stops parameter training.
    */
   void stop_accumulating();
 
+  /** Sets parameters according to the current accumulators.
+   */
+  void estimate_parameters();
+
 private:
+
   /** Helper function for loading legacy ph-files
    * \param pdf_index pdf index to look for
    * \return state index with the required pdf, or -1 if not found
