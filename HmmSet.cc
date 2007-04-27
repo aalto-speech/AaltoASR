@@ -8,9 +8,7 @@
 #include "util.hh"
 #include "str.hh"
 
-#define MIN_STATE_PROB 1e-30
-#define MIN_KERNEL_POS_PROB 1e-30
-
+#define MIN_STATE_PROB 1e-50
 
 
 void
@@ -119,11 +117,13 @@ HmmSet::read_mc(const std::string &filename)
 
   m_emission_pdfs.resize(pdfs);
   m_pdf_likelihoods.resize(pdfs);
+  m_valid_pdf_likelihoods.clear();
   
   for (int i = 0; i < pdfs; i++) {
     Mixture &pdf = m_emission_pdfs[i];
     pdf.set_pool(&m_pool);
     pdf.read(in);
+    m_pdf_likelihoods[i] = -1;
   }
 
   if (!in)
@@ -424,6 +424,9 @@ HmmSet::pdf_likelihood(const int p, const FeatureVec &feature)
 void
 HmmSet::precompute_likelihoods(const FeatureVec &f)
 {
+  // Clear cache
+  reset_cache();
+  
   // Precompute base distribution likelihoods
   m_pool.precompute_likelihoods(f);
 
@@ -523,7 +526,7 @@ HmmSet::dump_mc_statistics(const std::string filename) const
       mcs << std::endl;
     }
 
-    if (m_emission_pdfs[i].estimation_mode() == PDF::MMI) {
+    if (m_emission_pdfs[i].estimation_mode() == MMI) {
       if (m_emission_pdfs[i].accumulated(1)) {
 	mcs << i << " den ";
 	m_emission_pdfs[i].dump_statistics(mcs, 1);
@@ -555,7 +558,7 @@ HmmSet::dump_gk_statistics(const std::string filename) const
       gks << std::endl;
     }
 
-    if (m_pool.get_pdf(g).estimation_mode() == PDF::MMI) {
+    if (m_pool.get_pdf(g).estimation_mode() == MMI) {
       if (m_pool.get_pdf(g).accumulated(1)) {
 	gks << g << " den ";
 	m_pool.get_pdf(g).dump_statistics(gks, 1);

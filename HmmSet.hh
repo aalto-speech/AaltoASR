@@ -397,6 +397,7 @@ private:
   std::vector<bool> m_accumulated;
 
   PDFPool m_pool;
+  EstimationMode m_mode;
 };
 
 

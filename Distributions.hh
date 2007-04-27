@@ -6,11 +6,11 @@
 #include "FeatureBuffer.hh"
 #include "LinearAlgebra.hh"
 
+enum EstimationMode { ML, MMI };
+
 
 class PDF {
 public:
-
-  enum EstimationMode { ML, MMI };
 
   // COMMON
 
@@ -70,8 +70,8 @@ protected:
 class PDFPool {
 public:
   
-  PDFPool() { m_dim=0; };
-  PDFPool(int dim) { m_dim=dim; };
+  PDFPool();
+  PDFPool(int dim);
   ~PDFPool();
   /* The dimensionality of the distributions in this pool */
   int dim() const { return m_dim; }
@@ -263,24 +263,19 @@ private:
     FullCovarianceAccumulator(int dim) { 
       mean.resize(dim);
       cov.resize(dim,dim);
-      outer.resize(dim,dim);
       mean=0;
       cov=0;
-      outer=0;
       gamma=0;
       accumulated=false;
     };
     double gamma;
     Vector mean;
     Matrix cov;
-    Matrix outer;
     bool accumulated;
   };
-
-  //  double m_determinant;
-  double m_constant;
   
   // Parameters
+  double m_constant;
   Vector m_mean;
   Matrix m_covariance;
   Matrix m_precision;
@@ -303,7 +298,7 @@ public:
   void set_components(const std::vector<int> &pointers,
 		      const std::vector<double> &weights);
   /* Get a mixture component */
-  PDF& get_basis_pdf(int index);
+  PDF& get_base_pdf(int index);
   /* Get all the mixture components */
   void get_components(std::vector<int> &pointers,
 		      std::vector<double> &weights);
