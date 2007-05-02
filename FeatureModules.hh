@@ -144,14 +144,15 @@ protected:
 
   /** The type of the module.  Should be equal to type_str(). */
   std::string m_type_str; 
-  int m_own_offset_left;  // Buffer offsets for own computations
+  int m_own_offset_left;  //!< Buffer offsets for own computations
   int m_own_offset_right;
-  int m_req_offset_left;  // Required buffer offsets by calling modules
+  int m_req_offset_left;  //!< Required buffer offsets by calling modules
   int m_req_offset_right;
-  int m_init_offset_left; // Buffer offsets used in initial buffer filling
+  int m_init_offset_left; //!< Buffer offsets used in initial buffer filling
   int m_init_offset_right;
   int m_buffer_size;
-  int m_buffer_last_pos;  // The last frame number in the buffer
+  int m_buffer_last_pos;  //!< The last frame number in the buffer
+  int m_buffer_first_pos; //!< The first frame number in the buffer
   FeatureBuffer m_buffer;
 
   int m_dim;

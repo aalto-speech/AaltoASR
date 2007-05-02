@@ -14,6 +14,7 @@ FeatureModule::FeatureModule() :
   m_init_offset_right(0),
   m_buffer_size(0),
   m_buffer_last_pos(INT_MAX),
+  m_buffer_first_pos(INT_MAX),
   m_dim(0)
 {
 }
@@ -37,7 +38,11 @@ FeatureModule::set_buffer(int left, int right)
   if (right > m_req_offset_right)
     m_req_offset_right = right;
   new_size = m_req_offset_right + m_req_offset_left + 1;
-  m_buffer_last_pos = INT_MAX; // Invalidate the buffer
+
+  // Invalidate the buffer
+  m_buffer_last_pos = INT_MAX;
+  m_buffer_first_pos = INT_MAX;
+
   if (new_size > m_buffer_size)
   {
     m_buffer_size = new_size;
@@ -86,26 +91,51 @@ FeatureModule::at(int frame)
   int buffer_gen_start, buffer_gen_end;
   
   if (frame <= m_buffer_last_pos &&
-      frame > m_buffer_last_pos - m_buffer_size)
+      frame >= m_buffer_first_pos)
     return m_buffer[frame];
 
   if (frame > m_buffer_last_pos)
   {
     // Moving forward, reuse the buffer if possible
-    buffer_gen_start = m_buffer_last_pos + 1;
-    if (frame >= buffer_gen_start + m_buffer_size)
-      buffer_gen_start = frame - m_buffer_size + 1;
-    m_buffer_last_pos = buffer_gen_end = frame;
+    if (frame - m_buffer_size + 1 > m_buffer_last_pos)
+    {
+      // Can not reuse, discard
+      m_buffer_first_pos = m_buffer_last_pos = frame;
+      buffer_gen_start = buffer_gen_end = frame;
+    }
+    else
+    {
+      // Fill the gap
+      buffer_gen_start = m_buffer_last_pos + 1;
+      buffer_gen_end = frame;
+      m_buffer_last_pos = frame;
+      if (m_buffer_first_pos < m_buffer_last_pos - m_buffer_size + 1)
+        m_buffer_first_pos = m_buffer_last_pos - m_buffer_size + 1;
+    }
   }
   else
   {
-    // Moving backwards, reuse the buffer if possible
-    buffer_gen_start = frame;
-    buffer_gen_end = m_buffer_last_pos - m_buffer_size;
-    if (buffer_gen_end - buffer_gen_start + 1 > m_buffer_size)
-      buffer_gen_end = buffer_gen_start + m_buffer_size - 1;
-    m_buffer_last_pos = buffer_gen_start + m_buffer_size - 1;
+    // Moving backward, reuse the buffer if possible
+    if (frame + m_buffer_size - 1 < m_buffer_first_pos)
+    {
+      // Can not reuse, discard
+      m_buffer_first_pos = m_buffer_last_pos = frame;
+      buffer_gen_start = buffer_gen_end = frame;
+    }
+    else
+    {
+      // Fill the gap
+      buffer_gen_start = frame;
+      buffer_gen_end = m_buffer_first_pos - 1;
+      m_buffer_first_pos = frame;
+      if (m_buffer_last_pos > m_buffer_first_pos + m_buffer_size - 1)
+        m_buffer_last_pos = m_buffer_first_pos + m_buffer_size - 1;
+        }
   }
+
+  assert(buffer_gen_start <= buffer_gen_end);
+  assert(m_buffer_last_pos >= m_buffer_first_pos);
+  assert(m_buffer_last_pos - m_buffer_first_pos + 1 <= m_buffer_size);
   
   // Generate the buffer
   for (int i = buffer_gen_start; i <= buffer_gen_end; i++)
@@ -150,6 +180,7 @@ void
 FeatureModule::reset()
 {
   m_buffer_last_pos = INT_MAX;
+  m_buffer_first_pos = INT_MAX;
   reset_module();
 }
 
