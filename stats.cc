@@ -142,6 +142,11 @@ main(int argc, char *argv[])
                 config["batch"].get_int(), config["bindex"].get_int(),
                 true);
 
+    // Configure the model for accumulating
+    if (config["den-hmmnet"].specified)
+      model.set_estimation_mode(PDF::MMI);
+    else model.set_estimation_mode(PDF::ML);
+    model.start_accumulating();        
 
     // Process each recipe line
     for (int f = 0; f < (int)recipe.infos.size(); f++)
@@ -182,7 +187,6 @@ main(int argc, char *argv[])
       }
       
       // Train
-      model.start_accumulating();
       train(&model, segmentator);
 	
       // Clean up

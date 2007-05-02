@@ -1,3 +1,4 @@
+
 #include <cassert>
 
 #include "Distributions.hh"
@@ -197,8 +198,7 @@ DiagonalGaussian::read(std::istream &is)
   m_constant=1;
   for (int i=0; i<dim(); i++)
     m_constant *= m_precision(i);
-  m_constant = sqrt(m_constant);
-  m_constant = log(m_constant);
+  m_constant = log(sqrt(m_constant));
 }
 
 
@@ -207,18 +207,18 @@ DiagonalGaussian::start_accumulating()
 {
   if (m_mode == ML) {
     m_accums.resize(1);
-    m_accums[0] = new DiagonalAccumulator(dim());
+    m_accums[0] = new DiagonalStatisticsAccumulator(dim());
   }
   else if (m_mode == MMI) {
     m_accums.resize(2);
-    m_accums[0] = new DiagonalAccumulator(dim());
-    m_accums[1] = new DiagonalAccumulator(dim());
+    m_accums[0] = new DiagonalStatisticsAccumulator(dim());
+    m_accums[1] = new DiagonalStatisticsAccumulator(dim());
   }
 }
 
 
 void
-DiagonalGaussian::accumulate(double prior,
+DiagonalGaussian::accumulate(double gamma,
 			     const FeatureVec &f,
 			     int accum_pos)
 {
@@ -226,11 +226,11 @@ DiagonalGaussian::accumulate(double prior,
   assert(m_accums[accum_pos] != NULL);
 
   m_accums[accum_pos]->accumulated = true;
-  m_accums[accum_pos]->gamma += prior;
+  m_accums[accum_pos]->gamma += gamma;
 
-  Blas_Add_Mult(m_accums[accum_pos]->mean, prior, *(f.get_vector()));
+  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
   for (int d=0; d<dim(); d++)
-    m_accums[accum_pos]->cov(d) += prior*f[d]*f[d];
+    m_accums[accum_pos]->cov(d) += gamma*f[d]*f[d];
 }
 
 
@@ -458,10 +458,6 @@ FullCovarianceGaussian::read(std::istream &is)
   if (type != "full")
     throw std::string("Error reading FullCovarianceGaussian parameters from a stream\n");
   
-  std::string line;
-  getline(is, line);
-  str::chomp(&line);
-  
   for (int i=0; i<dim(); i++)
     is >> m_mean(i);
   for (int i=0; i<dim(); i++)
@@ -469,6 +465,7 @@ FullCovarianceGaussian::read(std::istream &is)
       is >> m_covariance(i,j);
 
   LinearAlgebra::inverse(m_covariance, m_precision);
+  m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
 }
 
 
@@ -477,18 +474,18 @@ FullCovarianceGaussian::start_accumulating()
 {
   if (m_mode == ML) {
     m_accums.resize(1);
-    m_accums[0] = new FullCovarianceAccumulator(dim());
+    m_accums[0] = new FullStatisticsAccumulator(dim());
   }
   else if (m_mode == MMI) {
     m_accums.resize(2);
-    m_accums[0] = new FullCovarianceAccumulator(dim());
-    m_accums[1] = new FullCovarianceAccumulator(dim());
+    m_accums[0] = new FullStatisticsAccumulator(dim());
+    m_accums[1] = new FullStatisticsAccumulator(dim());
   }
 }
 
 
 void
-FullCovarianceGaussian::accumulate(double prior,
+FullCovarianceGaussian::accumulate(double gamma,
 				   const FeatureVec &f,
 				   int accum_pos)
 {
@@ -496,10 +493,10 @@ FullCovarianceGaussian::accumulate(double prior,
   assert(m_accums[accum_pos] != NULL);
 
   m_accums[accum_pos]->accumulated = true;  
-  m_accums[accum_pos]->gamma += prior;
+  m_accums[accum_pos]->gamma += gamma;
 
-  Blas_Add_Mult(m_accums[accum_pos]->mean, prior, *(f.get_vector()));
-  Blas_R1_Update(m_accums[accum_pos]->cov, *(f.get_vector()), *(f.get_vector()), prior);
+  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
+  Blas_R1_Update(m_accums[accum_pos]->cov, *(f.get_vector()), *(f.get_vector()), gamma);
 }
 
 
@@ -582,6 +579,7 @@ FullCovarianceGaussian::estimate_parameters()
     Blas_Scale(1/m_accums[0]->gamma, m_mean);
     Blas_Scale(1/m_accums[0]->gamma, m_covariance);
     LinearAlgebra::inverse(m_covariance, m_precision);
+    m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
   }
 
   // FIXME!
@@ -591,6 +589,7 @@ FullCovarianceGaussian::estimate_parameters()
     Blas_Scale(1/m_accums[0]->gamma, m_mean);
     Blas_Scale(1/m_accums[0]->gamma, m_covariance);
     LinearAlgebra::inverse(m_covariance, m_precision);
+    m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
   }
 }
 
@@ -675,7 +674,7 @@ Mixture::set_components(const std::vector<int> &pointers,
 }
 
 
-PDF&
+PDF*
 Mixture::get_base_pdf(int index)
 {
   assert(index < size());
@@ -744,21 +743,21 @@ Mixture::start_accumulating()
 {
   if (m_mode == ML) {
     m_accums.resize(1);
-    m_accums[0] = new MixtureAccumulator(dim());
+    m_accums[0] = new MixtureAccumulator(size());
   }
   else if (m_mode == MMI) {
     m_accums.resize(2);
-    m_accums[0] = new MixtureAccumulator(dim());
-    m_accums[1] = new MixtureAccumulator(dim());
+    m_accums[0] = new MixtureAccumulator(size());
+    m_accums[1] = new MixtureAccumulator(size());
   }
   
   for (int i=0; i<size(); i++)
-    get_base_pdf(i).start_accumulating();
+    get_base_pdf(i)->start_accumulating();
 }
 
 
 void
-Mixture::accumulate(double prior,
+Mixture::accumulate(double gamma,
 		    const FeatureVec &f,
 		    int accum_pos)
 {
@@ -767,12 +766,12 @@ Mixture::accumulate(double prior,
   // Compute the total likelihood for this mixture
   total_likelihood = compute_likelihood(f);
   
-  // Accumulate all basis distributions with some priors
+  // Accumulate all basis distributions with some gamma
   for (int i=0; i<size(); i++) {
     this_likelihood = 
-      prior * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i])/total_likelihood;
+      gamma * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i])/total_likelihood;
     m_accums[accum_pos]->gamma[i] += this_likelihood;
-    get_base_pdf(i).accumulate(this_likelihood, f, accum_pos);
+    get_base_pdf(i)->accumulate(this_likelihood, f, accum_pos);
   }
   m_accums[accum_pos]->accumulated = true;
 }
@@ -840,7 +839,7 @@ Mixture::stop_accumulating()
 	delete m_accums[i];
   
   for (int i=0; i<size(); i++)
-    get_base_pdf(i).stop_accumulating();
+    get_base_pdf(i)->stop_accumulating();
 }
 
 
@@ -854,7 +853,7 @@ Mixture::estimate_parameters()
     
     for (int i=0; i<size(); i++) {
       m_weights[i] = m_accums[0]->gamma[i]/total_gamma;
-      get_base_pdf(i).estimate_parameters();
+      get_base_pdf(i)->estimate_parameters();
     }
   }
   
@@ -867,7 +866,7 @@ Mixture::estimate_parameters()
     
     for (int i=0; i<size(); i++) {
       m_weights[i] = m_accums[0]->gamma[i]/total_gamma;
-      get_base_pdf(i).estimate_parameters();
+      get_base_pdf(i)->estimate_parameters();
     }
   }
 }
@@ -930,10 +929,10 @@ PDFPool::reset()
 }
 
 
-PDF&
+PDF*
 PDFPool::get_pdf(int index) const
 {
-  return *m_pool[index];
+  return m_pool[index];
 }
 
 

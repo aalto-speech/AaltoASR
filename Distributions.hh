@@ -4,14 +4,51 @@
 #include "gmd.h"
 #include "lavd.h"
 #include "FeatureBuffer.hh"
+#include "FeatureModules.hh"
 #include "LinearAlgebra.hh"
 
-enum EstimationMode { ML, MMI };
+
+
+class FullStatisticsAccumulator {
+public:
+  FullStatisticsAccumulator(int dim) { 
+    mean.resize(dim);
+    cov.resize(dim,dim);
+    mean=0;
+    cov=0;
+    gamma=0;
+    accumulated=false;
+  };
+  double gamma;
+  Vector mean;
+  Matrix cov;
+  bool accumulated;
+};
+
+
+class DiagonalStatisticsAccumulator {
+public:
+  DiagonalStatisticsAccumulator(int dim) { 
+    mean.resize(dim);
+    cov.resize(dim);
+    mean=0;
+    cov=0;
+    gamma=0;
+    accumulated=false;
+  };
+  bool accumulated;
+  double gamma;
+  Vector mean;
+  Vector cov;
+};
+
 
 
 class PDF {
 public:
 
+  enum EstimationMode { ML, MMI };
+  
   // COMMON
 
   virtual ~PDF() {}
@@ -81,7 +118,7 @@ public:
   void reset();
   
   /* Get the pdf from the position index */
-  PDF& get_pdf(int index) const;
+  PDF* get_pdf(int index) const;
   /* Set the pdf in the position index */
   void set_pdf(int index, PDF *pdf);
   
@@ -161,7 +198,6 @@ public:
 
 
 
-
 class DiagonalGaussian : public Gaussian {
 public:
   DiagonalGaussian(int dim);
@@ -196,34 +232,65 @@ public:
   /* Set the diagonal of the covariance matrix */
   void set_covariance(const Vector &covariance);
 
-private:
-
-  class DiagonalAccumulator {
-  public:
-    DiagonalAccumulator(int dim) { 
-      mean.resize(dim);
-      cov.resize(dim);
-      mean=0;
-      cov=0;
-      gamma=0;
-      accumulated=false;
-    };
-    bool accumulated;
-    double gamma;
-    Vector mean;
-    Vector cov;
-  };
-  
+private:  
   double m_constant;
-  
   Vector m_mean;
   Vector m_covariance;
   Vector m_precision;
   
-  std::vector<DiagonalAccumulator*> m_accums;
+  std::vector<DiagonalStatisticsAccumulator*> m_accums;
 };
 
 
+
+
+class MlltGaussian : public Gaussian {
+public:
+  MlltGaussian(int dim);
+  MlltGaussian(const DiagonalGaussian &g);
+  MlltGaussian(const MlltGaussian &g);
+  ~MlltGaussian();
+  virtual void reset(int dim);
+
+  // From pdf
+  virtual double compute_likelihood(const FeatureVec &f) const;
+  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual void write(std::ostream &os) const;
+  virtual void read(std::istream &is);
+
+  // Gaussian-specific
+  virtual void start_accumulating();
+  virtual void accumulate(double prior, const FeatureVec &f, 
+			  int accum_pos = 0);
+  virtual void dump_statistics(std::ostream &os,
+			       int accum_pos = 0) const;
+  virtual void accumulate_from_dump(std::istream &is);
+  virtual void stop_accumulating();
+  virtual bool accumulated(int accum_pos = 0) const;
+  virtual void estimate_parameters();
+  virtual void get_mean(Vector &mean) const;
+  virtual void get_covariance(Matrix &covariance) const;
+  virtual void set_mean(const Vector &mean);
+  virtual void set_covariance(const Matrix &covariance);
+
+  // Diagonal-specific
+  /* Get the diagonal of the covariance matrix */
+  void get_covariance(Vector &covariance) const;
+  /* Set the diagonal of the covariance matrix */
+  void set_covariance(const Vector &covariance);
+
+  // Mllt-specific
+  void transform_parameters(LinTransformModule &A);
+  static void update_mllt_transform(PDFPool &mllt_gaussians);
+    
+private:  
+  double m_constant;
+  Vector m_mean;
+  Vector m_covariance;
+  Vector m_precision;
+
+  std::vector<FullStatisticsAccumulator*> m_accums;
+};
 
 
 
@@ -257,31 +324,14 @@ public:
   virtual void set_covariance(const Matrix &covariance);
   
 private:
-
-  class FullCovarianceAccumulator {
-  public:
-    FullCovarianceAccumulator(int dim) { 
-      mean.resize(dim);
-      cov.resize(dim,dim);
-      mean=0;
-      cov=0;
-      gamma=0;
-      accumulated=false;
-    };
-    double gamma;
-    Vector mean;
-    Matrix cov;
-    bool accumulated;
-  };
-  
-  // Parameters
   double m_constant;
   Vector m_mean;
   Matrix m_covariance;
   Matrix m_precision;
   
-  std::vector<FullCovarianceAccumulator*> m_accums;
+  std::vector<FullStatisticsAccumulator*> m_accums;
 };
+
 
 
 
@@ -298,7 +348,7 @@ public:
   void set_components(const std::vector<int> &pointers,
 		      const std::vector<double> &weights);
   /* Get a mixture component */
-  PDF& get_base_pdf(int index);
+  PDF* get_base_pdf(int index);
   /* Get all the mixture components */
   void get_components(std::vector<int> &pointers,
 		      std::vector<double> &weights);

@@ -19,6 +19,7 @@ Hmm::resize(int states)
 
 HmmSet::HmmSet()
 {
+  m_mode=PDF::ML;
 }
 
 
@@ -449,15 +450,16 @@ HmmSet::start_accumulating()
     m_transition_accum[i].prob=0;
     m_accumulated[i]=false;
   }
+
   for (int i = 0; i < num_emission_pdfs(); i++)
     m_emission_pdfs[i].start_accumulating();
 }
 
 
 void
-HmmSet::accumulate_distribution(const FeatureVec &f, int pdf, double prior)
+HmmSet::accumulate_distribution(const FeatureVec &f, int pdf, double gamma, int pos)
 {
-  m_emission_pdfs[pdf].accumulate(prior, f);
+  m_emission_pdfs[pdf].accumulate(gamma, f, pos);
 }
 
 
@@ -526,7 +528,7 @@ HmmSet::dump_mc_statistics(const std::string filename) const
       mcs << std::endl;
     }
 
-    if (m_emission_pdfs[i].estimation_mode() == MMI) {
+    if (m_emission_pdfs[i].estimation_mode() == PDF::MMI) {
       if (m_emission_pdfs[i].accumulated(1)) {
 	mcs << i << " den ";
 	m_emission_pdfs[i].dump_statistics(mcs, 1);
@@ -552,16 +554,16 @@ HmmSet::dump_gk_statistics(const std::string filename) const
 
   gks << m_pool.size() << m_pool.dim() << std::endl;
   for (int g=0; g<m_pool.size(); g++) {
-    if (m_pool.get_pdf(g).accumulated(0)) {
+    if (m_pool.get_pdf(g)->accumulated(0)) {
       gks << g << " num ";
-      m_pool.get_pdf(g).dump_statistics(gks, 0);
+      m_pool.get_pdf(g)->dump_statistics(gks, 0);
       gks << std::endl;
     }
 
-    if (m_pool.get_pdf(g).estimation_mode() == MMI) {
-      if (m_pool.get_pdf(g).accumulated(1)) {
+    if (m_pool.get_pdf(g)->estimation_mode() == PDF::MMI) {
+      if (m_pool.get_pdf(g)->accumulated(1)) {
 	gks << g << " den ";
-	m_pool.get_pdf(g).dump_statistics(gks, 1);
+	m_pool.get_pdf(g)->dump_statistics(gks, 1);
 	gks << std::endl;
       }
     }
@@ -667,7 +669,7 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
     throw std::string("HmmSet::accumulate_gk_from_dump: the dimensionality of mixture base distributions in: %s is wrong\n", filename.c_str());
 
   while(gks >> pdf)
-    m_pool.get_pdf(pdf).accumulate_from_dump(gks);
+    m_pool.get_pdf(pdf)->accumulate_from_dump(gks);
   
   if (!gks)
     throw ReadError();  
@@ -715,4 +717,25 @@ HmmSet::estimate_parameters()
 
     m_emission_pdfs[state(s).emission_pdf].estimate_parameters();
   }
+}
+
+
+
+void
+HmmSet::set_estimation_mode(PDF::EstimationMode mode)
+{
+  m_mode = mode;
+  
+  for (int i=0; i<m_pool.size(); i++)
+    m_pool.get_pdf(i)->set_estimation_mode(m_mode);
+  
+  for (int i=0; i<num_emission_pdfs(); i++)
+    m_emission_pdfs[i].set_estimation_mode(m_mode);
+}
+  
+
+PDF::EstimationMode
+HmmSet::get_estimation_mode()
+{
+  return m_mode;
 }

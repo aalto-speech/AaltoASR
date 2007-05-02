@@ -275,9 +275,10 @@ public:
   /** Accumulates emission pdf statistics with a new frame
    * \param f the feature in the current frame
    * \param state the hmm state index
-   * \param prior prior probability for this emission
+   * \param gamma probability for this emission
+   * \param pos 1 = update denominator stats, 0 = update numerator stats, default = false
    */
-  void accumulate_distribution(const FeatureVec &f, int state, double prior);
+  void accumulate_distribution(const FeatureVec &f, int state, double gamma, int pos = 0);
 
   /** Accumulates state transition statistics
    * \param state the source state index
@@ -334,6 +335,11 @@ public:
    */
   void estimate_parameters();
 
+  void set_estimation_mode(PDF::EstimationMode mode);
+  
+  PDF::EstimationMode get_estimation_mode();
+
+  
 private:
 
   /** Helper function for loading legacy ph-files
@@ -397,7 +403,7 @@ private:
   std::vector<bool> m_accumulated;
 
   PDFPool m_pool;
-  EstimationMode m_mode;
+  PDF::EstimationMode m_mode;
 };
 
 
