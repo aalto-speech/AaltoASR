@@ -15,6 +15,7 @@ std::string out_file;
 std::string save_summary_file;
 
 int info;
+int accum_pos;
 bool raw_flag;
 bool transtat;
 bool durstat;
@@ -45,7 +46,7 @@ train(HmmSet *model, Segmentator *segmentator)
       = segmentator->pdf_probs();
     for (int i = 0; i < (int)pdfs.size(); i++)
       model->accumulate_distribution(feature, pdfs[i].index,
-                                     pdfs[i].prob);
+                                     pdfs[i].prob, accum_pos);
     
     // Accumulate also transition probabilities if desired
     if (transtat) {
@@ -143,9 +144,14 @@ main(int argc, char *argv[])
                 true);
 
     // Configure the model for accumulating
-    if (config["den-hmmnet"].specified)
+    if (config["den-hmmnet"].specified) {
       model.set_estimation_mode(PDF::MMI);
-    else model.set_estimation_mode(PDF::ML);
+      accum_pos=1;
+    }
+    else {
+      model.set_estimation_mode(PDF::ML);
+      accum_pos=0;
+    }
     model.start_accumulating();        
 
     // Process each recipe line

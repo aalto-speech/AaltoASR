@@ -287,6 +287,7 @@ DiagonalGaussian::stop_accumulating()
     for (unsigned int i=0; i<m_accums.size(); i++)
       if (m_accums[i] != NULL)
 	delete m_accums[i];
+  m_accums.resize(0);
 }
 
 
@@ -567,6 +568,7 @@ FullCovarianceGaussian::stop_accumulating()
     for (unsigned int i=0; i<m_accums.size(); i++)
       if (m_accums[i] != NULL)
 	delete m_accums[i];
+  m_accums.resize(0);
 }
 
 
@@ -767,13 +769,15 @@ Mixture::accumulate(double gamma,
   total_likelihood = compute_likelihood(f);
   
   // Accumulate all basis distributions with some gamma
-  for (int i=0; i<size(); i++) {
-    this_likelihood = 
-      gamma * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i])/total_likelihood;
-    m_accums[accum_pos]->gamma[i] += this_likelihood;
-    get_base_pdf(i)->accumulate(this_likelihood, f, accum_pos);
+  if (total_likelihood > 0) {
+    for (int i=0; i<size(); i++) {
+      this_likelihood = 
+        gamma * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i])/total_likelihood;
+      m_accums[accum_pos]->gamma[i] += this_likelihood;
+      get_base_pdf(i)->accumulate(this_likelihood, f, accum_pos);
+    }
+    m_accums[accum_pos]->accumulated = true;
   }
-  m_accums[accum_pos]->accumulated = true;
 }
 
 
@@ -796,11 +800,10 @@ Mixture::dump_statistics(std::ostream &os,
   assert(m_accums[accum_pos] != NULL);
 
   if (m_accums[accum_pos]->accumulated) {
-    os << size() << " ";
-    for (int i=0; i<size()-1; i++) {
-      os << m_pointers[i] << " " << m_accums[accum_pos]->gamma[i] << " ";
-      os << m_pointers[size()-1] << " " << m_accums[accum_pos]->gamma[size()-1];
-    }
+    os << size();
+    for (int i=0; i<size()-1; i++)
+      os << " " << m_pointers[i] << " " << m_accums[accum_pos]->gamma[i];
+    os << " " << m_pointers[size()-1] << " " << m_accums[accum_pos]->gamma[size()-1];    
   }
 }
 
@@ -837,6 +840,7 @@ Mixture::stop_accumulating()
     for (unsigned int i=0; i<m_accums.size(); i++)
       if (m_accums[i] != NULL)
 	delete m_accums[i];
+  m_accums.resize(0);
   
   for (int i=0; i<size(); i++)
     get_base_pdf(i)->stop_accumulating();

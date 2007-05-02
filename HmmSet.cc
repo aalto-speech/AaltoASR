@@ -552,7 +552,7 @@ HmmSet::dump_gk_statistics(const std::string filename) const
     throw OpenError();
   }  
 
-  gks << m_pool.size() << m_pool.dim() << std::endl;
+  gks << m_pool.size() << " " << m_pool.dim() << std::endl;
   for (int g=0; g<m_pool.size(); g++) {
     if (m_pool.get_pdf(g)->accumulated(0)) {
       gks << g << " num ";
@@ -688,6 +688,7 @@ HmmSet::stop_accumulating()
  
   // Clear accumulator
   m_transition_accum.clear();
+  m_accumulated.clear();
 }
 
 
