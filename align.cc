@@ -24,7 +24,6 @@ conf::Config config;
 Recipe recipe;
 HmmSet model;
 FeatureGenerator fea_gen;
-PhnReader phn_reader;
 SpeakerConfig speaker_config(fea_gen);
 
 
@@ -173,6 +172,7 @@ main(int argc, char *argv[])
   double sum_data_likelihood = 0.0, prec_buff = 0.0;
   io::Stream phn_out_file;
   double ll;
+  PhnReader phn_reader(model);
 
   try {
     config("usage: align [OPTION...]\n")
@@ -260,9 +260,8 @@ main(int argc, char *argv[])
       }
 
       // Open the audio and phn files from the given list.
-      recipe.infos[f].init_phn_files(NULL, false, false, &fea_gen,
-                                     config["raw-input"].specified,
-                                     &phn_reader);
+      recipe.infos[f].init_phn_files(&model, false, false, false, &fea_gen,
+                                     config["raw-input"].specified, NULL);
     
       phn_out_file.open(recipe.infos[f].alignment_path.c_str(), "w");
 

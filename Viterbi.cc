@@ -33,7 +33,6 @@ Viterbi::reset()
   m_last_frame = m_lattice.frames();
   m_last_position = m_lattice.positions();
   m_transcription.clear();
-  m_speakers.clear();
   m_best_log_prob = -INF;
   m_best_position = -1;
   m_force_end = false;
@@ -70,7 +69,7 @@ Viterbi::fill_transcription()
   {
     // FIXME!!!
     if (m_transcription.size() == 0)
-      eof = !m_phn_reader->next(phn);
+      eof = !m_phn_reader->next_phn_line(phn);
     while (!eof && (int)m_transcription.size() < m_last_position) {
       // Read the next label and get the hmm of the phoneme
       if (phn.state == -1 || phn.state == 0) // No need for state segmentation
@@ -78,9 +77,9 @@ Viterbi::fill_transcription()
         std::string label = phn.label[0];
         phn.label.erase(phn.label.begin()); // Remove the first HMM label
         add_hmm_to_transcription(m_model.hmm_index(label),phn.comment,
-                                 phn.label, phn.speaker);
+                                 phn.label);
       }
-      eof = !m_phn_reader->next(phn);
+      eof = !m_phn_reader->next_phn_line(phn);
     }
 
     if (m_last_position > (int)m_transcription.size())
@@ -95,8 +94,7 @@ Viterbi::fill_transcription()
 
 void
 Viterbi::add_hmm_to_transcription(int hmm_index,std::string &comment,
-                                  std::vector<std::string> &additional_hmms,
-                                  std::string &speaker)
+                                  std::vector<std::string> &additional_hmms)
 {
   std::string state_label;
   Hmm &hmm = m_model.hmm(hmm_index);
@@ -131,27 +129,21 @@ Viterbi::add_hmm_to_transcription(int hmm_index,std::string &comment,
       m_transcription.push_back(state);
     }
     
-    // Set speaker
-    m_speakers.push_back(speaker);
-    
     // Precompute transitions for the given transcription.  In the
     // transcription want the transition indices to be relative to
     // the position in the transcription.
     TranscriptionState &state = m_transcription.back();
-    std::vector<int> transitions = hmm.transitions(s);
+    std::vector<int> &transitions = m_model.state(hmm.state(s)).transitions();
     for (t = 0; t < (int)transitions.size(); t++) {
       transition_index = transitions[t];
       HmmTransition &orig = m_model.transition(transition_index);
       TranscriptionTransition copy;
 
-      assert(orig.target != -1);
+      assert(orig.target_offset >= 0);
 
       copy.transition_index = transition_index;
       copy.log_prob = util::safe_log(orig.prob); 
-      if (orig.target == -2)
-        copy.target = hmm.num_states() - s;
-      else
-        copy.target = orig.target - s;
+      copy.target = orig.target_offset;
 
       state.transitions.push_back(copy);
     }
@@ -244,7 +236,9 @@ Viterbi::fill_transition_probs()
 void
 Viterbi::fill_observation_probs(const FeatureVec &fea_vec)
 {
-  m_model.precompute(fea_vec);
+  // FIXME: Do we need the precomputation? Might be faster without...
+  m_model.precompute_likelihoods(fea_vec);
+  
   Lattice::Range &range = m_lattice.range(m_current_frame);
   assert(range.end > range.start);
 
@@ -252,7 +246,8 @@ Viterbi::fill_observation_probs(const FeatureVec &fea_vec)
   float best_prob = -1;
   register int p;
   for (p = range.start; p < range.end; p++) {
-    m_state_prob[p] = m_model.state_prob(m_transcription[p].state, fea_vec);
+    m_state_prob[p] = m_model.state_likelihood(m_transcription[p].state,
+                                               fea_vec);
     if (m_state_prob[p] > best_prob)
       best_prob = m_state_prob[p];
   }
@@ -361,7 +356,7 @@ Viterbi::compute_best_path()
 void Viterbi::fill()
 {
   fill_transcription();
-  m_model.reset_state_probs();
+  m_model.reset_cache();
   if (m_current_frame == 0) {
     m_lattice.reset_frame(0, 0, 1);
     // FIXME: Ok? We do not use real probabilities anyway.    
@@ -371,7 +366,7 @@ void Viterbi::fill()
     // the first state does not change the viterbi path)
     const FeatureVec feavec = m_fea_gen.generate(m_feature_frame);
     m_accumulated_log_prob = util::safe_log(
-      m_model.state_prob(m_transcription[0].state, feavec));
+      m_model.state_likelihood(m_transcription[0].state, feavec));
     
     m_feature_frame++;
     m_current_frame++;
@@ -385,7 +380,7 @@ void Viterbi::fill()
       m_last_window = true;
       break;
     }
-    m_model.reset_state_probs();
+    m_model.reset_cache();
     fill_transition_probs();
     fill_observation_probs(feavec);  
     m_feature_frame++;
@@ -405,7 +400,6 @@ void Viterbi::fill()
 void
 Viterbi::move(int frame, int position)
 {
-  m_speakers.erase(m_speakers.begin(), m_speakers.begin() + position);
   m_transcription.erase(m_transcription.begin(), 
 			m_transcription.begin() + position);
   m_lattice.move(frame, position);

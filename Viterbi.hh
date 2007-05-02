@@ -105,8 +105,7 @@ public:
 
   /// Add hmm to transcription, use if you don't wan't to read the transcription.
   void add_hmm_to_transcription(int hmm_index, std::string &comment,
-                                std::vector<std::string> &additional_hmms,
-                                std::string &speaker);
+                                std::vector<std::string> &additional_hmms);
 
   /// Move the lattice forward by repositioning the lattice.
   void move(int frame, int position);
@@ -152,9 +151,6 @@ public:
    * transition.  It is marked with -1.
    **/
   inline int best_transition(int frame) const;
-
-  /// The ID of the speaker active in the given frame.
-  inline const std::string &current_speaker(int frame) const;
 
   /// Return a lattice cell.
   inline Lattice::Cell &at(int frame, int position);
@@ -268,9 +264,6 @@ private:
   /// Work space for probability computation.
   std::vector<float> m_state_prob;
 
-  /// Speaker ID's
-  std::vector<std::string> m_speakers;
-
 };
 
 Lattice::Cell&
@@ -326,15 +319,6 @@ Viterbi::best_transition(int frame) const
     throw RangeError();
   }
   return m_best_path[frame].transition_index;
-}
-
-const std::string&
-Viterbi::current_speaker(int frame) const
-{
-  if (frame >= m_current_frame) {
-    throw RangeError();
-  }
-  return m_speakers[m_best_path[frame].position];
 }
 
 #endif /* VITERBI_HH */
