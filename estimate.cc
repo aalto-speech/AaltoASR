@@ -90,6 +90,7 @@ main(int argc, char *argv[])
     }
 
     // Estimate parameters
+    model.set_minvar(config["minvar"].get_double());
     model.estimate_parameters();
     model.stop_accumulating();
     

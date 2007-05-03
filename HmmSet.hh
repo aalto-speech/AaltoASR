@@ -335,10 +335,20 @@ public:
    */
   void estimate_parameters();
 
+  /** Sets the current estimation mode for this model
+   * \param mode PDF::EstimationMode (ML/MMI)
+   */
   void set_estimation_mode(PDF::EstimationMode mode);
-  
-  PDF::EstimationMode get_estimation_mode();
 
+  /** Gets the current estimation mode for this model
+   */
+  PDF::EstimationMode get_estimation_mode();
+  
+  /** Sets the minimum variance for all Gaussians in this model
+   * \param minvar minimum variance term
+   */
+  void set_minvar(double minvar);
+  
   
 private:
 

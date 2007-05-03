@@ -620,8 +620,6 @@ HmmSet::accumulate_ph_from_dump(const std::string filename)
     m_transition_accum[pos].prob += occ;
   }
   
-  if (!phs)
-    throw ReadError();  
   phs.close();
 }
 
@@ -644,8 +642,6 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
   while(mcs >> pdf)
     m_emission_pdfs[pdf].accumulate_from_dump(mcs);
   
-//  if (!mcs)
-//    throw ReadError();  
   mcs.close();
 }
 
@@ -670,8 +666,6 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
   while(gks >> pdf)
     m_pool.get_pdf(pdf)->accumulate_from_dump(gks);
   
-//  if (!gks)
-//    throw ReadError();  
   gks.close();
 }
  
@@ -720,7 +714,6 @@ HmmSet::estimate_parameters()
 }
 
 
-
 void
 HmmSet::set_estimation_mode(PDF::EstimationMode mode)
 {
@@ -738,4 +731,14 @@ PDF::EstimationMode
 HmmSet::get_estimation_mode()
 {
   return m_mode;
+}
+
+
+void
+HmmSet::set_minvar(double minvar)
+{
+  for (int i=0; i<m_pool.size(); i++) {
+    Gaussian *g = (Gaussian*)m_pool.get_pdf(i);
+    g->set_minvar(minvar);
+  }
 }

@@ -204,19 +204,11 @@ public:
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
 
-  // EASY, NO NEED FOR OVERWRITING
-
   /* Set the minimum variance for this Gaussian */
   void set_minvar(double minvar) { m_minvar = minvar; };
-  /* Set the minimum eigenvalue for this Gaussian */
-  void set_mineig(double mineig) { m_mineig = mineig; };
-  /* Set the covariance smoothing for this Gaussian */
-  void set_covsmooth(double covsmooth) { m_covsmooth = covsmooth; };
   
-private:
+protected:
   double m_minvar;
-  double m_mineig;
-  double m_covsmooth;
 };
 
 
@@ -346,8 +338,12 @@ public:
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance);
+
+  /* Set covariance smoothing  */
+  void set_covsmooth(double covsmooth) { m_covsmooth = covsmooth; };
   
 private:
+  double m_covsmooth;
   double m_constant;
   Vector m_mean;
   Matrix m_covariance;

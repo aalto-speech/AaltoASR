@@ -310,8 +310,11 @@ DiagonalGaussian::estimate_parameters()
     m_covariance.copy(m_accums[0]->cov);
     Blas_Scale(1/m_accums[0]->gamma, m_mean);
     Blas_Scale(1/m_accums[0]->gamma, m_covariance);
-    for (int i=0; i<dim(); i++)
+    for (int i=0; i<dim(); i++) {
       m_covariance(i) -= m_mean(i)*m_mean(i);
+      if (m_covariance(i) < m_minvar)
+        m_covariance(i) = m_minvar;
+    }
   }
   
   if (m_mode == MMI) {
@@ -328,8 +331,11 @@ DiagonalGaussian::estimate_parameters()
     Blas_Add_Mult(m_covariance, 1, m_accums[0]->cov);
     Blas_Add_Mult(m_covariance, -1, m_accums[1]->cov);
     Blas_Scale(1/(m_accums[0]->gamma-m_accums[1]->gamma+m_d_constant), m_covariance);
-    for (int i=0; i<dim(); i++)
+    for (int i=0; i<dim(); i++) {
       m_covariance(i) -= m_mean(i)*m_mean(i);
+      if (m_covariance(i) < m_minvar)
+        m_covariance(i) = m_minvar;
+    }
   }
 
   m_constant=1;
