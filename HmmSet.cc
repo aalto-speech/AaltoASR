@@ -180,10 +180,8 @@ HmmSet::read_legacy_ph(std::ifstream &in)
     if (!in)
       throw ReadError();
 
+    states -= 2; // Remove the dummy states
     Hmm &hmm = add_hmm(label, states);
-
-    // Read states
-    states -= 2;
 
     // In legacy ph-files the states are tied according to the emission pdfs.
     // If the state with the same emission pdf already exists, the transition

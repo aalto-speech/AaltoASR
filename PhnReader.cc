@@ -212,20 +212,18 @@ PhnReader::next_frame(void)
         }
         else
         {
-          int cur_relative_state = prev_phn.state;
-          int cur_hmm_index = m_model.hmm_index(prev_phn.label[0]);
-          Hmm &cur_hmm = m_model.hmm(cur_hmm_index);
+          int cur_state = prev_phn.state;
+          Hmm &cur_hmm = m_model.hmm(m_model.hmm_index(prev_phn.label[0]));
 
           // Find the correct transition
           for (int i = 0; i < (int)tr_index.size(); i++)
           {
-            int relative_next_state =
-              m_model.transition(tr_index[i]).target_offset+cur_relative_state;
-            int new_hmm_index = m_model.hmm_index(m_cur_phn.label[0]);
-            
-            if ((relative_next_state > cur_hmm.num_states() &&
-                 cur_hmm_index != new_hmm_index) ||
-                (relative_next_state == m_cur_phn.state))
+            int next_state =
+              m_model.transition(tr_index[i]).target_offset+cur_state;
+
+            if ((next_state >= cur_hmm.num_states() &&
+                 m_cur_phn.state == 0) ||
+                (next_state == m_cur_phn.state))
             {
               transition_index = tr_index[i];
               break;
@@ -244,7 +242,21 @@ PhnReader::next_frame(void)
           }
       }
       if (transition_index == -1)
+      {
+        fprintf(stderr, "m_current_frame = %i\n", m_current_frame);
+        if (new_phn_loaded)
+        {
+          fprintf(stderr, "  new phn, moving to %s (%i)\n",
+                  m_cur_phn.label[0].c_str(), m_model.hmm_index(m_cur_phn.label[0]));
+          fprintf(stderr, "  current relative state: %i\n", prev_phn.state);
+        }
+        else
+        {
+          fprintf(stderr, "  self transition, %i transitions\n",
+                  (int)tr_index.size());
+        }
         throw std::string("PhnReader::next_frame(): Correct transition was not found");
+      }
       if (transition_index != -1)
       {
         Segmentator::IndexProbPair new_transition(transition_index, 1);
