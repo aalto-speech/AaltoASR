@@ -18,8 +18,7 @@ int info;
 bool transtat;
 
 conf::Config config;
-HmmSet ml_model;
-HmmSet mmi_model;
+HmmSet model;
 
 
 int
@@ -37,7 +36,10 @@ main(int argc, char *argv[])
       ('o', "out=BASENAME", "arg must", "", "base filename for output models")
       ('t', "transitions", "", "", "estimate also state transitions")
       ('\0', "ml", "", "", "maximum likelihood estimation")
-      ('\0', "mmi", "", "", "maximum mutual information")
+      ('\0', "mmi", "", "", "maximum mutual information estimation")
+      ('\0', "minvar", "arg", "0.1", "minimum variance (default 0.1)")
+      ('\0', "mineig", "arg", "0.0", "minimum eigenvalues (default 0)")
+      ('\0', "covsmooth", "arg", "0.0", "covariance smoothing (default 0)")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -55,71 +57,53 @@ main(int argc, char *argv[])
     // Load the previous models
     if (config["base"].specified)
       {
-	ml_model.read_all(config["base"].get_str());
+	model.read_all(config["base"].get_str());
       }
     else if (config["gk"].specified && config["mc"].specified &&
              config["ph"].specified)
-      {
-	ml_model.read_gk(config["gk"].get_str());
-	ml_model.read_mc(config["mc"].get_str());
-	ml_model.read_ph(config["ph"].get_str());
+    {
+	model.read_gk(config["gk"].get_str());
+	model.read_mc(config["mc"].get_str());
+	model.read_ph(config["ph"].get_str());
       }
     else
       {
 	throw std::string("Must give either --base or all --gk, --mc and --ph");
       }
-    ml_model.start_accumulating();
-
-    // Load also mmi if needed
-    if (config["mmi"].specified) {
-      if (config["base"].specified)
-      {
-        mmi_model.read_all(config["base"].get_str());
-      }
-      else if (config["gk"].specified && config["mc"].specified &&
-	       config["ph"].specified)
-	{
-	  mmi_model.read_gk(config["gk"].get_str());
-	  mmi_model.read_mc(config["mc"].get_str());
-	  mmi_model.read_ph(config["ph"].get_str());
-	} 
-      mmi_model.start_accumulating();
-    }
+    if (config["ml"].specified)
+      model.set_estimation_mode(PDF::ML);
+    else
+      model.set_estimation_mode(PDF::MMI);
+    model.start_accumulating();
 
     // Open the list of statistics files
     std::ifstream filelist(config["list"].get_str().c_str());
     if (!filelist)
       fprintf(stderr, "Could not open %s\n", config["list"].get_str().c_str());
 
-    while (filelist >> stat_file) {
-
-      // Accumulate ML statistics
-      ml_model.accumulate_from_dump(stat_file);
-
-      // Accumulate MMI statistics if needed
-      if (config["mmi"].specified)
-	mmi_model.accumulate_from_dump(stat_file+"_mmi");
+    // Accumulate statistics
+    while (filelist >> stat_file && stat_file != " ") {
+      model.accumulate_gk_from_dump(stat_file+".gks");
+      model.accumulate_mc_from_dump(stat_file+".mcs");
+      if (transtat)
+        model.accumulate_ph_from_dump(stat_file+".phs");
     }
 
     // Estimate parameters
-    ml_model.stop_accumulating();
-    if (config["mmi"].specified)
-      mmi_model.stop_accumulating();
+    model.estimate_parameters();
+    model.stop_accumulating();
     
     // Write final models
-    ml_model.write_all(out_file);
-    if (config["mmi"].specified)
-      mmi_model.write_all(out_file+"_mmi");
+    model.write_all(out_file);
   } 
   
   catch (std::exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());
     abort();
   }
-
+  
   catch (std::string &str) {
     fprintf(stderr, "exception: %s\n", str.c_str());
     abort();
   }
-
 }

@@ -644,8 +644,8 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
   while(mcs >> pdf)
     m_emission_pdfs[pdf].accumulate_from_dump(mcs);
   
-  if (!mcs)
-    throw ReadError();  
+//  if (!mcs)
+//    throw ReadError();  
   mcs.close();
 }
 
@@ -670,8 +670,8 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
   while(gks >> pdf)
     m_pool.get_pdf(pdf)->accumulate_from_dump(gks);
   
-  if (!gks)
-    throw ReadError();  
+//  if (!gks)
+//    throw ReadError();  
   gks.close();
 }
  

@@ -80,7 +80,10 @@ public:
   EstimationMode estimation_mode() const { return m_mode; }
   /* Returns the correct accumulator for these statistics */
   int accumulator_position(std::string type);
-
+  /* Sets the constant D for MMI updates */
+  void set_mmi_d_constant(double d_constant) { m_d_constant = d_constant; }
+  
+  
   // LIKELIHOODS
   
   /* The likelihood of the current feature given this model */
@@ -98,6 +101,7 @@ public:
 
 protected:
   int m_dim;
+  double m_d_constant;
   EstimationMode m_mode;
 };
 
@@ -156,9 +160,12 @@ class Gaussian : public PDF {
 public:
   
   // ABSTRACT FUNCTIONS, SHOULD BE OVERWRITTEN IN THE GAUSSIAN IMPLEMENTATIONS
-
-    /* Resets the Gaussian to have dimensionality dim and all values zeroed */
+  
+  /* Resets the Gaussian to have dimensionality dim and all values zeroed */
   virtual void reset(int dim) = 0;
+  
+  // FROM PDF
+
   /* Initializes the accumulator buffers */  
   virtual void start_accumulating() = 0;
   /* Accumulates the maximum likelihood statistics for the Gaussian
@@ -176,6 +183,9 @@ public:
   virtual bool accumulated(int accum_pos = 0) const = 0;
   /* Use the accumulated statistics to update the current model parameters. */
   virtual void estimate_parameters() = 0;
+  
+  // GAUSSIAN SPECIFIC
+  
   /* Returns the mean vector for this Gaussian */
   virtual void get_mean(Vector &mean) const = 0;
   /* Returns the covariance matrix for this Gaussian */
@@ -193,6 +203,20 @@ public:
   virtual void merge(double w1, const Gaussian &m1, double w2, const Gaussian &m2);
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
+
+  // EASY, NO NEED FOR OVERWRITING
+
+  /* Set the minimum variance for this Gaussian */
+  void set_minvar(double minvar) { m_minvar = minvar; };
+  /* Set the minimum eigenvalue for this Gaussian */
+  void set_mineig(double mineig) { m_mineig = mineig; };
+  /* Set the covariance smoothing for this Gaussian */
+  void set_covsmooth(double covsmooth) { m_covsmooth = covsmooth; };
+  
+private:
+  double m_minvar;
+  double m_mineig;
+  double m_covsmooth;
 };
 
 

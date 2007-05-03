@@ -40,6 +40,7 @@ train(HmmSet *model, Segmentator *segmentator)
     // Fetch the current feature vector
     frame = segmentator->current_frame();
     FeatureVec feature = fea_gen.generate(frame);    
+    model->reset_cache();
     
     // Accumulate all possible states distributions for this frame
     const std::vector<Segmentator::IndexProbPair> &pdfs

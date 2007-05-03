@@ -273,8 +273,8 @@ DiagonalGaussian::accumulate_from_dump(std::istream &is)
     is >> cov(i);
 
   m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, mean);
-  Blas_Add_Mult(m_accums[accum_pos]->cov, gamma, cov);
+  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
+  Blas_Add_Mult(m_accums[accum_pos]->cov, 1, cov);
 
   m_accums[accum_pos]->accumulated = true;
 }
@@ -308,25 +308,37 @@ DiagonalGaussian::estimate_parameters()
   if (m_mode == ML) {
     m_mean.copy(m_accums[0]->mean);
     m_covariance.copy(m_accums[0]->cov);
-    Blas_Scale(m_accums[0]->gamma, m_mean);
-    Blas_Scale(m_accums[0]->gamma, m_covariance);
-
-    m_constant=1;
-    for (int i=0; i<dim(); i++) {
-      m_precision(i) = 1/m_covariance(i);
-      m_constant *= m_precision(i);
-    }
-    m_constant = sqrt(m_constant);
-    m_constant = log(m_constant);   
+    Blas_Scale(1/m_accums[0]->gamma, m_mean);
+    Blas_Scale(1/m_accums[0]->gamma, m_covariance);
+    for (int i=0; i<dim(); i++)
+      m_covariance(i) -= m_mean(i)*m_mean(i);
   }
-
-  // FIXME: do MMI
+  
   if (m_mode == MMI) {
-    m_mean.copy(m_accums[0]->mean);
-    m_covariance.copy(m_accums[0]->cov);
-    Blas_Scale(m_accums[0]->gamma, m_mean);
-    Blas_Scale(m_accums[0]->gamma, m_covariance);
+    LaVectorDouble old_mean(m_mean);
+    // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
+    Blas_Scale(m_d_constant, m_mean);
+    Blas_Add_Mult(m_mean, 1, m_accums[0]->mean);
+    Blas_Add_Mult(m_mean, -1, m_accums[1]->mean);
+    Blas_Scale(1/(m_accums[0]->gamma-m_accums[1]->gamma+m_d_constant), m_mean);
+
+    // new_cov=(obs_num-obs_den+D*old_cov+new_mean*new_mean')/(gamma_num-gamma_den+D)-old_mean*old_mean'
+    for (int i=0; i<dim(); i++)
+      m_covariance(i) += old_mean(i)*old_mean(i);
+    Blas_Add_Mult(m_covariance, 1, m_accums[0]->cov);
+    Blas_Add_Mult(m_covariance, -1, m_accums[1]->cov);
+    Blas_Scale(1/(m_accums[0]->gamma-m_accums[1]->gamma+m_d_constant), m_covariance);
+    for (int i=0; i<dim(); i++)
+      m_covariance(i) -= m_mean(i)*m_mean(i);
   }
+
+  m_constant=1;
+  for (int i=0; i<dim(); i++) {
+    m_precision(i) = 1/m_covariance(i);
+    m_constant *= m_precision(i);
+  }
+  m_constant = sqrt(m_constant);
+  m_constant = log(m_constant);
 }
 
 
@@ -766,14 +778,14 @@ Mixture::accumulate(double gamma,
   double total_likelihood, this_likelihood;
 
   // Compute the total likelihood for this mixture
-  total_likelihood = compute_likelihood(f);
+  total_likelihood = gamma * compute_likelihood(f);
   
   // Accumulate all basis distributions with some gamma
   if (total_likelihood > 0) {
     for (int i=0; i<size(); i++) {
       this_likelihood = 
-        gamma * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i])/total_likelihood;
-      m_accums[accum_pos]->gamma[i] += this_likelihood;
+        gamma * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i]);
+      m_accums[accum_pos]->gamma[i] += this_likelihood / total_likelihood;
       get_base_pdf(i)->accumulate(this_likelihood, f, accum_pos);
     }
     m_accums[accum_pos]->accumulated = true;
@@ -1000,11 +1012,11 @@ PDFPool::read_gk(const std::string &filename)
     for (int i=0; i<pdfs; i++) {
       in >> type_str;
 
-      if (type_str == "diagonal_cov") {
+      if (type_str == "diag") {
 	m_pool[i]=new DiagonalGaussian(m_dim);
         m_pool[i]->read(in);
       }
-      else if (type_str == "full_cov") {
+      else if (type_str == "full") {
 	m_pool[i]=new FullCovarianceGaussian(m_dim);
         m_pool[i]->read(in);
       }
@@ -1067,8 +1079,10 @@ PDFPool::write_gk(const std::string &filename) const
   
   out << m_pool.size() << " " << m_dim << " variable\n";
 
-  for (unsigned int i=0; i<m_pool.size(); i++)
+  for (unsigned int i=0; i<m_pool.size(); i++) {
     m_pool[i]->write(out);
+    out << std::endl;
+  }
 
   if (!out)
     throw std::string("PDFPool::write_gk(): error writing file: %s\n", filename.c_str());
