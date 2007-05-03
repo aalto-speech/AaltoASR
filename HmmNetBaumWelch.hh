@@ -15,7 +15,7 @@ public:
   enum { EPSILON = -1, FINAL_TRANSITION = -2 };
 
   static struct LLType {
-    double zero(void) { return -1e10; }
+    double zero(void) { return -1e15; }
     double one(void) { return 0; }
     double add(double a, double b) { return util::logadd(a,b); }
     double times(double a, double b) { return a + b; }

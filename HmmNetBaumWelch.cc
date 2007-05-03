@@ -293,6 +293,13 @@ HmmNetBaumWelch::next_frame(void)
 
     // Compute the total loglikelihood
     m_sum_total_loglikelihood=compute_sum_bw_loglikelihoods(m_initial_node_id);
+
+    // Make sure there is a backward probability for the initial node
+    if (m_sum_total_loglikelihood <= loglikelihoods.zero())
+    {
+      fprintf(stderr, "No backward probability for the initial node, increase the beam\n");
+      exit(1);
+    }
   }
   else
   {
@@ -393,7 +400,6 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
     int next_node_id = (forward?m_arcs[arc_id].target:
                         m_arcs[arc_id].source);
 
-    
     if (m_arcs[arc_id].epsilon())
     {
       // Propagate through epsilon arc
@@ -432,7 +438,7 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
           double cur_arc_prob = exp(
             loglikelihoods.divide(cur_arc_likelihood,
                                   m_sum_total_loglikelihood));
-          
+
           if (m_pdf_prob[pdf_id] <= 0)
           {
             // PDF didn't have probability for this frame
@@ -512,7 +518,8 @@ HmmNetBaumWelch::compute_sum_bw_loglikelihoods(int node_id)
     {
       cur_addition = m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame);
     }
-    sum = loglikelihoods.add(sum, cur_addition);
+    if (cur_addition > loglikelihoods.zero())
+      sum = loglikelihoods.add(sum, cur_addition);
   }
   return sum;
 }

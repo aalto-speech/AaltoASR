@@ -431,6 +431,7 @@ HmmSet::precompute_likelihoods(const FeatureVec &f)
   // Precompute base distribution likelihoods
   m_pool.precompute_likelihoods(f);
 
+  m_valid_pdf_likelihoods.clear();
   // Precompute state likelihoods
   for (int i = 0; i < num_emission_pdfs(); i++) {
     m_pdf_likelihoods[i] = m_emission_pdfs[i].compute_likelihood(f);
