@@ -172,16 +172,20 @@ HmmNetBaumWelch::reset(void)
   m_eof_flag = false;
   m_current_frame = -1;
   // Clear the probabilities of possible active nodes
-  for (int i = 0; i < (int)m_active_node_table[m_cur_buffer].size(); i++)
-    m_nodes[m_active_node_table[m_cur_buffer][i]].prob[m_cur_buffer] =
-      loglikelihoods.zero();
-  m_active_node_table[m_cur_buffer].clear();
+  for (int b = 0; b < 2; b++)
+  {
+    for (int i = 0; i < (int)m_active_node_table[b].size(); i++)
+      m_nodes[m_active_node_table[b][i]].prob[b] = loglikelihoods.zero();
+    m_active_node_table[b].clear();
+  }
 }
 
 
-void
+bool
 HmmNetBaumWelch::init_utterance_segmentation(void)
 {
+  reset();
+  
   // Reserve a table for pdf occupancy probabilities
   m_pdf_prob.resize(m_model.num_emission_pdfs());
 
@@ -189,11 +193,21 @@ HmmNetBaumWelch::init_utterance_segmentation(void)
     m_transition_prob.resize(m_model.num_transitions());
 
   // Fill the backward probabilities
-  fill_backward_probabilities();
+  if (!fill_backward_probabilities())
+    return false; // Backward beam should be increased
+
+  // Compute the total likelihood and check the backward phase got
+  // proper probabilities for the initial nodes
+  m_sum_total_loglikelihood=compute_sum_bw_loglikelihoods(m_initial_node_id,
+                                                          m_first_frame);
+  if (m_sum_total_loglikelihood <= loglikelihoods.zero())
+    return false; // Backward beam should be increased
+  
+  return true;
 }
 
 
-void
+bool
 HmmNetBaumWelch::fill_backward_probabilities(void)
 {
   int target_buffer = 0;
@@ -246,7 +260,8 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
 
     if (m_active_node_table[target_buffer].empty())
     {
-      throw std::string("Baum-Welch failed during backward phase, try increasing the beam");
+      // All tokens were pruned, backward beam should be increased
+      return false;
     }
 
     // Use previous maximum probability for pruning
@@ -265,6 +280,7 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
   // Reset the current frame for the forward phase
   m_current_frame = -1;
   m_eof_flag = false;
+  return true;
 }
 
 
@@ -290,16 +306,6 @@ HmmNetBaumWelch::next_frame(void)
     }
     m_nodes[m_initial_node_id].prob[m_cur_buffer] = loglikelihoods.one();
     m_active_node_table[m_cur_buffer].push_back(m_initial_node_id);
-
-    // Compute the total loglikelihood
-    m_sum_total_loglikelihood=compute_sum_bw_loglikelihoods(m_initial_node_id);
-
-    // Make sure there is a backward probability for the initial node
-    if (m_sum_total_loglikelihood <= loglikelihoods.zero())
-    {
-      fprintf(stderr, "No backward probability for the initial node, increase the beam\n");
-      exit(1);
-    }
   }
   else
   {
@@ -500,7 +506,7 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
 
 
 double
-HmmNetBaumWelch::compute_sum_bw_loglikelihoods(int node_id)
+HmmNetBaumWelch::compute_sum_bw_loglikelihoods(int node_id, int frame)
 {
   double sum = loglikelihoods.zero();
 
@@ -512,11 +518,11 @@ HmmNetBaumWelch::compute_sum_bw_loglikelihoods(int node_id)
     {
       cur_addition = loglikelihoods.times(
         m_arcs[arc_id].score,
-        compute_sum_bw_loglikelihoods(m_arcs[arc_id].target));
+        compute_sum_bw_loglikelihoods(m_arcs[arc_id].target, frame));
     }
     else
     {
-      cur_addition = m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame);
+      cur_addition = m_arcs[arc_id].bw_scores.get_log_prob(frame);
     }
     if (cur_addition > loglikelihoods.zero())
       sum = loglikelihoods.add(sum, cur_addition);
@@ -588,5 +594,6 @@ HmmNetBaumWelch::FrameProbs::clear(void)
   if (prob_table_size > 0)
     delete log_prob_table;
   prob_table_size = 0;
+  num_probs = 0;
   frame_blocks.clear();
 }

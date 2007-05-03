@@ -249,7 +249,7 @@ HmmSet::read_legacy_ph(std::ifstream &in)
         }
       }
 
-      if (!load_transitions[source])
+      if (source >= 0 && !load_transitions[source])
       {
         // Check the transitions are valid
         if (source >= 0)

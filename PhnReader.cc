@@ -123,12 +123,13 @@ PhnReader::set_frame_limits(int first_frame, int last_frame)
 }
 
 
-void
+bool
 PhnReader::init_utterance_segmentation(void)
 {
   m_eof_flag = false;
   if (!next_phn_line(m_cur_phn))
     m_eof_flag = true;
+  return m_eof_flag;
 }
 
 

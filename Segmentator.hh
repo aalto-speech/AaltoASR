@@ -41,8 +41,9 @@ public:
   virtual void set_collect_transition_probs(bool collect) = 0;
   
   /** Precomputes necessary statistics for generating the segmentation
-   * for an utterance. */
-  virtual void init_utterance_segmentation(void) = 0;
+   * for an utterance.
+   * \return true if successful, false if segmentation failed */
+  virtual bool init_utterance_segmentation(void) = 0;
   
   /** Returns the current frame number, as referenced for
    * \ref FeatureGenerator. */

@@ -91,6 +91,9 @@ public:
    */
   void set_pruning_thresholds(double backward, double forward);
 
+  double get_backward_beam(void) { return m_backward_beam; }
+  double get_forward_beam(void) { return m_forward_beam; }  
+
   /// Set the scaling for acoustic log likelihoods
   void set_acoustic_scaling(double scale) { m_acoustic_scale = scale; }
 
@@ -99,7 +102,7 @@ public:
   virtual void close();
   virtual void set_frame_limits(int first_frame, int last_frame);
   virtual void set_collect_transition_probs(bool collect) { m_collect_transitions = collect; }
-  virtual void init_utterance_segmentation(void);
+  virtual bool init_utterance_segmentation(void);
   virtual int current_frame(void) { return m_current_frame; }
   virtual bool next_frame(void);
   virtual void reset(void);
@@ -108,13 +111,14 @@ public:
   virtual const std::vector<Segmentator::IndexProbPair>& transition_probs(void) { return m_transition_prob_pairs; }
 
 private:
-  /** Computes the backward probabilities. */
-  void fill_backward_probabilities(void);
+  /** Computes the backward probabilities.
+   * \return true if successful, false if backward beam should be increased. */
+  bool fill_backward_probabilities(void);
 
   double propagate_node_arcs(int node_id, bool forward,
                              double cur_score, int target_buffer,
                              FeatureVec &fea_vec);
-  double compute_sum_bw_loglikelihoods(int node_id);
+  double compute_sum_bw_loglikelihoods(int node_id, int frame);
   void clear_bw_scores(void);
   
 private:

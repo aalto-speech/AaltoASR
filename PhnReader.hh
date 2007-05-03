@@ -45,7 +45,7 @@ public:
   virtual void reset(void);
   virtual bool eof(void) { return m_eof_flag; }
 
-  virtual void init_utterance_segmentation(void);
+  virtual bool init_utterance_segmentation(void);
   virtual int current_frame(void) { return m_current_frame; }
   virtual bool next_frame(void);
   virtual const std::vector<Segmentator::IndexProbPair>& pdf_probs(void) { return m_cur_pdf; }

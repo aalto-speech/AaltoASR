@@ -32,8 +32,6 @@ void
 train(HmmSet *model, Segmentator *segmentator)
 {
   int frame;
-  
-  segmentator->init_utterance_segmentation();
 
   while (segmentator->next_frame()) {
 
@@ -181,6 +179,21 @@ main(int argc, char *argv[])
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
+        
+        double orig_beam = lattice->get_backward_beam();
+        int counter = 1;
+        while (!lattice->init_utterance_segmentation())
+        {
+          if (counter >= 5)
+          {
+            throw std::string("Could not run Baum-Welch.\n") +
+              std::string("The HMM network may be incorrect or initial beam too low.");
+          }
+          fprintf(stderr,
+                  "Warning: Backward phase failed, increasing beam to %.1f\n",
+                  ++counter*orig_beam);
+          lattice->set_pruning_thresholds(counter*orig_beam, 0);
+        }
         segmentator = lattice;
       }
       else
@@ -191,6 +204,8 @@ main(int argc, char *argv[])
                                          config["raw-input"].specified, NULL);
         phnreader->set_collect_transition_probs(transtat);
         segmentator = phnreader;
+        if (!segmentator->init_utterance_segmentation())
+          throw std::string("Could not initialize the utterance for PhnReader");
       }
       
       // Train
