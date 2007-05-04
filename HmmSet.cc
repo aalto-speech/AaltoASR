@@ -364,7 +364,7 @@ HmmSet::write_legacy_ph(const std::string &filename)
 	HmmTransition &transition = this->transition(hmm_transitions[t]);
 
 	int target = transition.target_offset + 2 + s;
-	if (target == hmm.num_states())
+	if (target == hmm.num_states()+2)
 	  target = 1;
 
 	out << " " << target 
