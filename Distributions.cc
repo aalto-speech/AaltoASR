@@ -367,9 +367,10 @@ DiagonalGaussian::estimate_parameters()
     Blas_Scale(1/(m_accums[0]->gamma-m_accums[1]->gamma+d), m_mean);
 
     // UPDATE COVARIANCE
-    // new_cov=(obs_num-obs_den+D*old_cov+new_mean*new_mean')/(gamma_num-gamma_den+D)-old_mean*old_mean'
+    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
     for (int i=0; i<dim(); i++)
       m_covariance(i) += old_mean(i)*old_mean(i);
+    Blas_Scale(d, m_covariance);
     Blas_Add_Mult(m_covariance, 1, m_accums[0]->cov);
     Blas_Add_Mult(m_covariance, -1, m_accums[1]->cov);
     Blas_Scale(1/(m_accums[0]->gamma-m_accums[1]->gamma+d), m_covariance);
@@ -652,22 +653,21 @@ FullCovarianceGaussian::estimate_parameters()
     // c & mu~ & sigma~
     double c = m_accums[0]->gamma - m_accums[1]->gamma;
     LaVectorDouble mu_tilde(m_accums[0]->mean);
-    LaGenMatDouble sigma_tilde(m_accums[0]->cov);
     Blas_Add_Mult(mu_tilde, -1, m_accums[1]->mean);
-    sigma_tilde -= m_accums[1]->cov;
+    LaGenMatDouble sigma_tilde = m_accums[0]->cov - m_accums[1]->cov;
     
     // a0
     LaGenMatDouble a0(m_accums[0]->cov);
     Blas_Scale(c, a0);
-    Blas_R1_Update(a0, mu_tilde(i), mu_tilde(i), -1);
+    Blas_R1_Update(a0, mu_tilde, mu_tilde, -1);
     
     // a1
     LaGenMatDouble a1(m_covariance);
-    Blas_R1_Update(a1, m_mean(i), m_mean(i), 1);
+    Blas_R1_Update(a1, m_mean, m_mean, 1);
     Blas_Scale(c, a1);
     Blas_R1_Update(a1, m_mean, mu_tilde, -1);
     Blas_R1_Update(a1, mu_tilde, m_mean, -1);
-    a1 += sigma_tilde;
+    a1 = a1 + sigma_tilde;
     
     // a2
     LaGenMatDouble a2(m_covariance);
@@ -691,23 +691,21 @@ FullCovarianceGaussian::estimate_parameters()
     Blas_Scale(1/(m_accums[0]->gamma-m_accums[1]->gamma+d), m_mean);
 
     // UPDATE COVARIANCE
-    // new_cov=(obs_num-obs_den+D*old_cov+new_mean*new_mean')/(gamma_num-gamma_den+D)-old_mean*old_mean'
+    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
     Blas_R1_Update(m_covariance, old_mean, old_mean, 1);
-    Blas_Add_Mult(m_covariance, 1, m_accums[0]->cov);
-    Blas_Add_Mult(m_covariance, -1, m_accums[1]->cov);
+    Blas_Scale(d, m_covariance);
+    m_covariance = m_covariance + m_accums[0]->cov;
+    m_covariance = m_covariance - m_accums[1]->cov;
     Blas_Scale(1/(m_accums[0]->gamma-m_accums[1]->gamma+d), m_covariance);
+    Blas_R1_Update(m_covariance, m_mean, m_mean, -1);
     for (int i=0; i<dim(); i++) {
-      m_covariance(i) -= m_mean(i)*m_mean(i);
-      if (m_covariance(i) < m_minvar)
-        m_covariance(i) = m_minvar;
+      if (m_covariance(i,i) < m_minvar)
+        m_covariance(i,i) = m_minvar;
     }
   }
 
-  m_constant=1;
-  for (int i=0; i<dim(); i++) {
-    m_precision(i) = 1/m_covariance(i);
-    m_constant *= m_precision(i);
-  }
+  LinearAlgebra::inverse(m_covariance, m_precision);
+  m_constant = LinearAlgebra::determinant(m_precision);
   m_constant = sqrt(m_constant);
   m_constant = log(m_constant);
 }
