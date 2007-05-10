@@ -9,7 +9,7 @@
 #include "HmmSet.hh"
 #include "FeatureGenerator.hh"
 #include "Recipe.hh"
-
+#include "util.hh"
   
 std::string out_file;
 std::string save_summary_file;
@@ -21,6 +21,7 @@ bool transtat;
 bool durstat;
 float start_time, end_time;
 int start_frame, end_frame;
+double total_log_likelihood=0;
 
 conf::Config config;
 Recipe recipe;
@@ -43,9 +44,11 @@ train(HmmSet *model, Segmentator *segmentator)
     // Accumulate all possible states distributions for this frame
     const std::vector<Segmentator::IndexProbPair> &pdfs
       = segmentator->pdf_probs();
-    for (int i = 0; i < (int)pdfs.size(); i++)
+    for (int i = 0; i < (int)pdfs.size(); i++) {
       model->accumulate_distribution(feature, pdfs[i].index,
                                      pdfs[i].prob, accum_pos);
+      total_log_likelihood += util::safe_log(pdfs[i].prob);
+    }
     
     // Accumulate also transition probabilities if desired
     if (transtat) {
@@ -53,9 +56,11 @@ train(HmmSet *model, Segmentator *segmentator)
       const std::vector<Segmentator::IndexProbPair> &transitions
         = segmentator->transition_probs();
       
-      for (int i = 0; i < (int)transitions.size(); i++)
+      for (int i = 0; i < (int)transitions.size(); i++) {
         model->accumulate_transition(transitions[i].index,
                                      transitions[i].prob);
+        total_log_likelihood += util::safe_log(transitions[i].prob);
+      }
     }
   }
 }
@@ -220,6 +225,7 @@ main(int argc, char *argv[])
     {
       fprintf(stderr, "Finished collecting statistics (%i/%i), writing models\n",
 	      config["batch"].get_int(), config["bindex"].get_int());
+      fprintf(stderr, "Total log likelihood: %f\n", total_log_likelihood);
     }
 
     // Write statistics to file dump and clean up
