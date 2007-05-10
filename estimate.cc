@@ -38,8 +38,8 @@ main(int argc, char *argv[])
       ('\0', "ml", "", "", "maximum likelihood estimation")
       ('\0', "mmi", "", "", "maximum mutual information estimation")
       ('\0', "minvar", "arg", "0.1", "minimum variance (default 0.1)")
-      ('\0', "C1", "arg", "0.0", "constant \"C1\" for MMI updates (default 0)")
-      ('\0', "C2", "arg", "0.0", "constant \"C2\" for MMI updates (default 0)")
+      ('\0', "C1", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
+      ('\0', "C2", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
