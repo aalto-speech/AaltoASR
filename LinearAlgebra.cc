@@ -93,6 +93,33 @@ LinearAlgebra::generalized_eigenvalues(const Matrix &A,
 }
 
 
+
+void
+LinearAlgebra::generalized_eigenvalues(const Matrix &A,
+                                       const Matrix &B,
+                                       LaVectorComplex &eigvals,
+                                       LaGenMatComplex &eigvecs)
+{
+  assert(A.rows()==A.cols());
+  assert(B.rows()==B.cols());
+  assert(A.rows()==B.rows());
+  assert(is_spd(B));
+
+  LaGenMatDouble B_negsqrt;
+  LaGenMatDouble t(A);
+  LaGenMatDouble t2(A);
+  eigvals.resize(A.rows(),1);
+  eigvecs.resize(A.rows(),A.cols());
+  
+  matrix_power(B, B_negsqrt, -0.5);
+  Blas_Mat_Mat_Mult(B_negsqrt, A, t, 1.0, 0.0);
+  Blas_Mat_Mat_Mult(t, B_negsqrt, t2, 1.0, 0.0);
+
+  LaGenMatComplex c(t2);
+  LaEigSolve(c, eigvals, eigvecs);
+}
+
+
 void
 LinearAlgebra::map_m2v(const Matrix &m,
 		       Vector &v)

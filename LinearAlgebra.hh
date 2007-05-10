@@ -1,16 +1,8 @@
 #ifndef LINEARALGEBRA_HH
 #define LINEARALGEBRA_HH
 
-#include "fmd.h"
-#include "gmd.h"
-#include "blas1pp.h"
-#include "blas2pp.h"
-#include "blas3pp.h"
-#include "lasvd.h"
-#include "laslv.h"
-#include "lavli.h"
-#include "spdmd.h"
-
+#define LA_COMPLEX_SUPPORT
+#include "lapackpp.h"
 #include "HCL_Rn_d.h"
 
 typedef LaGenMatDouble Matrix;
@@ -31,11 +23,17 @@ public:
   static void cholesky_factor(const Matrix &A,
 			      Matrix &B);
   
-  // B assumed symmetric!
+  // A assumed symmetric, B symmetric positive definite!
   static void generalized_eigenvalues(const Matrix &A, 
 				      const Matrix &B, 
 				      Vector &eigvals,
 				      Matrix &eigvecs);
+
+  // B assumed symmetric positive definite!
+  static void generalized_eigenvalues(const Matrix &A,
+				      const Matrix &B,
+				      LaVectorComplex &eigvals,
+				      LaGenMatComplex &eigvecs);
   
   static void map_m2v(const Matrix &m,
 		      Vector &v);

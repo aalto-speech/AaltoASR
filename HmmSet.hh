@@ -348,6 +348,16 @@ public:
    * \param minvar minimum variance term
    */
   void set_minvar(double minvar);
+
+  /** Sets the "C1" constant for MMI updates
+   * \param c1 the C1 constant
+   */
+  void set_mmi_c1_constant(double c1);
+
+  /** Sets the "C1" constant for MMI updates
+   * \param c2 the C2 constant
+   */
+  void set_mmi_c2_constant(double c2);
   
   
 private:

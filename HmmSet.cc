@@ -742,3 +742,23 @@ HmmSet::set_minvar(double minvar)
     g->set_minvar(minvar);
   }
 }
+
+
+void
+HmmSet::set_mmi_c1_constant(double c1)
+{
+  for (int i=0; i<m_pool.size(); i++) {
+    Gaussian *g = (Gaussian*)m_pool.get_pdf(i);
+    g->set_mmi_c1_constant(c1);
+  }
+}
+
+
+void
+HmmSet::set_mmi_c2_constant(double c2)
+{
+  for (int i=0; i<m_pool.size(); i++) {
+    Gaussian *g = (Gaussian*)m_pool.get_pdf(i);
+    g->set_mmi_c2_constant(c2);
+  }
+}

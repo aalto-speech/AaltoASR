@@ -1,12 +1,9 @@
 #ifndef DISTRIBUTIONS_HH
 #define DISTRIBUTIONS_HH
 
-#include "gmd.h"
-#include "lavd.h"
 #include "FeatureBuffer.hh"
 #include "FeatureModules.hh"
 #include "LinearAlgebra.hh"
-
 
 
 class FullStatisticsAccumulator {
@@ -80,9 +77,6 @@ public:
   EstimationMode estimation_mode() const { return m_mode; }
   /* Returns the correct accumulator for these statistics */
   int accumulator_position(std::string type);
-  /* Sets the constant D for MMI updates */
-  void set_mmi_d_constant(double d_constant) { m_d_constant = d_constant; }
-  
   
   // LIKELIHOODS
   
@@ -101,7 +95,6 @@ public:
 
 protected:
   int m_dim;
-  double m_d_constant;
   EstimationMode m_mode;
 };
 
@@ -206,9 +199,15 @@ public:
 
   /* Set the minimum variance for this Gaussian */
   void set_minvar(double minvar) { m_minvar = minvar; };
+  /* Sets the constant "C1" for MMI updates */
+  void set_mmi_c1_constant(double c1_constant) { m_c1_constant = c1_constant; }
+  /* Sets the constant "C2" for MMI updates */
+  void set_mmi_c2_constant(double c2_constant) { m_c2_constant = c2_constant; }
   
 protected:
   double m_minvar;
+  double m_c1_constant;
+  double m_c2_constant;
 };
 
 
