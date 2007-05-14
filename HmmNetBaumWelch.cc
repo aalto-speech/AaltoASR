@@ -350,16 +350,17 @@ HmmNetBaumWelch::next_frame(void)
   // Clear the old active nodes
   m_active_node_table[source_buffer].clear();
 
-  // SANITY CHECK: Total likelihood must match
+  // SANITY CHECK: Total likelihood should match
   double total_prob = 0;
   for (int i = 0; i < (int)m_active_pdf_table.size(); i++)
     total_prob += m_pdf_prob[m_active_pdf_table[i]];
   if (fabs(1-total_prob)> 0.02) // Allow small deviation
   {
-    fprintf(stderr, "Total likelihood does not match, sum of PDF probabilities equals %g\n", total_prob);
-    exit(1);
+    fprintf(stderr, "Warning: Total likelihood does not match, sum of PDF probabilities is %g\n", total_prob);
+    if (total_prob < 0.01)
+      exit(1); // Exit if the probability is completely wrong and small
   }
-  // END OF SANITY CHECK  
+  // END OF SANITY CHECK
   
   // Fill the PDF probabilities and clear the active PDF probabilities
   m_pdf_prob_pairs.clear();
