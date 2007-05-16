@@ -47,7 +47,9 @@ train(HmmSet *model, Segmentator *segmentator)
     for (int i = 0; i < (int)pdfs.size(); i++) {
       model->accumulate_distribution(feature, pdfs[i].index,
                                      pdfs[i].prob, accum_pos);
-      total_log_likelihood += util::safe_log(pdfs[i].prob);
+      if (!segmentator->computes_total_log_likelihood())
+        total_log_likelihood += util::safe_log(
+          pdfs[i].prob*model->state_likelihood(pdfs[i].index, feature));
     }
     
     // Accumulate also transition probabilities if desired
@@ -59,10 +61,17 @@ train(HmmSet *model, Segmentator *segmentator)
       for (int i = 0; i < (int)transitions.size(); i++) {
         model->accumulate_transition(transitions[i].index,
                                      transitions[i].prob);
-        total_log_likelihood += util::safe_log(transitions[i].prob);
+        if (!segmentator->computes_total_log_likelihood())
+        {
+          HmmTransition &t = model->transition(transitions[i].index);
+          total_log_likelihood +=
+            util::safe_log(transitions[i].prob*t.prob);
+        }
       }
     }
   }
+  if (segmentator->computes_total_log_likelihood())
+    total_log_likelihood += segmentator->get_total_log_likelihood();
 }
 
 
@@ -173,6 +182,8 @@ main(int argc, char *argv[])
         fprintf(stderr,"\n");
       }
 
+      bool skip = false;
+
       if (config["hmmnet"].specified || config["den-hmmnet"].specified)
       {
         // Open files and configure
@@ -191,8 +202,11 @@ main(int argc, char *argv[])
         {
           if (counter >= 5)
           {
-            throw std::string("Could not run Baum-Welch.\n") +
-              std::string("The HMM network may be incorrect or initial beam too low.");
+            fprintf(stderr, "Could not run Baum-Welch for file %s\n",
+                    recipe.infos[f].audio_path);
+            fprintf(stderr, "The HMM network may be incorrect or initial beam too low.\n");
+            skip = true;
+            break;
           }
           fprintf(stderr,
                   "Warning: Backward phase failed, increasing beam to %.1f\n",
@@ -210,11 +224,18 @@ main(int argc, char *argv[])
         phnreader->set_collect_transition_probs(transtat);
         segmentator = phnreader;
         if (!segmentator->init_utterance_segmentation())
-          throw std::string("Could not initialize the utterance for PhnReader");
+        {
+          fprintf(stderr, "Could not initialize the utterance for PhnReader.");
+          fprintf(stderr,"Current file was: %s\n",recipe.infos[f].audio_path);
+          skip = true;
+        }
       }
-      
-      // Train
-      train(&model, segmentator);
+
+      if (!skip)
+      {
+        // Train
+        train(&model, segmentator);
+      }
 	
       // Clean up
       delete segmentator;

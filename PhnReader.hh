@@ -44,6 +44,7 @@ public:
   virtual void close();
   virtual void reset(void);
   virtual bool eof(void) { return m_eof_flag; }
+  virtual bool computes_total_log_likelihood(void) { return false; }
 
   virtual bool init_utterance_segmentation(void);
   virtual int current_frame(void) { return m_current_frame; }

@@ -65,6 +65,19 @@ public:
    * \ref next_frame() */
   virtual bool eof(void) = 0;
 
+  /** \return true if the total likelihood of the utterance is computed
+   * by the Segmentator class. If so, it will be available through
+   * \ref get_total_log_likelihood() after the segmentation.
+   */
+  virtual bool computes_total_log_likelihood(void) = 0;
+
+  /** If \ref computes_total_likelihood() returns true, this method can
+   * be used to fetch the total likelihood of the utterance after the
+   * segmentation.
+   * \return total log likelihood.
+   */
+  virtual double get_total_log_likelihood(void) { return 0; }
+
   /** Returns a reference to a vector of possible PDFs and their
    * probabilities */
   virtual const std::vector<IndexProbPair>& pdf_probs(void) = 0;
