@@ -24,7 +24,7 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate test_qep
+PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate
 #PROGS = feacat feadot feanorm phone_probs segfea init_hmm align tie vtln mllr gprocess estep
 #meltest adapt vtln train2 phone_probs2 segfea2 feanorm feacat init_hmm2 hmm2dcd tie cepstract
 
