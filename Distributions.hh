@@ -11,11 +11,13 @@ public:
   FullStatisticsAccumulator(int dim) { 
     mean.resize(dim);
     cov.resize(dim,dim);
+    feacount=0;
     mean=0;
     cov=0;
     gamma=0;
     accumulated=false;
   };
+  int feacount;
   double gamma;
   Vector mean;
   Matrix cov;
@@ -25,14 +27,16 @@ public:
 
 class DiagonalStatisticsAccumulator {
 public:
-  DiagonalStatisticsAccumulator(int dim) { 
+  DiagonalStatisticsAccumulator(int dim) {
     mean.resize(dim);
     cov.resize(dim);
+    feacount=0;
     mean=0;
     cov=0;
     gamma=0;
     accumulated=false;
   };
+  int feacount;
   bool accumulated;
   double gamma;
   Vector mean;
@@ -258,7 +262,6 @@ private:
 
 
 
-
 class MlltGaussian : public Gaussian {
 public:
   MlltGaussian(int dim);
@@ -297,7 +300,9 @@ public:
   // Mllt-specific
   void transform_parameters(LinTransformModule &A);
   static void update_mllt_transform(PDFPool &mllt_gaussians);
-    
+
+  friend class HmmSet;
+  
 private:  
   double m_constant;
   Vector m_mean;

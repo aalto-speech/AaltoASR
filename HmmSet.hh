@@ -6,9 +6,12 @@
 #include <map>
 #include <assert.h>
 
+#include "FeatureGenerator.hh"
 #include "FeatureModules.hh"
 #include "Distributions.hh"
 
+#define MAX_MLLT_ITER 7
+#define MAX_MLLT_A_ITER 80
 
 //
 // HmmState
@@ -335,6 +338,12 @@ public:
    */
   void estimate_parameters();
 
+  /** Estimates/updates the MLLT transform
+   * according to the current accumulators
+   * \param fea_gen FeatureGenerator with the current MLLT transform
+   */
+  void estimate_mllt(FeatureGenerator &fea_gen);
+
   /** Sets the current estimation mode for this model
    * \param mode PDF::EstimationMode (ML/MMI)
    */
@@ -348,6 +357,11 @@ public:
    * \param minvar minimum variance term
    */
   void set_minvar(double minvar);
+
+  /** Sets the covariance smoothing for all full covariance Gaussians in this model
+   * \param covsmooth covariance smoothing term
+   */
+  void set_covsmooth(double covsmooth);
 
   /** Sets the "C1" constant for MMI updates
    * \param c1 the C1 constant

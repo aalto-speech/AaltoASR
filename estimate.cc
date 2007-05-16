@@ -18,6 +18,7 @@ int info;
 bool transtat;
 
 conf::Config config;
+FeatureGenerator fea_gen;
 HmmSet model;
 
 
@@ -32,15 +33,18 @@ main(int argc, char *argv[])
       ('g', "gk=FILE", "arg", "", "Previous mixture base distributions")
       ('m', "mc=FILE", "arg", "", "Previous mixture coefficients for the states")
       ('p', "ph=FILE", "arg", "", "Previous HMM definitions")
+      ('c', "config=FILE", "arg must", "", "feature configuration (for MLLT)")
       ('L', "list=LISTNAME", "arg must", "", "file with one statistics file per line")
       ('o', "out=BASENAME", "arg must", "", "base filename for output models")
       ('t', "transitions", "", "", "estimate also state transitions")
+      ('i', "info=INT", "arg", "0", "info level")
+      ('\0', "mllt", "", "", "update maximum likelihood linear transform")
       ('\0', "ml", "", "", "maximum likelihood estimation")
       ('\0', "mmi", "", "", "maximum mutual information estimation")
       ('\0', "minvar", "arg", "0.1", "minimum variance (default 0.1)")
+      ('\0', "covsmooth", "arg", "0", "covariance smoothing (default 0.0)")
       ('\0', "C1", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
       ('\0', "C2", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
-      ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
 
@@ -74,6 +78,13 @@ main(int argc, char *argv[])
       model.set_estimation_mode(PDF::ML);
     else
       model.set_estimation_mode(PDF::MMI);
+
+    if (config["mllt"].specified) {
+      if (!config["config"].specified)
+        throw std::string("Must specify configuration file with MLLT");      
+      fea_gen.load_configuration(io::Stream(config["config"].get_str()));
+    }
+    
     model.start_accumulating();
 
     // Open the list of statistics files
@@ -91,8 +102,11 @@ main(int argc, char *argv[])
 
     // Estimate parameters
     model.set_minvar(config["minvar"].get_double());
+    model.set_covsmooth(config["covsmooth"].get_double());
     model.set_mmi_c1_constant(config["C1"].get_double());
     model.set_mmi_c2_constant(config["C2"].get_double());
+    if (config["mllt"].specified)
+      model.estimate_mllt(fea_gen);
     model.estimate_parameters();
     model.stop_accumulating();
     
