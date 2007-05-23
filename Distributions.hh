@@ -198,6 +198,11 @@ public:
   virtual void split(Gaussian &s1, Gaussian &s2) const;
   /* Sets the parameters for the current Gaussian by merging m1 and m2 */
   virtual void merge(double w1, const Gaussian &m1, double w2, const Gaussian &m2);
+  /** Sets the parameters for the current Gaussian by merging the Gaussians
+      given in a vector with the proper weights */
+  virtual void merge(const std::vector<double> &weights,
+                     const std::vector<Gaussian*> &gaussians);
+  
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
 

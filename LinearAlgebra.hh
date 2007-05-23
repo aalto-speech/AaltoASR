@@ -9,53 +9,56 @@ typedef LaGenMatDouble Matrix;
 typedef LaVectorDouble Vector;
 
 
-class LinearAlgebra {
+/** Functions for matrix operations */
+namespace LinearAlgebra {
 
-public:
+  //!< A assumed symmetric!
+  double log_determinant(const Matrix &A);
   
-  // A assumed symmetric!
-  static double determinant(const Matrix &A);
+  //!< A assumed symmetric!
+  double determinant(const Matrix &A);
   
-  static void matrix_power(const Matrix &A,
-			   Matrix &B,
-			   double power);
+  void matrix_power(const Matrix &A,
+                    Matrix &B,
+                    double power);
   
-  static void cholesky_factor(const Matrix &A,
-			      Matrix &B);
+  void cholesky_factor(const Matrix &A,
+                       Matrix &B);
   
-  // A assumed symmetric, B symmetric positive definite!
-  static void generalized_eigenvalues(const Matrix &A, 
-				      const Matrix &B, 
-				      Vector &eigvals,
-				      Matrix &eigvecs);
+  //!< A assumed symmetric, B symmetric positive definite!
+  void generalized_eigenvalues(const Matrix &A, 
+                               const Matrix &B, 
+                               Vector &eigvals,
+                               Matrix &eigvecs);
 
-  // B assumed symmetric positive definite!
-  static void generalized_eigenvalues(const Matrix &A,
-				      const Matrix &B,
-				      LaVectorComplex &eigvals,
-				      LaGenMatComplex &eigvecs);
+  //!< B assumed symmetric positive definite!
+  void generalized_eigenvalues(const Matrix &A,
+                               const Matrix &B,
+                               LaVectorComplex &eigvals,
+                               LaGenMatComplex &eigvecs);
   
-  static void map_m2v(const Matrix &m,
-		      Vector &v);
+  void map_m2v(const Matrix &m,
+               Vector &v);
   
-  static void map_v2m(const Vector &v, 
-		      Matrix &m);
+  void map_v2m(const Vector &v, 
+               Matrix &m);
 
-  static void map_hclv2lapackm(const HCL_RnVector_d &hcl_v, 
-			       Matrix &lapack_m);
+  void map_hclv2lapackm(const HCL_RnVector_d &hcl_v, 
+                        Matrix &lapack_m);
   
-  static void map_lapackm2hclv(const Matrix &lapack_m,
-			       HCL_RnVector_d &hcl_v);
+  void map_lapackm2hclv(const Matrix &lapack_m,
+                        HCL_RnVector_d &hcl_v);
 
-  static double cond(const Matrix &m);
+  double cond(const Matrix &m);
 
-  static bool is_spd(const Matrix &m);
+  bool is_spd(const Matrix &m);
 
-  static bool is_singular(const Matrix &m);
+  bool is_singular(const Matrix &m);
 
-  static void force_min_eig(Matrix &m, double min_eig);
+  void force_min_eig(Matrix &m, double min_eig);
 
-  static void inverse(const Matrix &m, Matrix &inv);
+  void inverse(const Matrix &m, Matrix &inv);
+
 };
 
 #endif /* LINEARALGEBRA_HH */

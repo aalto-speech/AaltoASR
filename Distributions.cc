@@ -84,6 +84,37 @@ Gaussian::merge(double weight1, const Gaussian &m1,
 }
 
 
+void
+Gaussian::merge(const std::vector<double> &weights,
+                const std::vector<Gaussian*> &gaussians)
+{
+  assert( weights.size() == gaussians.size() );
+
+  Vector new_mean(m_dim);
+  Matrix new_covariance = Matrix::zeros(m_dim, m_dim);
+  Matrix eye = Matrix::eye(m_dim, m_dim);
+  double weight_sum = 0;
+  new_mean = 0;
+  
+  for (int i = 0; i < (int)weights.size(); i++)
+  {
+    Matrix cur_covariance;
+    Vector cur_mean;
+    gaussians[i]->get_covariance(cur_covariance);
+    gaussians[i]->get_mean(cur_mean);
+    Blas_R1_Update(cur_covariance, cur_mean, cur_mean);
+    Blas_Mat_Mat_Mult(cur_covariance, eye, new_covariance, weights[i], 1.0);
+    Blas_Add_Mult(new_mean, weights[i], cur_mean);
+    weight_sum += weights[i];
+  }
+  Blas_Scale(1.0/weight_sum, new_mean);
+  Blas_Scale(1.0/weight_sum, new_covariance);
+  Blas_R1_Update(new_covariance, new_mean, new_mean, -1.0);
+  set_mean(new_mean);
+  set_covariance(new_covariance);
+}
+
+
 double
 Gaussian::kullback_leibler(Gaussian &g) const
 {
