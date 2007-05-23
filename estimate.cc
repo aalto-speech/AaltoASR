@@ -38,7 +38,7 @@ main(int argc, char *argv[])
       ('o', "out=BASENAME", "arg must", "", "base filename for output models")
       ('t', "transitions", "", "", "estimate also state transitions")
       ('i', "info=INT", "arg", "0", "info level")
-      ('\0', "mllt", "", "", "update maximum likelihood linear transform")
+      ('\0', "mllt=MODULE", "arg", "", "update maximum likelihood linear transform")
       ('\0', "ml", "", "", "maximum likelihood estimation")
       ('\0', "mmi", "", "", "maximum mutual information estimation")
       ('\0', "minvar", "arg", "0.1", "minimum variance (default 0.1)")
@@ -60,20 +60,20 @@ main(int argc, char *argv[])
       
     // Load the previous models
     if (config["base"].specified)
-      {
-	model.read_all(config["base"].get_str(), config["mllt"].specified);
-      }
+    {
+      model.read_all(config["base"].get_str(), config["mllt"].specified);
+    }
     else if (config["gk"].specified && config["mc"].specified &&
              config["ph"].specified)
     {
-	model.read_gk(config["gk"].get_str(), config["mllt"].specified);
-	model.read_mc(config["mc"].get_str());
-	model.read_ph(config["ph"].get_str());
-      }
+      model.read_gk(config["gk"].get_str(), config["mllt"].specified);
+      model.read_mc(config["mc"].get_str());
+      model.read_ph(config["ph"].get_str());
+    }
     else
-      {
-	throw std::string("Must give either --base or all --gk, --mc and --ph");
-      }
+    {
+      throw std::string("Must give either --base or all --gk, --mc and --ph");
+    }
     if (config["ml"].specified)
       model.set_estimation_mode(PDF::ML);
     else
@@ -106,7 +106,7 @@ main(int argc, char *argv[])
     model.set_mmi_c1_constant(config["C1"].get_double());
     model.set_mmi_c2_constant(config["C2"].get_double());
     if (config["mllt"].specified)
-      model.estimate_mllt(fea_gen);
+      model.estimate_mllt(fea_gen, config["mllt"].get_str());
     else
       model.estimate_parameters();
     model.stop_accumulating();

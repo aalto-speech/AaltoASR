@@ -709,15 +709,21 @@ HmmSet::estimate_parameters()
 
 
 void
-HmmSet::estimate_mllt(FeatureGenerator &fea_gen)
+HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
 {
   Matrix temp_m(dim(),dim());
   double beta=0;
-  
+
+  LinTransformModule *mllt_module = dynamic_cast< LinTransformModule* >
+    (fea_gen.module(mllt_name));
+  if (mllt_module == NULL)
+    throw std::string("Module ") + mllt_name +
+      std::string(" is not a transform module");
+
   // Get the old transform matrix
   LaGenMatDouble Aold(dim(),dim());
   const std::vector<float> *trold =
-    ((LinTransformModule*)fea_gen.module("transform"))->get_transformation_matrix();
+    mllt_module->get_transformation_matrix();
   for (int i=0; i<dim(); i++)
     for (int j=0; j<dim(); j++)
       Aold(i,j) = (*trold)[i*dim() + j];

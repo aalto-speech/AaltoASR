@@ -341,8 +341,9 @@ public:
   /** Estimates/updates the MLLT transform
    * according to the current accumulators
    * \param fea_gen FeatureGenerator with the current MLLT transform
+   * \param mllt_name Name of the MLLT module in feature configuration
    */
-  void estimate_mllt(FeatureGenerator &fea_gen);
+  void estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name);
 
   /** Sets the current estimation mode for this model
    * \param mode PDF::EstimationMode (ML/MMI)
