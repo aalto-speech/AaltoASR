@@ -16,7 +16,7 @@ PhnReader::Phn::Phn()
 {
 }
 
-PhnReader::PhnReader(HmmSet &model)
+PhnReader::PhnReader(HmmSet *model)
   : m_file(NULL), m_model(model),
     m_state_num_labels(false), m_relative_sample_numbers(false)
 {
@@ -91,7 +91,7 @@ PhnReader::set_line_limits(int first_line, int last_line,
   
   if (first_frame != NULL)
   {
-    *first_frame = (int)(phn.start/m_samples_per_frame);
+    *first_frame = phn.start;
     if (m_relative_sample_numbers)
       (*first_frame) += m_first_frame;
   }
@@ -112,7 +112,7 @@ PhnReader::set_frame_limits(int first_frame, int last_frame)
     while (next_phn_line(phn)) {
       oldpos = curpos;
       curpos = ftell(m_file);
-      if (phn.end < 0 || (int)(phn.end/m_samples_per_frame) > m_first_frame)
+      if (phn.end < 0 || phn.end > m_first_frame)
       {
         fseek(m_file, oldpos, SEEK_SET);
         m_current_line--;
@@ -137,6 +137,8 @@ bool
 PhnReader::next_frame(void)
 {
   int cur_state_index = -1;
+
+  assert( m_model != NULL );
   
   if (m_eof_flag)
     return false;
@@ -144,18 +146,16 @@ PhnReader::next_frame(void)
   if (m_current_frame == -1)
   {
     // Initialize the current frame to the beginning of the file
-    m_current_frame = (int)(m_cur_phn.start/m_samples_per_frame);
-    if (m_current_frame < m_first_frame)
-      m_current_frame = m_first_frame;
-    assert( (int)(m_cur_phn.end/m_samples_per_frame) >= m_current_frame );
+    m_current_frame = m_cur_phn.start;
+    assert( m_cur_phn.end >= m_current_frame );
   }
   else
   {
     m_current_frame++;
   }
 
-  assert( m_current_frame >= (int)(m_cur_phn.start/m_samples_per_frame) );
-  assert( m_current_frame <= (int)(m_cur_phn.end/m_samples_per_frame) );
+  assert( m_current_frame >= m_cur_phn.start );
+  assert( m_current_frame <= m_cur_phn.end );
 
   if (m_state_num_labels)
   {
@@ -165,28 +165,23 @@ PhnReader::next_frame(void)
   {
     if (m_cur_phn.state < 0)
       throw std::string("PhnReader::next_frame(): A state segmented phn file is required");
-    Hmm &hmm = m_model.hmm(m_model.hmm_index(m_cur_phn.label[0]));
+    Hmm &hmm = m_model->hmm(m_model->hmm_index(m_cur_phn.label[0]));
     cur_state_index = hmm.state(m_cur_phn.state);
   }
-  m_cur_pdf.back().index = m_model.emission_pdf_index(cur_state_index);
+  m_cur_pdf.back().index = m_model->emission_pdf_index(cur_state_index);
 
   bool new_phn_loaded = false;
   Phn prev_phn = m_cur_phn;
-  if (m_last_frame > 0 && m_current_frame+1 >= m_last_frame) {
-    m_eof_flag = true; // For the next call
-  }
-  else
+
+  // Do we need to load more phn lines?
+  while (m_current_frame+1 >= m_cur_phn.end)
   {
-    // Do we need to load more phn lines?
-    while (m_current_frame+1 >= (int)(m_cur_phn.end/m_samples_per_frame))
+    if (!next_phn_line(m_cur_phn))
     {
-      if (!next_phn_line(m_cur_phn))
-      {
-        m_eof_flag = true; // For the next call
-        break;
-      }
-      new_phn_loaded = true;
+      m_eof_flag = true; // For the next call
+      break;
     }
+    new_phn_loaded = true;
   }
 
   if (m_collect_transitions)
@@ -194,7 +189,7 @@ PhnReader::next_frame(void)
     m_transition_info.clear();
     if (!m_eof_flag) // Not the last frame
     {
-      std::vector<int> &tr_index=m_model.state(cur_state_index).transitions();
+      std::vector<int> &tr_index=m_model->state(cur_state_index).transitions();
       int transition_index = -1;
       
       if (new_phn_loaded)
@@ -205,7 +200,7 @@ PhnReader::next_frame(void)
           // We don't have information which transition it is, select the first
           // out transition
           for (int i = 0; i < (int)tr_index.size(); i++)
-            if (m_model.transition(tr_index[i]).target_offset != 0)
+            if (m_model->transition(tr_index[i]).target_offset != 0)
             {
               transition_index = tr_index[i];
               break;
@@ -214,13 +209,13 @@ PhnReader::next_frame(void)
         else
         {
           int cur_state = prev_phn.state;
-          Hmm &cur_hmm = m_model.hmm(m_model.hmm_index(prev_phn.label[0]));
+          Hmm &cur_hmm = m_model->hmm(m_model->hmm_index(prev_phn.label[0]));
 
           // Find the correct transition
           for (int i = 0; i < (int)tr_index.size(); i++)
           {
             int next_state =
-              m_model.transition(tr_index[i]).target_offset+cur_state;
+              m_model->transition(tr_index[i]).target_offset+cur_state;
 
             if ((next_state >= cur_hmm.num_states() &&
                  m_cur_phn.state == 0) ||
@@ -236,7 +231,7 @@ PhnReader::next_frame(void)
       {
         // Self transition
         for (int i = 0; i < (int)tr_index.size(); i++)
-          if (m_model.transition(tr_index[i]).target_offset == 0)
+          if (m_model->transition(tr_index[i]).target_offset == 0)
           {
             transition_index = tr_index[i];
             break;
@@ -291,8 +286,8 @@ PhnReader::next_phn_line(Phn &phn)
 
       // read start & end
 
-      phn.start = str::str2long(&fields[0], &ok);
-      phn.end = str::str2long(&fields[1], &ok);
+      phn.start = (int)(str::str2long(&fields[0], &ok)/m_samples_per_frame);
+      phn.end = (int)(str::str2long(&fields[1], &ok)/m_samples_per_frame);
 
       // read state
 
@@ -307,10 +302,11 @@ PhnReader::next_phn_line(Phn &phn)
     else
       ok = false;
 
-    if (!ok) {
-      throw str::fmt(1024,
-                     "PhnReader::next_phn_line(): invalid start or end time on line %d:\n"
-                     "%s\n", m_current_line, m_line.c_str());
+    if (!ok || phn.start > phn.end) {
+      throw str::fmt(
+        1024,
+        "PhnReader::next_phn_line(): invalid start or end time on line %d:\n"
+        "%s\n", m_current_line, m_line.c_str());
     }
 
     fields.erase(fields.begin(), fields.begin() + 2);
@@ -323,16 +319,26 @@ PhnReader::next_phn_line(Phn &phn)
     phn.end = -1;
   }
 
-  if (m_relative_sample_numbers)
+  if (m_relative_sample_numbers && phn.start >= 0)
   {
-    phn.start += (int)(m_first_frame*m_samples_per_frame);
-    phn.end += (int)(m_first_frame*m_samples_per_frame);
+    phn.start += m_first_frame;
+    phn.end += m_first_frame;
   }
   
   // Is the current starting time out of requested range?
-  if (m_last_frame > 0 &&
-      (int)(phn.start/m_samples_per_frame) >= m_last_frame)
-    return false;
+  if (m_last_frame > 0)
+  {
+    if (phn.start >= m_last_frame)
+      return false;
+    if (phn.end >= m_last_frame)
+      phn.end = m_last_frame;
+  }
+
+  if (m_first_frame > 0 && phn.start < m_first_frame && phn.start >= 0)
+  {
+    phn.start = m_first_frame;
+    assert( phn.start > phn.end );
+  }
 
   // Read label and comments
   phn.label.clear();

@@ -37,7 +37,7 @@ public:
     std::string comment;
   };
 
-  PhnReader(HmmSet &model);
+  PhnReader(HmmSet *model);
   virtual ~PhnReader();
 
   virtual void open(std::string ref_file);
@@ -108,7 +108,7 @@ private:
   std::string m_line;
   FILE *m_file;
 
-  HmmSet &m_model;
+  HmmSet *m_model;
 
   /// true if eof has been detected, or line/frame limits have been reached
   bool m_eof_flag;

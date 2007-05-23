@@ -146,7 +146,7 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
   {
     if (model == NULL)
       throw std::string("recipe::Info::init_phn_files: HMM model is required if phn_reader==NULL");
-    phn_reader = new PhnReader(*model);
+    phn_reader = new PhnReader(model);
   }
   phn_reader->set_state_num_labels(state_num_labels);
   phn_reader->set_relative_sample_numbers(relative_sample_nums);

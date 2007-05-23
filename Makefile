@@ -3,7 +3,7 @@ ARCH = $(shell uname -p)
 #############################
 # Opteron cluster
 ifeq ($(ARCH),x86_64)
-CXX = /usr/bin/g++
+CXX = /usr/local/bin/g++
 OPT = -O3
 INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include -I/share/puhe/x86_64/include/lapackpp -I/share/puhe/x86_64/include/hcld/
 LDFLAGS = -L/share/puhe/x86_64/lib
@@ -24,7 +24,8 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate
+PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie
+
 #PROGS = feacat feadot feanorm phone_probs segfea init_hmm align tie vtln mllr gprocess estep
 #meltest adapt vtln train2 phone_probs2 segfea2 feanorm feacat init_hmm2 hmm2dcd tie cepstract
 
@@ -32,9 +33,10 @@ PROGS_SRCS = $(PROGS:=.cc)
 
 CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	ModuleConfig.cc HmmSet.cc \
-	PhnReader.cc TriphoneSet.cc SpeakerConfig.cc \
+	PhnReader.cc SpeakerConfig.cc \
 	Recipe.cc conf.cc io.cc str.cc endian.cc Distributions.cc \
-	LinearAlgebra.cc HmmNetBaumWelch.cc Subspaces.cc
+	LinearAlgebra.cc Subspaces.cc HmmNetBaumWelch.cc \
+	Lattice.cc Viterbi.cc PhonePool.cc
 #MllrTrainer.cc HmmTrainer.cc Viterbi.cc Lattice.cc \
 
 #HmmTrainer.cc SphereReader.cc Lattice.cc Viterbi.cc StateGenerator.cc FeatureBuffer.cc HmmSet.cc PhnReader.cc StateProbCache.cc FeatureGenerator.cc Recipe.cc tools.cc TriphoneSet.cc Changeling.cc AdaReader.cc Warpster.cc

@@ -172,7 +172,7 @@ main(int argc, char *argv[])
   double sum_data_likelihood = 0.0, prec_buff = 0.0;
   io::Stream phn_out_file;
   double ll;
-  PhnReader phn_reader(model);
+  PhnReader phn_reader(&model);
 
   try {
     config("usage: align [OPTION...]\n")
