@@ -9,8 +9,9 @@
 #include "HmmSet.hh"
 #include "FeatureGenerator.hh"
 #include "Recipe.hh"
+#include "SpeakerConfig.hh"
 #include "util.hh"
-  
+
 std::string out_file;
 std::string save_summary_file;
 
@@ -27,6 +28,7 @@ conf::Config config;
 Recipe recipe;
 HmmSet model;
 FeatureGenerator fea_gen;
+SpeakerConfig speaker_config(fea_gen);
 
 
 void
@@ -151,6 +153,13 @@ main(int argc, char *argv[])
                      model.dim(), fea_gen.dim());
     }
 
+    // Load speaker configurations
+    if (config["speakers"].specified)
+    {
+      speaker_config.read_speaker_file(
+        io::Stream(config["speakers"].get_str()));
+    }
+
     // Read recipe file
     recipe.read(io::Stream(config["recipe"].get_str()),
                 config["batch"].get_int(), config["bindex"].get_int(),
@@ -182,6 +191,13 @@ main(int argc, char *argv[])
         fprintf(stderr,"\n");
       }
 
+      if (config["speakers"].specified)
+      {
+        speaker_config.set_speaker(recipe.infos[f].speaker_id);
+        if (recipe.infos[f].utterance_id.size() > 0)
+          speaker_config.set_utterance(recipe.infos[f].utterance_id);
+      }
+
       bool skip = false;
 
       if (config["hmmnet"].specified || config["den-hmmnet"].specified)
@@ -203,7 +219,7 @@ main(int argc, char *argv[])
           if (counter >= 5)
           {
             fprintf(stderr, "Could not run Baum-Welch for file %s\n",
-                    recipe.infos[f].audio_path);
+                    recipe.infos[f].audio_path.c_str());
             fprintf(stderr, "The HMM network may be incorrect or initial beam too low.\n");
             skip = true;
             break;
@@ -226,7 +242,8 @@ main(int argc, char *argv[])
         if (!segmentator->init_utterance_segmentation())
         {
           fprintf(stderr, "Could not initialize the utterance for PhnReader.");
-          fprintf(stderr,"Current file was: %s\n",recipe.infos[f].audio_path);
+          fprintf(stderr,"Current file was: %s\n",
+                  recipe.infos[f].audio_path.c_str());
           skip = true;
         }
       }
