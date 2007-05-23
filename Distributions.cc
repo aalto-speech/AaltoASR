@@ -686,7 +686,6 @@ FullCovarianceGaussian::estimate_parameters()
     m_covariance.copy(m_accums[0]->cov);
     Blas_Scale(1/m_accums[0]->gamma, m_mean);
     Blas_Scale(1/m_accums[0]->gamma, m_covariance);
-    LinearAlgebra::inverse(m_covariance, m_precision);
   }
   
   if (m_mode == MMI) {
@@ -1153,6 +1152,518 @@ MlltGaussian::set_covariance(const Vector &covariance)
 }
 
 
+PrecisionConstrainedGaussian::PrecisionConstrainedGaussian()
+{
+}
+
+
+PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(PrecisionSubspace *space)
+{
+  m_ps = space;
+}
+
+
+PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(const PrecisionConstrainedGaussian &g)
+{
+  g.get_mean(m_transformed_mean);
+  g.get_precision_coeffs(m_coeffs);
+  m_ps = g.get_subspace();
+}
+
+
+PrecisionConstrainedGaussian::~PrecisionConstrainedGaussian()
+{
+}
+
+
+void
+PrecisionConstrainedGaussian::reset(int feature_dim)
+{
+  m_transformed_mean.resize(feature_dim);
+  m_transformed_mean=0;
+  m_constant=0;
+  m_coeffs=0;
+}
+
+
+double
+PrecisionConstrainedGaussian::compute_likelihood(const FeatureVec &f) const
+{
+  return exp(compute_log_likelihood(f));
+}
+
+
+double
+PrecisionConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
+{
+  if (!m_ps->computed())
+    m_ps->precompute(f);
+  
+  double result=m_constant
+    +Blas_Dot_Prod(m_transformed_mean, *f.get_vector())
+    +m_ps->dotproduct(m_coeffs);
+  return result;
+}
+
+
+void
+PrecisionConstrainedGaussian::write(std::ostream &os) const
+{
+  os << "pcgmm ";
+  for (int i=0; i<dim(); i++)
+    os << m_transformed_mean(i) << " ";
+  os << subspace_dim() << " ";
+  for (int i=0; i<subspace_dim()-1; i++)
+    os << m_coeffs(i) << " ";
+  os << m_coeffs(subspace_dim()-1);  
+}
+
+
+void
+PrecisionConstrainedGaussian::read(std::istream &is)
+{
+  int ss_dim;
+  
+  for (int i=0; i<dim(); i++)
+    is >> m_transformed_mean(i);
+  is >> ss_dim;
+  m_coeffs.resize(ss_dim);
+  for (int i=0; i<subspace_dim(); i++)
+    is >> m_coeffs(i);
+
+  Matrix precision;
+  m_ps->compute_precision(m_coeffs, precision);
+  m_constant = LinearAlgebra::determinant(precision);
+  m_constant = log(sqrt(m_constant));
+}
+
+
+void
+PrecisionConstrainedGaussian::start_accumulating()
+{
+  if (m_mode == ML) {
+    m_accums.resize(1);
+    m_accums[0] = new FullStatisticsAccumulator(dim());
+  }
+  else if (m_mode == MMI) {
+    m_accums.resize(2);
+    m_accums[0] = new FullStatisticsAccumulator(dim());
+    m_accums[1] = new FullStatisticsAccumulator(dim());
+  }
+}
+
+void
+PrecisionConstrainedGaussian::accumulate(double gamma,
+                                         const FeatureVec &f,
+                                         int accum_pos)
+{
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);
+
+  m_accums[accum_pos]->accumulated = true;  
+  m_accums[accum_pos]->feacount++;
+  m_accums[accum_pos]->gamma += gamma;
+
+  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
+  Blas_R1_Update(m_accums[accum_pos]->cov, *(f.get_vector()), *(f.get_vector()), gamma);
+}
+
+
+bool
+PrecisionConstrainedGaussian::accumulated(int accum_pos) const
+{
+  if ((int)m_accums.size() <= accum_pos)
+    return false;
+  if (m_accums[accum_pos] == NULL)
+    return false;
+  return m_accums[accum_pos]->accumulated;
+}
+
+
+void 
+PrecisionConstrainedGaussian::dump_statistics(std::ostream &os,
+                                              int accum_pos) const
+{
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);  
+
+  if (m_accums[accum_pos]->accumulated) {
+    os << m_accums[accum_pos]->gamma << " ";
+    for (int i=0; i<dim(); i++)
+      os << m_accums[accum_pos]->mean(i) << " ";
+    for (int i=0; i<dim()-1; i++)
+      for (int j=0; j<dim()-1; j++)
+        if (!(i==dim()-1 && j==dim()-1))
+          os << m_accums[accum_pos]->cov(i,j) << " ";
+    os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
+  }
+}
+
+  
+void 
+PrecisionConstrainedGaussian::accumulate_from_dump(std::istream &is)
+{
+  std::string type;
+  is >> type;
+  int accum_pos = accumulator_position(type);
+
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);
+
+  double gamma;
+  Vector mean(dim());
+  Matrix cov(dim(), dim());
+
+  is >> gamma;
+  for (int i=0; i<dim(); i++)
+    is >> mean(i);
+  for (int i=0; i<dim(); i++)
+    for (int j=0; j<dim(); j++)
+      is >> cov(i,j);
+
+  m_accums[accum_pos]->gamma += gamma;
+  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, mean);
+  m_accums[accum_pos]->cov = m_accums[accum_pos]->cov + cov;
+  
+  m_accums[accum_pos]->accumulated = true;
+}
+
+
+void
+PrecisionConstrainedGaussian::stop_accumulating()
+{
+  if (m_accums.size() > 0)
+    for (unsigned int i=0; i<m_accums.size(); i++)
+      if (m_accums[i] != NULL)
+	delete m_accums[i];
+  m_accums.resize(0);
+}
+
+
+void
+PrecisionConstrainedGaussian::estimate_parameters()
+{
+  Vector mean; get_mean(mean);
+  Matrix covariance; get_covariance(covariance);
+  
+  if (m_mode == ML || !accumulated(1)) {
+    mean.copy(m_accums[0]->mean);
+    covariance.copy(m_accums[0]->cov);
+    Blas_Scale(1/m_accums[0]->gamma, mean);
+    Blas_Scale(1/m_accums[0]->gamma, covariance);
+  }
+  
+  if (m_mode == MMI) {
+
+    // c & mu~ & sigma~
+    double c = m_accums[0]->gamma - m_accums[1]->gamma;
+    LaVectorDouble mu_tilde(m_accums[0]->mean);
+    Blas_Add_Mult(mu_tilde, -1, m_accums[1]->mean);
+    LaGenMatDouble sigma_tilde = m_accums[0]->cov - m_accums[1]->cov;
+    
+    // a0
+    LaGenMatDouble a0(sigma_tilde);
+    Blas_Scale(c, a0);
+    Blas_R1_Update(a0, mu_tilde, mu_tilde, -1);
+    
+    // a1
+    LaGenMatDouble a1(covariance);
+    Blas_R1_Update(a1, mean, mean, 1);
+    Blas_Scale(c, a1);
+    Blas_R1_Update(a1, mean, mu_tilde, -1);
+    Blas_R1_Update(a1, mu_tilde, mean, -1);
+    a1 = a1 + sigma_tilde;
+    
+    // a2
+    LaGenMatDouble a2(covariance);
+
+    // Solve the quadratic eigenvalue problem
+    // A_0 + D A_1 + D^2 A_2
+    // by linearizing to a generalized eigenvalue problem
+    // See: www.cs.utk.edu/~dongarra/etemplates/node333.html
+    // Note: complex eigenvalues, we want only the max real eigenvalue!
+    LaGenMatDouble A=LaGenMatDouble::zeros(2*dim());
+    LaGenMatDouble B=LaGenMatDouble::zeros(2*dim());
+    LaGenMatDouble identity=LaGenMatDouble::zeros(dim());
+
+    A(LaIndex(dim(),2*dim()-1),LaIndex(0,dim()-1)).inject(a0);
+    A(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a1);
+    Blas_Scale(-1,A);
+    A(LaIndex(0,dim()-1),LaIndex(dim(),2*dim()-1)).inject(identity);
+
+    B(LaIndex(0,dim()-1),LaIndex(0,dim()-1)).inject(identity);
+    B(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a2);
+    
+    LaVectorComplex eigvals;
+    LaGenMatComplex eigvecs;
+    LinearAlgebra::generalized_eigenvalues(A,B,eigvals,eigvecs);
+
+    double d=0;
+    for (int i=0; i<eigvals.size(); i++)
+      if (eigvals(i).i < 0.000000001)
+        d=std::max(d, eigvals(i).r);
+    
+    assert(d>0);
+    assert(m_c2_constant>1);
+    d=std::max(m_c1_constant*m_accums[1]->gamma, m_c2_constant*d);
+    
+    // UPDATE MEAN
+    LaVectorDouble old_mean(mean);
+    // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
+    Blas_Scale(d, mean);
+    Blas_Add_Mult(mean, 1, mu_tilde);
+    Blas_Scale(1/(c+d), mean);
+
+    // UPDATE COVARIANCE
+    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
+    Blas_R1_Update(covariance, old_mean, old_mean, 1);
+    Blas_Scale(d, covariance);
+    covariance = covariance + sigma_tilde;
+    Blas_Scale(1/(c+d), covariance);
+    Blas_R1_Update(covariance, mean, mean, -1);
+    
+  }
+
+  // Common
+  for (int i=0; i<dim(); i++)
+    if (covariance(i,i) < m_minvar)
+      covariance(i,i) = m_minvar;
+  
+  set_covariance(covariance);
+  set_mean(mean);
+}
+
+
+void
+PrecisionConstrainedGaussian::get_mean(Vector &mean) const
+{
+  Matrix precision;
+  Matrix covariance;
+  m_ps->compute_precision(m_coeffs, precision);
+  LinearAlgebra::inverse(precision, covariance);
+  Blas_Mat_Vec_Mult(covariance, m_transformed_mean, mean);
+}
+
+
+void
+PrecisionConstrainedGaussian::get_covariance(Matrix &covariance) const
+{
+  Matrix precision;
+  m_ps->compute_precision(m_coeffs, precision);
+  LinearAlgebra::inverse(precision, covariance);
+}
+
+
+void
+PrecisionConstrainedGaussian::set_mean(const Vector &mean)
+{
+  Matrix precision;
+  m_ps->compute_precision(m_coeffs, precision);
+  Blas_Mat_Vec_Mult(precision, mean, m_transformed_mean);
+}
+
+
+void
+PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance)
+{
+  m_ps->optimize_coefficients(covariance, m_coeffs);
+}
+
+
+SubspaceConstrainedGaussian::SubspaceConstrainedGaussian()
+{
+}
+
+
+SubspaceConstrainedGaussian::SubspaceConstrainedGaussian(ExponentialSubspace *space)
+{
+  m_es = space;
+}
+
+
+SubspaceConstrainedGaussian::SubspaceConstrainedGaussian(const SubspaceConstrainedGaussian &g)
+{
+  g.get_subspace_coeffs(m_coeffs);
+  m_es = g.get_subspace();
+}
+
+
+SubspaceConstrainedGaussian::~SubspaceConstrainedGaussian()
+{
+}
+
+
+void
+SubspaceConstrainedGaussian::reset(int dim)
+{
+  m_constant=0;
+  m_coeffs=0;
+}
+
+
+double
+SubspaceConstrainedGaussian::compute_likelihood(const FeatureVec &f) const
+{
+  return exp(compute_log_likelihood(f));
+}
+
+
+double
+SubspaceConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
+{
+  if (!m_es->computed())
+    m_es->precompute(f);
+  
+  double result=m_constant+m_es->dotproduct(m_coeffs);
+  return result;
+}
+
+
+void
+SubspaceConstrainedGaussian::write(std::ostream &os) const
+{
+}
+
+
+void
+SubspaceConstrainedGaussian::read(std::istream &is)
+{
+}
+
+
+void
+SubspaceConstrainedGaussian::start_accumulating()
+{
+  if (m_mode == ML) {
+    m_accums.resize(1);
+    m_accums[0] = new FullStatisticsAccumulator(dim());
+  }
+  else if (m_mode == MMI) {
+    m_accums.resize(2);
+    m_accums[0] = new FullStatisticsAccumulator(dim());
+    m_accums[1] = new FullStatisticsAccumulator(dim());
+  }
+}
+
+
+void
+SubspaceConstrainedGaussian::accumulate(double gamma,
+                                         const FeatureVec &f,
+                                         int accum_pos)
+{
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);
+
+  m_accums[accum_pos]->accumulated = true;  
+  m_accums[accum_pos]->feacount++;
+  m_accums[accum_pos]->gamma += gamma;
+
+  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
+  Blas_R1_Update(m_accums[accum_pos]->cov, *(f.get_vector()), *(f.get_vector()), gamma);
+}
+
+
+bool
+SubspaceConstrainedGaussian::accumulated(int accum_pos) const
+{
+  if ((int)m_accums.size() <= accum_pos)
+    return false;
+  if (m_accums[accum_pos] == NULL)
+    return false;
+  return m_accums[accum_pos]->accumulated;
+}
+
+
+void 
+SubspaceConstrainedGaussian::dump_statistics(std::ostream &os,
+                                              int accum_pos) const
+{
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);  
+
+  if (m_accums[accum_pos]->accumulated) {
+    os << m_accums[accum_pos]->gamma << " ";
+    for (int i=0; i<dim(); i++)
+      os << m_accums[accum_pos]->mean(i) << " ";
+    for (int i=0; i<dim()-1; i++)
+      for (int j=0; j<dim()-1; j++)
+        if (!(i==dim()-1 && j==dim()-1))
+          os << m_accums[accum_pos]->cov(i,j) << " ";
+    os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
+  }
+}
+
+  
+void 
+SubspaceConstrainedGaussian::accumulate_from_dump(std::istream &is)
+{
+  std::string type;
+  is >> type;
+  int accum_pos = accumulator_position(type);
+
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);
+
+  double gamma;
+  Vector mean(dim());
+  Matrix cov(dim(), dim());
+
+  is >> gamma;
+  for (int i=0; i<dim(); i++)
+    is >> mean(i);
+  for (int i=0; i<dim(); i++)
+    for (int j=0; j<dim(); j++)
+      is >> cov(i,j);
+
+  m_accums[accum_pos]->gamma += gamma;
+  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, mean);
+  m_accums[accum_pos]->cov = m_accums[accum_pos]->cov + cov;
+  
+  m_accums[accum_pos]->accumulated = true;
+}
+
+
+void
+SubspaceConstrainedGaussian::stop_accumulating()
+{
+  if (m_accums.size() > 0)
+    for (unsigned int i=0; i<m_accums.size(); i++)
+      if (m_accums[i] != NULL)
+	delete m_accums[i];
+  m_accums.resize(0);
+}
+
+
+void
+SubspaceConstrainedGaussian::estimate_parameters()
+{
+}
+
+
+void
+SubspaceConstrainedGaussian::get_mean(Vector &mean) const
+{
+}
+
+
+void
+SubspaceConstrainedGaussian::get_covariance(Matrix &covariance) const
+{
+}
+
+
+void
+SubspaceConstrainedGaussian::set_mean(const Vector &mean)
+{
+}
+
+
+void
+SubspaceConstrainedGaussian::set_covariance(const Matrix &covariance)
+{
+}
+
+
 Mixture::Mixture()
 {
 }
@@ -1527,7 +2038,7 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
 
 
 void
-PDFPool::read_gk(const std::string &filename)
+PDFPool::read_gk(const std::string &filename, bool mllt)
 {
   std::ifstream in(filename.c_str());
   if (!in)
@@ -1548,23 +2059,24 @@ PDFPool::read_gk(const std::string &filename)
       in >> type_str;
 
       if (type_str == "diag") {
-	m_pool[i]=new DiagonalGaussian(m_dim);
+        if (mllt)
+          m_pool[i]=new MlltGaussian(m_dim);
+        else
+          m_pool[i]=new DiagonalGaussian(m_dim);
         m_pool[i]->read(in);
       }
       else if (type_str == "full") {
 	m_pool[i]=new FullCovarianceGaussian(m_dim);
         m_pool[i]->read(in);
       }
-      /*
       else if (type_str == "pcgmm") {
-	m_pool[i]=new PrecisionConstrainedGaussian(m_dim);
+	m_pool[i]=new PrecisionConstrainedGaussian();
         m_pool[i]->read(in);
       }
       else if (type_str == "scgmm") {
-	m_pool[i]=new SubspaceConstrainedGaussian(m_dim);
+	m_pool[i]=new SubspaceConstrainedGaussian();
         m_pool[i]->read(in);
       }
-      */
     }
   }
 
@@ -1572,7 +2084,10 @@ PDFPool::read_gk(const std::string &filename)
   else {
     if (type_str == "diagonal_cov") {
       for (int i=0; i<pdfs; i++) {
-	m_pool[i]=new DiagonalGaussian(m_dim);
+        if (mllt)
+          m_pool[i]=new MlltGaussian(m_dim);
+        else
+          m_pool[i]=new DiagonalGaussian(m_dim);
 	m_pool[i]->read(in);
       }
     }
@@ -1582,20 +2097,18 @@ PDFPool::read_gk(const std::string &filename)
 	m_pool[i]->read(in);
       }      
     }
-    /*
     else if (type_str == "pcgmm") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
-	m_pool[i]=new PrecisionConstrainedGaussian(m_dim);
+	m_pool[i]=new PrecisionConstrainedGaussian();
 	m_pool[i]->read(in);
       }      
     }
     else if (type_str == "scgmm") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
-	m_pool[i]=new SubspaceConstrainedGaussian(m_dim);
+	m_pool[i]=new SubspaceConstrainedGaussian();
 	m_pool[i]->read(in);
       }            
     }
-    */
     else
       throw std::string("Unknown model type\n");
   }

@@ -287,18 +287,18 @@ HmmSet::get_state_with_pdf(int pdf_index)
 
 
 void
-HmmSet::read_gk(const std::string &filename)
+HmmSet::read_gk(const std::string &filename, bool mllt)
 {
-  m_pool.read_gk(filename);
+  m_pool.read_gk(filename, mllt);
 }
 
 
 void
-HmmSet::read_all(const std::string &base)
+HmmSet::read_all(const std::string &base, bool mllt)
 {
   read_mc(base + ".mc");
   read_ph(base + ".ph");
-  read_gk(base + ".gk");
+  read_gk(base + ".gk", mllt);
 }
 
 

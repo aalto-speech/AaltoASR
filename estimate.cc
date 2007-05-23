@@ -61,12 +61,12 @@ main(int argc, char *argv[])
     // Load the previous models
     if (config["base"].specified)
       {
-	model.read_all(config["base"].get_str());
+	model.read_all(config["base"].get_str(), config["mllt"].specified);
       }
     else if (config["gk"].specified && config["mc"].specified &&
              config["ph"].specified)
     {
-	model.read_gk(config["gk"].get_str());
+	model.read_gk(config["gk"].get_str(), config["mllt"].specified);
 	model.read_mc(config["mc"].get_str());
 	model.read_ph(config["ph"].get_str());
       }
@@ -107,11 +107,14 @@ main(int argc, char *argv[])
     model.set_mmi_c2_constant(config["C2"].get_double());
     if (config["mllt"].specified)
       model.estimate_mllt(fea_gen);
-    model.estimate_parameters();
+    else
+      model.estimate_parameters();
     model.stop_accumulating();
     
     // Write final models
     model.write_all(out_file);
+    if (config["mllt"].specified)
+      fea_gen.write_configuration(io::Stream(out_file + ".cfg","w"));
   } 
   
   catch (std::exception &e) {

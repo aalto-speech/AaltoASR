@@ -196,7 +196,7 @@ public:
    *  Just a redirection to \ref PDFPool::read_gk()
    * \param filename the .gk file to be read
    */
-  void read_gk(const std::string &filename);
+  void read_gk(const std::string &filename, bool mllt = false);
 
   /** Reads the mixture coefficients from a file
    *  Calls \ref Mixture::read() for each line
@@ -221,7 +221,7 @@ public:
    * Calls \ref read_gk(), \ref read_mc(), \ref read_ph()
    * \param base the base filename
    */
-  void read_all(const std::string &base);
+  void read_all(const std::string &base, bool mllt = false);
 
   /** Writes the mixture base functions to a file. 
    *  Just a redirection to \ref PDFPool::write_gk()

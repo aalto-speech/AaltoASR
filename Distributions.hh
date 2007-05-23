@@ -4,6 +4,7 @@
 #include "FeatureBuffer.hh"
 #include "FeatureModules.hh"
 #include "LinearAlgebra.hh"
+#include "Subspaces.hh"
 
 
 class FullStatisticsAccumulator {
@@ -124,7 +125,7 @@ public:
   void set_pdf(int index, PDF *pdf);
   
   /* Read the distributions from a .gk -file */
-  void read_gk(const std::string &filename);
+  void read_gk(const std::string &filename, bool mllt = false);
   /* Write the distributions to a .gk -file */
   void write_gk(const std::string &filename) const;
   
@@ -214,6 +215,7 @@ public:
   void set_mmi_c2_constant(double c2_constant) { m_c2_constant = c2_constant; }
   
 protected:
+  double m_constant;
   double m_minvar;
   double m_c1_constant;
   double m_c2_constant;
@@ -257,7 +259,6 @@ public:
   void set_covariance(const Vector &covariance);
 
 private:  
-  double m_constant;
   Vector m_mean;
   Vector m_covariance;
   Vector m_precision;
@@ -309,7 +310,6 @@ public:
   friend class HmmSet;
   
 private:  
-  double m_constant;
   Vector m_mean;
   Vector m_covariance;
   Vector m_precision;
@@ -353,7 +353,6 @@ public:
   
 private:
   double m_covsmooth;
-  double m_constant;
   Vector m_mean;
   Matrix m_covariance;
   Matrix m_precision;
@@ -361,6 +360,110 @@ private:
   std::vector<FullStatisticsAccumulator*> m_accums;
 };
 
+
+
+class PrecisionConstrainedGaussian : public Gaussian {
+public:
+  PrecisionConstrainedGaussian();
+  PrecisionConstrainedGaussian(PrecisionSubspace *space);
+  PrecisionConstrainedGaussian(const PrecisionConstrainedGaussian& g);
+  ~PrecisionConstrainedGaussian();
+  virtual void reset(int dim);
+
+  // From pdf
+  virtual double compute_likelihood(const FeatureVec &f) const;
+  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual void write(std::ostream &os) const;
+  virtual void read(std::istream &is);
+
+  // Gaussian-specific
+  virtual void start_accumulating();
+  virtual void accumulate(double gamma, const FeatureVec &f, 
+			  int accum_pos = 0);
+  virtual void dump_statistics(std::ostream &os, int accum_pos = 0) const;
+  virtual void accumulate_from_dump(std::istream &is);
+  virtual void stop_accumulating();
+  virtual bool accumulated(int accum_pos = 0) const;
+  virtual void estimate_parameters();
+  virtual void get_mean(Vector &mean) const;
+  virtual void get_covariance(Matrix &covariance) const;
+  virtual void set_mean(const Vector &mean);
+  virtual void set_covariance(const Matrix &covariance);
+
+  // PCGMM-specific
+
+  /* Get the transformed mean */
+  void get_transformed_mean(Vector &transformed_mean) const { transformed_mean.copy(m_transformed_mean); }
+  /* Set the transformed mean */
+  void set_transformed_mean(const Vector &transformed_mean) { m_transformed_mean.copy(transformed_mean); }
+  
+  /* Get the coefficients for the subspace constrained precision matrix */
+  void get_precision_coeffs(Vector &coeffs) const { coeffs.copy(m_coeffs); }
+  /* Set the coefficients for the subspace constrained precision matrix */
+  void set_precision_coeffs(const Vector &coeffs) { m_coeffs.copy(coeffs); }
+
+  /* Get the subspace dimensionality */
+  int subspace_dim() const { return m_coeffs.size(); }
+  /* Get the subspace */
+  PrecisionSubspace* get_subspace() const { return m_ps; }
+  /* Set the subspace */
+  void set_subspace(PrecisionSubspace *space) { m_ps = space; }
+  
+  
+private:
+  Vector m_transformed_mean;
+  Vector m_coeffs;
+  PrecisionSubspace *m_ps;
+
+  std::vector<FullStatisticsAccumulator*> m_accums;
+};
+
+
+
+class SubspaceConstrainedGaussian : public Gaussian {
+public:
+  SubspaceConstrainedGaussian();
+  SubspaceConstrainedGaussian(ExponentialSubspace *space);
+  SubspaceConstrainedGaussian(const SubspaceConstrainedGaussian &g);
+  ~SubspaceConstrainedGaussian();
+  virtual void reset(int dim);
+
+  // From pdf
+  virtual double compute_likelihood(const FeatureVec &f) const;
+  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual void write(std::ostream &os) const;
+  virtual void read(std::istream &is);
+
+  // Gaussian-specific
+  virtual void start_accumulating();
+  virtual void accumulate(double gamma, const FeatureVec &f, 
+			  int accum_pos = 0);
+  virtual void dump_statistics(std::ostream &os, int accum_pos = 0) const;
+  virtual void accumulate_from_dump(std::istream &is);
+  virtual void stop_accumulating();
+  virtual bool accumulated(int accum_pos = 0) const;
+  virtual void estimate_parameters();
+  virtual void get_mean(Vector &mean) const;
+  virtual void get_covariance(Matrix &covariance) const;
+  virtual void set_mean(const Vector &mean);
+  virtual void set_covariance(const Matrix &covariance);
+
+  // SCGMM-specific
+  /* Get the coefficients for the subspace constrained exponential parameters */
+  void get_subspace_coeffs(Vector &coeffs) const { coeffs.copy(m_coeffs); }
+  /* Set the coefficients for the subspace constrained exponential parameters */
+  void set_subspace_coeffs(const Vector &coeffs) { m_coeffs.copy(coeffs); }
+  /* Get the subspace */
+  ExponentialSubspace* get_subspace() const { return m_es; }
+  /* Set the subspace */
+  void set_subspace(ExponentialSubspace *space) { m_es = space; }
+  
+private:
+  Vector m_coeffs;
+  ExponentialSubspace *m_es;
+
+  std::vector<FullStatisticsAccumulator*> m_accums;
+};
 
 
 
