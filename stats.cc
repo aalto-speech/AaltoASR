@@ -105,6 +105,7 @@ main(int argc, char *argv[])
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
+      ('\0', "mllt", "", "", "maximum likelihood linear transformation")
       ;
     config.default_parse(argc, argv);
     
@@ -112,15 +113,15 @@ main(int argc, char *argv[])
     raw_flag = config["raw-input"].specified;
     fea_gen.load_configuration(io::Stream(config["config"].get_str()));
 
-    // Initialize the model for accumulating ML statistics
+    // Initialize the model for accumulating statistics
     if (config["base"].specified)
     {
-      model.read_all(config["base"].get_str());
+      model.read_all(config["base"].get_str(), config["mllt"].specified);
     }
     else if (config["gk"].specified && config["mc"].specified &&
              config["ph"].specified)
     {
-      model.read_gk(config["gk"].get_str());
+      model.read_gk(config["gk"].get_str(), config["mllt"].specified);
       model.read_mc(config["mc"].get_str());
       model.read_ph(config["ph"].get_str());
     }
