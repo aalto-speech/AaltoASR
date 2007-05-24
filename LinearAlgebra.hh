@@ -12,7 +12,13 @@ typedef LaVectorDouble Vector;
 /** Functions for matrix operations */
 namespace LinearAlgebra {
 
-  //!< A assumed symmetric!
+  //!< A assumed symmetric positive definite!
+  double spd_log_determinant(const Matrix &A);
+  
+  //!< A assumed symmetric positive definite!
+  double spd_determinant(const Matrix &A);
+
+    //!< A assumed symmetric!
   double log_determinant(const Matrix &A);
   
   //!< A assumed symmetric!

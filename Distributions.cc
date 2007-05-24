@@ -337,6 +337,8 @@ DiagonalGaussian::accumulated(int accum_pos) const
 void
 DiagonalGaussian::estimate_parameters()
 {
+  assert(accumulated(0));
+  
   if (m_mode == ML || !accumulated(1)) {
     m_mean.copy(m_accums[0]->mean);
     m_covariance.copy(m_accums[0]->cov);
@@ -681,6 +683,8 @@ FullCovarianceGaussian::stop_accumulating()
 void
 FullCovarianceGaussian::estimate_parameters()
 {
+  assert(accumulated(0));
+
   if (m_mode == ML || !accumulated(1)) {
     m_mean.copy(m_accums[0]->mean);
     m_covariance.copy(m_accums[0]->cov);
@@ -1004,6 +1008,8 @@ MlltGaussian::accumulated(int accum_pos) const
 void
 MlltGaussian::estimate_parameters()
 {
+  assert(accumulated(0));
+  
   if (m_mode == ML || !accumulated(1)) {
     m_mean.copy(m_accums[0]->mean);
     Blas_Scale(1/m_accums[0]->gamma, m_mean);
@@ -1343,6 +1349,8 @@ PrecisionConstrainedGaussian::stop_accumulating()
 void
 PrecisionConstrainedGaussian::estimate_parameters()
 {
+  assert(accumulated(0));
+  
   Vector mean; get_mean(mean);
   Matrix covariance; get_covariance(covariance);
   
@@ -1637,6 +1645,8 @@ SubspaceConstrainedGaussian::stop_accumulating()
 void
 SubspaceConstrainedGaussian::estimate_parameters()
 {
+  assert(accumulated(0));
+  
 }
 
 
@@ -1885,6 +1895,8 @@ Mixture::stop_accumulating()
 void
 Mixture::estimate_parameters()
 {
+  assert(accumulated(0));
+  
   if (m_mode == ML || !accumulated(1)) {    
     double total_gamma = 0;
     for (int i=0; i<size(); i++)

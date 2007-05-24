@@ -1,10 +1,11 @@
 #include "LinearAlgebra.hh"
+#include "util.hh"
 
 
 namespace LinearAlgebra {
 
   double
-  log_determinant(const Matrix &A)
+  spd_log_determinant(const Matrix &A)
   {
     assert(A.rows()==A.cols());
     assert(is_spd(A));
@@ -13,14 +14,14 @@ namespace LinearAlgebra {
     cholesky_factor(A, chol);
     double log_det=0;
     for (int i=0; i<chol.rows(); i++)
-      log_det += chol(i,i);
+      log_det += log(chol(i,i));
     log_det *= 2;
 
     return log_det;
   }
   
   double
-  determinant(const Matrix &A)
+  spd_determinant(const Matrix &A)
   {
     assert(A.rows()==A.cols());
     assert(is_spd(A));
@@ -33,6 +34,38 @@ namespace LinearAlgebra {
     det *=det;
 
     return det;
+  }
+
+
+  double
+  determinant(const Matrix &A)
+  {
+    assert(A.rows()==A.cols());
+
+    LaGenMatDouble B(A);
+    LaVectorDouble eigvals(A.cols());
+    LaEigSolveSymmetricVecIP(B, eigvals);
+    double det=1;
+    for (int i=0; i<eigvals.size(); i++)
+      det *= eigvals(i);
+    
+    return det;
+  }
+
+
+  double
+  log_determinant(const Matrix &A)
+  {
+    assert(A.rows()==A.cols());
+
+    LaGenMatDouble B(A);
+    LaVectorDouble eigvals(A.cols());
+    LaEigSolveSymmetricVecIP(B, eigvals);
+    double log_det=0;
+    for (int i=0; i<eigvals.size(); i++)
+      log_det += util::safe_log(eigvals(i));
+    
+    return log_det;
   }
 
 
