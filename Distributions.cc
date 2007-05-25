@@ -631,8 +631,8 @@ FullCovarianceGaussian::dump_statistics(std::ostream &os,
     os << m_accums[accum_pos]->gamma << " ";
     for (int i=0; i<dim(); i++)
       os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim()-1; i++)
-      for (int j=0; j<dim()-1; j++)
+    for (int i=0; i<dim(); i++)
+      for (int j=0; j<dim(); j++)
         if (!(i==dim()-1 && j==dim()-1))
           os << m_accums[accum_pos]->cov(i,j) << " ";
     os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
@@ -945,8 +945,8 @@ MlltGaussian::dump_statistics(std::ostream &os,
     os << m_accums[accum_pos]->gamma << " ";
     for (int i=0; i<dim(); i++)
       os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim()-1; i++)
-      for (int j=0; j<dim()-1; j++)
+    for (int i=0; i<dim(); i++)
+      for (int j=0; j<dim(); j++)
         if (!(i==dim()-1 && j==dim()-1))
           os << m_accums[accum_pos]->cov(i,j) << " ";
     os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
@@ -1016,8 +1016,8 @@ MlltGaussian::estimate_parameters()
     
     for (int i=0; i<dim(); i++) {
       m_covariance(i) = m_accums[0]->cov(i,i);
+      m_covariance(i) -= m_accums[0]->mean(i)*m_accums[0]->mean(i);
       m_covariance(i) /= m_accums[0]->gamma; 
-      m_covariance(i) -= m_mean(i)*m_mean(i);
       assert(m_covariance(i) > 0);
     }
   }
@@ -1297,8 +1297,8 @@ PrecisionConstrainedGaussian::dump_statistics(std::ostream &os,
     os << m_accums[accum_pos]->gamma << " ";
     for (int i=0; i<dim(); i++)
       os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim()-1; i++)
-      for (int j=0; j<dim()-1; j++)
+    for (int i=0; i<dim(); i++)
+      for (int j=0; j<dim(); j++)
         if (!(i==dim()-1 && j==dim()-1))
           os << m_accums[accum_pos]->cov(i,j) << " ";
     os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
@@ -1593,8 +1593,8 @@ SubspaceConstrainedGaussian::dump_statistics(std::ostream &os,
     os << m_accums[accum_pos]->gamma << " ";
     for (int i=0; i<dim(); i++)
       os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim()-1; i++)
-      for (int j=0; j<dim()-1; j++)
+    for (int i=0; i<dim(); i++)
+      for (int j=0; j<dim(); j++)
         if (!(i==dim()-1 && j==dim()-1))
           os << m_accums[accum_pos]->cov(i,j) << " ";
     os << m_accums[accum_pos]->cov(dim()-1, dim()-1);

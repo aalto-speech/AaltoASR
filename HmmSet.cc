@@ -764,7 +764,15 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
         continue;
       
       Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
-      mllt_gaussian->set_covariance(temp_m);
+      LaVectorDouble temp_v1;
+      LaVectorDouble temp_v2;
+      LaVectorDouble temp_v3;
+      for (int i=0; i<dim(); i++) {
+        temp_v1.ref(temp_m.row(i));
+        temp_v2.ref(A.row(i));
+        temp_v3=Blas_Dot_Prod(temp_v1, temp_v2);
+      }
+      mllt_gaussian->set_covariance(temp_m);      
     }      
 
     
@@ -783,7 +791,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
 
         if (mllt_gaussian->m_accums[0]->gamma > 0) {
           LaGenMatDouble t(mllt_gaussian->m_accums[0]->cov);
-          Blas_Scale(mllt_gaussian->m_accums[0]->gamma/mllt_gaussian->m_accums[0]->cov(i,i), t);
+          Blas_Scale(mllt_gaussian->m_accums[0]->gamma/mllt_gaussian->m_covariance(i), t);
           temp_m = temp_m + t;
         }
       }
@@ -797,7 +805,8 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     LaVectorLongInt pivots(dim());
     for (int mllt_a_iter=0; mllt_a_iter<MAX_MLLT_A_ITER; mllt_a_iter++) {
       LUFactorizeIP(A, pivots);
-      LaLUInverseIP(A, pivots);
+      temp_m.copy(A);
+      LaLUInverseIP(temp_m, pivots);
       Adet=1;
       for (int i=0; i<dim(); i++)
         Adet *= A(i,i);
@@ -822,26 +831,35 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     for (int i=0; i<dim(); i++)
       Adet *= A(i,i);
     Adet = std::fabs(Adet);
-    double scale = pow(Adet, 1/dim());
+    double scale = pow(Adet, 1/(double)dim());
     Blas_Scale(1/scale, A);
   }
   
   // Transform sample means and covariances
   for (int g=0; g<m_pool.size(); g++) {
-    MlltGaussian *gaussian = dynamic_cast< MlltGaussian* >
+    MlltGaussian *mllt_gaussian = dynamic_cast< MlltGaussian* >
       (m_pool.get_pdf(g));
-    if (gaussian == NULL)
+    if (mllt_gaussian == NULL)
       continue;
-    
-    LaVectorDouble transformed_mean(gaussian->m_accums[0]->mean);
-    LaGenMatDouble transformed_cov(gaussian->m_accums[0]->cov);
-    Blas_Mat_Vec_Mult(A, transformed_mean, gaussian->m_accums[0]->mean, 1.0, 0.0);
-    Blas_Mat_Mat_Mult(A, transformed_cov, gaussian->m_accums[0]->cov, 1.0, 0.0);
+
+    // Transform mean
+    LaVectorDouble temp_mean(mllt_gaussian->m_mean);
+    Blas_Mat_Vec_Mult(A, temp_mean, mllt_gaussian->m_mean, 1.0, 0.0);
+
+    // Re-estimate the diagonal covariance
+    Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
+    LaVectorDouble temp_v1;
+    LaVectorDouble temp_v2;
+    LaVectorDouble temp_v3;
+    for (int i=0; i<dim(); i++) {
+      temp_v1.ref(temp_m.row(i));
+      temp_v2.ref(A.row(i));
+      temp_v3=Blas_Dot_Prod(temp_v1, temp_v2);
+    }
+    mllt_gaussian->set_covariance(temp_m);
   }
-
-  // Once more, estimate the diagonal covariances  
-  estimate_parameters();  
-
+  
+      
   // Set transformation
   Blas_Mat_Mat_Mult(A, Aold, temp_m, 1.0, 0.0);
   std::vector<float> tr;
