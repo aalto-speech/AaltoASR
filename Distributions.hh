@@ -156,7 +156,8 @@ private:
 
 class Gaussian : public PDF {
 public:
-  
+
+  Gaussian() : m_minvar(0) { };
   // ABSTRACT FUNCTIONS, SHOULD BE OVERWRITTEN IN THE GAUSSIAN IMPLEMENTATIONS
   
   /* Resets the Gaussian to have dimensionality dim and all values zeroed */
@@ -202,7 +203,7 @@ public:
   /** Sets the parameters for the current Gaussian by merging the Gaussians
       given in a vector with the proper weights */
   virtual void merge(const std::vector<double> &weights,
-                     const std::vector<Gaussian*> &gaussians);
+                     const std::vector<const Gaussian*> &gaussians);
   
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;

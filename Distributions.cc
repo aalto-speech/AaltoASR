@@ -86,7 +86,7 @@ Gaussian::merge(double weight1, const Gaussian &m1,
 
 void
 Gaussian::merge(const std::vector<double> &weights,
-                const std::vector<Gaussian*> &gaussians)
+                const std::vector<const Gaussian*> &gaussians)
 {
   assert( weights.size() == gaussians.size() );
 
@@ -346,7 +346,11 @@ DiagonalGaussian::estimate_parameters()
     Blas_Scale(1/m_accums[0]->gamma, m_covariance);
     for (int i=0; i<dim(); i++) {
       m_covariance(i) -= m_mean(i)*m_mean(i);
-      assert(m_covariance(i) > 0);
+      if (m_covariance(i) <= 0) {
+        fprintf(stderr, "Warning: Variance in dimension %i is %g\n",
+                i, m_covariance(i));
+        //assert(m_covariance(i) > 0);
+      }
     }
   }
   
@@ -685,14 +689,15 @@ FullCovarianceGaussian::estimate_parameters()
 {
   assert(accumulated(0));
 
-  if (m_mode == ML || !accumulated(1)) {
+  if (m_mode == ML) {
     m_mean.copy(m_accums[0]->mean);
     m_covariance.copy(m_accums[0]->cov);
     Blas_Scale(1/m_accums[0]->gamma, m_mean);
     Blas_Scale(1/m_accums[0]->gamma, m_covariance);
   }
-  
-  if (m_mode == MMI) {
+  else if (m_mode == MMI) {
+
+    assert( accumulated(1) );
 
     // c & mu~ & sigma~
     double c = m_accums[0]->gamma - m_accums[1]->gamma;
@@ -762,16 +767,20 @@ FullCovarianceGaussian::estimate_parameters()
     Blas_R1_Update(m_covariance, m_mean, m_mean, -1);
     
   }
+  else
+    assert( 0 );
 
   // Common
   for (int i=0; i<dim(); i++)
     if (m_covariance(i,i) < m_minvar)
       m_covariance(i,i) = m_minvar;
-  
+
+  /* FIXME! Do we need this?
   for (int i=0; i<dim(); i++)
     for (int j=0; j<dim(); j++)
       if (i != j)
         m_covariance(i,j) *= m_accums[0]->feacount/(m_accums[0]->feacount+m_covsmooth);
+  */
   
   LinearAlgebra::inverse(m_covariance, m_precision);
   m_constant = LinearAlgebra::determinant(m_precision);
