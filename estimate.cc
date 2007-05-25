@@ -33,7 +33,7 @@ main(int argc, char *argv[])
       ('g', "gk=FILE", "arg", "", "Previous mixture base distributions")
       ('m', "mc=FILE", "arg", "", "Previous mixture coefficients for the states")
       ('p', "ph=FILE", "arg", "", "Previous HMM definitions")
-      ('c', "config=FILE", "arg must", "", "feature configuration (for MLLT)")
+      ('c', "config=FILE", "arg must", "", "feature configuration (required for MLLT)")
       ('L', "list=LISTNAME", "arg must", "", "file with one statistics file per line")
       ('o', "out=BASENAME", "arg must", "", "base filename for output models")
       ('t', "transitions", "", "", "estimate also state transitions")
@@ -79,10 +79,11 @@ main(int argc, char *argv[])
     else
       model.set_estimation_mode(PDF::MMI);
 
-    if (config["mllt"].specified) {
-      if (!config["config"].specified)
-        throw std::string("Must specify configuration file with MLLT");      
+    if (config["config"].specified) {
       fea_gen.load_configuration(io::Stream(config["config"].get_str()));
+    }
+    else if (config["mllt"].specified) {
+      throw std::string("Must specify configuration file with MLLT");      
     }
     
     model.start_accumulating();
@@ -113,9 +114,10 @@ main(int argc, char *argv[])
     
     // Write final models
     model.write_all(out_file);
-    if (config["mllt"].specified)
+    if (config["config"].specified) {
       fea_gen.write_configuration(io::Stream(out_file + ".cfg","w"));
-  } 
+    }
+  }
   
   catch (std::exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());

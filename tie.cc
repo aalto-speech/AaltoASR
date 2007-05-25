@@ -28,18 +28,19 @@ collect_phone_stats(PhnReader *phn_reader, PhonePool *pool)
   int f;
   PhnReader::Phn phn;
 
-  while (!phn_reader->next_phn_line(phn))
+  while (phn_reader->next_phn_line(phn))
   {
     if (phn.state == -1)
       throw std::string("Context phone tying requires phn files with state numbers!");
-    PhonePool::ContextPhone &phone = pool->get_context_phone(
+    PhonePool::ContextPhone *phone = pool->get_context_phone(
       phn.label[0], phn.state);
+    //fprintf(stderr, "Frames %i - %i: %s\n",phn.start, phn.end, phn.label[0].c_str());
     for (f = phn.start; f < phn.end; f++)
     {
       FeatureVec feature = fea_gen.generate(f);
       if (fea_gen.eof())
         break; // EOF in FeatureGenerator
-      phone.add_feature(1, feature);
+      phone->add_feature(1, feature);
     }
     if (f < phn.end) // EOF in FeatureGenerator
       return;
