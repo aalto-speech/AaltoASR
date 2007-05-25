@@ -55,7 +55,7 @@ public:
     FullCovarianceGaussian m_stats;
   };
   
-  typedef std::map<std::string, ContextPhone> ContextPhoneMap;
+  typedef std::map<std::string, ContextPhone*> ContextPhoneMap;
   typedef std::set<ContextPhone*> ContextPhoneSet;
   
   /** Class for a cluster of context dependent phone states
@@ -105,8 +105,13 @@ public:
   class Phone {
   public:
     Phone(std::string &center_label, PhonePool *pool);
-    ContextPhone& get_context_phone(const std::string &label, int state);
-    void finish_statistics(void);
+    ~Phone();
+    ContextPhone* get_context_phone(const std::string &label, int state);
+
+    /** Finishes the statistics for this phone.
+     * \return The number of different context dependent phone states
+     */
+    int finish_statistics(void);
 
     int num_states(void) { return (int)m_cp_states.size(); }
     int max_left_contexts(void) { return m_max_left_contexts; }
@@ -120,6 +125,8 @@ public:
     
   private:
     std::string m_center_phone;
+
+    /// Handles allocation and deletion of ContextPhone objects!
     std::vector< ContextPhoneMap > m_cp_states;
 
     std::vector< std::vector<ContextPhoneCluster*> > m_cluster_states;
@@ -127,7 +134,7 @@ public:
     int m_max_left_contexts, m_max_right_contexts;
   };
   
-  typedef std::map<std::string, Phone> PhoneMap;
+  typedef std::map<std::string, Phone*> PhoneMap;
 
 public:
   // Static methods for phone label handling
@@ -142,6 +149,7 @@ public:
   // PhonePool interface
 
   PhonePool(void);
+  ~PhonePool();
   
   inline void set_clustering_parameters(double min_occupancy,
                                         double min_ll_gain);
@@ -150,7 +158,7 @@ public:
   void set_info(int info) { m_info = info; }
   void load_decision_tree_rules(FILE *fp);
   
-  ContextPhone& get_context_phone(const std::string &label, int state);
+  ContextPhone* get_context_phone(const std::string &label, int state);
   void finish_statistics(void);
   void decision_tree_cluster_context_phones(int max_context_index);
 
@@ -160,8 +168,8 @@ public:
   inline void add_context(const std::string &context);
   
 private:
-  void apply_best_splitting_rule(ContextPhoneCluster *cl, int max_left_context,
-                                 int max_right_context,
+  void apply_best_splitting_rule(ContextPhoneCluster *cl,
+                                 int min_context_index, int max_context_index,
                                  ContextPhoneCluster **new_cl);
   double compute_log_likelihood_gain(ContextPhoneCluster &parent,
                                      ContextPhoneCluster &child1,
