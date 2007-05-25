@@ -713,7 +713,8 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
 {
   Matrix temp_m(dim(),dim());
   double beta=0;
-
+  LaGenMatDouble identity = LaGenMatDouble::eye(dim());
+  
   LinTransformModule *mllt_module = dynamic_cast< LinTransformModule* >
     (fea_gen.module(mllt_name));
   if (mllt_module == NULL)
@@ -748,7 +749,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       continue;
     beta += mllt_gaussian->m_accums[0]->gamma;
   }
-      
+
   // Iterate long enough
   for (int mllt_iter=0; mllt_iter<MAX_MLLT_ITER; mllt_iter++) {
     
@@ -766,13 +767,12 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
       LaVectorDouble temp_v1;
       LaVectorDouble temp_v2;
-      LaVectorDouble temp_v3;
       for (int i=0; i<dim(); i++) {
         temp_v1.ref(temp_m.row(i));
         temp_v2.ref(A.row(i));
-        temp_v3=Blas_Dot_Prod(temp_v1, temp_v2);
+        mllt_gaussian->m_covariance(i)=
+          std::max(Blas_Dot_Prod(temp_v1, temp_v2), mllt_gaussian->m_minvar);
       }
-      mllt_gaussian->set_covariance(temp_m);      
     }      
 
     
@@ -789,10 +789,10 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
         if (!mllt_gaussian->accumulated())
           continue;
 
-        if (mllt_gaussian->m_accums[0]->gamma > 0) {
-          LaGenMatDouble t(mllt_gaussian->m_accums[0]->cov);
-          Blas_Scale(mllt_gaussian->m_accums[0]->gamma/mllt_gaussian->m_covariance(i), t);
-          temp_m = temp_m + t;
+        if (mllt_gaussian->accumulated()) {
+          Blas_Add_Mat_Mult(temp_m,
+                            mllt_gaussian->m_accums[0]->gamma/mllt_gaussian->m_covariance(i),
+                            mllt_gaussian->m_accums[0]->cov);
         }
       }
       // Invert
@@ -804,6 +804,10 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     double Adet;
     LaVectorLongInt pivots(dim());
     for (int mllt_a_iter=0; mllt_a_iter<MAX_MLLT_A_ITER; mllt_a_iter++) {
+      // A=A'
+      temp_m.copy(A);
+      Blas_Mat_Trans_Mat_Mult(temp_m, identity, A);
+      
       LUFactorizeIP(A, pivots);
       temp_m.copy(A);
       LaLUInverseIP(temp_m, pivots);
@@ -816,7 +820,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       LaVectorDouble temp_v1;
       LaVectorDouble temp_v2;
       for (int i=0; i<dim(); i++) {
-        temp_v1.ref(temp_m.col(i));
+        temp_v1.ref(temp_m.row(i));
         temp_v2.ref(A.row(i));
         Blas_Mat_Trans_Vec_Mult(G[i], temp_v1, temp_v2);
         Blas_Scale(sqrt(beta/Blas_Dot_Prod(temp_v1, temp_v2)), temp_v2);
@@ -835,7 +839,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     Blas_Scale(1/scale, A);
   }
   
-  // Transform sample means and covariances
+  // Transform means and covariances
   for (int g=0; g<m_pool.size(); g++) {
     MlltGaussian *mllt_gaussian = dynamic_cast< MlltGaussian* >
       (m_pool.get_pdf(g));
@@ -846,17 +850,16 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     LaVectorDouble temp_mean(mllt_gaussian->m_mean);
     Blas_Mat_Vec_Mult(A, temp_mean, mllt_gaussian->m_mean, 1.0, 0.0);
 
-    // Re-estimate the diagonal covariance
+    // Re-estimate the diagonal covariances
     Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
     LaVectorDouble temp_v1;
     LaVectorDouble temp_v2;
-    LaVectorDouble temp_v3;
     for (int i=0; i<dim(); i++) {
       temp_v1.ref(temp_m.row(i));
       temp_v2.ref(A.row(i));
-      temp_v3=Blas_Dot_Prod(temp_v1, temp_v2);
+      mllt_gaussian->m_covariance(i)=
+        std::max(Blas_Dot_Prod(temp_v1, temp_v2), mllt_gaussian->m_minvar);
     }
-    mllt_gaussian->set_covariance(temp_m);
   }
   
       
@@ -867,7 +870,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
   for (int i=0; i<dim(); i++)
     for (int j=0; j<dim(); j++)
       tr[i*dim() + j] = temp_m(i,j);
-  ((LinTransformModule*)fea_gen.module("transform"))->set_transformation_matrix(tr);
+  mllt_module->set_transformation_matrix(tr);
 }
 
 

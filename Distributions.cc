@@ -662,8 +662,8 @@ FullCovarianceGaussian::accumulate_from_dump(std::istream &is)
       is >> cov(i,j);
 
   m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, mean);
-  m_accums[accum_pos]->cov = m_accums[accum_pos]->cov + cov;
+  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
+  Blas_Add_Mat_Mult(m_accums[accum_pos]->cov, 1, cov);
   
   m_accums[accum_pos]->accumulated = true;
 }
@@ -976,8 +976,8 @@ MlltGaussian::accumulate_from_dump(std::istream &is)
       is >> cov(i,j);
 
   m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, mean);
-  m_accums[accum_pos]->cov = m_accums[accum_pos]->cov + cov;
+  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
+  Blas_Add_Mat_Mult(m_accums[accum_pos]->cov, 1, cov);
   
   m_accums[accum_pos]->accumulated = true;  
 }
@@ -1015,13 +1015,12 @@ MlltGaussian::estimate_parameters()
     Blas_Scale(1/m_accums[0]->gamma, m_mean);
     
     for (int i=0; i<dim(); i++) {
-      m_covariance(i) = m_accums[0]->cov(i,i);
-      m_covariance(i) -= m_accums[0]->mean(i)*m_accums[0]->mean(i);
-      m_covariance(i) /= m_accums[0]->gamma; 
+      m_covariance(i) = m_accums[0]->cov(i,i) / m_accums[0]->gamma;
+      m_covariance(i) -= m_mean(i)*m_mean(i);
       assert(m_covariance(i) > 0);
     }
   }
-  
+
   if (m_mode == MMI) {
 
     // c & mu~ & sigma~
@@ -1328,8 +1327,8 @@ PrecisionConstrainedGaussian::accumulate_from_dump(std::istream &is)
       is >> cov(i,j);
 
   m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, mean);
-  m_accums[accum_pos]->cov = m_accums[accum_pos]->cov + cov;
+  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
+  Blas_Add_Mat_Mult(m_accums[accum_pos]->cov, 1, cov);
   
   m_accums[accum_pos]->accumulated = true;
 }
@@ -1530,12 +1529,19 @@ SubspaceConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
 void
 SubspaceConstrainedGaussian::write(std::ostream &os) const
 {
+  os << "scgmm ";
+  for (int i=0; i<m_coeffs.size()-1; i++)
+    os << m_coeffs(i) << " ";
+  os << m_coeffs(m_coeffs.size()-1);
 }
 
 
 void
 SubspaceConstrainedGaussian::read(std::istream &is)
 {
+  
+
+  
 }
 
 
@@ -1624,8 +1630,8 @@ SubspaceConstrainedGaussian::accumulate_from_dump(std::istream &is)
       is >> cov(i,j);
 
   m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, mean);
-  m_accums[accum_pos]->cov = m_accums[accum_pos]->cov + cov;
+  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
+  Blas_Add_Mat_Mult(m_accums[accum_pos]->cov, 1, cov);
   
   m_accums[accum_pos]->accumulated = true;
 }
