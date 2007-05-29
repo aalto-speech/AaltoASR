@@ -742,9 +742,9 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
 
   // Estimate parameters and get the total gamma
   estimate_parameters();
-  for (int i=0; i<m_pool.size(); i++) {
+  for (int g=0; g<m_pool.size(); g++) {
     MlltGaussian *mllt_gaussian = dynamic_cast< MlltGaussian* >
-      (m_pool.get_pdf(i));
+      (m_pool.get_pdf(g));
     if (mllt_gaussian == NULL)
       continue;
     beta += mllt_gaussian->m_accums[0]->gamma;
@@ -765,11 +765,19 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
         continue;
       
       Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
-      LaVectorDouble temp_v1;
-      LaVectorDouble temp_v2;
+//      LaVectorDouble temp_v1;
+//      LaVectorDouble temp_v2;
+      LaVectorDouble temp_v1(dim());
+      LaVectorDouble temp_v2(dim());
       for (int i=0; i<dim(); i++) {
-        temp_v1.ref(temp_m.row(i));
-        temp_v2.ref(A.row(i));
+//        temp_v1.ref(temp_m.row(i));
+//        temp_v2.ref(A.row(i));
+        for (int d=0; d<dim(); d++) {
+          temp_v1(d)=temp_m(i,d);
+          temp_v2(d)=A(i,d);
+        }
+
+        
         mllt_gaussian->m_covariance(i)=
           std::max(Blas_Dot_Prod(temp_v1, temp_v2), mllt_gaussian->m_minvar);
       }
@@ -807,7 +815,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       // A=A'
       temp_m.copy(A);
       Blas_Mat_Trans_Mat_Mult(temp_m, identity, A);
-      
+
       LUFactorizeIP(A, pivots);
       temp_m.copy(A);
       LaLUInverseIP(temp_m, pivots);
@@ -817,13 +825,25 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       Adet = std::fabs(Adet);
       Blas_Scale(Adet, temp_m);
 
-      LaVectorDouble temp_v1;
-      LaVectorDouble temp_v2;
+//      LaVectorDouble temp_v1;
+//      LaVectorDouble temp_v2;
+      LaVectorDouble temp_v1(dim());
+      LaVectorDouble temp_v2(dim());
       for (int i=0; i<dim(); i++) {
-        temp_v1.ref(temp_m.row(i));
-        temp_v2.ref(A.row(i));
+        for (int d=0; d<dim(); d++) {
+          temp_v1(d)=temp_m(i,d);
+          temp_v2(d)=A(i,d);
+        }
+
+        
+//        temp_v1.ref(temp_m.row(i));
+//        temp_v2.ref(A.row(i));
         Blas_Mat_Trans_Vec_Mult(G[i], temp_v1, temp_v2);
-        Blas_Scale(sqrt(beta/Blas_Dot_Prod(temp_v1, temp_v2)), temp_v2);
+        double temp = sqrt(beta/Blas_Dot_Prod(temp_v1, temp_v2));
+        for (int d=0; d<dim(); d++)
+          A(i,d)=temp*temp_v2(d);
+        
+//        Blas_Scale(sqrt(beta/Blas_Dot_Prod(temp_v1, temp_v2)), temp_v2);
       }
     }
 
@@ -833,10 +853,12 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     LUFactorizeIP(temp_m, pivots);
     Adet=1;
     for (int i=0; i<dim(); i++)
-      Adet *= A(i,i);
+      Adet *= temp_m(i,i);
     Adet = std::fabs(Adet);
     double scale = pow(Adet, 1/(double)dim());
     Blas_Scale(1/scale, A);
+
+    
   }
   
   // Transform means and covariances
@@ -845,18 +867,24 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       (m_pool.get_pdf(g));
     if (mllt_gaussian == NULL)
       continue;
-
+    
     // Transform mean
     LaVectorDouble temp_mean(mllt_gaussian->m_mean);
     Blas_Mat_Vec_Mult(A, temp_mean, mllt_gaussian->m_mean, 1.0, 0.0);
-
+    
     // Re-estimate the diagonal covariances
     Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
-    LaVectorDouble temp_v1;
-    LaVectorDouble temp_v2;
+//    LaVectorDouble temp_v1;
+//    LaVectorDouble temp_v2;
+    LaVectorDouble temp_v1(dim());
+    LaVectorDouble temp_v2(dim());
     for (int i=0; i<dim(); i++) {
-      temp_v1.ref(temp_m.row(i));
-      temp_v2.ref(A.row(i));
+      for (int d=0; d<dim(); d++) {
+        temp_v1(d)=temp_m(i,d);
+        temp_v2(d)=A(i,d);
+      }
+//      temp_v1.ref(temp_m.row(i));
+//      temp_v2.ref(A.row(i));
       mllt_gaussian->m_covariance(i)=
         std::max(Blas_Dot_Prod(temp_v1, temp_v2), mllt_gaussian->m_minvar);
     }

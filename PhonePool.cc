@@ -85,7 +85,7 @@ void
 PhonePool::ContextPhoneCluster::compute_statistics(void)
 {
   std::vector<double> weights;
-  std::vector<Gaussian*> gaussians;
+  std::vector<const Gaussian*> gaussians;
 
   m_sum_occupancy = 0;
   for (ContextPhoneSet::iterator it = m_contexts.begin();
