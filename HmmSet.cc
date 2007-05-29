@@ -743,12 +743,15 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
   }
 
   // Estimate parameters and get the total gamma
-  estimate_parameters();
   for (int g=0; g<m_pool.size(); g++) {
     MlltGaussian *mllt_gaussian = dynamic_cast< MlltGaussian* >
       (m_pool.get_pdf(g));
     if (mllt_gaussian == NULL)
       continue;
+    Blas_Scale(1/mllt_gaussian->m_accums[0]->gamma, mllt_gaussian->m_accums[0]->cov);
+    Blas_Scale(1/mllt_gaussian->m_accums[0]->gamma, mllt_gaussian->m_accums[0]->mean);
+    Blas_R1_Update(mllt_gaussian->m_accums[0]->cov, mllt_gaussian->m_accums[0]->mean,
+                   mllt_gaussian->m_accums[0]->mean, -1);
     beta += mllt_gaussian->m_accums[0]->gamma;
   }
 
@@ -765,26 +768,18 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
         continue;
       if (!mllt_gaussian->accumulated())
         continue;
-      
-      Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
-//      LaVectorDouble temp_v1;
-//      LaVectorDouble temp_v2;
-      LaVectorDouble temp_v1(dim());
-      LaVectorDouble temp_v2(dim());
-      for (int i=0; i<dim(); i++) {
-//        temp_v1.ref(temp_m.row(i));
-//        temp_v2.ref(A.row(i));
-        for (int d=0; d<dim(); d++) {
-          temp_v1(d)=temp_m(i,d);
-          temp_v2(d)=A(i,d);
-        }
 
-        
+      Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
+
+      LaVectorDouble temp_v1;
+      LaVectorDouble temp_v2;
+      for (int i=0; i<dim(); i++) {
+        temp_v1.ref(temp_m.row(i));
+        temp_v2.ref(A.row(i));
         mllt_gaussian->m_covariance(i)=
           std::max(Blas_Dot_Prod(temp_v1, temp_v2), mllt_gaussian->m_minvar);
       }
     }      
-
     
     // Calculate the auxiliary matrix G
     for (int i=0; i<dim(); i++)
@@ -798,7 +793,6 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
           continue;
         if (!mllt_gaussian->accumulated())
           continue;
-
         if (mllt_gaussian->accumulated()) {
           Blas_Add_Mat_Mult(temp_m,
                             mllt_gaussian->m_accums[0]->gamma/mllt_gaussian->m_covariance(i),
@@ -808,7 +802,6 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       // Invert
       LinearAlgebra::inverse(temp_m, G[i]);
     }
-
     
     // Iterate to update A
     double Adet;
@@ -827,28 +820,15 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       Adet = std::fabs(Adet);
       Blas_Scale(Adet, temp_m);
 
-//      LaVectorDouble temp_v1;
-//      LaVectorDouble temp_v2;
-      LaVectorDouble temp_v1(dim());
-      LaVectorDouble temp_v2(dim());
+      LaVectorDouble temp_v1;
+      LaVectorDouble temp_v2;
       for (int i=0; i<dim(); i++) {
-        for (int d=0; d<dim(); d++) {
-          temp_v1(d)=temp_m(i,d);
-          temp_v2(d)=A(i,d);
-        }
-
-        
-//        temp_v1.ref(temp_m.row(i));
-//        temp_v2.ref(A.row(i));
+        temp_v1.ref(temp_m.row(i));
+        temp_v2.ref(A.row(i));
         Blas_Mat_Trans_Vec_Mult(G[i], temp_v1, temp_v2);
-        double temp = sqrt(beta/Blas_Dot_Prod(temp_v1, temp_v2));
-        for (int d=0; d<dim(); d++)
-          A(i,d)=temp*temp_v2(d);
-        
-//        Blas_Scale(sqrt(beta/Blas_Dot_Prod(temp_v1, temp_v2)), temp_v2);
+        Blas_Scale(sqrt(beta/Blas_Dot_Prod(temp_v1, temp_v2)), temp_v2);
       }
     }
-
 
     // Normalize A by 1/(det(A)^(1/d))
     temp_m.copy(A);
@@ -858,9 +838,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       Adet *= temp_m(i,i);
     Adet = std::fabs(Adet);
     double scale = pow(Adet, 1/(double)dim());
-    Blas_Scale(1/scale, A);
-
-    
+    Blas_Scale(1/scale, A);    
   }
   
   // Transform means and covariances
@@ -876,20 +854,21 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     
     // Re-estimate the diagonal covariances
     Blas_Mat_Mat_Mult(A, mllt_gaussian->m_accums[0]->cov, temp_m, 1.0, 0.0);
-//    LaVectorDouble temp_v1;
-//    LaVectorDouble temp_v2;
-    LaVectorDouble temp_v1(dim());
-    LaVectorDouble temp_v2(dim());
+    LaVectorDouble temp_v1;
+    LaVectorDouble temp_v2;
     for (int i=0; i<dim(); i++) {
-      for (int d=0; d<dim(); d++) {
-        temp_v1(d)=temp_m(i,d);
-        temp_v2(d)=A(i,d);
-      }
-//      temp_v1.ref(temp_m.row(i));
-//      temp_v2.ref(A.row(i));
+      temp_v1.ref(temp_m.row(i));
+      temp_v2.ref(A.row(i));
       mllt_gaussian->m_covariance(i)=
         std::max(Blas_Dot_Prod(temp_v1, temp_v2), mllt_gaussian->m_minvar);
     }
+
+    // Return the statistics to original values in case they are needed again
+    Blas_R1_Update(mllt_gaussian->m_accums[0]->cov,
+                   mllt_gaussian->m_accums[0]->mean,
+                   mllt_gaussian->m_accums[0]->mean, 1);
+    Blas_Scale(mllt_gaussian->m_accums[0]->gamma, mllt_gaussian->m_accums[0]->cov);
+    Blas_Scale(mllt_gaussian->m_accums[0]->gamma, mllt_gaussian->m_accums[0]->mean);
   }
   
       
