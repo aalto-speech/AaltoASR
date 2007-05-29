@@ -212,7 +212,7 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
 {
   int target_buffer = 0;
   double max_prob;
-  double prev_max_prob = 0;
+  double prev_max_prob = loglikelihoods.zero();
   
   clear_bw_scores();
   if (m_last_frame > 0)
@@ -229,8 +229,8 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
   while (m_current_frame > m_first_frame)
   {
     FeatureVec fea_vec = m_fea_gen.generate(--m_current_frame);
+    int source_buffer = target_buffer;
     target_buffer ^= 1;
-    int source_buffer = target_buffer^1;
 
     max_prob = loglikelihoods.zero();
 
@@ -243,6 +243,8 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     {
       double cur_node_score =
         m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer];
+
+      // Propagate the node only if its loglikelihood is within the beam
       if (loglikelihoods.divide(cur_node_score, prev_max_prob) >
           -m_backward_beam)
       {

@@ -17,7 +17,6 @@ std::string save_summary_file;
 
 int info;
 int accum_pos;
-bool raw_flag;
 bool transtat;
 bool durstat;
 float start_time, end_time;
@@ -110,7 +109,6 @@ main(int argc, char *argv[])
     config.default_parse(argc, argv);
     
     info = config["info"].get_int();
-    raw_flag = config["raw-input"].specified;
     fea_gen.load_configuration(io::Stream(config["config"].get_str()));
 
     // Initialize the model for accumulating statistics
@@ -204,10 +202,9 @@ main(int argc, char *argv[])
       if (config["hmmnet"].specified || config["den-hmmnet"].specified)
       {
         // Open files and configure
-        HmmNetBaumWelch* lattice =
-          recipe.infos[f].init_hmmnet_files(&model,
-                                            config["den-hmmnet"].specified,
-                                            &fea_gen, raw_flag, NULL);
+        HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
+          &model, config["den-hmmnet"].specified, &fea_gen,
+          config["raw-input"].specified, NULL);
         lattice->set_collect_transition_probs(transtat);
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
         if (config["ac-scale"].specified)
@@ -262,8 +259,8 @@ main(int argc, char *argv[])
     
     if (info > 0)
     {
-      fprintf(stderr, "Finished collecting statistics (%i/%i), writing models\n",
-	      config["batch"].get_int(), config["bindex"].get_int());
+      fprintf(stderr, "Finished collecting statistics (%i/%i)\n",
+	      config["bindex"].get_int(), config["batch"].get_int());
       fprintf(stderr, "Total log likelihood: %f\n", total_log_likelihood);
     }
 
