@@ -540,6 +540,8 @@ void
 HmmSet::dump_gk_statistics(const std::string filename) const
 {
   std::ofstream gks(filename.c_str());
+  gks.precision(10);
+  
   if (!gks) {
     fprintf(stderr, "HmmSet::dump_gk_statistics(): could not open %s\n", filename.c_str());
     throw OpenError();
