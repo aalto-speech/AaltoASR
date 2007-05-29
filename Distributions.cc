@@ -2092,6 +2092,10 @@ PDFPool::read_gk(const std::string &filename, bool mllt)
           m_pool[i]=new DiagonalGaussian(m_dim);
         m_pool[i]->read(in);
       }
+      else if (type_str == "mllt") {
+	m_pool[i]=new MlltGaussian(m_dim);
+        m_pool[i]->read(in);
+      }
       else if (type_str == "full") {
 	m_pool[i]=new FullCovarianceGaussian(m_dim);
         m_pool[i]->read(in);
