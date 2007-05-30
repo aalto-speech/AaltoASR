@@ -587,6 +587,8 @@ PreModule::generate(int frame)
       throw std::string("PreModule: Could not read the file");
     // EOF
     m_eof_frame = pre_frame;
+    if (m_last_feature.empty() || m_last_feature_frame < m_eof_frame - 1)
+      generate(last_frame()); // Fills the m_last_feature
     assert(!m_last_feature.empty());
     m_buffer[frame].set(m_last_feature);
     return;
