@@ -264,6 +264,15 @@ main(int argc, char *argv[])
       fprintf(stderr, "Total log likelihood: %f\n", total_log_likelihood);
     }
 
+    if (config["savesum"].specified) {
+      std::ofstream summary_file(save_summary_file.c_str());
+      if (!summary_file)
+        fprintf(stderr, "Could not open summary file: %s\n", save_summary_file.c_str());
+      else
+        summary_file << total_log_likelihood;
+      summary_file.close();
+    }
+    
     // Write statistics to file dump and clean up
     model.dump_statistics(out_file);
     model.stop_accumulating();
