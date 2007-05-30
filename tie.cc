@@ -32,7 +32,7 @@ collect_phone_stats(PhnReader *phn_reader, PhonePool *pool)
   {
     if (phn.state == -1)
       throw std::string("Context phone tying requires phn files with state numbers!");
-    PhonePool::ContextPhone *phone = pool->get_context_phone(
+    PhonePool::ContextPhoneContainer phone = pool->get_context_phone(
       phn.label[0], phn.state);
     //fprintf(stderr, "Frames %i - %i: %s\n",phn.start, phn.end, phn.label[0].c_str());
     for (f = phn.start; f < phn.end; f++)
@@ -40,7 +40,7 @@ collect_phone_stats(PhnReader *phn_reader, PhonePool *pool)
       FeatureVec feature = fea_gen.generate(f);
       if (fea_gen.eof())
         break; // EOF in FeatureGenerator
-      phone->add_feature(1, feature);
+      phone.add_feature(1, feature);
     }
     if (f < phn.end) // EOF in FeatureGenerator
       return;
@@ -59,9 +59,9 @@ save_basebind(const std::string &filename, PhonePool *pool)
     fprintf(stderr, "Could not open file %s for writing.\n", filename.c_str());
     exit(1);
   }
-  fprintf(fp, "_ 1 0\n__ 3 1 2 3\n");
+  //fprintf(fp, "_ 1 0\n__ 3 1 2 3\n");
   
-  pool->save_to_basebind(fp, 4, max_contexts);
+  pool->save_to_basebind(fp, 0, max_contexts);
   fclose(fp);
 }
 
@@ -82,7 +82,8 @@ main(int argc, char *argv[])
       ('o', "out=FILE", "arg", "", "output filename for basebind")
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "count=INT", "arg", "100", "minimum feature count for state clusters")
-      ('\0', "lh=FLOAT", "arg", "0", "minimum likelihood gain for cluster splitting")
+      ('\0', "sgain=FLOAT", "arg", "0", "minimum loglikelihood gain in cluster splitting")
+      ('\0', "mloss=FLOAT", "arg", "0", "maximum loglikelihood loss in cluster merging")
       ('\0', "context=INT", "arg", "1", "maximum number of contexts (default 1=triphones)")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('i', "info=INT", "arg", "0", "info level")
@@ -96,7 +97,8 @@ main(int argc, char *argv[])
     recipe.read(io::Stream(config["recipe"].get_str()), 0, 0, false);
     
     phone_pool.set_clustering_parameters(config["count"].get_int(),
-                                         config["lh"].get_float());
+                                         config["sgain"].get_float(),
+                                         config["mloss"].get_float());
 
     phone_pool.load_decision_tree_rules(io::Stream(config["rule"].get_str()));
 
@@ -154,6 +156,8 @@ main(int argc, char *argv[])
     
     phone_pool.finish_statistics();
     phone_pool.decision_tree_cluster_context_phones(max_contexts);
+    if (config["mloss"].specified)
+      phone_pool.merge_context_phones();
     
     save_basebind(config["out"].get_str(), &phone_pool);
   }

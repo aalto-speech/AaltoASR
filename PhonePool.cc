@@ -145,6 +145,49 @@ PhonePool::ContextPhoneCluster::remove_from_cluster(
   compute_statistics();
 }
 
+void
+PhonePool::ContextPhoneCluster::merge_clusters(
+  const ContextPhoneCluster *cl1, const ContextPhoneCluster *cl2)
+{
+  std::vector<double> weights;
+  std::vector<const Gaussian*> gaussians;
+
+  // Merge the Gaussian statistics
+  weights.push_back(cl1->occupancy_count());
+  weights.push_back(cl2->occupancy_count());
+  gaussians.push_back(cl1->statistics());
+  gaussians.push_back(cl2->statistics());
+  m_sum_stats.merge(weights, gaussians);
+  m_sum_occupancy = cl1->occupancy_count() + cl2->occupancy_count();
+
+  // Add new set of rules for this cluster
+  if (this != cl1)
+  {
+    for (int i = 0; i < cl1->num_applied_rule_sets(); i++)
+      m_applied_rules.push_back(cl1->applied_rules(i));
+  }
+  if (this != cl2)
+  {
+    for (int i = 0; i < cl2->num_applied_rule_sets(); i++)
+      m_applied_rules.push_back(cl2->applied_rules(i));
+  }
+
+  // Merge the context phone sets
+  ContextPhoneSet new_set;
+  set_union(cl1->m_contexts.begin(), cl1->m_contexts.end(),
+            cl2->m_contexts.begin(), cl2->m_contexts.end(),
+            inserter(new_set, new_set.begin()));
+  m_contexts = new_set;
+}
+
+void
+PhonePool::ContextPhoneCluster::add_rule(AppliedDecisionRule &rule)
+{
+  if (m_applied_rules.size() == 0)
+    m_applied_rules.resize(1);
+  m_applied_rules[0].push_back(rule);
+}
+
 
 PhonePool::Phone::Phone(std::string &center_label, PhonePool *pool) :
   m_center_phone(center_label),
@@ -243,10 +286,29 @@ PhonePool::Phone::add_final_cluster(int state, ContextPhoneCluster *cl)
   m_cluster_states[state].push_back(cl);
 }
 
+void
+PhonePool::Phone::merge_clusters(int state, int cl1_index, int cl2_index)
+{
+  if (cl2_index < cl1_index)
+  {
+    int temp = cl1_index;
+    cl1_index = cl2_index;
+    cl2_index = temp;
+  }
+
+  assert( state < (int)m_cluster_states.size() );
+  assert( cl2_index < (int)m_cluster_states[state].size() );
+
+  m_cluster_states[state][cl1_index]->merge_clusters(
+    m_cluster_states[state][cl1_index], m_cluster_states[state][cl2_index]);
+  m_cluster_states[state].erase(m_cluster_states[state].begin() + cl2_index);
+}
+
 
 PhonePool::PhonePool(void) :
   m_min_occupancy(0),
-  m_min_ll_gain(0),
+  m_min_split_ll_gain(0),
+  m_max_merge_ll_loss(0),
   m_dim(0),
   m_info(0)
 {
@@ -363,7 +425,7 @@ PhonePool::load_decision_tree_rules(FILE *fp)
 }
 
 
-PhonePool::ContextPhone*
+PhonePool::ContextPhoneContainer
 PhonePool::get_context_phone(const std::string &label, int state)
 {
   std::string center_label(center_phone(label));
@@ -373,9 +435,9 @@ PhonePool::get_context_phone(const std::string &label, int state)
     if (m_info > 1)
       fprintf(stderr, "New phone %s\n", center_label.c_str());
 
-    return (*((m_phones.insert(PhoneMap::value_type(center_label, new Phone(center_label, this)))).first)).second->get_context_phone(label, state);
+    return ContextPhoneContainer((*((m_phones.insert(PhoneMap::value_type(center_label, new Phone(center_label, this)))).first)).second->get_context_phone(label, state));
   }
-  return (*it).second->get_context_phone(label, state);
+  return ContextPhoneContainer((*it).second->get_context_phone(label, state));
 }
 
 
@@ -518,7 +580,7 @@ PhonePool::apply_best_splitting_rule(
       applied_sets.push_back(new_context_phones);
 
       double gain = compute_log_likelihood_gain(*cl, cl1, cl2);
-      if (gain > best_ll_gain && gain > m_min_ll_gain)
+      if (gain > best_ll_gain && gain > m_min_split_ll_gain)
       {
         best_cl1 = cl1;
         best_cl2 = cl2;
@@ -556,6 +618,66 @@ PhonePool::apply_best_splitting_rule(
 }
 
 
+void
+PhonePool::merge_context_phones(void)
+{
+  int total_clusters = 0;
+  for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
+  {
+    for (int s = 0; s < (*it).second->num_states(); s++)
+    {
+      const std::vector<ContextPhoneCluster*> &cur_clusters =
+        (*it).second->get_state_clusters(s);
+      int orig_size = cur_clusters.size();
+      if (m_info > 0)
+        fprintf(stderr,"Merging clusters of phone %s, state %i, initially %i clusters\n", (*it).second->label().c_str(), s, orig_size);
+      
+      // Merge the clusters while maximum likelihood loss is retained
+      for (int c = 0; c < (int)cur_clusters.size(); c++)
+      {
+        double min_loss = 2*m_max_merge_ll_loss; // Just a value over maximum
+        int best_target = -1;
+        
+        for (int i = c+1; i < (int)cur_clusters.size(); i++)
+        {
+          ContextPhoneCluster merged_cl(m_dim);
+          merged_cl.merge_clusters(cur_clusters[c], cur_clusters[i]);
+          double gain = compute_log_likelihood_gain(merged_cl,*cur_clusters[c],
+                                                    *cur_clusters[i]);
+          if (gain < min_loss)
+          {
+            min_loss = gain;
+            best_target = i;
+          }
+        }
+        if (min_loss < m_max_merge_ll_loss)
+        {
+          assert( best_target > c );
+          if (m_info > 1)
+          {
+            fprintf(stderr, "  Merging clusters %i and %i (occupancy counts %i + %i)\n", c, best_target, (int)cur_clusters[c]->occupancy_count(), (int)cur_clusters[best_target]->occupancy_count());
+            fprintf(stderr, "    Loglikelihood loss: %.2f\n", min_loss);
+          }
+          (*it).second->merge_clusters(s, c, best_target);
+          c--; // Continue processing this cluster
+        }
+      }
+      if (m_info > 0)
+      {
+        if (orig_size > (int)cur_clusters.size())
+          fprintf(stderr, "Merging resulted %i clusters\n",
+                  (int)cur_clusters.size());
+        else
+          fprintf(stderr, "No clusters were merged\n");
+      }
+      total_clusters += (int)cur_clusters.size();
+    }
+  }
+  if (m_info > 0)
+    fprintf(stderr, "Total %i clusters after merging\n", total_clusters);
+}
+
+
 double
 PhonePool::compute_log_likelihood_gain(ContextPhoneCluster &parent,
                                        ContextPhoneCluster &child1,
@@ -584,8 +706,8 @@ PhonePool::save_to_basebind(FILE *fp, int initial_statenum,
     // Allocate state numbers
     for (int s = 0; s < (*it).second->num_states(); s++)
     {
-      std::vector<ContextPhoneCluster*> &clusters =
-        (*it).second->get_state_cluster(s);
+      const std::vector<ContextPhoneCluster*> &clusters =
+        (*it).second->get_state_clusters(s);
       for (int i = 0; i < (int)clusters.size(); i++)
         clusters[i]->set_state_number(state_num++);
     }
@@ -619,28 +741,38 @@ PhonePool::save_to_basebind(FILE *fp, int initial_statenum,
           // Iterate through states
           for (int s = 0; s < (*it).second->num_states(); s++)
           {
-            std::vector<ContextPhoneCluster*> &clusters =
-              (*it).second->get_state_cluster(s);
+            const std::vector<ContextPhoneCluster*> &clusters =
+              (*it).second->get_state_clusters(s);
             int cluster_index = -1;
-            
-            // Find the cluster this context phone belongs to
-            for (int i = 0; i < (int)clusters.size(); i++)
+
+            if ((int)clusters.size() == 1)
+              cluster_index = 0;
+            else
             {
-              const std::vector<AppliedDecisionRule> &rules =
-                clusters[i]->applied_rules();
-              int j;
-              for (j = 0; j < (int)rules.size(); j++)
-                if (cur_phone.rule_answer(rules[j].rule, rules[j].context) !=
-                    rules[j].answer)
-                  break;
-              if (j == (int)rules.size()) // Found a match
+              // Find the cluster this context phone belongs to
+              for (int i = 0; i < (int)clusters.size(); i++)
               {
-                cluster_index = i;
-                break;
+                for (int r = 0; r < clusters[i]->num_applied_rule_sets(); r++)
+                {
+                  const std::vector<AppliedDecisionRule> &rules =
+                    clusters[i]->applied_rules(r);
+                  int j;
+                  for (j = 0; j < (int)rules.size(); j++)
+                  {
+                    if (cur_phone.rule_answer(rules[j].rule,rules[j].context)!=
+                        rules[j].answer)
+                      break; // Does not fit into this rule set
+                  }
+                  if (j == (int)rules.size())
+                  {
+                    cluster_index = i;
+                    goto cluster_index_found;
+                  }
+                }
               }
             }
+          cluster_index_found:
             assert( cluster_index >= 0 );
-
             fprintf(fp, " %d", clusters[cluster_index]->state_number());
           }
           fprintf(fp, "\n");
@@ -661,8 +793,8 @@ PhonePool::save_to_basebind(FILE *fp, int initial_statenum,
               (*it).second->num_states());
       for (int s = 0; s < (*it).second->num_states(); s++)
       {
-        std::vector<ContextPhoneCluster*> &clusters =
-          (*it).second->get_state_cluster(s);    
+        const std::vector<ContextPhoneCluster*> &clusters =
+          (*it).second->get_state_clusters(s);    
         fprintf(fp, " %d", clusters[0]->state_number());
       }
       fprintf(fp, "\n");

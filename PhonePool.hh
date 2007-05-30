@@ -7,8 +7,10 @@
 #include <stdio.h>
 #include "Distributions.hh"
 
+/** A class for tying the states of context dependent phones.
+ */
 class PhonePool {
-public:
+private:
 
   typedef std::set<std::string> PhoneLabelSet;
 
@@ -34,12 +36,12 @@ public:
                  bool persistent = true);
     bool rule_answer(const DecisionRule *rule, int context_index);
 
-    std::string& label(void) { return m_label; }
+    const std::string& label(void) const { return m_label; }
 
-    double occupancy_count(void) { return m_occupancy; }
-    int num_left_contexts(void) { return (int)m_left_contexts.size(); }
-    int num_right_contexts(void) { return (int)m_right_contexts.size(); }
-    FullCovarianceGaussian* statistics(void) { return &m_stats; }
+    double occupancy_count(void) const { return m_occupancy; }
+    int num_left_contexts(void) const { return (int)m_left_contexts.size(); }
+    int num_right_contexts(void) const { return (int)m_right_contexts.size(); }
+    const FullCovarianceGaussian* statistics(void) const { return &m_stats; }
 
     inline void add_feature(double prior, const FeatureVec &f);
     void finish_statistics(void);
@@ -51,7 +53,8 @@ public:
     double m_occupancy;
 
     PhonePool *m_pool;
-    
+
+    /// Full covariance statistics for the state
     FullCovarianceGaussian m_stats;
   };
   
@@ -65,9 +68,9 @@ public:
     ContextPhoneCluster(int dim) : m_sum_occupancy(0), m_sum_stats(dim) { }
     void fill_cluster(ContextPhoneSet &context_phones);
     void compute_statistics(void);
-    double occupancy_count(void) { return m_sum_occupancy; }
-    int num_context_phones(void) { return (int)m_contexts.size(); }
-    FullCovarianceGaussian* statistics(void) { return &m_sum_stats; }
+    double occupancy_count(void) const { return m_sum_occupancy; }
+    int num_context_phones(void) const { return (int)m_contexts.size(); }
+    const FullCovarianceGaussian* statistics(void) const {return &m_sum_stats;}
 
     double compute_new_cluster_occupancy(DecisionRule *rule, int context_index,
                                          bool answer,
@@ -76,15 +79,22 @@ public:
                                          int context_index, bool answer,
                                          ContextPhoneSet &new_set);
     void remove_from_cluster(const ContextPhoneCluster &cl);
-    void add_rule(AppliedDecisionRule &rule) { m_applied_rules.push_back(rule); }
-    const std::vector<AppliedDecisionRule>& applied_rules(void) { return m_applied_rules; }
+    void merge_clusters(const ContextPhoneCluster *cl1,
+                        const ContextPhoneCluster *cl2);
+    void add_rule(AppliedDecisionRule &rule);
+    int num_applied_rule_sets(void) const { return (int)m_applied_rules.size(); }
+    const std::vector<AppliedDecisionRule>& applied_rules(int set_index) const { return m_applied_rules[set_index]; }
 
     void set_state_number(int state_number) { m_state_number = state_number; }
-    int state_number(void) { return m_state_number; }
+    int state_number(void) const { return m_state_number; }
     
   private:
-    /// Ordered vector of rules applied so far
-    std::vector<AppliedDecisionRule> m_applied_rules;
+    /** A collection of ordered vector of rules for this cluster.
+     * During splitting, the first (and only) rule vector is the ordered
+     * set of rules applied so far. During merging, several rule sets
+     * can be defined for the same cluster.
+     */
+    std::vector< std::vector<AppliedDecisionRule> > m_applied_rules;
 
     /// Context phones defining the statistics of the cluster
     ContextPhoneSet m_contexts;
@@ -119,7 +129,8 @@ public:
 
     ContextPhoneCluster* get_initial_clustered_state(int state);
     void add_final_cluster(int state, ContextPhoneCluster *cl);
-    std::vector<ContextPhoneCluster*>& get_state_cluster(int state) { return m_cluster_states[state]; }
+    void merge_clusters(int state, int cl1_index, int cl2_index);
+    const std::vector<ContextPhoneCluster*>& get_state_clusters(int state) { return m_cluster_states[state]; }
 
     std::string& label(void) { return m_center_phone; }
     
@@ -129,12 +140,38 @@ public:
     /// Handles allocation and deletion of ContextPhone objects!
     std::vector< ContextPhoneMap > m_cp_states;
 
+    /** The final clusters. The outer vector corresponds to different
+     * states, which are itself collections of \ref ContextPhoneCluster
+     * objects.
+     */
     std::vector< std::vector<ContextPhoneCluster*> > m_cluster_states;
     PhonePool *m_pool;
-    int m_max_left_contexts, m_max_right_contexts;
+
+    /// Maximum left context index in this phone
+    int m_max_left_contexts;
+    /// Maximum right context index in this phone
+    int m_max_right_contexts;
   };
   
   typedef std::map<std::string, Phone*> PhoneMap;
+
+public:
+
+  /** Interface class for \ref get_context_phone(). It is used to pass
+   * the features to the correct ContextPhone object
+   */
+  class ContextPhoneContainer {
+  private:
+    ContextPhone *cp;
+  public:
+    ContextPhoneContainer(ContextPhone *cp_) : cp(cp_) { }
+
+    /** Adds a feature to the ContextPhone object this container points to.
+     * \param prior Prior probability of the state (1 for Viterbi)
+     * \param f     The feature
+     */
+    void add_feature(double prior, const FeatureVec &f) { cp->add_feature(prior, f); }
+  };
 
 public:
   // Static methods for phone label handling
@@ -150,18 +187,64 @@ public:
 
   PhonePool(void);
   ~PhonePool();
-  
+
+  /** Set the clustering parameters
+   * \param min_occupancy Minimum occupancy (feature) count for the states
+   * \param min_split_ll_gain Minimum loglikelihood gain for a cluster split
+   * \param max_merge_ll_loss Maximum loglikelihood loss for a cluster merge
+   */
   inline void set_clustering_parameters(double min_occupancy,
-                                        double min_ll_gain);
+                                        double min_split_ll_gain,
+                                        double max_merge_ll_loss);
+  /** Sets feature dimension
+   * \param dim Feature dimension
+   */
   void set_dimension(int dim) { m_dim = dim; }
-  int dimension(void) { return m_dim; }
-  void set_info(int info) { m_info = info; }
-  void load_decision_tree_rules(FILE *fp);
   
-  ContextPhone* get_context_phone(const std::string &label, int state);
+  /// \return Feature dimension
+  int dimension(void) { return m_dim; }
+
+  /** Sets verbosity
+   * \param info Level of verbosity: 0 = none, 1 = some, >1 = lots of info
+   */
+  void set_info(int info) { m_info = info; }
+
+  /** Loads the rule set for the decision tree
+   * \param fp Pointer to FILE object
+   */
+  void load_decision_tree_rules(FILE *fp);
+
+  /** Returns a \ref ContextPhoneContainer object for adding features to
+   * a certain context phone
+   * \param label Context phone label
+   * \param state State number of the context phone
+   * \return \ref ContextPhoneContainer object
+   */
+  ContextPhoneContainer get_context_phone(const std::string &label, int state);
+
+  /** Finishes the collection of statistics.
+   * \note Must be called before \ref decision_tree_cluster_context_phones!
+   */
   void finish_statistics(void);
+
+  /** Forms tied states of context phones by splitting the context phone
+   * clusters according to the decision tree
+   * \param max_context_index Maximum context index (left and right) to
+   *                          try in cluster splitting
+   */
   void decision_tree_cluster_context_phones(int max_context_index);
 
+  /** Merges the clusters created by \ref decision_tree_cluster_context_phones
+   * if the loss in likelihood is less than the threshold set by
+   * \ref set_cluistering_parameters
+   */
+  void merge_context_phones(void);
+
+  /** Saves the result of context phone tying to a basebind file
+   * \param fp                Pointer to FILE object
+   * \param initial_statenum  First state index to be allocated
+   * \param max_context_index Maximum context index (left and right)
+   */
   void save_to_basebind(FILE *fp, int initial_statenum, int max_context_index);
 
   /// Internal function for adding the labels of different contexts
@@ -177,8 +260,10 @@ private:
 
 private:
   double m_min_occupancy;
-  double m_min_ll_gain;
-  
+  double m_min_split_ll_gain;
+  double m_max_merge_ll_loss;
+
+  /// Handles allocation and deletion of Phone objects!
   PhoneMap m_phones;
 
   PhoneLabelSet m_contexts;
@@ -198,10 +283,13 @@ PhonePool::ContextPhone::add_feature(double prior, const FeatureVec &f)
 }
 
 void
-PhonePool::set_clustering_parameters(double min_occupancy, double min_ll_gain)
+PhonePool::set_clustering_parameters(double min_occupancy,
+                                     double min_split_ll_gain,
+                                     double max_merge_ll_loss)
 {
   m_min_occupancy = min_occupancy;
-  m_min_ll_gain = min_ll_gain;
+  m_min_split_ll_gain = min_split_ll_gain;
+  m_max_merge_ll_loss = max_merge_ll_loss;
 }
 
 void

@@ -5,7 +5,7 @@
 #include "FeatureGenerator.hh"
 #include "HmmSet.hh"
 
-/** A class for generating PDF probabilities for a HMM network.
+/** A class for generating state probabilities for a HMM network.
  * The network is represented in FST format.
  */
 class HmmNetBaumWelch : public Segmentator {
