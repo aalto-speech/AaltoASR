@@ -110,13 +110,13 @@ compute_vtln_log_likelihoods(Segmentator *seg, std::string &speaker,
       FeatureVec fea_vec = fea_gen.generate(seg->current_frame());
       if (fea_gen.eof())
         break; // EOF in FeatureGenerator
-      model.reset_cache();
 
       for (i = 0; i < (int)pdfs.size(); i++)
       {
         // Get probabilities
         speaker_stats[cur_speaker].log_likelihoods[cur_warp_index] += 
-          log(pdfs[i].prob*model.pdf_likelihood(pdfs[i].index,fea_vec));
+          util::safe_log(pdfs[i].prob*model.pdf_likelihood(pdfs[i].index,
+                                                           fea_vec));
       }
     }
   }

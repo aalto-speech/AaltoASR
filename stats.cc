@@ -40,7 +40,9 @@ train(HmmSet *model, Segmentator *segmentator)
     // Fetch the current feature vector
     frame = segmentator->current_frame();
     FeatureVec feature = fea_gen.generate(frame);    
-    model->reset_cache();
+
+    if (fea_gen.eof())
+      break; // EOF in FeatureGenerator
     
     // Accumulate all possible states distributions for this frame
     const std::vector<Segmentator::IndexProbPair> &pdfs
@@ -137,8 +139,6 @@ main(int argc, char *argv[])
 
     // Check for state transition statistics
     transtat = config["transitions"].specified;
-    if (transtat)
-      fprintf(stderr, "You have defined --transitions option: state transition statistics will be collected as well\n");
 
     // Check for duration statistics
     durstat = config["durstat"].specified;

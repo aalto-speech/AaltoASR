@@ -347,8 +347,8 @@ DiagonalGaussian::estimate_parameters()
     for (int i=0; i<dim(); i++) {
       m_covariance(i) -= m_mean(i)*m_mean(i);
       if (m_covariance(i) <= 0) {
-        fprintf(stderr, "Warning: Variance in dimension %i is %g\n",
-                i, m_covariance(i));
+        fprintf(stderr, "Warning: Variance in dimension %i is %g (gamma %g)\n",
+                i, m_covariance(i), m_accums[0]->gamma);
         //assert(m_covariance(i) > 0);
       }
     }

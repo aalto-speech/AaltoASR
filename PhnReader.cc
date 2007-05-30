@@ -142,6 +142,9 @@ PhnReader::next_frame(void)
   
   if (m_eof_flag)
     return false;
+
+  // Segmentator object must reset the model cache during next_frame()
+  m_model->reset_cache();
   
   if (m_current_frame == -1)
   {

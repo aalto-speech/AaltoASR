@@ -50,6 +50,7 @@ public:
   virtual int current_frame(void) = 0;
 
   /** Computes the PDF probability statistics for the next frame.
+   * \note Resets the \ref HmmSet cache of state/PDF probabilities
    * \return true if a new frame is available, false if EOF was encountered.
    */
   virtual bool next_frame(void) = 0;

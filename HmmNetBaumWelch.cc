@@ -212,7 +212,7 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
 {
   int target_buffer = 0;
   double max_prob;
-  double prev_max_prob = loglikelihoods.zero();
+  double prev_max_prob = loglikelihoods.one();
   
   clear_bw_scores();
   if (m_last_frame > 0)
@@ -421,9 +421,10 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
     else
     {
       HmmTransition &tr = m_model.transition(m_arcs[arc_id].transition_id);
+      double model_score = m_model.state_likelihood(tr.source_index,
+                                                    fea_vec);
       double arc_score = loglikelihoods.times(
-        m_acoustic_scale*(log(m_model.state_likelihood(tr.source_index,
-                                                       fea_vec)) + tr.prob),
+        m_acoustic_scale*(util::safe_log(model_score * tr.prob)),
         m_arcs[arc_id].score);
       double total_score = loglikelihoods.times(cur_score, arc_score);
 
@@ -588,7 +589,8 @@ HmmNetBaumWelch::FrameProbs::get_log_prob(int frame)
                             frame_blocks[i].end-frame];
     }
   }
-  return HmmNetBaumWelch::loglikelihoods.zero(); // There is no probability for this frame
+  // There is no probability for this frame
+  return HmmNetBaumWelch::loglikelihoods.zero();
 }
 
 void
