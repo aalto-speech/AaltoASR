@@ -1826,15 +1826,14 @@ Mixture::accumulate(double gamma,
   double total_likelihood, this_likelihood;
 
   // Compute the total likelihood for this mixture
-  total_likelihood = gamma * compute_likelihood(f);
+  total_likelihood = compute_likelihood(f);
   
   // Accumulate all basis distributions with some gamma
   if (total_likelihood > 0) {
     for (int i=0; i<size(); i++) {
-      this_likelihood = 
-        gamma * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i]);
+      this_likelihood = gamma * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i]);
       m_accums[accum_pos]->gamma[i] += this_likelihood / total_likelihood;
-      get_base_pdf(i)->accumulate(this_likelihood, f, accum_pos);
+      get_base_pdf(i)->accumulate(this_likelihood / total_likelihood, f, accum_pos);
     }
     m_accums[accum_pos]->accumulated = true;
   }

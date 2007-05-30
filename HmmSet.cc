@@ -664,14 +664,12 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
   
   gks.close();
 }
- 
+
 
 void 
 HmmSet::stop_accumulating()
 {
-  assert(m_transition_accum.size() > 0);
-
-  // Stop accumulation also for state distributions
+  // Stop accumulation for state distributions
   for (int i=0; i<num_emission_pdfs(); i++)
     m_emission_pdfs[i].stop_accumulating();
  
