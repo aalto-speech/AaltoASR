@@ -130,7 +130,7 @@ FeatureModule::at(int frame)
       m_buffer_first_pos = frame;
       if (m_buffer_last_pos > m_buffer_first_pos + m_buffer_size - 1)
         m_buffer_last_pos = m_buffer_first_pos + m_buffer_size - 1;
-        }
+    }
   }
 
   assert(buffer_gen_start <= buffer_gen_end);
@@ -340,6 +340,7 @@ void
 FFTModule::generate(int frame)
 {
   int t;
+  bool eof_found = false;
   
   // NOTE: because of lowpass filtering, (m_window_width PLUS one)
   // samples are fetched from the audio file
@@ -369,22 +370,25 @@ FFTModule::generate(int frame)
   m_reader.fetch(window_start, window_end);
 
   // EOF during this frame?
-  if (m_eof_frame == INT_MAX && m_reader.eof_sample() < window_end) {
-    assert(m_reader.eof_sample() >= window_start);
+  if (frame < m_eof_frame && m_reader.eof_sample() < window_end)
+  {
     m_eof_frame = frame;
+    eof_found = true; // Indicate EOF for generating the last frame
 
     if (frame == 0)
       throw std::string("audio shorter than frame");
 
-    if (m_first_feature.empty())
-      m_first_feature.resize(m_dim, 0);
-    if (m_last_feature.empty())
-      m_last_feature.resize(m_dim, 0);
-
     if (m_copy_borders) {
-      assert(!m_last_feature.empty());
-      m_buffer[frame].set(m_last_feature);
-      return;
+      if (!m_last_feature.empty() && m_last_feature_frame == m_eof_frame - 1)
+      {
+        m_buffer[frame].set(m_last_feature);
+        return;
+      }
+      m_eof_frame = last_frame() + 1;
+      window_start = (int)((m_eof_frame-1) * m_window_advance);
+      window_end = window_start + m_window_width + 1;
+      m_reader.fetch(window_start, window_end);
+      assert( m_reader.eof_sample() >= window_end );
     }
   }
   
@@ -422,13 +426,13 @@ FFTModule::generate(int frame)
   if (m_copy_borders && frame > m_last_feature_frame) 
   {
     target.get(m_last_feature);
-    m_last_feature_frame = frame;
+    m_last_feature_frame = (eof_found ? m_eof_frame - 1 : frame);
   }
 }
 
 
 //////////////////////////////////////////////////////////////////
-// FFTModule
+// PreModule
 //////////////////////////////////////////////////////////////////
 
 PreModule::PreModule() :
@@ -528,9 +532,11 @@ PreModule::set_module_config(const ModuleConfig &config)
   config.get("sample_rate", m_sample_rate);
   config.get("frame_rate", m_frame_rate);
   config.get("legacy_file", m_legacy_file);
-
+  
   if (!config.get("dim", m_dim))
     throw std::string("PreModule: Must set dimension");
+
+  m_temp_fea_buf.resize(m_dim);
 }
 
 void
@@ -571,12 +577,11 @@ PreModule::generate(int frame)
     if (fseek(m_fp, m_file_offset + pre_frame * m_dim * sizeof(float),
               SEEK_SET) < 0)
       throw std::string("PreModule: Could not seek the file.");
-    
   }
   m_cur_pre_frame = pre_frame;
 
   // Read the frame
-  if ((int)fread(&target_vec[0], sizeof(float), m_dim, m_fp) < m_dim)
+  if ((int)fread(&m_temp_fea_buf[0], sizeof(float), m_dim, m_fp) < m_dim)
   {
     if (!feof(m_fp))
       throw std::string("PreModule: Could not read the file");
@@ -586,6 +591,7 @@ PreModule::generate(int frame)
     m_buffer[frame].set(m_last_feature);
     return;
   }
+  target_vec.set(m_temp_fea_buf);
 
   if (pre_frame > m_last_feature_frame) 
   {
@@ -1120,7 +1126,7 @@ void
 MeanSubtractorModule::get_module_config(ModuleConfig &config)
 {
   config.set("left", m_own_offset_left-1);
-  config.set("right", m_own_offset_right);
+  config.set("right", m_own_offset_right-1);
 }
 
 void

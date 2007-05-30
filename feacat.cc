@@ -85,11 +85,21 @@ main(int argc, char *argv[])
       start_frame = config["start-frame"].get_int();
     if (config["end-frame"].specified)
       end_frame = config["end-frame"].get_int();
-    for (int f = start_frame; f < end_frame; f++) {
-      const FeatureVec fea = gen.generate(f);
-      if (end_frame == INT_MAX && gen.eof())
-	break;
-      print_feature(fea);
+    if (start_frame < end_frame)
+    {
+      for (int f = start_frame; f <= end_frame; f++) {
+        const FeatureVec fea = gen.generate(f);
+        if (end_frame == INT_MAX && gen.eof())
+          break;
+        print_feature(fea);
+      }
+    }
+    else
+    {
+      for (int f = start_frame; f >= end_frame; f--) {
+        const FeatureVec fea = gen.generate(f);
+        print_feature(fea);
+      }
     }
 
     gen.close();

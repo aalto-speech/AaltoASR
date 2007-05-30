@@ -37,6 +37,13 @@ public:
       (*(const_cast<Vector*>(m_ptr)))(i) = vec[i];
   }
 
+  void set(const std::vector<float> &vec)
+  {
+    assert((int)vec.size() == m_dim);
+    for (int i = 0; i < m_dim; i++)
+      (*(const_cast<Vector*>(m_ptr)))(i) = vec[i];
+  }
+
   /** Fill std::vector with the feature values. */
   void get(std::vector<double> &vec) const
   {

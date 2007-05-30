@@ -266,6 +266,8 @@ private:
   std::vector<double> m_first_feature; //!< Feature returned for negative frames
   std::vector<double> m_last_feature; //!< Feature returned after EOF
   int m_last_feature_frame; //!< The frame of the feature returned after EOF
+
+  std::vector<float> m_temp_fea_buf; //!< Need a float buffer for reading
 };
 
 
