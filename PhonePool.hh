@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <stdio.h>
+#include "HmmSet.hh"
 #include "Distributions.hh"
 
 /** A class for tying the states of context dependent phones.
@@ -85,8 +86,8 @@ private:
     int num_applied_rule_sets(void) const { return (int)m_applied_rules.size(); }
     const std::vector<AppliedDecisionRule>& applied_rules(int set_index) const { return m_applied_rules[set_index]; }
 
-    void set_state_number(int state_number) { m_state_number = state_number; }
-    int state_number(void) const { return m_state_number; }
+    void set_state_index(int state_index) { m_state_index = state_index; }
+    int state_index(void) const { return m_state_index; }
     
   private:
     /** A collection of ordered vector of rules for this cluster.
@@ -105,8 +106,8 @@ private:
     /// Summed statistics of the context phones
     FullCovarianceGaussian m_sum_stats;
 
-    /// State number allocated for this cluster
-    int m_state_number;
+    /// State index allocated for this cluster
+    int m_state_index;
   };
 
 
@@ -154,6 +155,47 @@ private:
   };
   
   typedef std::map<std::string, Phone*> PhoneMap;
+
+  /** Baseclass for defining callback functions for iterating through
+   * all the context phones with their labels and state indices.
+   */
+  class ContextPhoneCallback {
+  public:
+    virtual ~ContextPhoneCallback() { }
+    virtual void add_label(std::string &label, int num_states) { }
+    virtual void add_state(int state_index) { }
+    virtual void allocate_state(int state_index, ContextPhoneCluster *state) {}
+  };
+
+  /** Callback class for saving the basebind file
+   */
+  class SaveToBasebind : public ContextPhoneCallback {
+  public:
+    SaveToBasebind(FILE *fp, int init_state_index) : m_fp(fp), m_initial_state_index(init_state_index) { m_state_counter = -1; }
+    virtual ~SaveToBasebind() { }
+    virtual void add_label(std::string &label, int num_states);
+    virtual void add_state(int state_index);
+  private:
+    FILE *m_fp;
+    int m_initial_state_index;
+    int m_state_counter;
+  };
+
+
+  /** Callback class for making filling the model to \ref HmmSet
+   */
+  class MakeHmmModel : public ContextPhoneCallback {
+  public:
+    MakeHmmModel(HmmSet &model) : m_model(model) { }
+    virtual ~MakeHmmModel() { }
+    virtual void add_label(std::string &label, int num_states);
+    virtual void add_state(int state_index);
+    virtual void allocate_state(int state_index, ContextPhoneCluster *state);
+  private:
+    HmmSet &m_model;
+    Hmm *m_cur_hmm;
+    int m_state_count;
+  };
 
 public:
 
@@ -230,22 +272,30 @@ public:
   /** Forms tied states of context phones by splitting the context phone
    * clusters according to the decision tree
    * \param max_context_index Maximum context index (left and right) to
-   *                          try in cluster splitting
+   *                          be tested in cluster splitting
    */
   void decision_tree_cluster_context_phones(int max_context_index);
 
   /** Merges the clusters created by \ref decision_tree_cluster_context_phones
    * if the loss in likelihood is less than the threshold set by
-   * \ref set_cluistering_parameters
+   * \ref set_clustering_parameters
    */
   void merge_context_phones(void);
 
-  /** Saves the result of context phone tying to a basebind file
-   * \param fp                Pointer to FILE object
-   * \param initial_statenum  First state index to be allocated
+  /** Saves the result of context phone tying to a HMM model.
+   * The model will have one full covariance Gaussian for each state
+   * \param base              Base filename for the model
    * \param max_context_index Maximum context index (left and right)
    */
-  void save_to_basebind(FILE *fp, int initial_statenum, int max_context_index);
+  void save_model(const std::string &base, int max_context_index);
+
+  /** Saves the result of context phone tying to a basebind file
+   * \param fp                  Pointer to FILE object
+   * \param initial_state_index First state index to be allocated
+   * \param max_context_index   Maximum context index (left and right)
+   */
+  void save_to_basebind(FILE *fp, int initial_state_index,
+                        int max_context_index);
 
   /// Internal function for adding the labels of different contexts
   inline void add_context(const std::string &context);
@@ -257,6 +307,8 @@ private:
   double compute_log_likelihood_gain(ContextPhoneCluster &parent,
                                      ContextPhoneCluster &child1,
                                      ContextPhoneCluster &child2);
+
+  void iterate_context_phones(ContextPhoneCallback &c, int max_context_index);
 
 private:
   double m_min_occupancy;

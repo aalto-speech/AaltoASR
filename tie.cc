@@ -79,7 +79,8 @@ main(int argc, char *argv[])
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for training")
       ('u', "rule=FILE", "arg must", "", "rule set for triphone state tying")
-      ('o', "out=FILE", "arg", "", "output filename for basebind")
+      ('o', "out=FILE", "arg", "", "write output to HMM model with base name FILE")
+      ('b', "basebind=FILE", "arg", "", "write output to basebind FILE")
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "count=INT", "arg", "100", "minimum feature count for state clusters")
       ('\0', "sgain=FLOAT", "arg", "0", "minimum loglikelihood gain in cluster splitting")
@@ -95,6 +96,9 @@ main(int argc, char *argv[])
 
     // Read recipe file
     recipe.read(io::Stream(config["recipe"].get_str()), 0, 0, false);
+
+    if (!(config["out"].specified^config["basebind"].specified))
+      throw std::string("Specify either --out or --basebind for output");
     
     phone_pool.set_clustering_parameters(config["count"].get_int(),
                                          config["sgain"].get_float(),
@@ -158,8 +162,11 @@ main(int argc, char *argv[])
     phone_pool.decision_tree_cluster_context_phones(max_contexts);
     if (config["mloss"].specified)
       phone_pool.merge_context_phones();
-    
-    save_basebind(config["out"].get_str(), &phone_pool);
+
+    if (config["out"].specified)
+      phone_pool.save_model(config["out"].get_str(), max_contexts);
+    else
+      save_basebind(config["basebind"].get_str(), &phone_pool);
   }
   catch (std::exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());

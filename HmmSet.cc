@@ -36,6 +36,7 @@ HmmSet::copy(const HmmSet &hmm_set)
   m_hmm_map = hmm_set.m_hmm_map;
   m_transitions = hmm_set.m_transitions;
   m_states = hmm_set.m_states;
+  // Note! Copies just the pointers, not the objects!
   m_emission_pdfs = hmm_set.m_emission_pdfs;
   m_hmms = hmm_set.m_hmms;
 }
@@ -47,7 +48,7 @@ HmmSet::reset()
   m_pool.reset();
 
   for (int i = 0; i < num_emission_pdfs(); i++)
-    m_emission_pdfs[i].reset();
+    m_emission_pdfs[i]->reset();
 
   for (int t = 0; t < num_transitions(); t++)
     m_transitions[t].prob = 0;
@@ -101,6 +102,16 @@ HmmSet::add_state(int pdf_index)
 }
 
 
+int
+HmmSet::add_mixture_pdf(Mixture *pdf)
+{
+  int index = (int)m_emission_pdfs.size();
+  m_emission_pdfs.push_back(pdf);
+  pdf->set_pool(&m_pool);
+  return index;
+}
+
+
 void
 HmmSet::read_mc(const std::string &filename)
 {
@@ -120,9 +131,9 @@ HmmSet::read_mc(const std::string &filename)
   m_valid_pdf_likelihoods.clear();
   
   for (int i = 0; i < pdfs; i++) {
-    Mixture &pdf = m_emission_pdfs[i];
-    pdf.set_pool(&m_pool);
-    pdf.read(in);
+    Mixture *pdf = new Mixture(&m_pool);
+    m_emission_pdfs[i] = pdf;
+    pdf->read(in);
     m_pdf_likelihoods[i] = -1;
   }
 }
@@ -310,7 +321,7 @@ HmmSet::write_mc(const std::string &filename)
   out << m_emission_pdfs.size() << std::endl;
   
   for (int i = 0; i < (int)m_states.size(); i++) {
-    m_emission_pdfs[i].write(out);
+    m_emission_pdfs[i]->write(out);
   }
 }
 
@@ -405,7 +416,7 @@ HmmSet::pdf_likelihood(const int p, const FeatureVec &feature)
   if (m_pdf_likelihoods[p] > 0)
     return m_pdf_likelihoods[p];
 
-  m_pdf_likelihoods[p] = m_emission_pdfs[p].compute_likelihood(feature);
+  m_pdf_likelihoods[p] = m_emission_pdfs[p]->compute_likelihood(feature);
   if (m_pdf_likelihoods[p] < MIN_STATE_PROB)
     m_pdf_likelihoods[p] = MIN_STATE_PROB;
   m_valid_pdf_likelihoods.push_back(p);
@@ -426,7 +437,7 @@ HmmSet::precompute_likelihoods(const FeatureVec &f)
   m_valid_pdf_likelihoods.clear();
   // Precompute state likelihoods
   for (int i = 0; i < num_emission_pdfs(); i++) {
-    m_pdf_likelihoods[i] = m_emission_pdfs[i].compute_likelihood(f);
+    m_pdf_likelihoods[i] = m_emission_pdfs[i]->compute_likelihood(f);
     if (m_pdf_likelihoods[i] < MIN_STATE_PROB)
       m_pdf_likelihoods[i] = MIN_STATE_PROB;
     m_valid_pdf_likelihoods.push_back(i);
@@ -445,14 +456,14 @@ HmmSet::start_accumulating()
   }
 
   for (int i = 0; i < num_emission_pdfs(); i++)
-    m_emission_pdfs[i].start_accumulating();
+    m_emission_pdfs[i]->start_accumulating();
 }
 
 
 void
 HmmSet::accumulate_distribution(const FeatureVec &f, int pdf, double gamma, int pos)
 {
-  m_emission_pdfs[pdf].accumulate(gamma, f, pos);
+  m_emission_pdfs[pdf]->accumulate(gamma, f, pos);
 }
 
 
@@ -515,16 +526,16 @@ HmmSet::dump_mc_statistics(const std::string filename) const
   mcs << num_emission_pdfs() << std::endl;
 
   for (int i = 0; i < num_emission_pdfs(); i++) {
-    if (m_emission_pdfs[i].accumulated(0)) {
+    if (m_emission_pdfs[i]->accumulated(0)) {
       mcs << i << " num ";
-      m_emission_pdfs[i].dump_statistics(mcs, 0);
+      m_emission_pdfs[i]->dump_statistics(mcs, 0);
       mcs << std::endl;
     }
 
-    if (m_emission_pdfs[i].estimation_mode() == PDF::MMI) {
-      if (m_emission_pdfs[i].accumulated(1)) {
+    if (m_emission_pdfs[i]->estimation_mode() == PDF::MMI) {
+      if (m_emission_pdfs[i]->accumulated(1)) {
 	mcs << i << " den ";
-	m_emission_pdfs[i].dump_statistics(mcs, 1);
+	m_emission_pdfs[i]->dump_statistics(mcs, 1);
 	mcs << std::endl;
       }
     }
@@ -636,7 +647,7 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
     throw str::fmt(128, "HmmSet::accumulate_mc_from_dump: the number of PDFs in: %s is wrong\n", filename.c_str());
 
   while(mcs >> pdf)
-    m_emission_pdfs[pdf].accumulate_from_dump(mcs);
+    m_emission_pdfs[pdf]->accumulate_from_dump(mcs);
   
   mcs.close();
 }
@@ -671,7 +682,7 @@ HmmSet::stop_accumulating()
 {
   // Stop accumulation for state distributions
   for (int i=0; i<num_emission_pdfs(); i++)
-    m_emission_pdfs[i].stop_accumulating();
+    m_emission_pdfs[i]->stop_accumulating();
  
   // Clear accumulator
   m_transition_accum.clear();
@@ -711,7 +722,7 @@ void
 HmmSet::estimate_parameters()
 {
   for (int s = 0; s < num_states(); s++)
-    m_emission_pdfs[state(s).emission_pdf].estimate_parameters();
+    m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
 }
 
 
@@ -913,7 +924,7 @@ HmmSet::set_estimation_mode(PDF::EstimationMode mode)
     m_pool.get_pdf(i)->set_estimation_mode(m_mode);
   
   for (int i=0; i<num_emission_pdfs(); i++)
-    m_emission_pdfs[i].set_estimation_mode(m_mode);
+    m_emission_pdfs[i]->set_estimation_mode(m_mode);
 }
   
 

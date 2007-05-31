@@ -696,20 +696,96 @@ PhonePool::compute_log_likelihood_gain(ContextPhoneCluster &parent,
 
 
 void
-PhonePool::save_to_basebind(FILE *fp, int initial_statenum,
+PhonePool::save_model(const std::string &base, int max_context_index)
+{
+  HmmSet model;
+  MakeHmmModel m(model);
+  iterate_context_phones(m, max_context_index);
+  model.write_all(base);
+}
+
+void
+PhonePool::MakeHmmModel::add_label(std::string &label, int num_states)
+{
+  m_cur_hmm = &m_model.add_hmm(label, num_states);
+  m_state_count = 0;
+}
+
+void
+PhonePool::MakeHmmModel::add_state(int state_index)
+{
+  m_cur_hmm->state(m_state_count) = state_index;
+}
+
+void
+PhonePool::MakeHmmModel::allocate_state(int state_index,
+                                        ContextPhoneCluster *state)
+{
+  // Add the pdf to the state
+  int index = m_model.add_state(state_index);
+  assert( index == state_index );
+
+  // Add transitions
+  m_model.add_transition(state_index, 0, 0.8);
+  m_model.add_transition(state_index, 1, 0.2);
+
+  // Add the pdf
+  FullCovarianceGaussian *g=new FullCovarianceGaussian(*(state->statistics()));
+  int pool_index = m_model.add_pool_pdf(g);
+
+  // Add the mixture
+  Mixture *m = new Mixture();
+  int mindex = m_model.add_mixture_pdf(m);
+  assert( mindex == state_index );
+  m->add_component(pool_index, 1);
+}
+
+
+void
+PhonePool::save_to_basebind(FILE *fp, int initial_state_index,
                             int max_context_index)
 {
-  int state_num = initial_statenum;
-    
+  SaveToBasebind s(fp, initial_state_index);
+  iterate_context_phones(s, max_context_index);
+}
+
+
+void
+PhonePool::SaveToBasebind::add_label(std::string &label, int num_states)
+{
+  fprintf(m_fp, "%s %d", label.c_str(), num_states);
+  m_state_counter = num_states;
+}
+
+void
+PhonePool::SaveToBasebind::add_state(int state_index)
+{
+  assert( m_state_counter > 0 );
+  fprintf(m_fp, " %d", m_initial_state_index + state_index);
+  if (--m_state_counter == 0)
+    fprintf(m_fp, "\n");
+}
+
+
+void
+PhonePool::iterate_context_phones(ContextPhoneCallback &c,
+                                  int max_context_index)
+{
+  int state_index = 0;
+  
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
-    // Allocate state numbers
+    // Allocate state indices
     for (int s = 0; s < (*it).second->num_states(); s++)
     {
       const std::vector<ContextPhoneCluster*> &clusters =
         (*it).second->get_state_clusters(s);
       for (int i = 0; i < (int)clusters.size(); i++)
-        clusters[i]->set_state_number(state_num++);
+      {
+        clusters[i]->set_state_index(state_index);
+        c.allocate_state(state_index, clusters[i]);
+        state_index++;
+      }
     }
 
     if ((*it).second->label()[0] != '_')
@@ -733,7 +809,7 @@ PhonePool::save_to_basebind(FILE *fp, int initial_statenum,
           for (int i = max_context_index; i < 2*max_context_index; i++)
             label += std::string("+") + *(context_it[i]);
 
-          fprintf(fp, "%s %d", label.c_str(), (*it).second->num_states());
+          c.add_label(label, (*it).second->num_states());
         
           // Construct a ContextPhone object for rule testing
           ContextPhone cur_phone(label, this, false);
@@ -773,9 +849,8 @@ PhonePool::save_to_basebind(FILE *fp, int initial_statenum,
             }
           cluster_index_found:
             assert( cluster_index >= 0 );
-            fprintf(fp, " %d", clusters[cluster_index]->state_number());
+            c.add_state(clusters[cluster_index]->state_index());
           }
-          fprintf(fp, "\n");
         
           // Update the iterators
           for (int i = max_context_index*2-1;
@@ -789,15 +864,13 @@ PhonePool::save_to_basebind(FILE *fp, int initial_statenum,
     }
     else
     {
-      fprintf(fp, "%s %d", (*it).second->label().c_str(),
-              (*it).second->num_states());
+      c.add_label((*it).second->label(), (*it).second->num_states());
       for (int s = 0; s < (*it).second->num_states(); s++)
       {
         const std::vector<ContextPhoneCluster*> &clusters =
-          (*it).second->get_state_clusters(s);    
-        fprintf(fp, " %d", clusters[0]->state_number());
+          (*it).second->get_state_clusters(s);
+        c.add_state(clusters[0]->state_index());
       }
-      fprintf(fp, "\n");
     }
   }
 }

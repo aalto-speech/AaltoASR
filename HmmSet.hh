@@ -192,6 +192,18 @@ public:
    */
   inline HmmTransition &transition(int t);
 
+  /** Adds a pdf to the pool
+   * \param pdf Pointer to PDF object
+   * \return Index of the pdf in the pool
+   */
+  int add_pool_pdf(PDF *pdf) { return m_pool.add_pdf(pdf); }
+
+  /** Adds a mixture pdf to the model
+   * \param pdf Pointer to Mixture object
+   * \return Index of the mixture pdf in the model
+   */
+  int add_mixture_pdf(Mixture *pdf);
+
   /** Reads the mixture base functions from a file. 
    *  Just a redirection to \ref PDFPool::read_gk()
    * \param filename the .gk file to be read
@@ -431,7 +443,7 @@ private:
   std::vector<HmmState> m_states;
 
   /// Container for the emission PDFs
-  std::vector<Mixture> m_emission_pdfs;
+  std::vector<Mixture*> m_emission_pdfs;
   
   /// Buffer of PDF likelihoods for the current feature
   std::vector<double> m_pdf_likelihoods;

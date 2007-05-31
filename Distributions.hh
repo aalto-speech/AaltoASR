@@ -73,24 +73,29 @@ public:
   PDFPool();
   PDFPool(int dim);
   ~PDFPool();
-  /* The dimensionality of the distributions in this pool */
+  /// The dimensionality of the distributions in this pool
   int dim() const { return m_dim; }
-  /* The dimensionality of the distributions in this pool */
+  /// The dimensionality of the distributions in this pool
   int size() const { return m_pool.size(); };
-  /* Reset everything */
+  /// Reset everything
   void reset();
   
-  /* Get the pdf from the position index */
+  /// Get the pdf from the position index
   PDF* get_pdf(int index) const;
-  /* Set the pdf in the position index */
+  /// Set the pdf in the position index
   void set_pdf(int index, PDF *pdf);
+
+  /** Add a new pdf to the pool.
+   * \return Index of the pdf in the pool
+   */
+  int add_pdf(PDF *pdf);
   
-  /* Read the distributions from a .gk -file */
+  /// Read the distributions from a .gk -file
   void read_gk(const std::string &filename);
-  /* Write the distributions to a .gk -file */
+  /// Write the distributions to a .gk -file
   void write_gk(const std::string &filename) const;
   
-  /* Reset the cache */
+  /// Reset the cache
   void reset_cache();
 
   /** Compute the likelihood of a feature for pdf in the pool. Uses cache.

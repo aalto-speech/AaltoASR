@@ -1418,6 +1418,15 @@ PDFPool::set_pdf(int pdfindex, PDF *pdf)
 }
 
 
+int
+PDFPool::add_pdf(PDF *pdf)
+{
+  int index = (int)m_pool.size();
+  m_pool.push_back(pdf);
+  return index;
+}
+
+
 void
 PDFPool::reset_cache()
 {
