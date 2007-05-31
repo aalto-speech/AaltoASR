@@ -338,13 +338,17 @@ public:
    */
   void estimate_parameters();
 
-  /** Estimates/updates the MLLT transform
+  /** Estimates/updates the MLLT transform and Gaussian parameters
    * according to the current accumulators
    * \param fea_gen FeatureGenerator with the current MLLT transform
    * \param mllt_name Name of the MLLT module in feature configuration
    */
   void estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name);
 
+  /** Sets transition parameters according to the current accumulators.
+   */
+  void estimate_transition_parameters();
+  
   /** Sets the current estimation mode for this model
    * \param mode PDF::EstimationMode (ML/MMI)
    */

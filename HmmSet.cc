@@ -680,7 +680,7 @@ HmmSet::stop_accumulating()
 
 
 void
-HmmSet::estimate_parameters()
+HmmSet::estimate_transition_parameters()
 {
   float sum;
   
@@ -703,9 +703,15 @@ HmmSet::estimate_parameters()
       }
     }
     m_transitions = m_transition_accum;
-    
-    m_emission_pdfs[state(s).emission_pdf].estimate_parameters();
   }
+}
+
+
+void
+HmmSet::estimate_parameters()
+{
+  for (int s = 0; s < num_states(); s++)
+    m_emission_pdfs[state(s).emission_pdf].estimate_parameters();
 }
 
 

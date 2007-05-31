@@ -108,6 +108,9 @@ main(int argc, char *argv[])
     model.set_covsmooth(config["covsmooth"].get_double());
     model.set_mmi_c1_constant(config["C1"].get_double());
     model.set_mmi_c2_constant(config["C2"].get_double());
+
+    if (transtat)
+      model.estimate_transition_parameters();
     if (config["mllt"].specified)
       model.estimate_mllt(fea_gen, config["mllt"].get_str());
     else
