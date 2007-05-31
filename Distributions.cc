@@ -32,7 +32,7 @@ FullStatisticsAccumulator::dump_statistics(std::ostream &os) const
     for (int i=0; i<dim(); i++)
       os << m_mean(i) << " ";
     for (int i=0; i<dim(); i++)
-      for (int j=0; i<dim(); i++)
+      for (int j=0; j<dim(); j++)
         if (!(i==dim()-1 && j==dim()-1))
           os << m_second_moment(i,j) << " ";
     os << m_second_moment(dim()-1,dim()-1);
