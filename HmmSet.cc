@@ -702,7 +702,8 @@ HmmSet::estimate_parameters()
 	  m_transition_accum[state_transitions[t]].prob = .001;
       }
     }
-
+    m_transitions = m_transition_accum;
+    
     m_emission_pdfs[state(s).emission_pdf].estimate_parameters();
   }
 }
