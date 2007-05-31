@@ -1,4 +1,3 @@
-
 #include <cassert>
 
 #include "Distributions.hh"
@@ -10,6 +9,158 @@
 #include "blas3pp.h"
 
 
+void
+GaussianAccumulator::get_accumulated_mean(Vector &mean) const
+{
+  mean.copy(m_mean);
+}
+
+
+void
+GaussianAccumulator::get_mean_estimate(Vector &mean) const
+{
+  mean.copy(m_mean);
+  Blas_Scale(1/m_gamma, mean);
+}
+
+
+void 
+FullStatisticsAccumulator::dump_statistics(std::ostream &os) const
+{
+  if (accumulated()) {
+    os << m_feacount << " " << m_gamma << " ";
+    for (int i=0; i<dim(); i++)
+      os << m_mean(i) << " ";
+    for (int i=0; i<dim(); i++)
+      for (int j=0; i<dim(); i++)
+        if (!(i==dim()-1 && j==dim()-1))
+          os << m_second_moment(i,j) << " ";
+    os << m_second_moment(dim()-1,dim()-1);
+  }
+}
+
+  
+void 
+FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
+{
+  int feacount;
+  double gamma;
+  Vector mean(dim());
+  Matrix second_moment(dim(), dim());
+
+  is >> feacount >> gamma;
+  for (int i=0; i<dim(); i++)
+    is >> mean(i);
+  for (int i=0; i<dim(); i++)
+    for (int j=0; j<dim(); j++)
+      is >> second_moment(i,j);
+  
+  m_feacount += feacount;
+  m_gamma += gamma;
+  m_accumulated = true;
+  Blas_Add_Mult(m_mean, 1, mean);
+  Blas_Add_Mat_Mult(m_second_moment, 1, second_moment);
+}
+
+
+void
+FullStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_moment) const
+{
+  second_moment.copy(m_second_moment);
+}
+
+
+void
+FullStatisticsAccumulator::get_covariance_estimate(Matrix &covariance_estimate) const
+{
+  covariance_estimate.copy(m_second_moment);
+  Blas_Scale(1/m_gamma, covariance_estimate);
+  Blas_R1_Update(covariance_estimate, m_mean, m_mean, -1/m_gamma);
+}
+
+
+void
+FullStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &feature)
+{
+  m_feacount += feacount;
+  m_gamma += gamma;
+  m_accumulated = true;
+  Blas_Add_Mult(m_mean, gamma, feature);
+  Blas_R1_Update(m_second_moment, feature, feature, gamma);
+}
+
+
+void 
+DiagonalStatisticsAccumulator::dump_statistics(std::ostream &os) const
+{
+  if (accumulated()) {
+    os << m_feacount << " " << m_gamma << " ";
+    for (int i=0; i<dim(); i++)
+      os << m_mean(i) << " ";
+    for (int i=0; i<dim()-1; i++)
+      os << m_second_moment(i) << " ";
+    os << m_second_moment(dim()-1);
+  }
+}
+
+  
+void 
+DiagonalStatisticsAccumulator::accumulate_from_dump(std::istream &is)
+{
+  int feacount;
+  double gamma;
+  Vector mean(dim());
+  Vector second_moment(dim());
+
+  is >> feacount >> gamma;
+  for (int i=0; i<dim(); i++)
+    is >> mean(i);
+  for (int i=0; i<dim(); i++)
+    is >> second_moment(i);
+
+  m_feacount += feacount;
+  m_gamma += gamma;
+  m_accumulated = true;
+  Blas_Add_Mult(m_mean, 1, mean);
+  Blas_Add_Mult(m_second_moment, 1, second_moment);
+}
+
+
+void
+DiagonalStatisticsAccumulator::get_covariance_estimate(Matrix &covariance_estimate) const
+{
+  Vector mean_estimate;
+  get_mean_estimate(mean_estimate);
+  covariance_estimate.resize(dim(), dim());
+  covariance_estimate=0;
+  for (int i=0; i<dim(); i++) {
+    covariance_estimate(i,i) = m_second_moment(i) / m_gamma;
+    covariance_estimate(i,i) -= mean_estimate(i)*mean_estimate(i);
+  }
+}
+
+
+void
+DiagonalStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_moment) const
+{
+  second_moment.resize(dim(), dim());
+  second_moment=0;
+  for (int i=0; i<dim(); i++)
+    second_moment(i,i) = m_second_moment(i);
+}
+
+
+void
+DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &feature)
+{
+  m_feacount += feacount;
+  m_gamma += gamma;
+  m_accumulated = true;
+  Blas_Add_Mult(m_mean, gamma, feature);
+  for (int i=0; i<dim(); i++)
+    m_second_moment(i) += gamma * feature(i) * feature(i);
+}
+
 
 int
 PDF::accumulator_position(std::string stats_type)
@@ -19,6 +170,186 @@ PDF::accumulator_position(std::string stats_type)
   else if (stats_type == "den")
     return 1;
   else return -1;
+}
+
+
+void
+Gaussian::accumulate(double gamma,
+                     const FeatureVec &f,
+                     int accum_pos)
+{
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);
+  
+  m_accums[accum_pos]->accumulate(1, gamma, *(f.get_vector()));
+}
+
+
+void 
+Gaussian::dump_statistics(std::ostream &os,
+                          int accum_pos) const
+{
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);  
+
+  m_accums[accum_pos]->dump_statistics(os);
+}
+  
+void 
+Gaussian::accumulate_from_dump(std::istream &is)
+{
+  std::string type;
+  is >> type;
+  int accum_pos = accumulator_position(type);
+
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);
+
+  m_accums[accum_pos]->accumulate_from_dump(is);
+}
+
+
+void
+Gaussian::stop_accumulating()
+{
+  if (m_accums.size() > 0)
+    for (unsigned int i=0; i<m_accums.size(); i++)
+      if (m_accums[i] != NULL)
+	delete m_accums[i];
+  m_accums.resize(0);
+}
+
+
+bool
+Gaussian::accumulated(int accum_pos) const
+{
+  if ((int)m_accums.size() <= accum_pos)
+    return false;
+  if (m_accums[accum_pos] == NULL)
+    return false;
+  return m_accums[accum_pos]->accumulated();
+}
+
+
+void
+Gaussian::estimate_parameters()
+{
+  assert(accumulated(0));
+
+  Vector old_mean;
+  Matrix old_covariance;
+  get_mean(old_mean);
+  get_covariance(old_covariance);
+  
+  Vector new_mean;
+  Matrix new_covariance;
+  
+  if (m_mode == ML) {
+    m_accums[0]->get_mean_estimate(new_mean);
+    m_accums[0]->get_covariance_estimate(new_covariance);
+  }
+  else if (m_mode == MMI) {
+
+    assert( accumulated(1) );
+
+    // c & mu~ & sigma~
+    double c = m_accums[0]->gamma() - m_accums[1]->gamma();
+    LaVectorDouble mu_tilde;
+    LaVectorDouble temp_denominator_mu;
+    m_accums[0]->get_accumulated_mean(mu_tilde);
+    m_accums[1]->get_accumulated_mean(temp_denominator_mu);
+    Blas_Add_Mult(mu_tilde, -1, temp_denominator_mu);
+
+    LaGenMatDouble sigma_tilde;
+    LaGenMatDouble temp_denominator_sigma;
+    m_accums[0]->get_accumulated_second_moment(sigma_tilde);
+    m_accums[1]->get_accumulated_second_moment(temp_denominator_sigma);
+    Blas_Add_Mat_Mult(sigma_tilde, -1, temp_denominator_sigma);
+    
+    // a0
+    LaGenMatDouble a0(sigma_tilde);
+    Blas_Scale(c, a0);
+    Blas_R1_Update(a0, mu_tilde, mu_tilde, -1);
+    
+    // a1
+    LaGenMatDouble a1(old_covariance);
+    Blas_R1_Update(a1, old_mean, old_mean, 1);
+    Blas_Scale(c, a1);
+    Blas_R1_Update(a1, old_mean, mu_tilde, -1);
+    Blas_R1_Update(a1, mu_tilde, old_mean, -1);
+    Blas_Add_Mat_Mult(a1, 1, sigma_tilde);
+    
+    // a2
+    LaGenMatDouble a2(old_covariance);
+
+    // Solve the quadratic eigenvalue problem
+    // A_0 + D A_1 + D^2 A_2
+    // by linearizing to a generalized eigenvalue problem
+    // See: www.cs.utk.edu/~dongarra/etemplates/node333.html
+    // Note: complex eigenvalues, we want only the max real eigenvalue!
+    LaGenMatDouble A=LaGenMatDouble::zeros(2*dim());
+    LaGenMatDouble B=LaGenMatDouble::zeros(2*dim());
+    LaGenMatDouble identity=LaGenMatDouble::zeros(dim());
+
+    A(LaIndex(dim(),2*dim()-1),LaIndex(0,dim()-1)).inject(a0);
+    A(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a1);
+    Blas_Scale(-1,A);
+    A(LaIndex(0,dim()-1),LaIndex(dim(),2*dim()-1)).inject(identity);
+
+    B(LaIndex(0,dim()-1),LaIndex(0,dim()-1)).inject(identity);
+    B(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a2);
+    
+    LaVectorComplex eigvals;
+    LaGenMatComplex eigvecs;
+    LinearAlgebra::generalized_eigenvalues(A,B,eigvals,eigvecs);
+
+    double d=0;
+    for (int i=0; i<eigvals.size(); i++)
+      if (eigvals(i).i < 0.000000001)
+        d=std::max(d, eigvals(i).r);
+    
+    assert(d>0);
+    assert(m_c2_constant>1);
+    d=std::max(m_c1_constant*m_accums[1]->gamma(), m_c2_constant*d);
+    
+    // COMPUTE NEW MEAN
+    // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
+    new_mean.copy(old_mean);
+    Blas_Scale(d, new_mean);
+    Blas_Add_Mult(new_mean, 1, mu_tilde);
+    Blas_Scale(1/(c+d), new_mean);
+
+    // COMPUTE NEW COVARIANCE
+    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
+    new_covariance.copy(old_covariance);
+    Blas_R1_Update(new_covariance, old_mean, old_mean, 1);
+    Blas_Scale(d, new_covariance);
+    Blas_Add_Mat_Mult(new_covariance, 1, sigma_tilde);
+    Blas_Scale(1/(c+d), new_covariance);
+    Blas_R1_Update(new_covariance, new_mean, new_mean, -1);
+  }
+  else
+    assert( 0 );
+
+  // Check that covariances are valid
+  for (int i=0; i<dim(); i++)
+    if (new_covariance(i,i) <= 0)
+      fprintf(stderr, "Warning: Variance in dimension %i is %g (gamma %g)\n",
+              i, new_covariance(i,i), m_accums[0]->gamma());
+  
+  // Common tweaking
+  for (int i=0; i<dim(); i++)
+    if (new_covariance(i,i) < m_minvar)
+      new_covariance(i,i) = m_minvar;
+  
+  for (int i=0; i<dim(); i++)
+    for (int j=0; j<dim(); j++)
+      if (i != j)
+        new_covariance(i,j) *= m_accums[0]->feacount()/(m_accums[0]->feacount()+m_covsmooth);
+
+  // Set the parameters
+  set_mean(new_mean);
+  set_covariance(new_covariance);
 }
 
 
@@ -249,184 +580,6 @@ DiagonalGaussian::start_accumulating()
 
 
 void
-DiagonalGaussian::accumulate(double gamma,
-			     const FeatureVec &f,
-			     int accum_pos)
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  m_accums[accum_pos]->accumulated = true;
-  m_accums[accum_pos]->feacount++;
-  m_accums[accum_pos]->gamma += gamma;
-  
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
-  for (int d=0; d<dim(); d++)
-    m_accums[accum_pos]->cov(d) += gamma*f[d]*f[d];
-}
-
-
-void 
-DiagonalGaussian::dump_statistics(std::ostream &os,
-				  int accum_pos) const
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);  
-
-  if (m_accums[accum_pos]->accumulated) {
-    os << m_accums[accum_pos]->gamma << " ";
-    for (int i=0; i<dim(); i++)
-      os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim()-1; i++)
-      os << m_accums[accum_pos]->cov(i) << " ";
-    os << m_accums[accum_pos]->cov(dim()-1);
-  }
-}
-
-  
-void 
-DiagonalGaussian::accumulate_from_dump(std::istream &is)
-{
-  std::string type;
-  is >> type;
-  int accum_pos = accumulator_position(type);
-
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  double gamma;
-  Vector mean(dim());
-  Vector cov(dim());
-
-  is >> gamma;
-  for (int i=0; i<dim(); i++)
-    is >> mean(i);
-  for (int i=0; i<dim(); i++)
-    is >> cov(i);
-
-  m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
-  Blas_Add_Mult(m_accums[accum_pos]->cov, 1, cov);
-
-  m_accums[accum_pos]->accumulated = true;
-}
-
-
-void
-DiagonalGaussian::stop_accumulating()
-{
-  if (m_accums.size() > 0)
-    for (unsigned int i=0; i<m_accums.size(); i++)
-      if (m_accums[i] != NULL)
-	delete m_accums[i];
-  m_accums.resize(0);
-}
-
-
-bool
-DiagonalGaussian::accumulated(int accum_pos) const
-{
-  if ((int)m_accums.size() <= accum_pos)
-    return false;
-  if (m_accums[accum_pos] == NULL)
-    return false;
-  return m_accums[accum_pos]->accumulated;
-}
-
-
-void
-DiagonalGaussian::estimate_parameters()
-{
-  assert(accumulated(0));
-  
-  if (m_mode == ML || !accumulated(1)) {
-    m_mean.copy(m_accums[0]->mean);
-    m_covariance.copy(m_accums[0]->cov);
-    Blas_Scale(1/m_accums[0]->gamma, m_mean);
-    Blas_Scale(1/m_accums[0]->gamma, m_covariance);
-    for (int i=0; i<dim(); i++) {
-      m_covariance(i) -= m_mean(i)*m_mean(i);
-      if (m_covariance(i) <= 0) {
-        fprintf(stderr, "Warning: Variance in dimension %i is %g (gamma %g)\n",
-                i, m_covariance(i), m_accums[0]->gamma);
-        //assert(m_covariance(i) > 0);
-      }
-    }
-  }
-  
-  if (m_mode == MMI) {
-
-    // c & mu~ & sigma~
-    double c = m_accums[0]->gamma - m_accums[1]->gamma;
-    LaVectorDouble mu_tilde(m_accums[0]->mean);
-    Blas_Add_Mult(mu_tilde, -1, m_accums[1]->mean);
-    LaVectorDouble sigma_tilde(m_accums[0]->cov);
-    Blas_Add_Mult(sigma_tilde, -1, m_accums[1]->cov);
-
-    // a0
-    LaVectorDouble a0(sigma_tilde);
-    Blas_Scale(c, a0);
-    for (int i=0; i<dim(); i++)
-      a0(i) -= mu_tilde(i)*mu_tilde(i);
-
-    // a1
-    LaVectorDouble a1(m_covariance);
-    for (int i=0; i<dim(); i++)
-      a1(i) += m_mean(i)*m_mean(i);
-    Blas_Scale(c, a1);
-    for (int i=0; i<dim(); i++)
-      a1(i) -= 2*m_mean(i)*mu_tilde(i);
-    Blas_Add_Mult(a1, 1, sigma_tilde);
-
-    // a2
-    LaVectorDouble a2(m_covariance);
-
-    // solve dim quadratic equations to find the most limiting value for D
-    double d=0;
-    double sol;
-    for (int i=0; i<dim(); i++) {
-      sol=(-a1(i)+sqrt(a1(i)*a1(i)-4*a2(i)*a0(i)))/(2*a2(i));
-      d=std::max(d, sol);
-    }
-    assert(m_c2_constant>1);
-    d=std::max(m_c1_constant*m_accums[1]->gamma, m_c2_constant*d);
-    
-    // UPDATE MEAN
-    LaVectorDouble old_mean(m_mean);
-    // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
-    Blas_Scale(d, m_mean);
-    Blas_Add_Mult(m_mean, 1, mu_tilde);
-    Blas_Scale(1/(c+d), m_mean);
-
-    // UPDATE COVARIANCE
-    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
-    LaVectorDouble old_covariance(m_covariance);
-    for (int i=0; i<dim(); i++)
-      m_covariance(i) += old_mean(i)*old_mean(i);
-    Blas_Scale(d, m_covariance);
-    Blas_Add_Mult(m_covariance, 1, sigma_tilde);
-    Blas_Scale(1/(c+d), m_covariance);
-    for (int i=0; i<dim(); i++) {
-      m_covariance(i) -= m_mean(i)*m_mean(i);
-      assert(m_covariance(i) > 0);
-    }
-  }
-
-  // Common
-  for (int i=0; i<dim(); i++)
-    if (m_covariance(i) < m_minvar)
-      m_covariance(i) = m_minvar;
-  
-  m_constant=1;
-  for (int i=0; i<dim(); i++) {
-    m_precision(i) = 1/m_covariance(i);
-    m_constant *= m_precision(i);
-  }
-  m_constant = log(sqrt(m_constant));
-}
-
-
-void
 DiagonalGaussian::get_mean(Vector &mean) const
 {
   mean.copy(m_mean);
@@ -459,6 +612,7 @@ DiagonalGaussian::set_covariance(const Matrix &covariance)
 
   m_constant=1;
   for (int i=0; i<dim(); i++) {
+    assert(covariance(i,i)>0);
     m_covariance(i) = std::max(covariance(i,i), m_minvar);
     m_precision(i) = 1/m_covariance(i);
     m_constant *= m_precision(i);
@@ -482,6 +636,7 @@ DiagonalGaussian::set_covariance(const Vector &covariance)
 
   m_constant=1;
   for (int i=0; i<dim(); i++) {
+    assert(covariance(i)>0);
     m_covariance(i) = std::max(covariance(i), m_minvar);
     m_precision(i) = 1/m_covariance(i);
     m_constant *= m_precision(i);
@@ -597,198 +752,6 @@ FullCovarianceGaussian::start_accumulating()
 
 
 void
-FullCovarianceGaussian::accumulate(double gamma,
-				   const FeatureVec &f,
-				   int accum_pos)
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  m_accums[accum_pos]->accumulated = true;  
-  m_accums[accum_pos]->feacount++;
-  m_accums[accum_pos]->gamma += gamma;
-
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
-  Blas_R1_Update(m_accums[accum_pos]->cov, *(f.get_vector()), *(f.get_vector()), gamma);
-}
-
-
-bool
-FullCovarianceGaussian::accumulated(int accum_pos) const
-{
-  if ((int)m_accums.size() <= accum_pos)
-    return false;
-  if (m_accums[accum_pos] == NULL)
-    return false;
-  return m_accums[accum_pos]->accumulated;
-}
-
-
-void 
-FullCovarianceGaussian::dump_statistics(std::ostream &os,
-                                        int accum_pos) const
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);  
-
-  if (m_accums[accum_pos]->accumulated) {
-    os << m_accums[accum_pos]->gamma << " ";
-    for (int i=0; i<dim(); i++)
-      os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim(); i++)
-      for (int j=0; j<dim(); j++)
-        if (!(i==dim()-1 && j==dim()-1))
-          os << m_accums[accum_pos]->cov(i,j) << " ";
-    os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
-  }
-}
-
-  
-void 
-FullCovarianceGaussian::accumulate_from_dump(std::istream &is)
-{
-  std::string type;
-  is >> type;
-  int accum_pos = accumulator_position(type);
-
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  double gamma;
-  Vector mean(dim());
-  Matrix cov(dim(), dim());
-
-  is >> gamma;
-  for (int i=0; i<dim(); i++)
-    is >> mean(i);
-  for (int i=0; i<dim(); i++)
-    for (int j=0; j<dim(); j++)
-      is >> cov(i,j);
-
-  m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
-  Blas_Add_Mat_Mult(m_accums[accum_pos]->cov, 1, cov);
-  
-  m_accums[accum_pos]->accumulated = true;
-}
-
-
-void
-FullCovarianceGaussian::stop_accumulating()
-{
-  if (m_accums.size() > 0)
-    for (unsigned int i=0; i<m_accums.size(); i++)
-      if (m_accums[i] != NULL)
-	delete m_accums[i];
-  m_accums.resize(0);
-}
-
-
-void
-FullCovarianceGaussian::estimate_parameters()
-{
-  assert(accumulated(0));
-
-  if (m_mode == ML) {
-    m_mean.copy(m_accums[0]->mean);
-    m_covariance.copy(m_accums[0]->cov);
-    Blas_Scale(1/m_accums[0]->gamma, m_mean);
-    Blas_Scale(1/m_accums[0]->gamma, m_covariance);
-  }
-  else if (m_mode == MMI) {
-
-    assert( accumulated(1) );
-
-    // c & mu~ & sigma~
-    double c = m_accums[0]->gamma - m_accums[1]->gamma;
-    LaVectorDouble mu_tilde(m_accums[0]->mean);
-    Blas_Add_Mult(mu_tilde, -1, m_accums[1]->mean);
-    LaGenMatDouble sigma_tilde = m_accums[0]->cov - m_accums[1]->cov;
-    
-    // a0
-    LaGenMatDouble a0(sigma_tilde);
-    Blas_Scale(c, a0);
-    Blas_R1_Update(a0, mu_tilde, mu_tilde, -1);
-    
-    // a1
-    LaGenMatDouble a1(m_covariance);
-    Blas_R1_Update(a1, m_mean, m_mean, 1);
-    Blas_Scale(c, a1);
-    Blas_R1_Update(a1, m_mean, mu_tilde, -1);
-    Blas_R1_Update(a1, mu_tilde, m_mean, -1);
-    a1 = a1 + sigma_tilde;
-    
-    // a2
-    LaGenMatDouble a2(m_covariance);
-
-    // Solve the quadratic eigenvalue problem
-    // A_0 + D A_1 + D^2 A_2
-    // by linearizing to a generalized eigenvalue problem
-    // See: www.cs.utk.edu/~dongarra/etemplates/node333.html
-    // Note: complex eigenvalues, we want only the max real eigenvalue!
-    LaGenMatDouble A=LaGenMatDouble::zeros(2*dim());
-    LaGenMatDouble B=LaGenMatDouble::zeros(2*dim());
-    LaGenMatDouble identity=LaGenMatDouble::zeros(dim());
-
-    A(LaIndex(dim(),2*dim()-1),LaIndex(0,dim()-1)).inject(a0);
-    A(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a1);
-    Blas_Scale(-1,A);
-    A(LaIndex(0,dim()-1),LaIndex(dim(),2*dim()-1)).inject(identity);
-
-    B(LaIndex(0,dim()-1),LaIndex(0,dim()-1)).inject(identity);
-    B(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a2);
-    
-    LaVectorComplex eigvals;
-    LaGenMatComplex eigvecs;
-    LinearAlgebra::generalized_eigenvalues(A,B,eigvals,eigvecs);
-
-    double d=0;
-    for (int i=0; i<eigvals.size(); i++)
-      if (eigvals(i).i < 0.000000001)
-        d=std::max(d, eigvals(i).r);
-    
-    assert(d>0);
-    assert(m_c2_constant>1);
-    d=std::max(m_c1_constant*m_accums[1]->gamma, m_c2_constant*d);
-    
-    // UPDATE MEAN
-    LaVectorDouble old_mean(m_mean);
-    // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
-    Blas_Scale(d, m_mean);
-    Blas_Add_Mult(m_mean, 1, mu_tilde);
-    Blas_Scale(1/(c+d), m_mean);
-
-    // UPDATE COVARIANCE
-    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
-    Blas_R1_Update(m_covariance, old_mean, old_mean, 1);
-    Blas_Scale(d, m_covariance);
-    m_covariance = m_covariance + sigma_tilde;
-    Blas_Scale(1/(c+d), m_covariance);
-    Blas_R1_Update(m_covariance, m_mean, m_mean, -1);
-    
-  }
-  else
-    assert( 0 );
-
-  // Common
-  for (int i=0; i<dim(); i++)
-    if (m_covariance(i,i) < m_minvar)
-      m_covariance(i,i) = m_minvar;
-
-  /* FIXME! Do we need this?
-  for (int i=0; i<dim(); i++)
-    for (int j=0; j<dim(); j++)
-      if (i != j)
-        m_covariance(i,j) *= m_accums[0]->feacount/(m_accums[0]->feacount+m_covsmooth);
-  */
-  
-  LinearAlgebra::inverse(m_covariance, m_precision);
-  m_constant = LinearAlgebra::determinant(m_precision);
-  m_constant = log(sqrt(m_constant));
-}
-
-
-void
 FullCovarianceGaussian::get_mean(Vector &mean) const
 {
   mean.copy(m_mean);
@@ -815,7 +778,8 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance)
 {
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
-
+  assert(LinearAlgebra::is_spd(covariance));
+  
   m_covariance.copy(covariance);
   for (int i=0; i<dim(); i++)
     m_covariance(i,i) = std::max(m_minvar, m_covariance(i,i));
@@ -923,182 +887,6 @@ MlltGaussian::start_accumulating()
     m_accums[0] = new FullStatisticsAccumulator(dim());
     m_accums[1] = new FullStatisticsAccumulator(dim());
   }
-}
-
-
-void
-MlltGaussian::accumulate(double gamma,
-                         const FeatureVec &f,
-                         int accum_pos)
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  m_accums[accum_pos]->accumulated = true;  
-  m_accums[accum_pos]->feacount++;
-  m_accums[accum_pos]->gamma += gamma;
-
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
-  Blas_R1_Update(m_accums[accum_pos]->cov, *(f.get_vector()), *(f.get_vector()), gamma);
-}
-
-
-void 
-MlltGaussian::dump_statistics(std::ostream &os,
-                              int accum_pos) const
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);  
-  
-  if (m_accums[accum_pos]->accumulated) {
-    os << m_accums[accum_pos]->gamma << " ";
-    for (int i=0; i<dim(); i++)
-      os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim(); i++)
-      for (int j=0; j<dim(); j++)
-        if (!(i==dim()-1 && j==dim()-1))
-          os << m_accums[accum_pos]->cov(i,j) << " ";
-    os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
-  }
-}
-
-  
-void 
-MlltGaussian::accumulate_from_dump(std::istream &is)
-{
-  std::string type;
-  is >> type;
-  int accum_pos = accumulator_position(type);
-
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  double gamma;
-  Vector mean(dim());
-  Matrix cov(dim(), dim());
-
-  is >> gamma;
-  for (int i=0; i<dim(); i++)
-    is >> mean(i);
-  for (int i=0; i<dim(); i++)
-    for (int j=0; j<dim(); j++)
-      is >> cov(i,j);
-
-  m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
-  Blas_Add_Mat_Mult(m_accums[accum_pos]->cov, 1, cov);
-  
-  m_accums[accum_pos]->accumulated = true;  
-}
-
-
-void
-MlltGaussian::stop_accumulating()
-{
-  if (m_accums.size() > 0)
-    for (unsigned int i=0; i<m_accums.size(); i++)
-      if (m_accums[i] != NULL)
-	delete m_accums[i];
-  m_accums.resize(0);
-}
-
-
-bool
-MlltGaussian::accumulated(int accum_pos) const
-{
-  if ((int)m_accums.size() <= accum_pos)
-    return false;
-  if (m_accums[accum_pos] == NULL)
-    return false;
-  return m_accums[accum_pos]->accumulated;
-}
-
-
-void
-MlltGaussian::estimate_parameters()
-{
-  assert(accumulated(0));
-  
-  if (m_mode == ML || !accumulated(1)) {
-    m_mean.copy(m_accums[0]->mean);
-    Blas_Scale(1/m_accums[0]->gamma, m_mean);
-    
-    for (int i=0; i<dim(); i++) {
-      m_covariance(i) = m_accums[0]->cov(i,i) / m_accums[0]->gamma;
-      m_covariance(i) -= m_mean(i)*m_mean(i);
-      assert(m_covariance(i) > 0);
-    }
-  }
-
-  if (m_mode == MMI) {
-
-    // c & mu~ & sigma~
-    double c = m_accums[0]->gamma - m_accums[1]->gamma;
-    LaVectorDouble mu_tilde(m_accums[0]->mean);
-    Blas_Add_Mult(mu_tilde, -1, m_accums[1]->mean);
-    LaVectorDouble sigma_tilde(m_accums[0]->cov);
-    Blas_Add_Mult(sigma_tilde, -1, m_accums[1]->cov);
-
-    // a0
-    LaVectorDouble a0(sigma_tilde);
-    Blas_Scale(c, a0);
-    for (int i=0; i<dim(); i++)
-      a0(i) -= mu_tilde(i)*mu_tilde(i);
-
-    // a1
-    LaVectorDouble a1(m_covariance);
-    for (int i=0; i<dim(); i++)
-      a1(i) += m_mean(i)*m_mean(i);
-    Blas_Scale(c, a1);
-    for (int i=0; i<dim(); i++)
-      a1(i) -= 2*m_mean(i)*mu_tilde(i);
-    Blas_Add_Mult(a1, 1, sigma_tilde);
-
-    // a2
-    LaVectorDouble a2(m_covariance);
-
-    // solve dim quadratic equations to find the most limiting value for D
-    double d=0;
-    double sol;
-    for (int i=0; i<dim(); i++) {
-      sol=(-a1(i)+sqrt(a1(i)*a1(i)-4*a2(i)*a0(i)))/(2*a2(i));
-      d=std::max(d, sol);
-    }
-    assert(m_c2_constant>1);
-    d=std::max(m_c1_constant*m_accums[1]->gamma, m_c2_constant*d);
-    
-    // UPDATE MEAN
-    LaVectorDouble old_mean(m_mean);
-    // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
-    Blas_Scale(d, m_mean);
-    Blas_Add_Mult(m_mean, 1, mu_tilde);
-    Blas_Scale(1/(c+d), m_mean);
-
-    // UPDATE COVARIANCE
-    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
-    LaVectorDouble old_covariance(m_covariance);
-    for (int i=0; i<dim(); i++)
-      m_covariance(i) += old_mean(i)*old_mean(i);
-    Blas_Scale(d, m_covariance);
-    Blas_Add_Mult(m_covariance, 1, sigma_tilde);
-    Blas_Scale(1/(c+d), m_covariance);
-    for (int i=0; i<dim(); i++) {
-      m_covariance(i) -= m_mean(i)*m_mean(i);
-      assert(m_covariance(i) > 0);
-    }
-  }
-
-  // Common
-  for (int i=0; i<dim(); i++)
-    if (m_covariance(i) < m_minvar)
-      m_covariance(i) = m_minvar;
-  
-  m_constant=1;
-  for (int i=0; i<dim(); i++) {
-    m_precision(i) = 1/m_covariance(i);
-    m_constant *= m_precision(i);
-  }
-  m_constant = log(sqrt(m_constant));
 }
 
 
@@ -1266,189 +1054,6 @@ PrecisionConstrainedGaussian::start_accumulating()
   }
 }
 
-void
-PrecisionConstrainedGaussian::accumulate(double gamma,
-                                         const FeatureVec &f,
-                                         int accum_pos)
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  m_accums[accum_pos]->accumulated = true;  
-  m_accums[accum_pos]->feacount++;
-  m_accums[accum_pos]->gamma += gamma;
-
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
-  Blas_R1_Update(m_accums[accum_pos]->cov, *(f.get_vector()), *(f.get_vector()), gamma);
-}
-
-
-bool
-PrecisionConstrainedGaussian::accumulated(int accum_pos) const
-{
-  if ((int)m_accums.size() <= accum_pos)
-    return false;
-  if (m_accums[accum_pos] == NULL)
-    return false;
-  return m_accums[accum_pos]->accumulated;
-}
-
-
-void 
-PrecisionConstrainedGaussian::dump_statistics(std::ostream &os,
-                                              int accum_pos) const
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);  
-
-  if (m_accums[accum_pos]->accumulated) {
-    os << m_accums[accum_pos]->gamma << " ";
-    for (int i=0; i<dim(); i++)
-      os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim(); i++)
-      for (int j=0; j<dim(); j++)
-        if (!(i==dim()-1 && j==dim()-1))
-          os << m_accums[accum_pos]->cov(i,j) << " ";
-    os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
-  }
-}
-
-  
-void 
-PrecisionConstrainedGaussian::accumulate_from_dump(std::istream &is)
-{
-  std::string type;
-  is >> type;
-  int accum_pos = accumulator_position(type);
-
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  double gamma;
-  Vector mean(dim());
-  Matrix cov(dim(), dim());
-
-  is >> gamma;
-  for (int i=0; i<dim(); i++)
-    is >> mean(i);
-  for (int i=0; i<dim(); i++)
-    for (int j=0; j<dim(); j++)
-      is >> cov(i,j);
-
-  m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
-  Blas_Add_Mat_Mult(m_accums[accum_pos]->cov, 1, cov);
-  
-  m_accums[accum_pos]->accumulated = true;
-}
-
-
-void
-PrecisionConstrainedGaussian::stop_accumulating()
-{
-  if (m_accums.size() > 0)
-    for (unsigned int i=0; i<m_accums.size(); i++)
-      if (m_accums[i] != NULL)
-	delete m_accums[i];
-  m_accums.resize(0);
-}
-
-
-void
-PrecisionConstrainedGaussian::estimate_parameters()
-{
-  assert(accumulated(0));
-  
-  Vector mean; get_mean(mean);
-  Matrix covariance; get_covariance(covariance);
-  
-  if (m_mode == ML || !accumulated(1)) {
-    mean.copy(m_accums[0]->mean);
-    covariance.copy(m_accums[0]->cov);
-    Blas_Scale(1/m_accums[0]->gamma, mean);
-    Blas_Scale(1/m_accums[0]->gamma, covariance);
-  }
-  
-  if (m_mode == MMI) {
-
-    // c & mu~ & sigma~
-    double c = m_accums[0]->gamma - m_accums[1]->gamma;
-    LaVectorDouble mu_tilde(m_accums[0]->mean);
-    Blas_Add_Mult(mu_tilde, -1, m_accums[1]->mean);
-    LaGenMatDouble sigma_tilde = m_accums[0]->cov - m_accums[1]->cov;
-    
-    // a0
-    LaGenMatDouble a0(sigma_tilde);
-    Blas_Scale(c, a0);
-    Blas_R1_Update(a0, mu_tilde, mu_tilde, -1);
-    
-    // a1
-    LaGenMatDouble a1(covariance);
-    Blas_R1_Update(a1, mean, mean, 1);
-    Blas_Scale(c, a1);
-    Blas_R1_Update(a1, mean, mu_tilde, -1);
-    Blas_R1_Update(a1, mu_tilde, mean, -1);
-    a1 = a1 + sigma_tilde;
-    
-    // a2
-    LaGenMatDouble a2(covariance);
-
-    // Solve the quadratic eigenvalue problem
-    // A_0 + D A_1 + D^2 A_2
-    // by linearizing to a generalized eigenvalue problem
-    // See: www.cs.utk.edu/~dongarra/etemplates/node333.html
-    // Note: complex eigenvalues, we want only the max real eigenvalue!
-    LaGenMatDouble A=LaGenMatDouble::zeros(2*dim());
-    LaGenMatDouble B=LaGenMatDouble::zeros(2*dim());
-    LaGenMatDouble identity=LaGenMatDouble::zeros(dim());
-
-    A(LaIndex(dim(),2*dim()-1),LaIndex(0,dim()-1)).inject(a0);
-    A(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a1);
-    Blas_Scale(-1,A);
-    A(LaIndex(0,dim()-1),LaIndex(dim(),2*dim()-1)).inject(identity);
-
-    B(LaIndex(0,dim()-1),LaIndex(0,dim()-1)).inject(identity);
-    B(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a2);
-    
-    LaVectorComplex eigvals;
-    LaGenMatComplex eigvecs;
-    LinearAlgebra::generalized_eigenvalues(A,B,eigvals,eigvecs);
-
-    double d=0;
-    for (int i=0; i<eigvals.size(); i++)
-      if (eigvals(i).i < 0.000000001)
-        d=std::max(d, eigvals(i).r);
-    
-    assert(d>0);
-    assert(m_c2_constant>1);
-    d=std::max(m_c1_constant*m_accums[1]->gamma, m_c2_constant*d);
-    
-    // UPDATE MEAN
-    LaVectorDouble old_mean(mean);
-    // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
-    Blas_Scale(d, mean);
-    Blas_Add_Mult(mean, 1, mu_tilde);
-    Blas_Scale(1/(c+d), mean);
-
-    // UPDATE COVARIANCE
-    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
-    Blas_R1_Update(covariance, old_mean, old_mean, 1);
-    Blas_Scale(d, covariance);
-    covariance = covariance + sigma_tilde;
-    Blas_Scale(1/(c+d), covariance);
-    Blas_R1_Update(covariance, mean, mean, -1);
-    
-  }
-
-  // Common
-  for (int i=0; i<dim(); i++)
-    if (covariance(i,i) < m_minvar)
-      covariance(i,i) = m_minvar;
-  
-  set_covariance(covariance);
-  set_mean(mean);
-}
-
 
 void
 PrecisionConstrainedGaussian::get_mean(Vector &mean) const
@@ -1566,102 +1171,6 @@ SubspaceConstrainedGaussian::start_accumulating()
     m_accums[0] = new FullStatisticsAccumulator(dim());
     m_accums[1] = new FullStatisticsAccumulator(dim());
   }
-}
-
-
-void
-SubspaceConstrainedGaussian::accumulate(double gamma,
-                                         const FeatureVec &f,
-                                         int accum_pos)
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  m_accums[accum_pos]->accumulated = true;  
-  m_accums[accum_pos]->feacount++;
-  m_accums[accum_pos]->gamma += gamma;
-
-  Blas_Add_Mult(m_accums[accum_pos]->mean, gamma, *(f.get_vector()));
-  Blas_R1_Update(m_accums[accum_pos]->cov, *(f.get_vector()), *(f.get_vector()), gamma);
-}
-
-
-bool
-SubspaceConstrainedGaussian::accumulated(int accum_pos) const
-{
-  if ((int)m_accums.size() <= accum_pos)
-    return false;
-  if (m_accums[accum_pos] == NULL)
-    return false;
-  return m_accums[accum_pos]->accumulated;
-}
-
-
-void 
-SubspaceConstrainedGaussian::dump_statistics(std::ostream &os,
-                                              int accum_pos) const
-{
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);  
-
-  if (m_accums[accum_pos]->accumulated) {
-    os << m_accums[accum_pos]->gamma << " ";
-    for (int i=0; i<dim(); i++)
-      os << m_accums[accum_pos]->mean(i) << " ";
-    for (int i=0; i<dim(); i++)
-      for (int j=0; j<dim(); j++)
-        if (!(i==dim()-1 && j==dim()-1))
-          os << m_accums[accum_pos]->cov(i,j) << " ";
-    os << m_accums[accum_pos]->cov(dim()-1, dim()-1);
-  }
-}
-
-  
-void 
-SubspaceConstrainedGaussian::accumulate_from_dump(std::istream &is)
-{
-  std::string type;
-  is >> type;
-  int accum_pos = accumulator_position(type);
-
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
-
-  double gamma;
-  Vector mean(dim());
-  Matrix cov(dim(), dim());
-
-  is >> gamma;
-  for (int i=0; i<dim(); i++)
-    is >> mean(i);
-  for (int i=0; i<dim(); i++)
-    for (int j=0; j<dim(); j++)
-      is >> cov(i,j);
-
-  m_accums[accum_pos]->gamma += gamma;
-  Blas_Add_Mult(m_accums[accum_pos]->mean, 1, mean);
-  Blas_Add_Mat_Mult(m_accums[accum_pos]->cov, 1, cov);
-  
-  m_accums[accum_pos]->accumulated = true;
-}
-
-
-void
-SubspaceConstrainedGaussian::stop_accumulating()
-{
-  if (m_accums.size() > 0)
-    for (unsigned int i=0; i<m_accums.size(); i++)
-      if (m_accums[i] != NULL)
-	delete m_accums[i];
-  m_accums.resize(0);
-}
-
-
-void
-SubspaceConstrainedGaussian::estimate_parameters()
-{
-  assert(accumulated(0));
-  
 }
 
 

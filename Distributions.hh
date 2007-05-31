@@ -7,45 +7,6 @@
 #include "Subspaces.hh"
 
 
-class FullStatisticsAccumulator {
-public:
-  FullStatisticsAccumulator(int dim) { 
-    mean.resize(dim);
-    cov.resize(dim,dim);
-    feacount=0;
-    mean=0;
-    cov=0;
-    gamma=0;
-    accumulated=false;
-  };
-  int feacount;
-  double gamma;
-  Vector mean;
-  Matrix cov;
-  bool accumulated;
-};
-
-
-class DiagonalStatisticsAccumulator {
-public:
-  DiagonalStatisticsAccumulator(int dim) {
-    mean.resize(dim);
-    cov.resize(dim);
-    feacount=0;
-    mean=0;
-    cov=0;
-    gamma=0;
-    accumulated=false;
-  };
-  int feacount;
-  bool accumulated;
-  double gamma;
-  Vector mean;
-  Vector cov;
-};
-
-
-
 class PDF {
 public:
 
@@ -154,6 +115,75 @@ private:
 
 
 
+class GaussianAccumulator {
+public:
+  virtual ~GaussianAccumulator() {}
+  int dim() const { return m_dim; }
+  bool accumulated() const { return m_accumulated; }
+  int feacount() const { return m_feacount; }
+  double gamma() const { return m_gamma; }
+  void get_mean_estimate(Vector &mean_estimate) const;
+  void get_accumulated_mean(Vector &mean) const;
+  virtual void get_covariance_estimate(Matrix &covariance_estimate) const = 0;
+  virtual void get_accumulated_second_moment(Matrix &second_moment) const = 0;
+  virtual void accumulate(int feacount, double gamma, const Vector &feature) = 0;
+  virtual void dump_statistics(std::ostream &os) const = 0;
+  virtual void accumulate_from_dump(std::istream &is) = 0;
+protected:
+  int m_dim;
+  bool m_accumulated;
+  int m_feacount;
+  double m_gamma;
+  Vector m_mean;
+};
+
+
+class FullStatisticsAccumulator : public GaussianAccumulator {
+public:
+  FullStatisticsAccumulator(int dim) { 
+    m_mean.resize(dim);
+    m_second_moment.resize(dim,dim);
+    m_feacount=0;
+    m_mean=0;
+    m_second_moment=0;
+    m_gamma=0;
+    m_dim=dim;
+    m_accumulated=false;
+  }
+  virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
+  virtual void get_accumulated_second_moment(Matrix &second_moment) const;
+  virtual void accumulate(int feacount, double gamma, const Vector &feature);
+  virtual void dump_statistics(std::ostream &os) const;
+  virtual void accumulate_from_dump(std::istream &is);
+private:
+  Matrix m_second_moment;
+};
+
+
+class DiagonalStatisticsAccumulator : public GaussianAccumulator {
+public:
+  DiagonalStatisticsAccumulator(int dim) {
+    m_mean.resize(dim);
+    m_second_moment.resize(dim);
+    m_feacount=0;
+    m_mean=0;
+    m_second_moment=0;
+    m_gamma=0;
+    m_dim=dim;
+    m_accumulated=false;
+  }
+  virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
+  virtual void get_accumulated_second_moment(Matrix &second_moment) const;
+  virtual void accumulate(int feacount, double gamma, const Vector &feature);
+  virtual void dump_statistics(std::ostream &os) const;
+  virtual void accumulate_from_dump(std::istream &is);
+private:
+  Vector m_second_moment;
+};
+
+
+
+
 class Gaussian : public PDF {
 public:
 
@@ -170,18 +200,18 @@ public:
   /* Accumulates the maximum likelihood statistics for the Gaussian
      weighed with a prior. */
   virtual void accumulate(double prior, const FeatureVec &f, 
-			  int accum_pos = 0) = 0;
+			  int accum_pos = 0) ;
   /* Writes the currently accumulated statistics to a stream */
   virtual void dump_statistics(std::ostream &os,
-			       int accum_pos = 0) const = 0;
+			       int accum_pos = 0) const;
   /* Accumulates from dump */
-  virtual void accumulate_from_dump(std::istream &is) = 0;
+  virtual void accumulate_from_dump(std::istream &is);
   /* Stops training and clears the accumulators */
-  virtual void stop_accumulating() = 0;
+  virtual void stop_accumulating();
   /* Tells if this Gaussian has been accumulated */
-  virtual bool accumulated(int accum_pos = 0) const = 0;
+  virtual bool accumulated(int accum_pos = 0) const;
   /* Use the accumulated statistics to update the current model parameters. */
-  virtual void estimate_parameters() = 0;
+  virtual void estimate_parameters();
   
   // GAUSSIAN SPECIFIC
   
@@ -209,7 +239,9 @@ public:
   virtual double kullback_leibler(Gaussian &g) const;
 
   /* Set the minimum variance for this Gaussian */
-  void set_minvar(double minvar) { m_minvar = minvar; };
+  void set_minvar(double minvar) { m_minvar = minvar; }
+  /* Set the covariance smoothing for this Gaussian */
+  void set_covsmooth(double covsmooth) { m_covsmooth = covsmooth; }
   /* Sets the constant "C1" for MMI updates */
   void set_mmi_c1_constant(double c1_constant) { m_c1_constant = c1_constant; }
   /* Sets the constant "C2" for MMI updates */
@@ -218,8 +250,11 @@ public:
 protected:
   double m_constant;
   double m_minvar;
+  double m_covsmooth;
   double m_c1_constant;
   double m_c2_constant;
+
+  std::vector<GaussianAccumulator*> m_accums;
 };
 
 
@@ -240,14 +275,6 @@ public:
 
   // Gaussian-specific
   virtual void start_accumulating();
-  virtual void accumulate(double prior, const FeatureVec &f, 
-			  int accum_pos = 0);
-  virtual void dump_statistics(std::ostream &os,
-			       int accum_pos = 0) const;
-  virtual void accumulate_from_dump(std::istream &is);
-  virtual void stop_accumulating();
-  virtual bool accumulated(int accum_pos = 0) const;
-  virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
@@ -263,8 +290,6 @@ private:
   Vector m_mean;
   Vector m_covariance;
   Vector m_precision;
-  
-  std::vector<DiagonalStatisticsAccumulator*> m_accums;
 };
 
 
@@ -285,14 +310,6 @@ public:
 
   // Gaussian-specific
   virtual void start_accumulating();
-  virtual void accumulate(double prior, const FeatureVec &f, 
-			  int accum_pos = 0);
-  virtual void dump_statistics(std::ostream &os,
-			       int accum_pos = 0) const;
-  virtual void accumulate_from_dump(std::istream &is);
-  virtual void stop_accumulating();
-  virtual bool accumulated(int accum_pos = 0) const;
-  virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
@@ -304,18 +321,12 @@ public:
   /* Set the diagonal of the covariance matrix */
   void set_covariance(const Vector &covariance);
 
-  // Mllt-specific
-  void transform_parameters(LinTransformModule &A);
-  static void update_mllt_transform(PDFPool &mllt_gaussians);
-
   friend class HmmSet;
   
 private:  
   Vector m_mean;
   Vector m_covariance;
   Vector m_precision;
-
-  std::vector<FullStatisticsAccumulator*> m_accums;
 };
 
 
@@ -335,30 +346,15 @@ public:
 
   // Gaussian-specific
   virtual void start_accumulating();
-  virtual void accumulate(double prior,
-			  const FeatureVec &f, 
-			  int accum_pos = 0);
-  virtual void dump_statistics(std::ostream &os,
-			       int accum_pos = 0) const;
-  virtual void accumulate_from_dump(std::istream &is);
-  virtual void stop_accumulating();
-  virtual bool accumulated(int accum_pos = 0) const;
-  virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance);
 
-  /* Set covariance smoothing  */
-  void set_covsmooth(double covsmooth) { m_covsmooth = covsmooth; };
-  
 private:
-  double m_covsmooth;
   Vector m_mean;
   Matrix m_covariance;
   Matrix m_precision;
-  
-  std::vector<FullStatisticsAccumulator*> m_accums;
 };
 
 
@@ -379,13 +375,6 @@ public:
 
   // Gaussian-specific
   virtual void start_accumulating();
-  virtual void accumulate(double gamma, const FeatureVec &f, 
-			  int accum_pos = 0);
-  virtual void dump_statistics(std::ostream &os, int accum_pos = 0) const;
-  virtual void accumulate_from_dump(std::istream &is);
-  virtual void stop_accumulating();
-  virtual bool accumulated(int accum_pos = 0) const;
-  virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
@@ -415,8 +404,6 @@ private:
   Vector m_transformed_mean;
   Vector m_coeffs;
   PrecisionSubspace *m_ps;
-
-  std::vector<FullStatisticsAccumulator*> m_accums;
 };
 
 
@@ -437,13 +424,6 @@ public:
 
   // Gaussian-specific
   virtual void start_accumulating();
-  virtual void accumulate(double gamma, const FeatureVec &f, 
-			  int accum_pos = 0);
-  virtual void dump_statistics(std::ostream &os, int accum_pos = 0) const;
-  virtual void accumulate_from_dump(std::istream &is);
-  virtual void stop_accumulating();
-  virtual bool accumulated(int accum_pos = 0) const;
-  virtual void estimate_parameters();
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
@@ -462,8 +442,6 @@ public:
 private:
   Vector m_coeffs;
   ExponentialSubspace *m_es;
-
-  std::vector<FullStatisticsAccumulator*> m_accums;
 };
 
 
