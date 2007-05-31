@@ -287,18 +287,18 @@ HmmSet::get_state_with_pdf(int pdf_index)
 
 
 void
-HmmSet::read_gk(const std::string &filename, bool mllt)
+HmmSet::read_gk(const std::string &filename)
 {
-  m_pool.read_gk(filename, mllt);
+  m_pool.read_gk(filename);
 }
 
 
 void
-HmmSet::read_all(const std::string &base, bool mllt)
+HmmSet::read_all(const std::string &base)
 {
   read_mc(base + ".mc");
   read_ph(base + ".ph");
-  read_gk(base + ".gk", mllt);
+  read_gk(base + ".gk");
 }
 
 
@@ -711,7 +711,9 @@ HmmSet::estimate_parameters()
 void
 HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
 {
+  Matrix curr_sample_covariance(dim(),dim());
   Matrix curr_covariance(dim(),dim());
+  Matrix new_covariance(dim(),dim());
   Matrix temp_m(dim(),dim());
   double beta=0;
   LaGenMatDouble identity = LaGenMatDouble::eye(dim());
@@ -741,13 +743,15 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     G[i] = 0;
   }
 
-  // Get the total gamma
+  // Get the total gamma for Gaussians which have full stats available
   for (int g=0; g<m_pool.size(); g++) {
-    MlltGaussian *mllt_gaussian = dynamic_cast< MlltGaussian* >
+    Gaussian *gaussian = dynamic_cast< Gaussian* >
       (m_pool.get_pdf(g));
-    if (mllt_gaussian == NULL)
+    if (gaussian == NULL)
       continue;
-    beta += mllt_gaussian->m_accums[0]->gamma();
+    if (!gaussian->full_stats_accumulated())
+      continue;
+    beta += gaussian->m_accums[0]->gamma();
   }
 
   // Iterate long enough
@@ -757,25 +761,32 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     for (int g=0; g < m_pool.size(); g++) {
       // Ensure that the current Gaussian is of type MlltGaussian
       // and accumulated or else skip to the next one
-      MlltGaussian *mllt_gaussian = dynamic_cast< MlltGaussian* >
+      Gaussian *gaussian = dynamic_cast< Gaussian* >
         (m_pool.get_pdf(g));
-      if (mllt_gaussian == NULL)
+      if (gaussian == NULL)
         continue;
-      if (!mllt_gaussian->accumulated())
+      if (!gaussian->full_stats_accumulated())
         continue;
 
-      mllt_gaussian->m_accums[0]->get_covariance_estimate(curr_covariance);
-      Blas_Mat_Mat_Mult(A, curr_covariance, temp_m, 1.0, 0.0);
-
-      LaVectorDouble temp_v1;
-      LaVectorDouble temp_v2;
-      for (int i=0; i<dim(); i++) {
-        temp_v1.ref(temp_m.row(i));
-        temp_v2.ref(A.row(i));
-        mllt_gaussian->m_covariance(i)=
-          std::max(Blas_Dot_Prod(temp_v1, temp_v2), mllt_gaussian->m_minvar);
-      }
-    }      
+      gaussian->m_accums[0]->get_covariance_estimate(curr_sample_covariance);
+      Blas_Mat_Mat_Mult(A, curr_sample_covariance, temp_m, 1.0, 0.0);
+      Blas_Mat_Mat_Mult(temp_m, A, new_covariance, 1.0, 0.0);
+      // Check that covariances are valid
+      for (int i=0; i<dim(); i++)
+        if (new_covariance(i,i) <= 0)
+          fprintf(stderr, "Warning: Variance in dimension %i is %g (gamma %g)\n",
+                  i, new_covariance(i,i), gaussian->m_accums[0]->gamma());
+      // Common tweaking
+      for (int i=0; i<dim(); i++)
+        if (new_covariance(i,i) < gaussian->m_minvar)
+          new_covariance(i,i) = gaussian->m_minvar;
+      for (int i=0; i<dim(); i++)
+        for (int j=0; j<dim(); j++)
+          if (i != j)
+            new_covariance(i,j) *= gaussian->m_accums[0]->feacount()
+              /(gaussian->m_accums[0]->feacount()+gaussian->m_covsmooth);
+      gaussian->set_covariance(new_covariance);
+    }
     
     // Calculate the auxiliary matrix G
     for (int i=0; i<dim(); i++)
@@ -783,18 +794,18 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       temp_m=0;
       for (int g=0; g<m_pool.size(); g++)
       {
-        MlltGaussian *mllt_gaussian = dynamic_cast< MlltGaussian* >
+        Gaussian *gaussian = dynamic_cast< Gaussian* >
           (m_pool.get_pdf(g));
-        if (mllt_gaussian == NULL)
+        if (gaussian == NULL)
           continue;
-        if (!mllt_gaussian->accumulated())
+        if (!gaussian->full_stats_accumulated())
           continue;
-        if (mllt_gaussian->accumulated()) {
-          mllt_gaussian->m_accums[0]->get_covariance_estimate(curr_covariance);
-          Blas_Add_Mat_Mult(temp_m,
-                            mllt_gaussian->m_accums[0]->gamma()/mllt_gaussian->m_covariance(i),
-                            curr_covariance);
-        }
+
+        gaussian->m_accums[0]->get_covariance_estimate(curr_sample_covariance);
+        gaussian->get_covariance(curr_covariance);
+        Blas_Add_Mat_Mult(temp_m,
+                          gaussian->m_accums[0]->gamma()/curr_covariance(i,i),
+                          curr_sample_covariance);
       }
       // Invert
       LinearAlgebra::inverse(temp_m, G[i]);
@@ -840,28 +851,40 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
   
   // Transform means and covariances
   for (int g=0; g<m_pool.size(); g++) {
-    MlltGaussian *mllt_gaussian = dynamic_cast< MlltGaussian* >
+    Gaussian *gaussian = dynamic_cast< Gaussian* >
       (m_pool.get_pdf(g));
-    if (mllt_gaussian == NULL)
+    if (gaussian == NULL)
+      continue;
+    if (!gaussian->full_stats_accumulated())
       continue;
     
     // Transform mean
-    LaVectorDouble temp_mean(mllt_gaussian->m_mean);
-    Blas_Mat_Vec_Mult(A, temp_mean, mllt_gaussian->m_mean, 1.0, 0.0);
+    LaVectorDouble old_mean(dim());
+    LaVectorDouble new_mean(dim());
+    gaussian->get_mean(old_mean);
+    Blas_Mat_Vec_Mult(A, old_mean, new_mean, 1.0, 0.0);
+    gaussian->set_mean(new_mean);
     
-    // Re-estimate the diagonal covariances
-    mllt_gaussian->m_accums[0]->get_covariance_estimate(curr_covariance);
-    Blas_Mat_Mat_Mult(A, curr_covariance, temp_m, 1.0, 0.0);
-    LaVectorDouble temp_v1;
-    LaVectorDouble temp_v2;
-    for (int i=0; i<dim(); i++) {
-      temp_v1.ref(temp_m.row(i));
-      temp_v2.ref(A.row(i));
-      mllt_gaussian->m_covariance(i)=
-        std::max(Blas_Dot_Prod(temp_v1, temp_v2), mllt_gaussian->m_minvar);
-    }
+    // Re-estimate the covariances
+    gaussian->m_accums[0]->get_covariance_estimate(curr_sample_covariance);
+    Blas_Mat_Mat_Mult(A, curr_sample_covariance, temp_m, 1.0, 0.0);
+    Blas_Mat_Mat_Mult(temp_m, A, new_covariance, 1.0, 0.0);
+    // Check that covariances are valid
+    for (int i=0; i<dim(); i++)
+      if (new_covariance(i,i) <= 0)
+        fprintf(stderr, "Warning: Variance in dimension %i is %g (gamma %g)\n",
+                i, new_covariance(i,i), gaussian->m_accums[0]->gamma());
+    // Common tweaking
+    for (int i=0; i<dim(); i++)
+      if (new_covariance(i,i) < gaussian->m_minvar)
+        new_covariance(i,i) = gaussian->m_minvar;
+    for (int i=0; i<dim(); i++)
+      for (int j=0; j<dim(); j++)
+        if (i != j)
+          new_covariance(i,j) *= gaussian->m_accums[0]->feacount()
+            /(gaussian->m_accums[0]->feacount()+gaussian->m_covsmooth);
+    gaussian->set_covariance(new_covariance);
   }
-  
       
   // Set transformation
   Blas_Mat_Mat_Mult(A, Aold, temp_m, 1.0, 0.0);
@@ -895,6 +918,18 @@ HmmSet::get_estimation_mode()
 
 
 void
+HmmSet::set_full_stats(bool full_stats)
+{
+  for (int i=0; i<m_pool.size(); i++) {
+    Gaussian *g = dynamic_cast< Gaussian* >
+      (m_pool.get_pdf(i));
+    if (g != NULL)
+      g->set_full_stats(full_stats);
+  }
+}
+
+
+void
 HmmSet::set_minvar(double minvar)
 {
   for (int i=0; i<m_pool.size(); i++) {
@@ -910,7 +945,7 @@ void
 HmmSet::set_covsmooth(double covsmooth)
 {
   for (int i=0; i<m_pool.size(); i++) {
-    FullCovarianceGaussian *g = dynamic_cast< FullCovarianceGaussian* >
+    Gaussian *g = dynamic_cast< Gaussian* >
       (m_pool.get_pdf(i));
     if (g != NULL)
       g->set_covsmooth(covsmooth);

@@ -116,12 +116,12 @@ main(int argc, char *argv[])
     // Initialize the model for accumulating statistics
     if (config["base"].specified)
     {
-      model.read_all(config["base"].get_str(), config["mllt"].specified);
+      model.read_all(config["base"].get_str());
     }
     else if (config["gk"].specified && config["mc"].specified &&
              config["ph"].specified)
     {
-      model.read_gk(config["gk"].get_str(), config["mllt"].specified);
+      model.read_gk(config["gk"].get_str());
       model.read_mc(config["mc"].get_str());
       model.read_ph(config["ph"].get_str());
     }
@@ -173,7 +173,9 @@ main(int argc, char *argv[])
       model.set_estimation_mode(PDF::ML);
       accum_pos=0;
     }
-    model.start_accumulating();        
+    if (config["mllt"].specified)
+      model.set_full_stats(true);
+    model.start_accumulating();
 
     // Process each recipe line
     for (int f = 0; f < (int)recipe.infos.size(); f++)

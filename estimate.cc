@@ -61,12 +61,12 @@ main(int argc, char *argv[])
     // Load the previous models
     if (config["base"].specified)
     {
-      model.read_all(config["base"].get_str(), config["mllt"].specified);
+      model.read_all(config["base"].get_str());
     }
     else if (config["gk"].specified && config["mc"].specified &&
              config["ph"].specified)
     {
-      model.read_gk(config["gk"].get_str(), config["mllt"].specified);
+      model.read_gk(config["gk"].get_str());
       model.read_mc(config["mc"].get_str());
       model.read_ph(config["ph"].get_str());
     }
@@ -78,7 +78,9 @@ main(int argc, char *argv[])
       model.set_estimation_mode(PDF::ML);
     else
       model.set_estimation_mode(PDF::MMI);
-
+    if (config["mllt"].specified)
+      model.set_full_stats(true);
+    
     if (config["config"].specified) {
       fea_gen.load_configuration(io::Stream(config["config"].get_str()));
     }

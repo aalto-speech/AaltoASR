@@ -503,12 +503,20 @@ DiagonalGaussian::~DiagonalGaussian()
 void
 DiagonalGaussian::reset(int dim)
 {
+  m_dim=dim;
+  m_mode=ML;
+  
   m_mean.resize(dim);
   m_covariance.resize(dim);
   m_precision.resize(dim);
   m_mean=0; m_covariance=0; m_precision=0;
+
   m_constant=0;
-  m_dim=dim;
+  m_minvar=0;
+  m_covsmooth=0;
+  m_c1_constant=0;
+  m_c2_constant=0;
+  m_full_stats=false;
 }
 
 
@@ -569,12 +577,21 @@ DiagonalGaussian::start_accumulating()
 {
   if (m_mode == ML) {
     m_accums.resize(1);
-    m_accums[0] = new DiagonalStatisticsAccumulator(dim());
+    if (m_full_stats)
+      m_accums[0] = new FullStatisticsAccumulator(dim());
+    else
+      m_accums[0] = new DiagonalStatisticsAccumulator(dim());
   }
   else if (m_mode == MMI) {
     m_accums.resize(2);
-    m_accums[0] = new DiagonalStatisticsAccumulator(dim());
-    m_accums[1] = new DiagonalStatisticsAccumulator(dim());
+    if (m_full_stats) {
+      m_accums[0] = new FullStatisticsAccumulator(dim());
+      m_accums[1] = new FullStatisticsAccumulator(dim());
+    }
+    else {
+      m_accums[0] = new DiagonalStatisticsAccumulator(dim());
+      m_accums[1] = new DiagonalStatisticsAccumulator(dim());
+    }
   }
 }
 
@@ -669,12 +686,20 @@ FullCovarianceGaussian::~FullCovarianceGaussian()
 void
 FullCovarianceGaussian::reset(int dim)
 {
+  m_dim=dim;
+  m_mode=ML;
+  
   m_mean.resize(dim);
   m_covariance.resize(dim,dim);
   m_precision.resize(dim,dim);
   m_mean=0; m_covariance=0; m_precision=0;
+
   m_constant=0;
-  m_dim=dim;
+  m_minvar=0;
+  m_covsmooth=0;
+  m_c1_constant=0;
+  m_c2_constant=0;
+  m_full_stats=true;
 }
 
 
@@ -789,171 +814,6 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance)
 }
 
 
-MlltGaussian::MlltGaussian(int dim)
-{
-  reset(dim);
-}
-
-
-MlltGaussian::MlltGaussian(const MlltGaussian &g)
-{
-  reset(g.dim());
-  g.get_mean(m_mean);
-  g.get_covariance(m_covariance);
-  for (int i=0; i<dim(); i++)
-    m_precision(i)=1/m_covariance(i);
-}
-
-
-MlltGaussian::~MlltGaussian()
-{
-  stop_accumulating();
-}
-
-
-void
-MlltGaussian::reset(int dim)
-{
-  m_mean.resize(dim);
-  m_covariance.resize(dim);
-  m_precision.resize(dim);
-  m_mean=0; m_covariance=0; m_precision=0;
-  m_constant=0;
-  m_dim=dim;
-}
-
-
-double
-MlltGaussian::compute_likelihood(const FeatureVec &f) const
-{
-  return exp(compute_log_likelihood(f));
-}
-
-
-double
-MlltGaussian::compute_log_likelihood(const FeatureVec &f) const
-{
-  double ll=0;
-
-  Vector diff(*(f.get_vector()));
-
-  Blas_Add_Mult(diff, -1, m_mean);
-  for (int i=0; i<dim(); i++)
-    ll += diff(i)*diff(i)*m_precision(i);
-  ll *= -0.5;
-  ll += m_constant;
-
-  return ll;
-}
-
-
-void
-MlltGaussian::write(std::ostream &os) const
-{
-  os << "mllt ";
-  for (int i=0; i<dim(); i++)
-    os << m_mean(i) << " ";
-  for (int i=0; i<dim()-1; i++)
-    os << m_covariance(i) << " ";
-  os << m_covariance(dim()-1);
-}
-
-
-void
-MlltGaussian::read(std::istream &is)
-{
-  for (int i=0; i<dim(); i++)
-    is >> m_mean(i);
-  for (int i=0; i<dim(); i++) {
-    is >> m_covariance(i);
-    m_precision(i) = 1/m_covariance(i);
-  }
-  m_constant=1;
-  for (int i=0; i<dim(); i++)
-    m_constant *= m_precision(i);
-  m_constant = log(sqrt(m_constant));
-}
-
-
-void
-MlltGaussian::start_accumulating()
-{
-  if (m_mode == ML) {
-    m_accums.resize(1);
-    m_accums[0] = new FullStatisticsAccumulator(dim());
-  }
-  else if (m_mode == MMI) {
-    m_accums.resize(2);
-    m_accums[0] = new FullStatisticsAccumulator(dim());
-    m_accums[1] = new FullStatisticsAccumulator(dim());
-  }
-}
-
-
-void
-MlltGaussian::get_mean(Vector &mean) const
-{
-  mean.copy(m_mean);
-}
-
-
-void
-MlltGaussian::get_covariance(Matrix &covariance) const
-{
-  covariance.resize(dim(),dim());
-  covariance=0;
-  for (int i=0; i<dim(); i++)
-    covariance(i,i)=m_covariance(i);
-}
-
-
-void
-MlltGaussian::set_mean(const Vector &mean)
-{
-  assert(mean.size()==dim());
-  m_mean.copy(mean);
-}
-
-
-void
-MlltGaussian::set_covariance(const Matrix &covariance)
-{
-  assert(covariance.rows()==dim());
-  assert(covariance.cols()==dim());
-
-  m_constant=1;
-  for (int i=0; i<dim(); i++) {
-    m_covariance(i) = std::max(covariance(i,i), m_minvar);
-    m_precision(i) = 1/m_covariance(i);
-    m_constant *= m_precision(i);
-  }
-  m_constant = log(sqrt(m_constant));
-}
-
-
-void
-MlltGaussian::get_covariance(Vector &covariance) const
-{
-  covariance.copy(m_covariance);
-}
-
-
-void
-MlltGaussian::set_covariance(const Vector &covariance)
-{
-  assert(covariance.size()==dim());
-  m_covariance.copy(covariance);
-
-  m_constant=1;
-  for (int i=0; i<dim(); i++) {
-    m_covariance(i) = std::max(covariance(i), m_minvar);
-    m_precision(i) = 1/m_covariance(i);
-    m_constant *= m_precision(i);
-  }
-  m_constant = log(sqrt(m_constant));
-}
-
-
 PrecisionConstrainedGaussian::PrecisionConstrainedGaussian()
 {
 }
@@ -981,10 +841,19 @@ PrecisionConstrainedGaussian::~PrecisionConstrainedGaussian()
 void
 PrecisionConstrainedGaussian::reset(int feature_dim)
 {
+  m_dim=feature_dim;
+  m_mode=ML;
+  
   m_transformed_mean.resize(feature_dim);
   m_transformed_mean=0;
-  m_constant=0;
   m_coeffs=0;
+  
+  m_constant=0;
+  m_minvar=0;
+  m_covsmooth=0;
+  m_c1_constant=0;
+  m_c2_constant=0;
+  m_full_stats=true;
 }
 
 
@@ -1115,10 +984,19 @@ SubspaceConstrainedGaussian::~SubspaceConstrainedGaussian()
 
 
 void
-SubspaceConstrainedGaussian::reset(int dim)
+SubspaceConstrainedGaussian::reset(int feature_dim)
 {
-  m_constant=0;
+  m_dim=feature_dim;
+  m_mode=ML;
+  
   m_coeffs=0;
+  
+  m_constant=0;
+  m_minvar=0;
+  m_covsmooth=0;
+  m_c1_constant=0;
+  m_c2_constant=0;
+  m_full_stats=true;
 }
 
 
@@ -1573,7 +1451,7 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
 
 
 void
-PDFPool::read_gk(const std::string &filename, bool mllt)
+PDFPool::read_gk(const std::string &filename)
 {
   std::ifstream in(filename.c_str());
   if (!in)
@@ -1594,14 +1472,7 @@ PDFPool::read_gk(const std::string &filename, bool mllt)
       in >> type_str;
 
       if (type_str == "diag") {
-        if (mllt)
-          m_pool[i]=new MlltGaussian(m_dim);
-        else
-          m_pool[i]=new DiagonalGaussian(m_dim);
-        m_pool[i]->read(in);
-      }
-      else if (type_str == "mllt") {
-	m_pool[i]=new MlltGaussian(m_dim);
+        m_pool[i]=new DiagonalGaussian(m_dim);
         m_pool[i]->read(in);
       }
       else if (type_str == "full") {
@@ -1623,10 +1494,7 @@ PDFPool::read_gk(const std::string &filename, bool mllt)
   else {
     if (type_str == "diagonal_cov") {
       for (int i=0; i<pdfs; i++) {
-        if (mllt)
-          m_pool[i]=new MlltGaussian(m_dim);
-        else
-          m_pool[i]=new DiagonalGaussian(m_dim);
+        m_pool[i]=new DiagonalGaussian(m_dim);
 	m_pool[i]->read(in);
       }
     }

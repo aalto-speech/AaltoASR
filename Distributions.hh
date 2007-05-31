@@ -86,7 +86,7 @@ public:
   void set_pdf(int index, PDF *pdf);
   
   /* Read the distributions from a .gk -file */
-  void read_gk(const std::string &filename, bool mllt = false);
+  void read_gk(const std::string &filename);
   /* Write the distributions to a .gk -file */
   void write_gk(const std::string &filename) const;
   
@@ -234,10 +234,11 @@ public:
       given in a vector with the proper weights */
   virtual void merge(const std::vector<double> &weights,
                      const std::vector<const Gaussian*> &gaussians);
-  
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
 
+  /* Set the full statistics to be accumulated */
+  void set_full_stats(bool full_stats) { m_full_stats = full_stats; }
   /* Set the minimum variance for this Gaussian */
   void set_minvar(double minvar) { m_minvar = minvar; }
   /* Set the covariance smoothing for this Gaussian */
@@ -246,6 +247,8 @@ public:
   void set_mmi_c1_constant(double c1_constant) { m_c1_constant = c1_constant; }
   /* Sets the constant "C2" for MMI updates */
   void set_mmi_c2_constant(double c2_constant) { m_c2_constant = c2_constant; }
+  /* Tells if full statistics have been accumulated for this Gaussian */
+  bool full_stats_accumulated() const { return m_full_stats; }
   
 protected:
   double m_constant;
@@ -253,8 +256,11 @@ protected:
   double m_covsmooth;
   double m_c1_constant;
   double m_c2_constant;
-
+  bool m_full_stats;
+  
   std::vector<GaussianAccumulator*> m_accums;
+
+  friend class HmmSet;
 };
 
 
@@ -286,43 +292,6 @@ public:
   /* Set the diagonal of the covariance matrix */
   void set_covariance(const Vector &covariance);
 
-private:  
-  Vector m_mean;
-  Vector m_covariance;
-  Vector m_precision;
-};
-
-
-
-class MlltGaussian : public Gaussian {
-public:
-  MlltGaussian(int dim);
-  MlltGaussian(const DiagonalGaussian &g);
-  MlltGaussian(const MlltGaussian &g);
-  ~MlltGaussian();
-  virtual void reset(int dim);
-
-  // From pdf
-  virtual double compute_likelihood(const FeatureVec &f) const;
-  virtual double compute_log_likelihood(const FeatureVec &f) const;
-  virtual void write(std::ostream &os) const;
-  virtual void read(std::istream &is);
-
-  // Gaussian-specific
-  virtual void start_accumulating();
-  virtual void get_mean(Vector &mean) const;
-  virtual void get_covariance(Matrix &covariance) const;
-  virtual void set_mean(const Vector &mean);
-  virtual void set_covariance(const Matrix &covariance);
-
-  // Diagonal-specific
-  /* Get the diagonal of the covariance matrix */
-  void get_covariance(Vector &covariance) const;
-  /* Set the diagonal of the covariance matrix */
-  void set_covariance(const Vector &covariance);
-
-  friend class HmmSet;
-  
 private:  
   Vector m_mean;
   Vector m_covariance;
@@ -398,8 +367,7 @@ public:
   PrecisionSubspace* get_subspace() const { return m_ps; }
   /* Set the subspace */
   void set_subspace(PrecisionSubspace *space) { m_ps = space; }
-  
-  
+
 private:
   Vector m_transformed_mean;
   Vector m_coeffs;
@@ -414,7 +382,7 @@ public:
   SubspaceConstrainedGaussian(ExponentialSubspace *space);
   SubspaceConstrainedGaussian(const SubspaceConstrainedGaussian &g);
   ~SubspaceConstrainedGaussian();
-  virtual void reset(int dim);
+  virtual void reset(int feature_dim);
 
   // From pdf
   virtual double compute_likelihood(const FeatureVec &f) const;
@@ -430,10 +398,14 @@ public:
   virtual void set_covariance(const Matrix &covariance);
 
   // SCGMM-specific
+
   /* Get the coefficients for the subspace constrained exponential parameters */
   void get_subspace_coeffs(Vector &coeffs) const { coeffs.copy(m_coeffs); }
   /* Set the coefficients for the subspace constrained exponential parameters */
   void set_subspace_coeffs(const Vector &coeffs) { m_coeffs.copy(coeffs); }
+
+  /* Get the subspace dimensionality */
+  int subspace_dim() const { return m_coeffs.size(); }
   /* Get the subspace */
   ExponentialSubspace* get_subspace() const { return m_es; }
   /* Set the subspace */
