@@ -131,7 +131,7 @@ public:
   void get_accumulated_mean(Vector &mean) const;
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const = 0;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const = 0;
-  virtual void accumulate(int feacount, double gamma, const Vector &feature) = 0;
+  virtual void accumulate(int feacount, double gamma, const FeatureVec &f) = 0;
   virtual void dump_statistics(std::ostream &os) const = 0;
   virtual void accumulate_from_dump(std::istream &is) = 0;
 protected:
@@ -157,7 +157,7 @@ public:
   }
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
-  virtual void accumulate(int feacount, double gamma, const Vector &feature);
+  virtual void accumulate(int feacount, double gamma, const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
 private:
@@ -179,7 +179,7 @@ public:
   }
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
-  virtual void accumulate(int feacount, double gamma, const Vector &feature);
+  virtual void accumulate(int feacount, double gamma, const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
 private:

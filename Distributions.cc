@@ -73,18 +73,21 @@ FullStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_moment) 
 void
 FullStatisticsAccumulator::get_covariance_estimate(Matrix &covariance_estimate) const
 {
-  covariance_estimate.copy(m_second_moment);
+  Vector mean_estimate;
+  get_mean_estimate(mean_estimate);
+  get_accumulated_second_moment(covariance_estimate);
   Blas_Scale(1/m_gamma, covariance_estimate);
-  Blas_R1_Update(covariance_estimate, m_mean, m_mean, -1/m_gamma);
+  Blas_R1_Update(covariance_estimate, mean_estimate, mean_estimate, -1);
 }
 
 
 void
-FullStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &feature)
+FullStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureVec &f)
 {
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
+  Vector feature(*(f.get_vector()));
   Blas_Add_Mult(m_mean, gamma, feature);
   Blas_R1_Update(m_second_moment, feature, feature, gamma);
 }
@@ -151,11 +154,12 @@ DiagonalStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_mome
 
 
 void
-DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &feature)
+DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureVec &f)
 {
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
+  Vector feature(*(f.get_vector()));
   Blas_Add_Mult(m_mean, gamma, feature);
   for (int i=0; i<dim(); i++)
     m_second_moment(i) += gamma * feature(i) * feature(i);
@@ -181,7 +185,7 @@ Gaussian::accumulate(double gamma,
   assert((int)m_accums.size() > accum_pos);
   assert(m_accums[accum_pos] != NULL);
   
-  m_accums[accum_pos]->accumulate(1, gamma, *(f.get_vector()));
+  m_accums[accum_pos]->accumulate(1, gamma, f);
 }
 
 
@@ -342,10 +346,12 @@ Gaussian::estimate_parameters()
     if (new_covariance(i,i) < m_minvar)
       new_covariance(i,i) = m_minvar;
   
-  for (int i=0; i<dim(); i++)
-    for (int j=0; j<dim(); j++)
-      if (i != j)
-        new_covariance(i,j) *= m_accums[0]->feacount()/(m_accums[0]->feacount()+m_covsmooth);
+  if (m_covsmooth != 0) {
+    for (int i=0; i<dim(); i++)
+      for (int j=0; j<dim(); j++)
+        if (i != j)
+          new_covariance(i,j) *= m_accums[0]->feacount()/(m_accums[0]->feacount()+m_covsmooth);
+  }
 
   // Set the parameters
   set_mean(new_mean);
@@ -745,11 +751,6 @@ FullCovarianceGaussian::write(std::ostream &os) const
 void
 FullCovarianceGaussian::read(std::istream &is)
 {
-  std::string type;
-  is >> type;
-  if (type != "full")
-    throw std::string("Error reading FullCovarianceGaussian parameters from a stream\n");
-  
   for (int i=0; i<dim(); i++)
     is >> m_mean(i);
   for (int i=0; i<dim(); i++)
