@@ -788,7 +788,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
 
       gaussian->m_accums[0]->get_covariance_estimate(curr_sample_covariance);
       Blas_Mat_Mat_Mult(A, curr_sample_covariance, temp_m, 1.0, 0.0);
-      Blas_Mat_Mat_Mult(temp_m, A, new_covariance, 1.0, 0.0);
+      Blas_Mat_Mat_Trans_Mult(temp_m, A, new_covariance, 1.0, 0.0);
       // Check that covariances are valid
       for (int i=0; i<dim(); i++)
         if (new_covariance(i,i) <= 0)

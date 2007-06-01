@@ -161,7 +161,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
 private:
-  Matrix m_second_moment;
+  SymmetricMatrix m_second_moment;
 };
 
 

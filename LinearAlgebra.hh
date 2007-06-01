@@ -7,6 +7,7 @@
 
 typedef LaGenMatDouble Matrix;
 typedef LaVectorDouble Vector;
+typedef LaSymmMatDouble SymmetricMatrix;
 
 
 /** Functions for matrix operations */
