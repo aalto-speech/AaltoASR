@@ -104,10 +104,10 @@ main(int argc, char *argv[])
     }
 
     // Estimate parameters
-    model.set_minvar(config["minvar"].get_double());
-    model.set_covsmooth(config["covsmooth"].get_double());
-    model.set_mmi_c1_constant(config["C1"].get_double());
-    model.set_mmi_c2_constant(config["C2"].get_double());
+    model.set_gaussian_parameters(config["minvar"].get_double(),
+                                  config["covsmooth"].get_double(),
+                                  config["C1"].get_double(),
+                                  config["C2"].get_double());
 
     if (transtat)
       model.estimate_transition_parameters();

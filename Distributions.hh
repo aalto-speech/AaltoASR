@@ -36,7 +36,7 @@ public:
   /* Tells if this pdf has been accumulated */
   virtual bool accumulated(int accum_pos = 0) const = 0;
   /* Use the accumulated statistics to update the current model parameters. */
-  virtual void estimate_parameters() = 0;
+  virtual void estimate_parameters(void) = 0;
   /* Sets the training mode for this pdf */
   void set_estimation_mode(EstimationMode mode) { m_mode = mode; }
   /* Sets the training mode for this pdf */
@@ -72,7 +72,7 @@ public:
   
   PDFPool();
   PDFPool(int dim);
-  ~PDFPool();
+  virtual ~PDFPool();
   /// The dimensionality of the distributions in this pool
   int dim() const { return m_dim; }
   /// The dimensionality of the distributions in this pool
@@ -105,18 +105,37 @@ public:
    */
   double compute_likelihood(const FeatureVec &f, int index);
 
+  /** Sets the parameters used in Gaussian estimation
+   * \param minvar    Minimum diagonal variance term for Gaussians
+   * \param covsmooth Covariance smoothing value
+   * \param c1        MMI C1 constant
+   * \param c2        MMI C2 constant
+   */
+  void set_gaussian_parameters(double minvar = 0, double covsmooth = 0,
+                               double c1 = 0, double c2 = 0);
+
+  /// Estimates parameters of the pdfs in the pool
+  void estimate_parameters(void);
+
   /** Computes likelihoods for all distributions to the cache
    * \param f the feature vector
    */
   void precompute_likelihoods(const FeatureVec &f);
+
+  double get_minvar(void) { return m_minvar; }
+  double get_covsmooth(void) { return m_covsmooth; }
   
 private:
   std::vector<PDF*> m_pool;
   std::vector<double> m_likelihoods;
   std::vector<int> m_valid_likelihoods;
   int m_dim;
-};
 
+  double m_minvar;
+  double m_covsmooth;
+  double m_c1;
+  double m_c2;
+};
 
 
 
@@ -192,7 +211,7 @@ private:
 class Gaussian : public PDF {
 public:
 
-  Gaussian() : m_minvar(0) { };
+  Gaussian() { };
   // ABSTRACT FUNCTIONS, SHOULD BE OVERWRITTEN IN THE GAUSSIAN IMPLEMENTATIONS
   
   /* Resets the Gaussian to have dimensionality dim and all values zeroed */
@@ -216,7 +235,9 @@ public:
   /* Tells if this Gaussian has been accumulated */
   virtual bool accumulated(int accum_pos = 0) const;
   /* Use the accumulated statistics to update the current model parameters. */
-  virtual void estimate_parameters();
+  virtual void estimate_parameters(void) { estimate_parameters(0, 0, 0, 0); }
+  virtual void estimate_parameters(double minvar, double covsmooth,
+                                   double c1, double c2);
   
   // GAUSSIAN SPECIFIC
   
@@ -244,23 +265,11 @@ public:
 
   /* Set the full statistics to be accumulated */
   void set_full_stats(bool full_stats) { m_full_stats = full_stats; }
-  /* Set the minimum variance for this Gaussian */
-  void set_minvar(double minvar) { m_minvar = minvar; }
-  /* Set the covariance smoothing for this Gaussian */
-  void set_covsmooth(double covsmooth) { m_covsmooth = covsmooth; }
-  /* Sets the constant "C1" for MMI updates */
-  void set_mmi_c1_constant(double c1_constant) { m_c1_constant = c1_constant; }
-  /* Sets the constant "C2" for MMI updates */
-  void set_mmi_c2_constant(double c2_constant) { m_c2_constant = c2_constant; }
   /* Tells if full statistics have been accumulated for this Gaussian */
   bool full_stats_accumulated() const { return m_full_stats; }
   
 protected:
   double m_constant;
-  double m_minvar;
-  double m_covsmooth;
-  double m_c1_constant;
-  double m_c2_constant;
   bool m_full_stats;
   
   std::vector<GaussianAccumulator*> m_accums;
@@ -292,10 +301,13 @@ public:
   virtual void set_covariance(const Matrix &covariance);
 
   // Diagonal-specific
-  /* Get the diagonal of the covariance matrix */
+  /// Get the diagonal of the covariance matrix
   void get_covariance(Vector &covariance) const;
-  /* Set the diagonal of the covariance matrix */
+  /// Set the diagonal of the covariance matrix
   void set_covariance(const Vector &covariance);
+
+  /// Sets the constant after the precisions have been set
+  void set_constant(void); 
 
 private:  
   Vector m_mean;
@@ -456,7 +468,7 @@ public:
   virtual void accumulate_from_dump(std::istream &is);
   virtual void stop_accumulating();
   virtual bool accumulated(int accum_pos = 0) const;
-  virtual void estimate_parameters();
+  virtual void estimate_parameters(void);
   virtual double compute_likelihood(const FeatureVec &f) const;
   virtual double compute_log_likelihood(const FeatureVec &f) const;
   virtual void write(std::ostream &os) const;

@@ -239,7 +239,8 @@ Gaussian::accumulated(int accum_pos) const
 
 
 void
-Gaussian::estimate_parameters()
+Gaussian::estimate_parameters(double minvar, double covsmooth,
+                              double c1, double c2)
 {
   assert(accumulated(0));
 
@@ -316,8 +317,8 @@ Gaussian::estimate_parameters()
         d=std::max(d, eigvals(i).r);
     
     assert(d>0);
-    assert(m_c2_constant>1);
-    d=std::max(m_c1_constant*m_accums[1]->gamma(), m_c2_constant*d);
+    assert(c2>1);
+    d=std::max(c1*m_accums[1]->gamma(), c2*d);
     
     // COMPUTE NEW MEAN
     // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
@@ -346,14 +347,14 @@ Gaussian::estimate_parameters()
   
   // Common tweaking
   for (int i=0; i<dim(); i++)
-    if (new_covariance(i,i) < m_minvar)
-      new_covariance(i,i) = m_minvar;
+    if (new_covariance(i,i) < minvar)
+      new_covariance(i,i) = minvar;
   
-  if (m_covsmooth != 0) {
+  if (covsmooth != 0) {
     for (int i=0; i<dim(); i++)
       for (int j=0; j<dim(); j++)
         if (i != j)
-          new_covariance(i,j) *= m_accums[0]->feacount()/(m_accums[0]->feacount()+m_covsmooth);
+          new_covariance(i,j) *= m_accums[0]->feacount()/(m_accums[0]->feacount()+covsmooth);
   }
 
   // Set the parameters
@@ -499,7 +500,13 @@ DiagonalGaussian::DiagonalGaussian(const DiagonalGaussian &g)
   g.get_mean(m_mean);
   g.get_covariance(m_covariance);
   for (int i=0; i<dim(); i++)
-    m_precision(i)=1/m_covariance(i);
+  {
+    if (m_covariance(i) > 0)
+      m_precision(i)=1/m_covariance(i);
+    else
+      m_covariance(i) = 0;
+  }
+  set_constant();
 }
 
 
@@ -521,10 +528,6 @@ DiagonalGaussian::reset(int dim)
   m_mean=0; m_covariance=0; m_precision=0;
 
   m_constant=0;
-  m_minvar=0;
-  m_covsmooth=0;
-  m_c1_constant=0;
-  m_c2_constant=0;
   m_full_stats=false;
 }
 
@@ -572,12 +575,12 @@ DiagonalGaussian::read(std::istream &is)
     is >> m_mean(i);
   for (int i=0; i<dim(); i++) {
     is >> m_covariance(i);
-    m_precision(i) = 1/m_covariance(i);
+    if (m_covariance(i) > 0)
+      m_precision(i) = 1/m_covariance(i);
+    else
+      m_precision(i) = 0;
   }
-  m_constant=1;
-  for (int i=0; i<dim(); i++)
-    m_constant *= m_precision(i);
-  m_constant = log(sqrt(m_constant));
+  set_constant();
 }
 
 
@@ -636,14 +639,15 @@ DiagonalGaussian::set_covariance(const Matrix &covariance)
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
 
-  m_constant=1;
   for (int i=0; i<dim(); i++) {
     assert(covariance(i,i)>0);
-    m_covariance(i) = std::max(covariance(i,i), m_minvar);
-    m_precision(i) = 1/m_covariance(i);
-    m_constant *= m_precision(i);
+    m_covariance(i) = covariance(i,i);
+    if (m_covariance(i) > 0)
+      m_precision(i) = 1/m_covariance(i);
+    else
+      m_precision(i) = 0;
   }
-  m_constant = log(sqrt(m_constant));
+  set_constant();
 }
 
 
@@ -660,14 +664,25 @@ DiagonalGaussian::set_covariance(const Vector &covariance)
   assert(covariance.size()==dim());
   m_covariance.copy(covariance);
 
-  m_constant=1;
   for (int i=0; i<dim(); i++) {
-    assert(covariance(i)>0);
-    m_covariance(i) = std::max(covariance(i), m_minvar);
-    m_precision(i) = 1/m_covariance(i);
-    m_constant *= m_precision(i);
+    m_covariance(i) = covariance(i);
+    if (m_covariance(i) > 0)
+      m_precision(i) = 1/m_covariance(i);
+    else
+      m_precision(i) = 0;
   }
-  m_constant = log(sqrt(m_constant));
+  set_constant();
+}
+
+
+void
+DiagonalGaussian::set_constant(void)
+{
+  m_constant=1;
+  for (int i=0; i<dim(); i++)
+    m_constant *= m_precision(i);
+  if (m_constant > 0)
+    m_constant = log(sqrt(m_constant));
 }
 
 
@@ -682,7 +697,16 @@ FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
   reset(g.dim());
   g.get_mean(m_mean);
   g.get_covariance(m_covariance);
-  LinearAlgebra::inverse(m_covariance, m_precision);
+  if (LinearAlgebra::is_spd(m_covariance))
+  {
+    LinearAlgebra::inverse(m_covariance, m_precision);
+    m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
+  }
+  else
+  {
+    m_precision = 0;
+    m_constant = 0;
+  }
 }
 
 
@@ -704,10 +728,6 @@ FullCovarianceGaussian::reset(int dim)
   m_mean=0; m_covariance=0; m_precision=0;
 
   m_constant=0;
-  m_minvar=0;
-  m_covsmooth=0;
-  m_c1_constant=0;
-  m_c2_constant=0;
   m_full_stats=true;
 }
 
@@ -760,8 +780,16 @@ FullCovarianceGaussian::read(std::istream &is)
     for (int j=0; j<dim(); j++)
       is >> m_covariance(i,j);
 
-  LinearAlgebra::inverse(m_covariance, m_precision);
-  m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
+  if (LinearAlgebra::is_spd(m_covariance))
+  {
+    LinearAlgebra::inverse(m_covariance, m_precision);
+    m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
+  }
+  else
+  {
+    m_precision = 0;
+    m_constant = 0;
+  }
 }
 
 
@@ -807,14 +835,18 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance)
 {
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
-  assert(LinearAlgebra::is_spd(covariance));
   
   m_covariance.copy(covariance);
-  for (int i=0; i<dim(); i++)
-    m_covariance(i,i) = std::max(m_minvar, m_covariance(i,i));
-  LinearAlgebra::inverse(m_covariance, m_precision);
-  m_constant = LinearAlgebra::determinant(m_precision);
-  m_constant = log(sqrt(m_constant));
+  if (LinearAlgebra::is_spd(m_covariance))
+  {
+    LinearAlgebra::inverse(m_covariance, m_precision);
+    m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
+  }
+  else
+  {
+    m_precision = 0;
+    m_constant = 0;
+  }
 }
 
 
@@ -853,10 +885,6 @@ PrecisionConstrainedGaussian::reset(int feature_dim)
   m_coeffs=0;
   
   m_constant=0;
-  m_minvar=0;
-  m_covsmooth=0;
-  m_c1_constant=0;
-  m_c2_constant=0;
   m_full_stats=true;
 }
 
@@ -996,10 +1024,6 @@ SubspaceConstrainedGaussian::reset(int feature_dim)
   m_coeffs=0;
   
   m_constant=0;
-  m_minvar=0;
-  m_covsmooth=0;
-  m_c1_constant=0;
-  m_c2_constant=0;
   m_full_stats=true;
 }
 
@@ -1298,7 +1322,7 @@ Mixture::stop_accumulating()
 
 
 void
-Mixture::estimate_parameters()
+Mixture::estimate_parameters(void)
 {
   assert(accumulated(0));
   
@@ -1343,11 +1367,7 @@ Mixture::estimate_parameters()
       for (int i=0; i<size(); i++)
         diff += std::abs(m_weights[i]-previous_weights[i]);
     }
-  }
-  
-  // Common
-  for (int i=0; i<size(); i++)
-    get_base_pdf(i)->estimate_parameters();
+  }  
 }
 
 
@@ -1402,6 +1422,10 @@ void
 PDFPool::reset()
 {
   m_dim=0;
+  m_minvar = 0;
+  m_covsmooth = 0;
+  m_c1 = 1;
+  m_c2 = 2;
   m_pool.clear();
   m_likelihoods.clear();
   m_valid_likelihoods.clear();
@@ -1459,6 +1483,31 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
   for (int i=0; i<size(); i++) {
     m_likelihoods[i] = m_pool[i]->compute_likelihood(f);
     m_valid_likelihoods.push_back(i);
+  }
+}
+
+
+void
+PDFPool::set_gaussian_parameters(double minvar, double covsmooth,
+                                 double c1, double c2)
+{
+  m_minvar = minvar;
+  m_covsmooth = covsmooth;
+  m_c1 = c1;
+  m_c2 = c2;
+}
+
+
+void
+PDFPool::estimate_parameters(void)
+{
+  for (int i=0; i<size(); i++)
+  {
+    Gaussian *temp = dynamic_cast< Gaussian* > (m_pool[i]);
+    if (temp != NULL)
+      temp->estimate_parameters(m_minvar, m_covsmooth, m_c1, m_c2);
+    else
+      m_pool[i]->estimate_parameters();
   }
 }
 

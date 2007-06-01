@@ -164,7 +164,6 @@ private:
     virtual ~ContextPhoneCallback() { }
     virtual void add_label(std::string &label, int num_states) { }
     virtual void add_state(int state_index) { }
-    virtual void allocate_state(int state_index, ContextPhoneCluster *state) {}
   };
 
   /** Callback class for saving the basebind file
@@ -190,7 +189,6 @@ private:
     virtual ~MakeHmmModel() { }
     virtual void add_label(std::string &label, int num_states);
     virtual void add_state(int state_index);
-    virtual void allocate_state(int state_index, ContextPhoneCluster *state);
   private:
     HmmSet &m_model;
     Hmm *m_cur_hmm;

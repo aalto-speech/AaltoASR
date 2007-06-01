@@ -445,9 +445,21 @@ void
 PhonePool::finish_statistics(void)
 {
   int num_states = 0;
+  int state_index = 0;
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
     num_states += (*it).second->finish_statistics();
+    // Allocate state indices
+    for (int s = 0; s < (*it).second->num_states(); s++)
+    {
+      const std::vector<ContextPhoneCluster*> &clusters =
+        (*it).second->get_state_clusters(s);
+      for (int i = 0; i < (int)clusters.size(); i++)
+      {
+        clusters[i]->set_state_index(state_index);
+        state_index++;
+      }
+    }
   }
   if (m_info > 0)
     fprintf(stderr,"%i context dependent phone states in total\n",num_states);
@@ -700,6 +712,39 @@ PhonePool::save_model(const std::string &base, int max_context_index)
 {
   HmmSet model;
   MakeHmmModel m(model);
+
+  // Allocate PDFs, states, transitions and mixtures
+  for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
+  {
+    for (int s = 0; s < (*it).second->num_states(); s++)
+    {
+      const std::vector<ContextPhoneCluster*> &clusters =
+        (*it).second->get_state_clusters(s);
+      for (int i = 0; i < (int)clusters.size(); i++)
+      {
+        int state_index = clusters[i]->state_index();
+        // Add the pdf to the state
+        int index = model.add_state(state_index);
+        assert( index == state_index );
+        
+        // Add transitions
+        model.add_transition(state_index, 0, 0.8);
+        model.add_transition(state_index, 1, 0.2);
+
+        // Add the pdf
+        FullCovarianceGaussian *g =
+          new FullCovarianceGaussian(*(clusters[i]->statistics()));
+        int pool_index = model.add_pool_pdf(g);
+
+        // Add the mixture
+        Mixture *mixture = new Mixture();
+        int mindex = model.add_mixture_pdf(mixture);
+        assert( mindex == state_index );
+        mixture->add_component(pool_index, 1);
+      }
+    }
+  }
+  
   iterate_context_phones(m, max_context_index);
   model.write_all(base);
 }
@@ -715,29 +760,6 @@ void
 PhonePool::MakeHmmModel::add_state(int state_index)
 {
   m_cur_hmm->state(m_state_count) = state_index;
-}
-
-void
-PhonePool::MakeHmmModel::allocate_state(int state_index,
-                                        ContextPhoneCluster *state)
-{
-  // Add the pdf to the state
-  int index = m_model.add_state(state_index);
-  assert( index == state_index );
-
-  // Add transitions
-  m_model.add_transition(state_index, 0, 0.8);
-  m_model.add_transition(state_index, 1, 0.2);
-
-  // Add the pdf
-  FullCovarianceGaussian *g=new FullCovarianceGaussian(*(state->statistics()));
-  int pool_index = m_model.add_pool_pdf(g);
-
-  // Add the mixture
-  Mixture *m = new Mixture();
-  int mindex = m_model.add_mixture_pdf(m);
-  assert( mindex == state_index );
-  m->add_component(pool_index, 1);
 }
 
 
@@ -770,28 +792,12 @@ PhonePool::SaveToBasebind::add_state(int state_index)
 void
 PhonePool::iterate_context_phones(ContextPhoneCallback &c,
                                   int max_context_index)
-{
-  int state_index = 0;
-  
+{  
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
-    // Allocate state indices
-    for (int s = 0; s < (*it).second->num_states(); s++)
-    {
-      const std::vector<ContextPhoneCluster*> &clusters =
-        (*it).second->get_state_clusters(s);
-      for (int i = 0; i < (int)clusters.size(); i++)
-      {
-        clusters[i]->set_state_index(state_index);
-        c.allocate_state(state_index, clusters[i]);
-        state_index++;
-      }
-    }
-
     if ((*it).second->label()[0] != '_')
     {
-      // Iterate through all context phones (with this center phone) and
-      // write them to basebind
+      // Iterate through all context phones (with this center phone)
       if (max_context_index > 0)
       {
         PhoneLabelSet::iterator *context_it =

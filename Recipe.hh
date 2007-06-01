@@ -51,6 +51,7 @@ public:
      * \param out_phn              If true, reads alignment phns instead of
      *                             transcript phns.
      * \param fea_gen              Pointer to \ref FeatureGenerator.
+     *                             May be NULL.
      * \param raw_audio            true if audio files are of raw format.
      * \param phn_reader           The existing \ref PhnReader. If NULL,
      *                             creates a new instance.

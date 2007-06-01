@@ -18,7 +18,6 @@ std::string save_summary_file;
 int info;
 int accum_pos;
 bool transtat;
-bool durstat;
 float start_time, end_time;
 int start_frame, end_frame;
 double total_log_likelihood=0;
@@ -97,7 +96,6 @@ main(int argc, char *argv[])
       ('o', "out=BASENAME", "arg must", "", "base filename for output statistics")
       ('R', "raw-input", "", "", "raw audio input")
       ('t', "transitions", "", "", "collect also state transition statistics")
-      ('d', "durstat", "", "", "collect also duration statistics")
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for lattice-based training)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for lattice-based training)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for lattice-based training)")
@@ -140,11 +138,6 @@ main(int argc, char *argv[])
     // Check for state transition statistics
     transtat = config["transitions"].specified;
 
-    // Check for duration statistics
-    durstat = config["durstat"].specified;
-    if (durstat)
-      fprintf(stderr, "You have defined --durstat option: duration statistics will be collected as well\n");
-    
     // Check the dimension
     if (model.dim() != fea_gen.dim()) {
       throw str::fmt(128, 

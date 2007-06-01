@@ -348,7 +348,7 @@ public:
 
   /** Sets parameters according to the current accumulators.
    */
-  void estimate_parameters();
+  void estimate_parameters(void);
 
   /** Estimates/updates the MLLT transform and Gaussian parameters
    * according to the current accumulators
@@ -375,25 +375,13 @@ public:
    */
   void set_full_stats(bool full_stats);
   
-  /** Sets the minimum variance for all Gaussians in this model
-   * \param minvar minimum variance term
-   */
-  void set_minvar(double minvar);
-
-  /** Sets the covariance smoothing for all full covariance Gaussians in this model
-   * \param covsmooth covariance smoothing term
-   */
-  void set_covsmooth(double covsmooth);
-
-  /** Sets the "C1" constant for MMI updates
+  /** Sets the parameters for Gaussian estimation
+   * \param minvar    Minimum variance
+   * \param covsmooth Smoothing value for off-diagonal covariance terms
    * \param c1 the C1 constant
-   */
-  void set_mmi_c1_constant(double c1);
-
-  /** Sets the "C1" constant for MMI updates
    * \param c2 the C2 constant
    */
-  void set_mmi_c2_constant(double c2);
+  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2); }
   
   
 private:

@@ -34,7 +34,6 @@ collect_phone_stats(PhnReader *phn_reader, PhonePool *pool)
       throw std::string("Context phone tying requires phn files with state numbers!");
     PhonePool::ContextPhoneContainer phone = pool->get_context_phone(
       phn.label[0], phn.state);
-    //fprintf(stderr, "Frames %i - %i: %s\n",phn.start, phn.end, phn.label[0].c_str());
     for (f = phn.start; f < phn.end; f++)
     {
       FeatureVec feature = fea_gen.generate(f);

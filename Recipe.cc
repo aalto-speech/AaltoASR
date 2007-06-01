@@ -136,10 +136,13 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
                              FeatureGenerator *fea_gen,
                              bool raw_audio, PhnReader *phn_reader)
 {
-  float frame_rate;
+  float frame_rate = 125; // Default value
 
-  // Open the audio file
-  fea_gen->open(audio_path, raw_audio);
+  if (fea_gen != NULL)
+  {
+    // Open the audio file
+    fea_gen->open(audio_path, raw_audio);
+  }
 
   // Initialize the PhnReader
   if (phn_reader == NULL)
@@ -150,7 +153,9 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
   }
   phn_reader->set_state_num_labels(state_num_labels);
   phn_reader->set_relative_sample_numbers(relative_sample_nums);
-  frame_rate = fea_gen->frame_rate();
+
+  if (fea_gen != NULL)
+    frame_rate = fea_gen->frame_rate();
   phn_reader->set_frame_rate(frame_rate);
 
   // Open the segmentation

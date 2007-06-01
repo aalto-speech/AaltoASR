@@ -719,13 +719,15 @@ HmmSet::estimate_transition_parameters()
 
 
 void
-HmmSet::estimate_parameters()
+HmmSet::estimate_parameters(void)
 {
+  m_pool.estimate_parameters();
   for (int s = 0; s < num_states(); s++)
     m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
 }
 
 
+// FIXME: Move to PDFPool
 void
 HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
 {
@@ -796,13 +798,13 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
                   i, new_covariance(i,i), gaussian->m_accums[0]->gamma());
       // Common tweaking
       for (int i=0; i<dim(); i++)
-        if (new_covariance(i,i) < gaussian->m_minvar)
-          new_covariance(i,i) = gaussian->m_minvar;
+        if (new_covariance(i,i) < m_pool.get_minvar())
+          new_covariance(i,i) = m_pool.get_minvar();
       for (int i=0; i<dim(); i++)
         for (int j=0; j<dim(); j++)
           if (i != j)
             new_covariance(i,j) *= gaussian->m_accums[0]->feacount()
-              /(gaussian->m_accums[0]->feacount()+gaussian->m_covsmooth);
+              /(gaussian->m_accums[0]->feacount()+m_pool.get_covsmooth());
       gaussian->set_covariance(new_covariance);
     }
     
@@ -894,13 +896,13 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
                 i, new_covariance(i,i), gaussian->m_accums[0]->gamma());
     // Common tweaking
     for (int i=0; i<dim(); i++)
-      if (new_covariance(i,i) < gaussian->m_minvar)
-        new_covariance(i,i) = gaussian->m_minvar;
+      if (new_covariance(i,i) < m_pool.get_minvar())
+        new_covariance(i,i) = m_pool.get_minvar();
     for (int i=0; i<dim(); i++)
       for (int j=0; j<dim(); j++)
         if (i != j)
           new_covariance(i,j) *= gaussian->m_accums[0]->feacount()
-            /(gaussian->m_accums[0]->feacount()+gaussian->m_covsmooth);
+            /(gaussian->m_accums[0]->feacount()+m_pool.get_covsmooth());
     gaussian->set_covariance(new_covariance);
   }
       
@@ -946,50 +948,3 @@ HmmSet::set_full_stats(bool full_stats)
   }
 }
 
-
-void
-HmmSet::set_minvar(double minvar)
-{
-  for (int i=0; i<m_pool.size(); i++) {
-    Gaussian *g = dynamic_cast< Gaussian* >
-      (m_pool.get_pdf(i));
-    if (g != NULL)
-      g->set_minvar(minvar);
-  }
-}
-
-
-void
-HmmSet::set_covsmooth(double covsmooth)
-{
-  for (int i=0; i<m_pool.size(); i++) {
-    Gaussian *g = dynamic_cast< Gaussian* >
-      (m_pool.get_pdf(i));
-    if (g != NULL)
-      g->set_covsmooth(covsmooth);
-  }
-}
-
-
-void
-HmmSet::set_mmi_c1_constant(double c1)
-{
-  for (int i=0; i<m_pool.size(); i++) {
-    Gaussian *g = dynamic_cast< Gaussian* >
-      (m_pool.get_pdf(i));
-    if (g != NULL)
-      g->set_mmi_c1_constant(c1);
-  }
-}
-
-
-void
-HmmSet::set_mmi_c2_constant(double c2)
-{
-  for (int i=0; i<m_pool.size(); i++) {
-    Gaussian *g = dynamic_cast< Gaussian* >
-      (m_pool.get_pdf(i));
-    if (g != NULL)
-      g->set_mmi_c2_constant(c2);
-  }
-}
