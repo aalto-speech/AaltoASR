@@ -58,10 +58,11 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
+  
   Blas_Add_Mult(m_mean, 1, mean);
-
-  LaGenMatDouble identity = LaGenMatDouble::eye(dim());
-  Blas_Mat_Mat_Mult(m_second_moment, identity, second_moment, 1, 1);
+  for (int i=0; i<dim(); i++)
+    for (int j=0; j<=i; j++)
+      m_second_moment(i,j) += second_moment(i,j);
 }
 
 
@@ -92,7 +93,7 @@ FullStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureV
   m_accumulated = true;
   Vector feature(*(f.get_vector()));
   Blas_Add_Mult(m_mean, gamma, feature);
-  Blas_R1_Update(m_second_moment, feature, gamma);
+  Blas_R1_Update(m_second_moment, feature, gamma, 1.0, true);
 }
 
 
