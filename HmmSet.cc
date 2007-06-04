@@ -550,27 +550,32 @@ HmmSet::dump_mc_statistics(const std::string filename) const
 void
 HmmSet::dump_gk_statistics(const std::string filename) const
 {
-  std::ofstream gks(filename.c_str());
-  gks.precision(10);
+  std::ofstream gks(filename.c_str(), ofstream::binary);
   
   if (!gks) {
     fprintf(stderr, "HmmSet::dump_gk_statistics(): could not open %s\n", filename.c_str());
     throw OpenError();
   }  
 
-  gks << m_pool.size() << " " << m_pool.dim() << std::endl;
+  int sz=m_pool.size();
+  int di=m_pool.dim();
+  gks.write((char*)&sz, sizeof(int));
+  gks.write((char*)&di, sizeof(int));
+
   for (int g=0; g<m_pool.size(); g++) {
     if (m_pool.get_pdf(g)->accumulated(0)) {
-      gks << g << " num ";
+      int num=0;
+      gks.write((char*)&g, sizeof(int));
+      gks.write((char*)&num, sizeof(int));
       m_pool.get_pdf(g)->dump_statistics(gks, 0);
-      gks << std::endl;
     }
 
     if (m_pool.get_pdf(g)->estimation_mode() == PDF::MMI) {
       if (m_pool.get_pdf(g)->accumulated(1)) {
-	gks << g << " den ";
+        int den=1;
+        gks.write((char*)&g, sizeof(int));
+        gks.write((char*)&den, sizeof(int));
 	m_pool.get_pdf(g)->dump_statistics(gks, 1);
-	gks << std::endl;
       }
     }
   }
@@ -656,23 +661,25 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
 void
 HmmSet::accumulate_gk_from_dump(const std::string filename)
 {
-  std::ifstream gks(filename.c_str());
+  std::ifstream gks(filename.c_str(), ifstream::binary);
   if (!gks) {
     fprintf(stderr, "HmmSet::accumulate_gk_from_dump(): could not open %s\n", filename.c_str());
     throw OpenError();
   }
 
   int num_pdfs, dim, pdf;
-  gks >> num_pdfs >> dim;
+  gks.read((char*)&num_pdfs, sizeof(int));
+  gks.read((char*)&dim, sizeof(int));
   if (num_pdfs != m_pool.size())
     throw std::string("HmmSet::accumulate_gk_from_dump: the number of mixture base distributions in: %s is wrong\n", filename.c_str());
 
   if (dim != m_pool.dim())
     throw std::string("HmmSet::accumulate_gk_from_dump: the dimensionality of mixture base distributions in: %s is wrong\n", filename.c_str());
-
-  while(gks >> pdf)
-    m_pool.get_pdf(pdf)->accumulate_from_dump(gks);
   
+  while(gks.good()) {
+    gks.read((char*)&pdf, sizeof(int));
+    m_pool.get_pdf(pdf)->accumulate_from_dump(gks);
+  }
   gks.close();
 }
 

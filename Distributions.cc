@@ -27,15 +27,19 @@ GaussianAccumulator::get_mean_estimate(Vector &mean) const
 void 
 FullStatisticsAccumulator::dump_statistics(std::ostream &os) const
 {
+  float t;
   if (accumulated()) {
-    os << m_feacount << " " << m_gamma << " ";
+    os.write((char*)&m_feacount, sizeof(int));
+    os.write((char*)&m_gamma, sizeof(double));
+    for (int i=0; i<dim(); i++) {
+      t=m_mean(i);
+      os.write((char*)&t, sizeof(float));
+    }
     for (int i=0; i<dim(); i++)
-      os << m_mean(i) << " ";
-    for (int i=0; i<dim(); i++)
-      for (int j=0; j<dim(); j++)
-        if (!(i==dim()-1 && j==dim()-1))
-          os << m_second_moment(i,j) << " ";
-    os << m_second_moment(dim()-1,dim()-1);
+      for (int j=0; j<=i; j++) {
+        t=m_second_moment(i,j);
+        os.write((char*)&t, sizeof(float));
+      }
   }
 }
 
@@ -45,24 +49,23 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 {
   int feacount;
   double gamma;
-  Vector mean(dim());
-  Matrix second_moment(dim(), dim());
+  float t;
 
-  is >> feacount >> gamma;
-  for (int i=0; i<dim(); i++)
-    is >> mean(i);
-  for (int i=0; i<dim(); i++)
-    for (int j=0; j<dim(); j++)
-      is >> second_moment(i,j);
-  
+  is.read((char*)&feacount, sizeof(int));
+  is.read((char*)&gamma, sizeof(double));
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
   
-  Blas_Add_Mult(m_mean, 1, mean);
+  for (int i=0; i<dim(); i++) {
+    is.read((char*)&t, sizeof(float));
+    m_mean(i) += t;
+  }
   for (int i=0; i<dim(); i++)
-    for (int j=0; j<=i; j++)
-      m_second_moment(i,j) += second_moment(i,j);
+    for (int j=0; j<=i; j++) {
+      is.read((char*)&t, sizeof(float));
+      m_second_moment(i,j) += t;
+    }
 }
 
 
@@ -100,13 +103,18 @@ FullStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureV
 void 
 DiagonalStatisticsAccumulator::dump_statistics(std::ostream &os) const
 {
+  float t;
   if (accumulated()) {
-    os << m_feacount << " " << m_gamma << " ";
-    for (int i=0; i<dim(); i++)
-      os << m_mean(i) << " ";
-    for (int i=0; i<dim()-1; i++)
-      os << m_second_moment(i) << " ";
-    os << m_second_moment(dim()-1);
+    os.write((char*)&m_feacount, sizeof(int));
+    os.write((char*)&m_gamma, sizeof(double));
+    for (int i=0; i<dim(); i++) {
+      t=m_mean(i);
+      os.write((char*)&t, sizeof(float));
+    }
+    for (int i=0; i<dim(); i++) {
+      t=m_second_moment(i);
+      os.write((char*)&t, sizeof(float));
+    }
   }
 }
 
@@ -116,20 +124,22 @@ DiagonalStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 {
   int feacount;
   double gamma;
-  Vector mean(dim());
-  Vector second_moment(dim());
-
-  is >> feacount >> gamma;
-  for (int i=0; i<dim(); i++)
-    is >> mean(i);
-  for (int i=0; i<dim(); i++)
-    is >> second_moment(i);
-
+  float t;
+  
+  is.read((char*)&feacount, sizeof(int));
+  is.read((char*)&gamma, sizeof(double));
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
-  Blas_Add_Mult(m_mean, 1, mean);
-  Blas_Add_Mult(m_second_moment, 1, second_moment);
+  
+  for (int i=0; i<dim(); i++) {
+    is.read((char*)&t, sizeof(float));
+    m_mean(i) += t;
+  }
+  for (int i=0; i<dim(); i++) {
+    is.read((char*)&t, sizeof(float));
+    m_second_moment(i) += t;
+  }
 }
 
 
@@ -206,9 +216,8 @@ Gaussian::dump_statistics(std::ostream &os,
 void 
 Gaussian::accumulate_from_dump(std::istream &is)
 {
-  std::string type;
-  is >> type;
-  int accum_pos = accumulator_position(type);
+  int accum_pos;  
+  is.read((char*)&accum_pos, sizeof(int));
 
   assert((int)m_accums.size() > accum_pos);
   assert(m_accums[accum_pos] != NULL);
