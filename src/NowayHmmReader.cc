@@ -104,17 +104,19 @@ void NowayHmmReader::read_durations(std::istream &in)
       exit(1);
     }
     in >> version;
-    if (version != 1 && version != 2 && version != 3)
+    if (version != 1 && version != 2 && version != 3 && version != 4)
       throw InvalidFormat();
-    if (version == 3)
+    if (version == 3 || version == 4)
     {
       std::vector<float> a_table;
       std::vector<float> b_table;
       int num_states, state_id;
       in >> num_states;
-      a_table.reserve(num_states+1);
-      b_table.reserve(num_states+1);
-      for (int i = 0; i <= num_states; i++)
+      if (version == 3)
+        num_states++; // Used to be the index of the last state
+      a_table.reserve(num_states);
+      b_table.reserve(num_states);
+      for (int i = 0; i < num_states; i++)
       {
         in >> state_id;
         if (state_id != i)
@@ -128,7 +130,7 @@ void NowayHmmReader::read_durations(std::istream &in)
         for (int s = 2; s < m_hmms[i].states.size(); s++)
         {
           HmmState &state = m_hmms[i].states[s];
-          if (state.model > num_states)
+          if (state.model >= num_states)
             throw StateOutOfRange();
           state.duration.set_parameters(a_table[state.model],
                                         b_table[state.model]);
