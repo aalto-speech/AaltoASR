@@ -95,7 +95,7 @@ PhonePool::ContextPhoneCluster::compute_statistics(void)
     gaussians.push_back((*it)->statistics());
     m_sum_occupancy += (*it)->occupancy_count();
   }
-  m_sum_stats.merge(weights, gaussians);
+  m_sum_stats.merge(weights, gaussians, false);
 }
 
 
@@ -157,7 +157,7 @@ PhonePool::ContextPhoneCluster::merge_clusters(
   weights.push_back(cl2->occupancy_count());
   gaussians.push_back(cl1->statistics());
   gaussians.push_back(cl2->statistics());
-  m_sum_stats.merge(weights, gaussians);
+  m_sum_stats.merge(weights, gaussians, false);
   m_sum_occupancy = cl1->occupancy_count() + cl2->occupancy_count();
 
   // Add new set of rules for this cluster
@@ -445,21 +445,9 @@ void
 PhonePool::finish_statistics(void)
 {
   int num_states = 0;
-  int state_index = 0;
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
     num_states += (*it).second->finish_statistics();
-    // Allocate state indices
-    for (int s = 0; s < (*it).second->num_states(); s++)
-    {
-      const std::vector<ContextPhoneCluster*> &clusters =
-        (*it).second->get_state_clusters(s);
-      for (int i = 0; i < (int)clusters.size(); i++)
-      {
-        clusters[i]->set_state_index(state_index);
-        state_index++;
-      }
-    }
   }
   if (m_info > 0)
     fprintf(stderr,"%i context dependent phone states in total\n",num_states);
@@ -471,6 +459,7 @@ PhonePool::decision_tree_cluster_context_phones(int max_context_index)
 {
   int context_start, context_end;
   int total_clusters = 0;
+  
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
     for (int s = 0; s < (*it).second->num_states(); s++)
@@ -701,9 +690,9 @@ PhonePool::compute_log_likelihood_gain(ContextPhoneCluster &parent,
   child1.statistics()->get_covariance(child1_cov);
   child2.statistics()->get_covariance(child2_cov);
   return
-    (LinearAlgebra::log_determinant(parent_cov)*parent.occupancy_count() -
-     LinearAlgebra::log_determinant(child1_cov)*child1.occupancy_count() -
-     LinearAlgebra::log_determinant(child2_cov)*child2.occupancy_count())/2;
+    (LinearAlgebra::spd_log_determinant(parent_cov)*parent.occupancy_count() -
+     LinearAlgebra::spd_log_determinant(child1_cov)*child1.occupancy_count() -
+     LinearAlgebra::spd_log_determinant(child2_cov)*child2.occupancy_count())/2;
 }
 
 
@@ -712,6 +701,7 @@ PhonePool::save_model(const std::string &base, int max_context_index)
 {
   HmmSet model;
   MakeHmmModel m(model);
+  int state_index = 0;
 
   // Allocate PDFs, states, transitions and mixtures
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
@@ -722,10 +712,14 @@ PhonePool::save_model(const std::string &base, int max_context_index)
         (*it).second->get_state_clusters(s);
       for (int i = 0; i < (int)clusters.size(); i++)
       {
-        int state_index = clusters[i]->state_index();
+        clusters[i]->set_state_index(state_index);
         // Add the pdf to the state
         int index = model.add_state(state_index);
-        assert( index == state_index );
+        if (index != state_index)
+        {
+          fprintf(stderr, "%i  %i\n", index, state_index);
+          assert( index == state_index );
+        }
         
         // Add transitions
         model.add_transition(state_index, 0, 0.8);
@@ -741,6 +735,8 @@ PhonePool::save_model(const std::string &base, int max_context_index)
         int mindex = model.add_mixture_pdf(mixture);
         assert( mindex == state_index );
         mixture->add_component(pool_index, 1);
+
+        state_index++;
       }
     }
   }
@@ -759,7 +755,7 @@ PhonePool::MakeHmmModel::add_label(std::string &label, int num_states)
 void
 PhonePool::MakeHmmModel::add_state(int state_index)
 {
-  m_cur_hmm->state(m_state_count) = state_index;
+  m_cur_hmm->state(m_state_count++) = state_index;
 }
 
 
@@ -768,6 +764,22 @@ PhonePool::save_to_basebind(FILE *fp, int initial_state_index,
                             int max_context_index)
 {
   SaveToBasebind s(fp, initial_state_index);
+  int state_index = 0;
+
+  // Allocate state indices
+  for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
+  {
+    for (int s = 0; s < (*it).second->num_states(); s++)
+    {
+      const std::vector<ContextPhoneCluster*> &state_cl =
+        (*it).second->get_state_clusters(s);
+      for (int i = 0; i < (int)state_cl.size(); i++)
+      {
+        state_cl[i]->set_state_index(state_index);
+        state_index++;
+      }
+    }
+  }
   iterate_context_phones(s, max_context_index);
 }
 

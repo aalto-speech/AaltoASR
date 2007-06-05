@@ -404,7 +404,8 @@ Gaussian::split(Gaussian &g1, Gaussian &g2) const
 // sigma=f1*sigma1+f2*sigma2+f1*f2*(mu1-mu2)^2
 void
 Gaussian::merge(double weight1, const Gaussian &m1, 
-		double weight2, const Gaussian &m2)
+		double weight2, const Gaussian &m2,
+                bool finish_statistics)
 {
   assert(m1.dim() == m2.dim());
   assert(weight1 <1 && weight2 <1 && weight1>0 && weight2>0);
@@ -431,13 +432,14 @@ Gaussian::merge(double weight1, const Gaussian &m1,
   Vector diff; m1.get_mean(diff);
   Blas_Add_Mult(diff, -1, vtemp);
   Blas_R1_Update(covariance, diff, diff, f1*f2);
-  set_covariance(covariance);
+  set_covariance(covariance, finish_statistics);
 }
 
 
 void
 Gaussian::merge(const std::vector<double> &weights,
-                const std::vector<const Gaussian*> &gaussians)
+                const std::vector<const Gaussian*> &gaussians,
+                bool finish_statistics)
 {
   assert( weights.size() == gaussians.size() );
 
@@ -454,7 +456,8 @@ Gaussian::merge(const std::vector<double> &weights,
     gaussians[i]->get_covariance(cur_covariance);
     gaussians[i]->get_mean(cur_mean);
     Blas_R1_Update(cur_covariance, cur_mean, cur_mean);
-    Blas_Mat_Mat_Mult(cur_covariance, eye, new_covariance, weights[i], 1.0);
+    //Blas_Mat_Mat_Mult(cur_covariance, eye, new_covariance, weights[i], 1.0);
+    Blas_Add_Mat_Mult(new_covariance, weights[i], cur_covariance);
     Blas_Add_Mult(new_mean, weights[i], cur_mean);
     weight_sum += weights[i];
   }
@@ -462,7 +465,7 @@ Gaussian::merge(const std::vector<double> &weights,
   Blas_Scale(1.0/weight_sum, new_covariance);
   Blas_R1_Update(new_covariance, new_mean, new_mean, -1.0);
   set_mean(new_mean);
-  set_covariance(new_covariance);
+  set_covariance(new_covariance, finish_statistics);
 }
 
 
@@ -644,7 +647,8 @@ DiagonalGaussian::set_mean(const Vector &mean)
 
 
 void
-DiagonalGaussian::set_covariance(const Matrix &covariance)
+DiagonalGaussian::set_covariance(const Matrix &covariance,
+                                 bool finish_statistics)
 {
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
@@ -652,12 +656,13 @@ DiagonalGaussian::set_covariance(const Matrix &covariance)
   for (int i=0; i<dim(); i++) {
     assert(covariance(i,i)>0);
     m_covariance(i) = covariance(i,i);
-    if (m_covariance(i) > 0)
+    if (finish_statistics && m_covariance(i) > 0)
       m_precision(i) = 1/m_covariance(i);
     else
       m_precision(i) = 0;
   }
-  set_constant();
+  if (finish_statistics)
+    set_constant();
 }
 
 
@@ -669,19 +674,21 @@ DiagonalGaussian::get_covariance(Vector &covariance) const
 
 
 void
-DiagonalGaussian::set_covariance(const Vector &covariance)
+DiagonalGaussian::set_covariance(const Vector &covariance,
+                                 bool finish_statistics)
 {
   assert(covariance.size()==dim());
   m_covariance.copy(covariance);
 
   for (int i=0; i<dim(); i++) {
     m_covariance(i) = covariance(i);
-    if (m_covariance(i) > 0)
+    if (finish_statistics && m_covariance(i) > 0)
       m_precision(i) = 1/m_covariance(i);
     else
       m_precision(i) = 0;
   }
-  set_constant();
+  if (finish_statistics)
+    set_constant();
 }
 
 
@@ -707,16 +714,8 @@ FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
   reset(g.dim());
   g.get_mean(m_mean);
   g.get_covariance(m_covariance);
-  if (LinearAlgebra::is_spd(m_covariance))
-  {
-    LinearAlgebra::inverse(m_covariance, m_precision);
-    m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
-  }
-  else
-  {
-    m_precision = 0;
-    m_constant = 0;
-  }
+  m_precision.copy(g.m_precision);
+  m_constant = g.m_constant;
 }
 
 
@@ -793,7 +792,7 @@ FullCovarianceGaussian::read(std::istream &is)
   if (LinearAlgebra::is_spd(m_covariance))
   {
     LinearAlgebra::inverse(m_covariance, m_precision);
-    m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
+    m_constant = log(sqrt(LinearAlgebra::spd_determinant(m_precision)));
   }
   else
   {
@@ -841,16 +840,17 @@ FullCovarianceGaussian::set_mean(const Vector &mean)
 
 
 void
-FullCovarianceGaussian::set_covariance(const Matrix &covariance)
+FullCovarianceGaussian::set_covariance(const Matrix &covariance,
+                                       bool finish_statistics)
 {
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
   
   m_covariance.copy(covariance);
-  if (LinearAlgebra::is_spd(m_covariance))
+  if (finish_statistics && LinearAlgebra::is_spd(m_covariance))
   {
     LinearAlgebra::inverse(m_covariance, m_precision);
-    m_constant = log(sqrt(LinearAlgebra::determinant(m_precision)));
+    m_constant = log(sqrt(LinearAlgebra::spd_determinant(m_precision)));
   }
   else
   {
@@ -996,7 +996,8 @@ PrecisionConstrainedGaussian::set_mean(const Vector &mean)
 
 
 void
-PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance)
+PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance,
+                                             bool finish_statistics)
 {
   m_ps->optimize_coefficients(covariance, m_coeffs);
 }
@@ -1109,7 +1110,8 @@ SubspaceConstrainedGaussian::set_mean(const Vector &mean)
 
 
 void
-SubspaceConstrainedGaussian::set_covariance(const Matrix &covariance)
+SubspaceConstrainedGaussian::set_covariance(const Matrix &covariance,
+                                            bool finish_statistics)
 {
 }
 

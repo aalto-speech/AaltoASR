@@ -248,18 +248,22 @@ public:
   /* Sets the mean vector for this Gaussian */
   virtual void set_mean(const Vector &mean) = 0;
   /* Sets the covariance matrix for this Gaussian */
-  virtual void set_covariance(const Matrix &covariance) = 0;
+  virtual void set_covariance(const Matrix &covariance,
+                              bool finish_statistics = true) = 0;
   
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
 
   /* Splits the current Gaussian to two by disturbing the mean */
   virtual void split(Gaussian &s1, Gaussian &s2) const;
   /* Sets the parameters for the current Gaussian by merging m1 and m2 */
-  virtual void merge(double w1, const Gaussian &m1, double w2, const Gaussian &m2);
+  virtual void merge(double w1, const Gaussian &m1,
+                     double w2, const Gaussian &m2,
+                     bool finish_statistics = true);
   /** Sets the parameters for the current Gaussian by merging the Gaussians
       given in a vector with the proper weights */
   virtual void merge(const std::vector<double> &weights,
-                     const std::vector<const Gaussian*> &gaussians);
+                     const std::vector<const Gaussian*> &gaussians,
+                     bool finish_statistics = true);
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
 
@@ -298,13 +302,15 @@ public:
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
-  virtual void set_covariance(const Matrix &covariance);
+  virtual void set_covariance(const Matrix &covariance,
+                              bool finish_statistics = true);
 
   // Diagonal-specific
   /// Get the diagonal of the covariance matrix
   void get_covariance(Vector &covariance) const;
   /// Set the diagonal of the covariance matrix
-  void set_covariance(const Vector &covariance);
+  void set_covariance(const Vector &covariance,
+                      bool finish_statistics = true);
 
   /// Sets the constant after the precisions have been set
   void set_constant(void); 
@@ -335,7 +341,8 @@ public:
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
-  virtual void set_covariance(const Matrix &covariance);
+  virtual void set_covariance(const Matrix &covariance,
+                              bool finish_statistics = true);
 
 private:
   Vector m_mean;
@@ -364,7 +371,8 @@ public:
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
-  virtual void set_covariance(const Matrix &covariance);
+  virtual void set_covariance(const Matrix &covariance,
+                              bool finish_statistics = true);
 
   // PCGMM-specific
 
@@ -412,7 +420,8 @@ public:
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
-  virtual void set_covariance(const Matrix &covariance);
+  virtual void set_covariance(const Matrix &covariance,
+                              bool finish_statistics = true);
 
   // SCGMM-specific
 

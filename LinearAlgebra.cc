@@ -8,7 +8,7 @@ namespace LinearAlgebra {
   spd_log_determinant(const Matrix &A)
   {
     assert(A.rows()==A.cols());
-    assert(is_spd(A));
+    //assert(is_spd(A));
 
     LaGenMatDouble chol;
     cholesky_factor(A, chol);
@@ -24,7 +24,7 @@ namespace LinearAlgebra {
   spd_determinant(const Matrix &A)
   {
     assert(A.rows()==A.cols());
-    assert(is_spd(A));
+    //assert(is_spd(A));
 
     LaGenMatDouble chol;
     cholesky_factor(A, chol);
@@ -99,7 +99,7 @@ namespace LinearAlgebra {
                   Matrix &B)
   {
     assert(A.rows() == A.cols());
-    assert(is_spd(A));
+    //assert(is_spd(A));
 
     B.resize(A.rows(), A.cols());
     B.copy(A);
