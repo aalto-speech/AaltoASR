@@ -383,6 +383,14 @@ public:
    */
   void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2); }
   
+  /** Splits every Gaussian in the pool with some constrains
+   * OBS!! ASSUMES CURRENTLY CONTINUOUS-DENSITY HMMS!!
+   * \param minocc    Minimum occupancy count needed for splitting a gaussian
+   * \param maxg      Maximum number of Gaussians per state 
+   * \return          Amount of new Gaussians created to the pool
+  */ 
+  int split_gaussians(double minocc, int maxg);
+
   
 private:
 

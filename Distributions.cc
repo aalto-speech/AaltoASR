@@ -373,11 +373,16 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
 }
 
 
-void
-Gaussian::split(Gaussian &g1, Gaussian &g2) const
+bool
+Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation, double minocc, int minfeas) const
 {
   assert(dim() != 0);
 
+  if (m_accums[0]->gamma() < minocc)
+    return false;
+  if (m_accums[0]->feacount() < minfeas)
+    return false;
+  
   Vector mean1; get_mean(mean1);
   Vector mean2; get_mean(mean2);
   Matrix cov; get_covariance(cov);
@@ -386,7 +391,7 @@ Gaussian::split(Gaussian &g1, Gaussian &g2) const
   // FIXME: should we use eigvals/vecs for full covs?
   double sd=0;
   for (int i=0; i<dim(); i++) {
-    sd=0.00001*sqrt(cov(i,i));
+    sd=perturbation*sqrt(cov(i,i));
     mean1(i) -= sd;
     mean2(i) += sd;
   }
@@ -395,6 +400,40 @@ Gaussian::split(Gaussian &g1, Gaussian &g2) const
   g2.set_mean(mean2);
   g1.set_covariance(cov);
   g2.set_covariance(cov);
+
+  return true;
+}
+
+
+bool
+Gaussian::split(Gaussian &g2, double perturbation, double minocc, int minfeas)
+{
+  assert(dim() != 0);
+
+  if (m_accums[0]->gamma() < minocc)
+    return false;
+  if (m_accums[0]->feacount() < minfeas)
+    return false;
+  
+  Vector mean1; get_mean(mean1);
+  Vector mean2; get_mean(mean2);
+  Matrix cov; get_covariance(cov);
+
+  // Add/Subtract standard deviations
+  // FIXME: should we use eigvals/vecs for full covs?
+  double sd=0;
+  for (int i=0; i<dim(); i++) {
+    sd=perturbation*sqrt(cov(i,i));
+    mean1(i) -= sd;
+    mean2(i) += sd;
+  }
+  
+  set_mean(mean1);
+  g2.set_mean(mean2);
+  set_covariance(cov);
+  g2.set_covariance(cov);
+
+  return true;
 }
 
 
@@ -1617,3 +1656,48 @@ PDFPool::write_gk(const std::string &filename) const
     throw std::string("PDFPool::write_gk(): error writing file: %s\n", filename.c_str());
 }
 
+
+bool
+PDFPool::split_gaussian(int index, int &new_index, double minocc, int minfeas)
+{
+  Gaussian *gaussian = dynamic_cast< Gaussian* > (m_pool[index]);
+  if (gaussian == NULL)
+    return false;
+
+  DiagonalGaussian *dcgaussian;
+  FullCovarianceGaussian *fcgaussian;
+  PrecisionConstrainedGaussian *pcgaussian;
+  SubspaceConstrainedGaussian *scgaussian;
+  Gaussian *new_gaussian;
+  
+  fcgaussian = dynamic_cast< FullCovarianceGaussian* > (m_pool[index]);
+  if (fcgaussian != NULL) {
+    new_gaussian = new FullCovarianceGaussian(gaussian->dim());
+    goto split;
+  }
+
+  dcgaussian = dynamic_cast< DiagonalGaussian* > (m_pool[index]);
+  if (dcgaussian != NULL) {
+    new_gaussian = new DiagonalGaussian(gaussian->dim());
+    goto split;
+  }
+
+  pcgaussian = dynamic_cast< PrecisionConstrainedGaussian* > (m_pool[index]);
+  if (pcgaussian != NULL) {
+    new_gaussian = new PrecisionConstrainedGaussian(pcgaussian->get_subspace());
+    goto split;
+  }
+
+  scgaussian = dynamic_cast< SubspaceConstrainedGaussian* > (m_pool[index]);
+  if (scgaussian != NULL) {
+    new_gaussian = new SubspaceConstrainedGaussian(scgaussian->get_subspace());
+    goto split;
+  }
+
+ split:
+
+  if (!gaussian->split(*new_gaussian, 0.2, minocc, minfeas))
+    return false;
+  new_index = add_pdf(new_gaussian);
+  return true;
+}

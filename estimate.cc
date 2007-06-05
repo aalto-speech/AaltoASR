@@ -45,6 +45,9 @@ main(int argc, char *argv[])
       ('\0', "covsmooth", "arg", "0", "covariance smoothing (default 0.0)")
       ('\0', "C1", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
       ('\0', "C2", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
+      ('\0', "split", "arg", "", "split (every gaussian)")
+      ('\0', "minocc", "arg", "0.0", "minimum occupancy count for splitting")
+      ('\0', "maxg", "arg", "0", "maximum number of Gaussians per state for splitting")
       ;
     config.default_parse(argc, argv);
 
@@ -108,6 +111,11 @@ main(int argc, char *argv[])
                                   config["covsmooth"].get_double(),
                                   config["C1"].get_double(),
                                   config["C2"].get_double());
+
+    // Split Gaussians if desired
+    if (config["split"].specified)
+      model.split_gaussians(config["minocc"].get_double(),
+                            config["maxg"].get_int());
 
     if (transtat)
       model.estimate_transition_parameters();

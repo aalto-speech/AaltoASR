@@ -955,3 +955,47 @@ HmmSet::set_full_stats(bool full_stats)
   }
 }
 
+
+int
+HmmSet::split_gaussians(double minocc, int maxg)
+{
+  int total=0;
+
+  // Go through every mixture
+  for (int s = 0; s < num_states(); s++) {
+
+    int pdf_index = emission_pdf_index(s);
+    Mixture *curr_mixture = m_emission_pdfs[pdf_index];
+
+    int new_mixture_size = curr_mixture->size();
+    std::vector<int> new_pool_indices;
+    std::vector<double> new_weights;
+    for (int g = 0; g < curr_mixture->size(); g++) {
+
+      if (new_mixture_size < maxg) {
+
+        bool split_ok = false;
+        int pool_index = curr_mixture->get_base_pdf_index(g);
+        int new_pool_index;
+
+        split_ok = m_pool.split_gaussian(pool_index, new_pool_index, minocc, 0);
+
+        if (split_ok) {
+          // Halve the current mixing coefficient
+          double curr_coef = curr_mixture->get_mixture_coefficient(g);
+          curr_mixture->set_mixture_coefficient(g, 0.5*curr_coef);
+          new_pool_indices.push_back(new_pool_index);
+          new_weights.push_back(0.5*curr_coef);
+          new_mixture_size++;
+          total++;
+        }
+        
+      }
+    }
+
+    for (unsigned int i = 0; i < new_pool_indices.size(); i++)
+      curr_mixture->add_component(new_pool_indices[i], new_weights[i]);
+  }
+
+  return total;
+}

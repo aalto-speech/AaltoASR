@@ -114,6 +114,15 @@ public:
   void set_gaussian_parameters(double minvar = 0, double covsmooth = 0,
                                double c1 = 0, double c2 = 0);
 
+  /** Splits a Gaussian in the pool with some constrains
+  * \param index     Index of the Gaussian to be split
+  * \param new_index The index of the newly created Gaussian is return in this variable
+  * \param minocc    Minimum occupancy count needed for splitting this Gaussian
+  * \param minfeas   Minimum number of features for splitting this Gaussian
+  * \return true if the split was succesful, false otherwise
+  */
+  bool split_gaussian(int index, int &new_index, double minocc, int minfeas);
+  
   /// Estimates parameters of the pdfs in the pool
   void estimate_parameters(void);
 
@@ -254,7 +263,9 @@ public:
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
 
   /* Splits the current Gaussian to two by disturbing the mean */
-  virtual void split(Gaussian &s1, Gaussian &s2) const;
+  virtual bool split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2, double minocc = 0, int minfeas = 0) const;
+  /* Splits the current Gaussian to two by disturbing the mean */
+  virtual bool split(Gaussian &s2, double perturbation = 0.2, double minocc = 0, int minfeas = 0);
   /* Sets the parameters for the current Gaussian by merging m1 and m2 */
   virtual void merge(double w1, const Gaussian &m1,
                      double w2, const Gaussian &m2,
@@ -458,6 +469,8 @@ public:
 		      const std::vector<double> &weights);
   /* Get a mixture component */
   PDF* get_base_pdf(int index);
+  /* Get a pool index for a mixture component */
+  int get_base_pdf_index(int index) { return m_pointers[index]; }
   /* Get all the mixture components */
   void get_components(std::vector<int> &pointers,
 		      std::vector<double> &weights);
@@ -466,7 +479,11 @@ public:
   void add_component(int pool_index, double weight);
   /* Normalize the weights to have a sum of 1 */
   void normalize_weights();
-
+  /* Changes the mixture coefficient for a mixture component*/
+  void set_mixture_coefficient(int index, double coeff) { m_weights[index] = coeff; }
+  /* Changes the mixture coefficient for a mixture component*/
+  double get_mixture_coefficient(int index) const { return m_weights[index]; }
+  
   // From pdf
   virtual void start_accumulating();
   virtual void accumulate(double prior,
