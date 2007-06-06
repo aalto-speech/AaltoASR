@@ -254,11 +254,6 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
 {
   assert(accumulated(0));
 
-  Vector old_mean;
-  Matrix old_covariance;
-  get_mean(old_mean);
-  get_covariance(old_covariance);
-  
   Vector new_mean;
   Matrix new_covariance;
   
@@ -269,6 +264,11 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
   else if (m_mode == MMI) {
 
     assert( accumulated(1) );
+
+    Vector old_mean;
+    Matrix old_covariance;
+    get_mean(old_mean);
+    get_covariance(old_covariance);
 
     // c & mu~ & sigma~
     double c = m_accums[0]->gamma() - m_accums[1]->gamma();
@@ -307,7 +307,7 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
     // Note: complex eigenvalues, we want only the max real eigenvalue!
     LaGenMatDouble A=LaGenMatDouble::zeros(2*dim());
     LaGenMatDouble B=LaGenMatDouble::zeros(2*dim());
-    LaGenMatDouble identity=LaGenMatDouble::zeros(dim());
+    LaGenMatDouble identity=LaGenMatDouble::eye(dim());
 
     A(LaIndex(dim(),2*dim()-1),LaIndex(0,dim()-1)).inject(a0);
     A(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a1);
@@ -1501,6 +1501,8 @@ PDFPool::get_pdf(int index) const
 void
 PDFPool::set_pdf(int pdfindex, PDF *pdf)
 {
+  if ((unsigned int)pdfindex >= m_pool.size())
+    m_pool.resize(pdfindex+1);
   m_pool[pdfindex]=pdf;
 }
 
