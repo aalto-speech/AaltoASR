@@ -73,6 +73,11 @@ public:
   PDFPool();
   PDFPool(int dim);
   virtual ~PDFPool();
+
+  /** Set the dimensionality of the distributions in this pool
+   * \param dim Feature/distribution dimension
+   */
+  void set_dim(int dim) { m_dim = dim; }
   /// The dimensionality of the distributions in this pool
   int dim() const { return m_dim; }
   /// The dimensionality of the distributions in this pool
@@ -259,13 +264,15 @@ public:
   /* Sets the covariance matrix for this Gaussian */
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true) = 0;
+  /// Returns a copy of this Gaussian object
+  virtual Gaussian* copy_gaussian(void) = 0;
   
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
 
   /* Splits the current Gaussian to two by disturbing the mean */
-  virtual bool split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2, double minocc = 0, int minfeas = 0) const;
+  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2) const;
   /* Splits the current Gaussian to two by disturbing the mean */
-  virtual bool split(Gaussian &s2, double perturbation = 0.2, double minocc = 0, int minfeas = 0);
+  virtual void split(Gaussian &s2, double perturbation = 0.2);
   /* Sets the parameters for the current Gaussian by merging m1 and m2 */
   virtual void merge(double w1, const Gaussian &m1,
                      double w2, const Gaussian &m2,
@@ -290,6 +297,7 @@ protected:
   std::vector<GaussianAccumulator*> m_accums;
 
   friend class HmmSet;
+  friend class PDFPool;
 };
 
 
@@ -315,6 +323,7 @@ public:
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
+  virtual Gaussian* copy_gaussian(void) { return new DiagonalGaussian(*this); }
 
   // Diagonal-specific
   /// Get the diagonal of the covariance matrix
@@ -354,6 +363,7 @@ public:
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
+  virtual Gaussian* copy_gaussian(void) { return new FullCovarianceGaussian(*this); }
 
 private:
   Vector m_mean;
@@ -384,6 +394,7 @@ public:
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
+  virtual Gaussian* copy_gaussian(void) { return new PrecisionConstrainedGaussian(*this); }
 
   // PCGMM-specific
 
@@ -433,6 +444,7 @@ public:
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
+  virtual Gaussian* copy_gaussian(void) { return new SubspaceConstrainedGaussian(*this); }
 
   // SCGMM-specific
 

@@ -699,7 +699,7 @@ PhonePool::compute_log_likelihood_gain(ContextPhoneCluster &parent,
 void
 PhonePool::save_model(const std::string &base, int max_context_index)
 {
-  HmmSet model;
+  HmmSet model(m_dim);
   MakeHmmModel m(model);
   int state_index = 0;
 

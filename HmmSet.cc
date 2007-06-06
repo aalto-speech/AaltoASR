@@ -29,6 +29,12 @@ HmmSet::HmmSet(const HmmSet &hmm_set)
 }
 
 
+HmmSet::HmmSet(int dimension)
+{
+  m_pool.set_dim(dimension);
+}
+
+
 void
 HmmSet::copy(const HmmSet &hmm_set)
 {
