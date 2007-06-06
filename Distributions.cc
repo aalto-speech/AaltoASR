@@ -94,9 +94,9 @@ FullStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureV
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
-  Vector feature(*(f.get_vector()));
-  Blas_Add_Mult(m_mean, gamma, feature);
-  Blas_R1_Update(m_second_moment, feature, gamma, 1.0, true);
+  const Vector *feature = f.get_vector();
+  Blas_Add_Mult(m_mean, gamma, *feature);
+  Blas_R1_Update(m_second_moment, *feature, gamma, 1.0, true);
 }
 
 
@@ -173,10 +173,10 @@ DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const Feat
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
-  Vector feature(*(f.get_vector()));
-  Blas_Add_Mult(m_mean, gamma, feature);
+  const Vector *feature = f.get_vector();
+  Blas_Add_Mult(m_mean, gamma, *feature);
   for (int i=0; i<dim(); i++)
-    m_second_moment(i) += gamma * feature(i) * feature(i);
+    m_second_moment(i) += gamma * (*feature)(i) * (*feature)(i);
 }
 
 
