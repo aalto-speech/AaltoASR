@@ -12,16 +12,16 @@ main(int argc, char *argv[])
       ('h', "help", "", "", "display help")
       ('g', "gk=FILE", "arg must", "", "previous distributions (.gk)")
       ('o', "out=FILE", "arg must", "", "converted file (.gk)")
-      ('\0', "2d", "", "", "convert Gaussians to diagonal")
-      ('\0', "2f", "", "", "convert Gaussians to full covariances")
+      ('d', "to-diagonal", "", "", "convert Gaussians to diagonal")
+      ('f', "to-full", "", "", "convert Gaussians to full covariances")
       ;
     config.default_parse(argc, argv);
 
-    if (config["2d"].specified && config["2f"].specified)
-      throw std::string("Don't define both --2d and --2f!");
+    if (config["to-diagonal"].specified && config["to-full"].specified)
+      throw std::string("Don't define both -d and -f!");
 
-    if (!config["2d"].specified && !config["2f"].specified)
-      throw std::string("Define either --2d and --2f!");
+    if (!config["to-diagonal"].specified && !config["to-full"].specified)
+      throw std::string("Define either -d and -f!");
 
     PDFPool pool;
     PDFPool new_pool;
@@ -38,9 +38,9 @@ main(int argc, char *argv[])
 
       // Create target Gaussian
       Gaussian *new_gaussian = NULL;
-      if (config["2d"].specified)
+      if (config["to-diagonal"].specified)
         new_gaussian = new DiagonalGaussian(gaussian->dim());
-      if (config["2f"].specified)
+      if (config["to-full"].specified)
         new_gaussian = new FullCovarianceGaussian(gaussian->dim());
       
       // Convert
