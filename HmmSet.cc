@@ -968,10 +968,9 @@ HmmSet::split_gaussians(double minocc, int maxg)
   int total=0;
 
   // Go through every mixture
-  for (int s = 0; s < num_states(); s++) {
+  for (int p = 0; p < num_emission_pdfs(); p++) {
 
-    int pdf_index = emission_pdf_index(s);
-    Mixture *curr_mixture = m_emission_pdfs[pdf_index];
+    Mixture *curr_mixture = m_emission_pdfs[p];
 
     int new_mixture_size = curr_mixture->size();
     std::vector<int> new_pool_indices;

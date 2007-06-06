@@ -16,6 +16,8 @@ std::string out_file;
 
 int info;
 bool transtat;
+int maxg;
+double minocc;
 
 conf::Config config;
 FeatureGenerator fea_gen;
@@ -41,20 +43,22 @@ main(int argc, char *argv[])
       ('\0', "mllt=MODULE", "arg", "", "update maximum likelihood linear transform")
       ('\0', "ml", "", "", "maximum likelihood estimation")
       ('\0', "mmi", "", "", "maximum mutual information estimation")
-      ('\0', "minvar", "arg", "0.1", "minimum variance (default 0.1)")
+      ('\0', "minvar=FLOAT", "arg", "0.1", "minimum variance (default 0.1)")
       ('\0', "covsmooth", "arg", "0", "covariance smoothing (default 0.0)")
-      ('\0', "C1", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
-      ('\0', "C2", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
-      ('\0', "split", "arg", "", "split (every gaussian)")
-      ('\0', "minocc", "arg", "0.0", "minimum occupancy count for splitting")
-      ('\0', "maxg", "arg", "0", "maximum number of Gaussians per state for splitting")
+      ('\0', "C1=FLOAT", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
+      ('\0', "C2=FLOAT", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
+      ('\0', "split", "", "", "split (every gaussian)")
+      ('\0', "minocc=FLOAT", "arg", "0.0", "minimum occupancy count for splitting")
+      ('\0', "maxg=INT", "arg", "0", "maximum number of Gaussians per state for splitting")
       ;
     config.default_parse(argc, argv);
 
     transtat = config["transitions"].specified;    
     info = config["info"].get_int();
     out_file = config["out"].get_str();
-
+    maxg = config["maxg"].get_int();
+    minocc = config["minocc"].get_double();
+    
     if (config["mmi"].specified && config["ml"].specified)
       throw std::string("Don't define both --ml and --mmi!");
     
@@ -121,8 +125,7 @@ main(int argc, char *argv[])
 
     // Split Gaussians if desired
     if (config["split"].specified)
-      model.split_gaussians(config["minocc"].get_double(),
-                            config["maxg"].get_int());
+      model.split_gaussians(minocc, maxg);
 
     model.stop_accumulating();
     
