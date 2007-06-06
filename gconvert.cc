@@ -26,7 +26,8 @@ main(int argc, char *argv[])
     PDFPool pool;
     PDFPool new_pool;
     pool.read_gk(config["gk"].get_str());
-
+    new_pool.set_dim(pool.dim());
+    
     Matrix covariance;
     Vector mean;
     for (int i=0; i<pool.size(); i++) {
