@@ -112,17 +112,18 @@ main(int argc, char *argv[])
                                   config["C1"].get_double(),
                                   config["C2"].get_double());
 
-    // Split Gaussians if desired
-    if (config["split"].specified)
-      model.split_gaussians(config["minocc"].get_double(),
-                            config["maxg"].get_int());
-
     if (transtat)
       model.estimate_transition_parameters();
     if (config["mllt"].specified)
       model.estimate_mllt(fea_gen, config["mllt"].get_str());
     else
       model.estimate_parameters();
+
+    // Split Gaussians if desired
+    if (config["split"].specified)
+      model.split_gaussians(config["minocc"].get_double(),
+                            config["maxg"].get_int());
+
     model.stop_accumulating();
     
     // Write final models

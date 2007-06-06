@@ -288,7 +288,7 @@ public:
   /* Set the full statistics to be accumulated */
   void set_full_stats(bool full_stats) { m_full_stats = full_stats; }
   /* Tells if full statistics have been accumulated for this Gaussian */
-  bool full_stats_accumulated() const { return m_full_stats; }
+  bool full_stats_accumulated() const;
   
 protected:
   double m_constant;
@@ -324,7 +324,8 @@ public:
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
   virtual Gaussian* copy_gaussian(void) { return new DiagonalGaussian(*this); }
-
+  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2) const;
+  
   // Diagonal-specific
   /// Get the diagonal of the covariance matrix
   void get_covariance(Vector &covariance) const;

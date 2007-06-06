@@ -385,13 +385,17 @@ Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
   Vector mean2; get_mean(mean2);
   Matrix cov; get_covariance(cov);
 
-  // Add/Subtract standard deviations
-  // FIXME: should we use eigvals/vecs for full covs?
-  double sd=0;
+  Matrix eigvecs(cov);
+  Vector eigvals(dim());
+  LaEigSolveSymmetricVecIP(eigvecs, eigvals);
   for (int i=0; i<dim(); i++) {
-    sd=perturbation*sqrt(cov(i,i));
-    mean1(i) -= sd;
-    mean2(i) += sd;
+    double t=0;
+    for (int j=0; j<dim(); j++)
+      t +=  eigvals(j) * eigvecs(i,j);
+    // FIXME!? IS THIS CORRECT??
+    t = perturbation * sqrt(t);
+    mean1(i) -= t;
+    mean2(i) += t;
   }
   
   g1.set_mean(mean1);
@@ -511,6 +515,15 @@ Gaussian::kullback_leibler(Gaussian &g) const
 }
 
 
+bool
+Gaussian::full_stats_accumulated() const
+{
+  if (!m_full_stats)
+    return false;
+  return accumulated();
+}
+
+  
 DiagonalGaussian::DiagonalGaussian(int dim)
 {
   reset(dim);
@@ -710,6 +723,30 @@ DiagonalGaussian::set_constant(void)
     m_constant *= m_precision(i);
   if (m_constant > 0)
     m_constant = log(sqrt(m_constant));
+}
+
+
+void
+DiagonalGaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
+{
+  assert(dim() != 0);
+  
+  Vector mean1; get_mean(mean1);
+  Vector mean2; get_mean(mean2);
+  Matrix cov; get_covariance(cov);
+
+  // Add/Subtract standard deviations
+  double sd=0;
+  for (int i=0; i<dim(); i++) {
+    sd=perturbation*sqrt(cov(i,i));
+    mean1(i) -= sd;
+    mean2(i) += sd;
+  }
+  
+  g1.set_mean(mean1);
+  g2.set_mean(mean2);
+  g1.set_covariance(cov);
+  g2.set_covariance(cov);
 }
 
 
