@@ -24,7 +24,7 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est
+PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est gconvert
 
 PROGS_SRCS = $(PROGS:=.cc)
 
