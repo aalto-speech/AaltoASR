@@ -88,6 +88,8 @@ private:
 
     void set_state_index(int state_index) { m_state_index = state_index; }
     int state_index(void) const { return m_state_index; }
+
+    const ContextPhoneSet& get_context_phones(void) { return m_contexts; }
     
   private:
     /** A collection of ordered vector of rules for this cluster.
@@ -181,7 +183,7 @@ private:
   };
 
 
-  /** Callback class for making filling the model to \ref HmmSet
+  /** Callback class for making the model to \ref HmmSet
    */
   class MakeHmmModel : public ContextPhoneCallback {
   public:

@@ -493,10 +493,15 @@ PhonePool::decision_tree_cluster_context_phones(int max_context_index)
       {
         // Find the best rule to split the cluster
         ContextPhoneCluster *new_cluster;
+        int num_rules = 0;
+        if (clusters[c]->num_applied_rule_sets() > 0)
+          num_rules = (int)clusters[c]->applied_rules(0).size();
         apply_best_splitting_rule(clusters[c], context_start, context_end,
                                   &new_cluster);
         if (new_cluster != NULL)
         {
+          assert( (int)clusters[c]->applied_rules(0).size() == num_rules+1 );
+          assert( (int)new_cluster->applied_rules(0).size() == num_rules+1 );
           // The cluster was split, add the new cluster to the vector
           clusters.push_back(new_cluster);
           c--; // Reconsider the split cluster for splitting again
@@ -547,7 +552,7 @@ PhonePool::apply_best_splitting_rule(
       if (c1 < m_min_occupancy || c2 < m_min_occupancy)
         continue;
 
-      ContextPhoneCluster cl1(m_dim), cl2(m_dim);
+      ContextPhoneCluster cl1(*cl), cl2(*cl);
       ContextPhoneSet new_context_phones;
 
       // Use the smaller set to check whether we have a new set of phones
@@ -562,20 +567,13 @@ PhonePool::apply_best_splitting_rule(
       // Check we haven't tested this set before
       for (s = 0; s < (int)applied_sets.size(); s++)
       {
-        ContextPhoneSet temp_set;
-        set_symmetric_difference(applied_sets[s].begin(),
-                                 applied_sets[s].end(),
-                                 new_context_phones.begin(),
-                                 new_context_phones.end(),
-                                 inserter(temp_set, temp_set.begin()));
-        if (temp_set.size() == 0)
-          break;
+        if (new_context_phones == applied_sets[s])
+            break;
       }
       if (s < (int)applied_sets.size()) // Found the same set
         continue;
       
       cl1.fill_cluster(new_context_phones);
-      cl2 = *cl;
       cl2.remove_from_cluster(cl1);
 
       applied_sets.push_back(new_context_phones);
@@ -742,6 +740,7 @@ PhonePool::save_model(const std::string &base, int max_context_index)
   }
   
   iterate_context_phones(m, max_context_index);
+  
   model.write_all(base);
 }
 
@@ -853,8 +852,8 @@ PhonePool::iterate_context_phones(ContextPhoneCallback &c,
                   int j;
                   for (j = 0; j < (int)rules.size(); j++)
                   {
-                    if (cur_phone.rule_answer(rules[j].rule,rules[j].context)!=
-                        rules[j].answer)
+                    if (cur_phone.rule_answer(rules[j].rule, rules[j].context)
+                        != rules[j].answer)
                       break; // Does not fit into this rule set
                   }
                   if (j == (int)rules.size())
