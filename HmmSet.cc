@@ -977,7 +977,7 @@ HmmSet::split_gaussians(double minocc, int maxg)
     std::vector<double> new_weights;
     for (int g = 0; g < curr_mixture->size(); g++) {
 
-      if (new_mixture_size < maxg) {
+      if (maxg == 0 || new_mixture_size < maxg) {
 
         bool split_ok = false;
         int pool_index = curr_mixture->get_base_pdf_index(g);

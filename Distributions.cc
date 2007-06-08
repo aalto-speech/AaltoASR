@@ -390,10 +390,10 @@ Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
   LaEigSolveSymmetricVecIP(eigvecs, eigvals);
   for (int i=0; i<dim(); i++) {
     double t=0;
-    for (int j=0; j<dim(); j++)
-      t +=  eigvals(j) * eigvecs(i,j);
     // FIXME!? IS THIS CORRECT??
-    t = perturbation * sqrt(t);
+    for (int j=0; j<dim(); j++)
+      t +=  sqrt(eigvals(j)) * eigvecs(i,j);
+    t = perturbation * t;
     mean1(i) -= t;
     mean2(i) += t;
   }
