@@ -1396,8 +1396,8 @@ TPLexPrefixTree::debug_prune_dead_ends(Node *node)
   if (node->arcs.size() == 1 && node->arcs[0].next == node)
     node->arcs.clear();
 
-  if (node->arcs.empty() && !(node->flags & NODE_FINAL))
-    fprintf(stderr, "debug_prune_dead_ends: pruned node %d\n", node->node_id);
+  /*if (node->arcs.empty() && !(node->flags & NODE_FINAL))
+    fprintf(stderr, "debug_prune_dead_ends: pruned node %d\n", node->node_id);*/
 }
 
 void
