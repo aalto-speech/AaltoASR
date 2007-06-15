@@ -53,6 +53,13 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 
   is.read((char*)&feacount, sizeof(int));
   is.read((char*)&gamma, sizeof(double));
+
+  if (feacount < 0 || gamma < 0)
+  {
+    fprintf(stderr, "%i %g\n", feacount, gamma);
+    throw std::string("Invalid statistics dump\n");
+  }
+  
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
@@ -72,8 +79,7 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 void
 FullStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_moment) const
 {
-  LaGenMatDouble temp = LaGenMatDouble(m_second_moment);
-  second_moment.copy(temp);
+  second_moment = LaGenMatDouble(m_second_moment);
 }
 
 
@@ -128,6 +134,10 @@ DiagonalStatisticsAccumulator::accumulate_from_dump(std::istream &is)
   
   is.read((char*)&feacount, sizeof(int));
   is.read((char*)&gamma, sizeof(double));
+
+  if (feacount < 0 || gamma < 0)
+    throw std::string("Invalid statistics dump\n");
+  
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
@@ -1336,7 +1346,7 @@ Mixture::dump_statistics(std::ostream &os,
     os << size();
     for (int i=0; i<size()-1; i++)
       os << " " << m_pointers[i] << " " << m_accums[accum_pos]->gamma[i];
-    os << " " << m_pointers[size()-1] << " " << m_accums[accum_pos]->gamma[size()-1];    
+    os << " " << m_pointers[size()-1] << " " << m_accums[accum_pos]->gamma[size()-1];
   }
 }
 
@@ -1455,6 +1465,16 @@ Mixture::read(std::istream &is)
     add_component(index, weight);
   }
   normalize_weights();
+}
+
+
+int
+Mixture::component_index(int p)
+{
+  for (int i = 0; i < (int)m_pointers.size(); i++)
+    if (m_pointers[i] == p)
+      return i;
+  return -1;
 }
 
 
@@ -1610,6 +1630,8 @@ PDFPool::read_gk(const std::string &filename)
 	m_pool[i]=new SubspaceConstrainedGaussian();
         m_pool[i]->read(in);
       }
+      else
+        throw std::string("Unknown model type\n");
     }
   }
 
@@ -1668,20 +1690,44 @@ PDFPool::write_gk(const std::string &filename) const
 
 
 bool
-PDFPool::split_gaussian(int index, int &new_index, double minocc, int minfeas)
+PDFPool::split_gaussian(int index, int *new_index, double minocc, int minfeas)
 {
   Gaussian *gaussian = dynamic_cast< Gaussian* > (m_pool[index]);
   if (gaussian == NULL)
     return false;
 
-  Gaussian *new_gaussian = gaussian->copy_gaussian();
-
   if (gaussian->m_accums[0]->gamma() < minocc)
     return false;
   if (gaussian->m_accums[0]->feacount() < minfeas)
     return false;
-
+  
+  Gaussian *new_gaussian = gaussian->copy_gaussian();
   gaussian->split(*new_gaussian, 0.2);
-  new_index = add_pdf(new_gaussian);
+  *new_index = add_pdf(new_gaussian);
   return true;
+}
+
+
+void
+PDFPool::get_occ_sorted_gaussians(std::vector<int> &sorted_gaussians,
+                                  double minocc)
+{
+  for (int i = 0; i < (int)m_pool.size(); i++)
+  {
+    Gaussian *gaussian = dynamic_cast< Gaussian* > (m_pool[i]);
+    if (gaussian != NULL)
+    {
+      if (gaussian->accumulated(0))
+      {
+        if (gaussian->m_accums[0]->gamma() >= minocc)
+          sorted_gaussians.push_back(i);
+      }
+    }
+  }
+  if (sorted_gaussians.size() > 0)
+  {
+    // Sort the Gaussians according to occupancy
+    std::sort(sorted_gaussians.begin(), sorted_gaussians.end(),
+              PDFPool::Gaussian_occ_comp(m_pool));
+  }
 }

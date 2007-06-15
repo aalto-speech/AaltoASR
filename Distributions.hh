@@ -65,8 +65,6 @@ protected:
 };
 
 
-
-
 class PDFPool {
 public:
   
@@ -110,6 +108,19 @@ public:
    */
   double compute_likelihood(const FeatureVec &f, int index);
 
+  /** Computes likelihoods for all distributions to the cache
+   * \param f the feature vector
+   */
+  void precompute_likelihoods(const FeatureVec &f);
+
+  /// Estimates parameters of the pdfs in the pool
+  void estimate_parameters(void);
+
+
+  /********************************************************************/
+  /* Gaussian specific methods                                        */
+  /********************************************************************/
+  
   /** Sets the parameters used in Gaussian estimation
    * \param minvar    Minimum diagonal variance term for Gaussians
    * \param covsmooth Covariance smoothing value
@@ -121,23 +132,21 @@ public:
 
   /** Splits a Gaussian in the pool with some constrains
   * \param index     Index of the Gaussian to be split
-  * \param new_index The index of the newly created Gaussian is return in this variable
+  * \param new_index The index of the newly created Gaussian is saved
+  *                  to this pointer
   * \param minocc    Minimum occupancy count needed for splitting this Gaussian
   * \param minfeas   Minimum number of features for splitting this Gaussian
   * \return true if the split was succesful, false otherwise
   */
-  bool split_gaussian(int index, int &new_index, double minocc, int minfeas);
-  
-  /// Estimates parameters of the pdfs in the pool
-  void estimate_parameters(void);
-
-  /** Computes likelihoods for all distributions to the cache
-   * \param f the feature vector
-   */
-  void precompute_likelihoods(const FeatureVec &f);
+  bool split_gaussian(int index, int *new_index, double minocc, int minfeas);
 
   double get_minvar(void) { return m_minvar; }
   double get_covsmooth(void) { return m_covsmooth; }
+
+  void get_occ_sorted_gaussians(std::vector<int> &sorted_gaussians,
+                                double minocc);
+
+  struct Gaussian_occ_comp;
   
 private:
   std::vector<PDF*> m_pool;
@@ -298,6 +307,7 @@ protected:
 
   friend class HmmSet;
   friend class PDFPool;
+  friend struct PDFPool::Gaussian_occ_comp;
 };
 
 
@@ -494,8 +504,14 @@ public:
   void normalize_weights();
   /* Changes the mixture coefficient for a mixture component*/
   void set_mixture_coefficient(int index, double coeff) { m_weights[index] = coeff; }
-  /* Changes the mixture coefficient for a mixture component*/
+  /* Returns the mixture coefficient for a mixture component*/
   double get_mixture_coefficient(int index) const { return m_weights[index]; }
+
+  /** Returns the relative component index of a PDF
+   * \param p PDF pool index
+   * \return Index of the component in this mixture, -1 if not found
+   */
+  int component_index(int p);
   
   // From pdf
   virtual void start_accumulating();
@@ -536,5 +552,15 @@ Mixture::MixtureAccumulator::MixtureAccumulator(int mixture_size) {
     gamma[i]=0.0;
   accumulated = false;
 }
+
+// Comparison function to get a sorted list of Gaussians with decreasing
+// occupancies
+struct PDFPool::Gaussian_occ_comp
+{
+  Gaussian_occ_comp(std::vector<PDF*> &pool) : m_pool(pool) { }
+  bool operator()(int x, int y) { return dynamic_cast< Gaussian* > (m_pool[x]) ->m_accums[0]->gamma() > dynamic_cast< Gaussian* > (m_pool[y]) ->m_accums[0]->gamma(); }
+private:
+  std::vector<PDF*> &m_pool;
+};
 
 #endif /* DISTRIBUTIONS_HH */

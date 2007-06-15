@@ -27,7 +27,7 @@ HmmSet model;
 int
 main(int argc, char *argv[])
 {
-
+  double total_log_likelihood = 0;
   try {
     config("usage: estimate [OPTION...]\n")
       ('h', "help", "", "", "display help")
@@ -50,6 +50,7 @@ main(int argc, char *argv[])
       ('\0', "split", "", "", "split (every gaussian)")
       ('\0', "minocc=FLOAT", "arg", "0.0", "minimum occupancy count for splitting")
       ('\0', "maxg=INT", "arg", "0", "maximum number of Gaussians per state for splitting")
+      ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihood)")
       ;
     config.default_parse(argc, argv);
 
@@ -100,7 +101,10 @@ main(int argc, char *argv[])
     // Open the list of statistics files
     std::ifstream filelist(config["list"].get_str().c_str());
     if (!filelist)
+    {
       fprintf(stderr, "Could not open %s\n", config["list"].get_str().c_str());
+      exit(1);
+    }
 
     // Accumulate statistics
     while (filelist >> stat_file && stat_file != " ") {
@@ -108,6 +112,15 @@ main(int argc, char *argv[])
       model.accumulate_mc_from_dump(stat_file+".mcs");
       if (transtat)
         model.accumulate_ph_from_dump(stat_file+".phs");
+      std::string lls_file_name = stat_file+".lls";
+      std::ifstream lls_file(lls_file_name.c_str());
+      if (lls_file)
+      {
+        double temp;
+        lls_file >> temp;
+        lls_file.close();
+        total_log_likelihood += temp;
+      }
     }
 
     // Estimate parameters
@@ -133,6 +146,18 @@ main(int argc, char *argv[])
     model.write_all(out_file);
     if (config["config"].specified) {
       fea_gen.write_configuration(io::Stream(out_file + ".cfg","w"));
+    }
+
+    if (config["savesum"].specified) {
+      std::string summary_file_name = config["savesum"].get_str();
+      std::ofstream summary_file(summary_file_name.c_str(),
+                                 std::ios_base::app);
+      if (!summary_file)
+        fprintf(stderr, "Could not open summary file: %s\n",
+                summary_file_name.c_str());
+      else
+        summary_file << total_log_likelihood << std::endl;
+      summary_file.close();
     }
   }
   

@@ -13,7 +13,6 @@
 #include "util.hh"
 
 std::string out_file;
-std::string save_summary_file;
 
 int info;
 int accum_pos;
@@ -99,7 +98,6 @@ main(int argc, char *argv[])
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for lattice-based training)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for lattice-based training)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for lattice-based training)")
-      ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihood etc.)")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
@@ -128,9 +126,6 @@ main(int argc, char *argv[])
       throw std::string("Must give either --base or all --gk, --mc and --ph");
     }
     out_file = config["out"].get_str();
-
-    if (config["savesum"].specified)
-      save_summary_file = config["savesum"].get_str();
 
     if (config["batch"].specified^config["bindex"].specified)
       throw std::string("Must give both --batch and --bindex");
@@ -258,19 +253,18 @@ main(int argc, char *argv[])
 	      config["bindex"].get_int(), config["batch"].get_int());
       fprintf(stderr, "Total log likelihood: %f\n", total_log_likelihood);
     }
-
-    if (config["savesum"].specified) {
-      std::ofstream summary_file(save_summary_file.c_str());
-      if (!summary_file)
-        fprintf(stderr, "Could not open summary file: %s\n", save_summary_file.c_str());
-      else
-        summary_file << total_log_likelihood;
-      summary_file.close();
-    }
     
     // Write statistics to file dump and clean up
     model.dump_statistics(out_file);
     model.stop_accumulating();
+
+    std::string lls_file_name = out_file+".lls";
+    std::ofstream lls_file(lls_file_name.c_str());
+    if (lls_file)
+    {
+      lls_file << total_log_likelihood << std::endl;
+      lls_file.close();
+    }
   }
 
 

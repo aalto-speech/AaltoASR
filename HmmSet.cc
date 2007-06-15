@@ -684,6 +684,8 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
   
   while(gks.good()) {
     gks.read((char*)&pdf, sizeof(int));
+    if (pdf < 0 || pdf >= num_pdfs)
+      throw std::string("Invalid statistics dump");
     m_pool.get_pdf(pdf)->accumulate_from_dump(gks);
   }
   gks.close();
@@ -792,8 +794,8 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     
     // Estimate the diagonal covariances
     for (int g=0; g < m_pool.size(); g++) {
-      // Ensure that the current Gaussian is of type MlltGaussian
-      // and accumulated or else skip to the next one
+      // Ensure that the current Gaussian has full covariance statistics
+      // accumulated or else skip to the next one
       Gaussian *gaussian = dynamic_cast< Gaussian* >
         (m_pool.get_pdf(g));
       if (gaussian == NULL)
@@ -894,7 +896,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     // Transform mean
     LaVectorDouble old_mean(dim());
     LaVectorDouble new_mean(dim());
-    gaussian->get_mean(old_mean);
+    gaussian->m_accums[0]->get_mean_estimate(old_mean);
     Blas_Mat_Vec_Mult(A, old_mean, new_mean, 1.0, 0.0);
     gaussian->set_mean(new_mean);
     
@@ -918,7 +920,7 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
             /(gaussian->m_accums[0]->feacount()+m_pool.get_covsmooth());
     gaussian->set_covariance(new_covariance);
   }
-      
+  
   // Set transformation
   Blas_Mat_Mat_Mult(A, Aold, temp_m, 1.0, 0.0);
   std::vector<float> tr;
@@ -927,6 +929,12 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     for (int j=0; j<dim(); j++)
       tr[i*dim() + j] = temp_m(i,j);
   mllt_module->set_transformation_matrix(tr);
+
+  // FIXME: Because this function is called directly from estimate.cc
+  // instead of HmmSet::estimate_parameters(), we need to estimate
+  // mixture parameters as well
+  for (int s = 0; s < num_states(); s++)
+    m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
 }
 
 
@@ -965,42 +973,51 @@ HmmSet::set_full_stats(bool full_stats)
 int
 HmmSet::split_gaussians(double minocc, int maxg)
 {
-  int total=0;
+  int num_splits = 0;
+  std::vector<int> sorted_gaussians;
 
-  // Go through every mixture
-  for (int p = 0; p < num_emission_pdfs(); p++) {
-
-    Mixture *curr_mixture = m_emission_pdfs[p];
-
-    int new_mixture_size = curr_mixture->size();
-    std::vector<int> new_pool_indices;
-    std::vector<double> new_weights;
-    for (int g = 0; g < curr_mixture->size(); g++) {
-
-      if (maxg == 0 || new_mixture_size < maxg) {
-
-        bool split_ok = false;
-        int pool_index = curr_mixture->get_base_pdf_index(g);
-        int new_pool_index;
-
-        split_ok = m_pool.split_gaussian(pool_index, new_pool_index, minocc, 0);
-
-        if (split_ok) {
-          // Halve the current mixing coefficient
-          double curr_coef = curr_mixture->get_mixture_coefficient(g);
-          curr_mixture->set_mixture_coefficient(g, 0.5*curr_coef);
-          new_pool_indices.push_back(new_pool_index);
-          new_weights.push_back(0.5*curr_coef);
-          new_mixture_size++;
-          total++;
+  m_pool.get_occ_sorted_gaussians(sorted_gaussians, minocc);
+  for (int i = 0; i < (int)sorted_gaussians.size(); i++)
+  {
+    bool split = true;
+    std::vector<int> pdf_index;
+    Gaussian *g=dynamic_cast< Gaussian* >(m_pool.get_pdf(sorted_gaussians[i]));
+    if (g == NULL)
+      throw std::string("Invalid PDF type");
+    
+    for (int p = 0; p < num_emission_pdfs(); p++)
+    {
+      if (m_emission_pdfs[p]->component_index(sorted_gaussians[i]) >= 0)
+      {
+        if (m_emission_pdfs[p]->size() >= maxg)
+        {
+          split = false;
+          break;
         }
-        
+        pdf_index.push_back(p);
       }
     }
-
-    for (unsigned int i = 0; i < new_pool_indices.size(); i++)
-      curr_mixture->add_component(new_pool_indices[i], new_weights[i]);
+    if (split)
+    {
+      // OK to split this Gaussian
+      int new_pool_index;
+      split = m_pool.split_gaussian(sorted_gaussians[i], &new_pool_index,
+                                    minocc, 0);
+      if (split)
+      {
+        // Update the mixtures
+        for (int p = 0; p < (int)pdf_index.size(); p++)
+        {
+          Mixture *cur_mixture = m_emission_pdfs[pdf_index[p]];
+          int g = cur_mixture->component_index(sorted_gaussians[i]);
+          assert( g >= 0 );
+          double cur_coef = cur_mixture->get_mixture_coefficient(g);
+          cur_mixture->set_mixture_coefficient(g, 0.5*cur_coef);
+          cur_mixture->add_component(new_pool_index, 0.5*cur_coef);
+        }
+        num_splits++;
+      }
+    }
   }
-
-  return total;
+  return num_splits;
 }
