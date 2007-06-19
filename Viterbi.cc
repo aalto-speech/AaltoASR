@@ -236,9 +236,6 @@ Viterbi::fill_transition_probs()
 void
 Viterbi::fill_observation_probs(const FeatureVec &fea_vec)
 {
-  // FIXME: Do we need the precomputation? Might be faster without...
-  m_model.precompute_likelihoods(fea_vec);
-  
   Lattice::Range &range = m_lattice.range(m_current_frame);
   assert(range.end > range.start);
 

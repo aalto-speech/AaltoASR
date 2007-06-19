@@ -71,6 +71,8 @@ public:
   void set_state_num_labels(bool l) { m_state_num_labels = l; }
   void set_relative_sample_numbers(bool r) { m_relative_sample_numbers = r; }
 
+  int first_frame(void) { return m_first_frame; }
+
   /** Reads one line from phn transcription.
    * \note \ref next_frame() is a wrapper for next_phn_line() and should
    * be used whenever possible.

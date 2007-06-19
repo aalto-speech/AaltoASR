@@ -260,12 +260,13 @@ main(int argc, char *argv[])
       }
 
       // Open the audio and phn files from the given list.
-      recipe.infos[f].init_phn_files(&model, false, false, false, &fea_gen,
-                                     config["raw-input"].specified, NULL);
+      recipe.infos[f].init_phn_files(NULL, false, false, false, &fea_gen,
+                                     config["raw-input"].specified,
+                                     &phn_reader);
     
       phn_out_file.open(recipe.infos[f].alignment_path.c_str(), "w");
 
-      ll = viterbi_align(viterbi, phn_reader.current_frame(),
+      ll = viterbi_align(viterbi, phn_reader.first_frame(),
                          (int)(recipe.infos[f].end_time*fea_gen.frame_rate()),
                          phn_out_file, recipe.infos[f].speaker_id,
                          recipe.infos[f].utterance_id);
