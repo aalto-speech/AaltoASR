@@ -126,13 +126,16 @@ void SpeakerConfig::read_speaker_file(FILE *file)
 }
 
 
-void SpeakerConfig::write_speaker_file(FILE *file)
+void SpeakerConfig::write_speaker_file(FILE *file,
+                                       std::set<std::string> *speakers,
+                                       std::set<std::string> *utterances)
 {
   if (m_cur_speaker.size() > 0)
     retrieve_speaker_config(m_cur_speaker);
 
   // Write default speaker configuration
-  if (m_default_speaker_set)
+  if (m_default_speaker_set && (speakers == NULL ||
+                                speakers->find("default") != speakers->end()))
   {
     fputs("speaker default\n{\n", file);
     for (ModuleMap::const_iterator module_it=m_default_speaker_config.begin();
@@ -149,19 +152,24 @@ void SpeakerConfig::write_speaker_file(FILE *file)
   for (SpeakerMap::const_iterator speaker_it = m_speaker_config.begin();
        speaker_it != m_speaker_config.end(); speaker_it++)
   {
-    fprintf(file, "speaker %s\n{\n", (*speaker_it).first.c_str());
-    for (ModuleMap::const_iterator module_it = (*speaker_it).second.begin();
-       module_it != (*speaker_it).second.end(); module_it++)
+    if (speakers == NULL ||
+        speakers->find((*speaker_it).first) != speakers->end())
     {
-      fprintf(file, "  %s\n", (*module_it).first.c_str());
-      (*module_it).second.write(file, 2);
-      fputs("\n", file);
+      fprintf(file, "speaker %s\n{\n", (*speaker_it).first.c_str());
+      for (ModuleMap::const_iterator module_it = (*speaker_it).second.begin();
+           module_it != (*speaker_it).second.end(); module_it++)
+      {
+        fprintf(file, "  %s\n", (*module_it).first.c_str());
+        (*module_it).second.write(file, 2);
+        fputs("\n", file);
+      }
+      fputs("}\n\n",file);
     }
-    fputs("}\n\n",file);
   }
 
   // Write default utterance configuration
-  if (m_default_utterance_set)
+  if (m_default_utterance_set &&
+      (utterances == NULL || utterances->find("default") != utterances->end()))
   {
     fputs("utterance default\n{\n", file);
     for (ModuleMap::const_iterator module_it =
@@ -179,15 +187,19 @@ void SpeakerConfig::write_speaker_file(FILE *file)
   for (SpeakerMap::const_iterator ut_it = m_utterance_config.begin();
        ut_it != m_utterance_config.end(); ut_it++)
   {
-    fprintf(file, "utterance %s\n{\n", (*ut_it).first.c_str());
-    for (ModuleMap::const_iterator module_it = (*ut_it).second.begin();
-       module_it != (*ut_it).second.end(); module_it++)
+    if (utterances == NULL ||
+        utterances->find((*ut_it).first) != utterances->end())
     {
-      fprintf(file, "  %s\n", (*module_it).first.c_str());
-      (*module_it).second.write(file, 2);
-      fputs("\n", file);
+      fprintf(file, "utterance %s\n{\n", (*ut_it).first.c_str());
+      for (ModuleMap::const_iterator module_it = (*ut_it).second.begin();
+           module_it != (*ut_it).second.end(); module_it++)
+      {
+        fprintf(file, "  %s\n", (*module_it).first.c_str());
+        (*module_it).second.write(file, 2);
+        fputs("\n", file);
+      }
+      fputs("}\n\n",file);
     }
-    fputs("}\n\n",file);
   }
 }
 

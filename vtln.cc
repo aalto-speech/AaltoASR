@@ -295,8 +295,23 @@ main(int argc, char *argv[])
     
     // Write new speaker configuration
     if (config["out"].specified)
+    {
+      std::set<std::string> *speaker_set = NULL, *utterance_set = NULL;
+      std::set<std::string> speakers, empty_ut;
+      if (config["batch"].get_int() > 1)
+      {
+        if (config["bindex"].get_int() == 1)
+          speakers.insert(std::string("default"));
+        for (SpeakerStatsMap::iterator it = speaker_stats.begin();
+             it != speaker_stats.end(); it++)
+          speakers.insert((*it).first);
+        speaker_set = &speakers;
+        utterance_set = &empty_ut;
+      }
+      
       speaker_conf.write_speaker_file(
-        io::Stream(config["out"].get_str(), "w"));
+        io::Stream(config["out"].get_str(), "w"), speaker_set, utterance_set);
+    }
   }
   catch (HmmSet::UnknownHmm &e) {
     fprintf(stderr, 

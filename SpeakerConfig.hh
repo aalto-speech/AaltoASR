@@ -2,6 +2,7 @@
 #define SPEAKERCONFIG_HH
 
 #include <vector>
+#include <set>
 #include <map>
 #include <string>
 
@@ -17,7 +18,8 @@ public:
   SpeakerConfig(FeatureGenerator &fea_gen);
   
   void read_speaker_file(FILE *file);
-  void write_speaker_file(FILE *file);
+  void write_speaker_file(FILE *file, std::set<std::string> *speakers = NULL,
+                          std::set<std::string> *utterances = NULL);
 
   void set_speaker(const std::string &speaker_id);
   const std::string& get_cur_speaker(void) { return m_cur_speaker; }
