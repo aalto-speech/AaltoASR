@@ -5,7 +5,8 @@ ARCH = $(shell uname -p)
 ifeq ($(ARCH),x86_64)
 CXX = /usr/local/bin/g++
 OPT = -O2
-INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include -I/share/puhe/x86_64/include/lapackpp -I/share/puhe/x86_64/include/hcld/
+INCLUDES = -I/share/puhe/x86_64/include/lapackpp -I/share/puhe/linux/include -I/share/puhe/x86_64/include/hcld/
+#INCLUDES = -I/share/puhe/x86_64/include -I/share/puhe/linux/include -I/home/jpylkkon/libs/include/lapackpp -I/share/puhe/x86_64/include/hcld/
 LDFLAGS = -L/share/puhe/x86_64/lib
 WARNINGS = -Wall -Wno-deprecated
 DEPFLAG = -MM
@@ -24,7 +25,7 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est gconvert
+PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est gconvert test_hmmnet random_feature_test
 
 PROGS_SRCS = $(PROGS:=.cc)
 
@@ -38,6 +39,7 @@ CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 CLASS_OBJS = $(CLASS_SRCS:.cc=.o)
 
 LIBS = -lfftw3 -lsndfile -lm -llapackpp -llapack -lhcld
+#LIBS = -lhcld /home/jpylkkon/libs/lib/liblapackpp.a /home/jpylkkon/libs/lapack-3.1.1/lapack_X86_64.a /home/jpylkkon/libs/lapack-3.1.1/blas_X86_64.a -lfftw3 -lsndfile -lg2c -lm 
 
 ALL_SRCS = $(CLASS_SRCS) $(PROGS_SRCS)
 ALL_OBJS = $(ALL_SRCS:.cc=.o)
