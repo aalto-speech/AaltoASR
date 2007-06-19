@@ -125,7 +125,23 @@ START END LABEL COMMENT
 </pre>
 
 Numbers are in samples.  Ending time is the first sample after the
-phoneme.
+phoneme. The phoneme labels may be accompanied with a state number,
+counted from zero. Example:
+
+<pre>
+8448 11776 _-k+o.0 * kolme
+11776 14336 _-k+o.1 
+14336 15232 _-k+o.2 
+15232 15616 k-o+l.0 
+15616 16000 k-o+l.1 
+16000 16640 k-o+l.2 
+16640 16896 o-l+m.0 
+16896 17280 o-l+m.1 
+17280 17664 o-l+m.2 
+17664 17920 l-m+e.0 
+17920 18176 l-m+e.1 
+18176 18560 l-m+e.2 
+</pre>
 
 
 <h3>Basebind</h3>
@@ -148,14 +164,33 @@ _-k+o 3 9 10 11
 
 <h3>Train filelist (recipe)</h3>
 
-FILE PHNFILE OUTPUT_PHNFILE START_TIME(0=start) END_TIME(0=file end) FIRST_LINE(optional) LAST_LINE(optional) SPEAKER_ID(optional)
+Each line specifies one training utterance/segment. Possible fields:
+
+<ul>
+  <li> audio=&lt;audio file&gt;, accepts all audio formats supported by sndlib
+  <li> transcript=&lt;transcript file&gt;, either phone or state alignment
+  <li> alignment=&lt;state alignment file&gt;, used both for input and output
+  <li> hmmnet=&lt;hmmnet file&gt;, used for Baum-Welch training
+  <li> den-hmmnet=&lt;denominator hmmnet file&gt;, used for MMI training
+  <li> lna=&lt;lna file&gt;, output file for phone_probs
+  <li> start-time=&lt;time in seconds&gt;, start time in audio file
+  <li> end-time=&lt;time in seconds&gt;, end time in audio file
+  <li> start-line=&lt;line number&gt;, start line in transcript file
+  <li> end-line=&lt;line number&gt;, end line in transcript file
+  <li> speaker=&lt;speaker ID&gt;, speaker ID for adaptation
+  <li> utterance=&lt;utterance ID&gt; utterance ID for adaptation
+</ul>
+
+If time limits and line limits overlap, the most limiting factor is used.
+
+<p>
+Example:
 
 <pre>
-synt.sph synt.phn synt2.phn 0 42620
-lootus.sph lootus.phn lootus2.phn 100 200 30 50 spk1
+audio=/share/puhe/audio/speecon-fi/adult/ADULT1FI/BLOCK00/SES001/SA001S01.FI0 transcript=/share/work/jpylkkon/phn/speecon/SES001/SA001S01.phn hmmnet=/share/work/jpylkkon/hmmnet/speecon/SES001/SA001S01.hmmnet den-hmmnet=/share/work/jpylkkon/den-hmmnet/speecon/SA001S01.fst alignment=/share/work/jpylkkon/phn/speecon/SES001/SA001S01.stateseg speaker=SES001
+audio=/share/puhe/audio/speecon-fi/adult/ADULT1FI/BLOCK00/SES002/SA002CC1.FI0 transcript=/share/work/jpylkkon/phn/speecon/SES002/SA002CC1.phn hmmnet=/share/work/jpylkkon/hmmnet/speecon/SES002/SA002CC1.hmmnet den-hmmnet=/share/work/jpylkkon/den-hmmnet/speecon/SA002CC1.fst alignment=/share/work/jpylkkon/phn/speecon/SES002/SA002CC1.stateseg speaker=SES002
 </pre>
 
-Start time and end time are in seconds. First line means the first phn-line to be included and so on: counting starts from 1. If timelimits and linelimits overlap, the most limiting factor is used.
 
 
 <h3>LNA_file</h3>
