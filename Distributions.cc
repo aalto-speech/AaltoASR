@@ -53,12 +53,11 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 
   is.read((char*)&feacount, sizeof(int));
   is.read((char*)&gamma, sizeof(double));
+  if (is.fail())
+    fprintf(stderr, "Error while reading statistics dump\n");
 
   if (feacount < 0 || gamma < 0)
-  {
-    fprintf(stderr, "%i %g\n", feacount, gamma);
     throw std::string("Invalid statistics dump\n");
-  }
   
   m_feacount += feacount;
   m_gamma += gamma;
@@ -134,7 +133,9 @@ DiagonalStatisticsAccumulator::accumulate_from_dump(std::istream &is)
   
   is.read((char*)&feacount, sizeof(int));
   is.read((char*)&gamma, sizeof(double));
-
+  if (is.fail())
+    fprintf(stderr, "Error while reading statistics dump\n");
+  
   if (feacount < 0 || gamma < 0)
     throw std::string("Invalid statistics dump\n");
   
@@ -180,6 +181,8 @@ DiagonalStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_mome
 void
 DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureVec &f)
 {
+  assert( feacount >= 0 );
+  assert( gamma >= 0 );
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;

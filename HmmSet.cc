@@ -681,11 +681,13 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
 
   if (dim != m_pool.dim())
     throw std::string("HmmSet::accumulate_gk_from_dump: the dimensionality of mixture base distributions in: %s is wrong\n", filename.c_str());
-  
+
   while(gks.good()) {
     gks.read((char*)&pdf, sizeof(int));
+    if (gks.eof())
+      break;
     if (pdf < 0 || pdf >= num_pdfs)
-      throw std::string("Invalid statistics dump");
+      throw std::string("Invalid statistics dump (wrong pdf index)");
     m_pool.get_pdf(pdf)->accumulate_from_dump(gks);
   }
   gks.close();
