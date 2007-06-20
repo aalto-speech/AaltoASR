@@ -4,6 +4,9 @@
 # modify appropriately. You MUST modify at least the path settings,
 # training file list and BASE_ID/Initial model names!
 
+# Run this script at itl-cl1, as it uses GridEngine for scheduling
+# the parallel processes.
+
 use locale;
 use strict;
 
