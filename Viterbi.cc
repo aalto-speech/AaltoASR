@@ -248,7 +248,7 @@ Viterbi::fill_observation_probs(const FeatureVec &fea_vec)
     if (m_state_prob[p] > best_prob)
       best_prob = m_state_prob[p];
   }
-  assert(best_prob > 0);
+  assert(best_prob >= 0);
 
   float best_log_prob = util::safe_log(best_prob);
   for (p = range.start; p < range.end; p++) 
