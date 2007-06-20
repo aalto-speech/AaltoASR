@@ -43,15 +43,15 @@ my $ALIGN_BEAM = 1000;
 my $ALIGN_SBEAM = 100;
 
 # Context phone tying options
-my $TIE_USE_OUT_PHN = 0;
+my $TIE_USE_OUT_PHN = 0; # 0=read transcript field, 1=read alignment field
 my $TIE_RULES = "$SCRIPTDIR/finnish_rules.txt";
-my $TIE_MIN_COUNT = 1500;
-my $TIE_MIN_GAIN = 1200;
-my $TIE_MAX_LOSS = 1200;
+my $TIE_MIN_COUNT = 1500; # Minimum number of features per state
+my $TIE_MIN_GAIN = 1200; # Minimum loglikelihood gain for a state split
+my $TIE_MAX_LOSS = 1200; # Maximum loglikelihood loss for merging states
 
 # Gaussian splitting options
-my $SPLIT_MIN_OCCUPANCY = 250;
-my $SPLIT_MAX_GAUSSIANS = 24;
+my $SPLIT_MIN_OCCUPANCY = 250; # Accumulated state probability
+my $SPLIT_MAX_GAUSSIANS = 24;  # Per state
 
 # Minimum variance
 my $MINVAR = 0.1;
@@ -70,6 +70,7 @@ my $VTLN_MODULE = "vtln";
 my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
 
 # Misc settings
+my $DUR_SKIP_MODELS = 8; # Models without duration model (silences/noises)
 my $FILEFORMAT = "-R"; # Empty for wav files, -R for raw
 my $VERBOSITY = 1;
 
@@ -89,7 +90,7 @@ context_phone_tying($tempdir, $init_model, $init_cfg);
 # Convert the generated full covariance model to diagonal model
 convert_full_to_diagonal($init_model);
 
-# Create the hmmnet file
+# Create the hmmnet files
 generate_hmmnet_files($tempdir, $init_model);
 
 # ML/EM training
@@ -335,7 +336,7 @@ sub estimate_vtln {
 # NOTE: Uses alignments
 sub estimate_dur_model {
   my $om = shift(@_);
-  system("$BINDIR/dur_est -p $om.ph -r $RECIPE -O --gamma $om.dur --skip 8") && die("Error estimating duration models");
+  system("$BINDIR/dur_est -p $om.ph -r $RECIPE -O --gamma $om.dur --skip $DUR_SKIP_MODELS") && die("Error estimating duration models");
 }
 
 
