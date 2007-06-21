@@ -280,6 +280,8 @@ PhnReader::next_phn_line(Phn &phn)
   str::chomp(&m_line);
   std::vector<std::string> fields;
 
+  phn.state = -1; // state default value !
+  
   // If the first char is digit, we have start and end fields.
   if (isdigit(m_line[0])) {
     str::split(&m_line, " \t", true, &fields, 4);
@@ -293,9 +295,6 @@ PhnReader::next_phn_line(Phn &phn)
       phn.end = (int)(str::str2long(&fields[1], &ok)/m_samples_per_frame);
 
       // read state
-
-      phn.state = -1; // state default value !
-
       if (strchr(fields[2].c_str(), '.') != NULL){
 	phn.state = atoi( (const char*)(strchr(fields[2].c_str(), '.') + 1) );
 	fields[2].erase(fields[2].find('.', 0), 2);
