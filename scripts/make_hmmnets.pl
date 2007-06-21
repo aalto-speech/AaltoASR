@@ -33,7 +33,7 @@ while (<>) {
   /hmmnet=(\S*)/;
   $hmmnet_file = $1;
   for ($retry = 0; $retry < 4; $retry++) {
-    open $fh, "| fst_optimize -A - $hmmnet_file";
+    open $fh, "| fst_optimize -A - $hmmnet_file" or die "can't run fst_optimize: $!";
     phn2fsm($phn_file, $fh);
     last if (close($fh) && ($?>>8) == 0);
   }
