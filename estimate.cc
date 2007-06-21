@@ -17,7 +17,6 @@ std::string out_file;
 int info;
 bool transtat;
 int maxg;
-double minocc;
 
 conf::Config config;
 FeatureGenerator fea_gen;
@@ -47,8 +46,8 @@ main(int argc, char *argv[])
       ('\0', "covsmooth", "arg", "0", "covariance smoothing (default 0.0)")
       ('\0', "C1=FLOAT", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
       ('\0', "C2=FLOAT", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
-      ('\0', "split", "", "", "split (every gaussian)")
-      ('\0', "minocc=FLOAT", "arg", "0.0", "minimum occupancy count for splitting")
+      ('\0', "delete=FLOAT", "arg", "0.0", "delete Gaussians with occupancies below the threshold")
+      ('\0', "split=FLOAT", "arg", "0.0", "split a Gaussian if the occupancy exceeds the threshold")
       ('\0', "maxg=INT", "arg", "0", "maximum number of Gaussians per state for splitting")
       ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihood)")
       ;
@@ -58,7 +57,6 @@ main(int argc, char *argv[])
     info = config["info"].get_int();
     out_file = config["out"].get_str();
     maxg = config["maxg"].get_int();
-    minocc = config["minocc"].get_double();
     
     if (config["mmi"].specified && config["ml"].specified)
       throw std::string("Don't define both --ml and --mmi!");
@@ -136,9 +134,13 @@ main(int argc, char *argv[])
     else
       model.estimate_parameters();
 
+    // Delete Gaussians
+    if (config["delete"].specified)
+      model.delete_gaussians(config["delete"].get_double());
+    
     // Split Gaussians if desired
     if (config["split"].specified)
-      model.split_gaussians(minocc, maxg);
+      model.split_gaussians(config["split"].get_double(), maxg);
 
     model.stop_accumulating();
     

@@ -973,6 +973,94 @@ HmmSet::set_full_stats(bool full_stats)
 
 
 int
+HmmSet::delete_gaussians(double minocc)
+{
+  std::vector<int> index_map;
+  int orig_pool_size = m_pool.size();
+
+  index_map.resize(orig_pool_size);
+  // Initialize the index map
+  for (int i = 0; i < orig_pool_size; i++)
+    index_map[i] = i;
+
+  // Find the Gaussians to be deleted
+  for (int i = 0; i < orig_pool_size; i++)
+  {
+    if (m_pool.get_gaussian_occupancy(i) < minocc)
+    {
+      if (m_pool.get_gaussian_occupancy(i) >= 0) // Check this was valid value
+      {
+        for (int j = i+1; j < orig_pool_size; j++)
+          index_map[j]--;
+        index_map[i] = -1; // Mark for deletion
+      }
+    }
+  }
+
+  // Retain at least one Gaussian for each mixture
+  for (int p = 0; p < num_emission_pdfs(); p++)
+  {
+    // Check if all the components from this mixture would be deleted
+    bool all_deleted = true;
+    Mixture *cur_mixture = m_emission_pdfs[p];
+    for (int i = 0; i < cur_mixture->size(); i++)
+    {
+      if (index_map[cur_mixture->get_base_pdf_index(i)] >= 0)
+      {
+        all_deleted = false;
+        break;
+      }
+    }
+    if (all_deleted)
+    {
+      // Find the maximum mixture weight and retain that component
+      double max_weight = -1;
+      int max_index = -1;
+      for (int i = 0; i < cur_mixture->size(); i++)
+      {
+        if (cur_mixture->get_mixture_coefficient(i) > max_weight)
+        {
+          max_weight = cur_mixture->get_mixture_coefficient(i);
+          max_index = cur_mixture->get_base_pdf_index(i);
+        }
+      }
+      assert( max_index >= 0);
+      // Find the new index
+      int new_index = 0;
+      for (int j = max_index-1; j >= 0; j--)
+        if (index_map[j] >= 0)
+        {
+          new_index = index_map[j]+1;
+          break;
+        }
+      // Update the index map
+      index_map[max_index] = new_index;
+      for (int j = max_index+1; j < orig_pool_size; j++)
+        if (index_map[j] >= 0)
+          index_map[j]++;
+    }
+  }
+
+  // Delete the Gaussians
+  int index_offset = 0;
+  for (int i = 0; i < orig_pool_size; i++)
+    if (index_map[i] < 0)
+    {
+      m_pool.delete_pdf(i-index_offset);
+      index_offset++;
+    }
+
+  // Update the mixtures
+  for (int p = 0; p < num_emission_pdfs(); p++)
+  {
+    m_emission_pdfs[p]->update_components(index_map);
+    assert( m_emission_pdfs[p]->size() > 0 );
+  }
+  return index_offset; // Return the number of Gaussians deleted
+}
+
+
+int
 HmmSet::split_gaussians(double minocc, int maxg)
 {
   int num_splits = 0;

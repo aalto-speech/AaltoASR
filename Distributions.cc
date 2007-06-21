@@ -1481,6 +1481,25 @@ Mixture::component_index(int p)
 }
 
 
+void
+Mixture::update_components(const std::vector<int> &cmap)
+{
+  for (int i = 0; i < (int)m_pointers.size(); i++)
+  {
+    if (cmap[m_pointers[i]] < 0)
+    {
+      // Delete this component
+      m_pointers.erase(m_pointers.begin()+i);
+      m_weights.erase(m_weights.begin()+i);
+      i--; // Continue from the next component
+    }
+    else
+      m_pointers[i] = cmap[m_pointers[i]];
+  }
+  normalize_weights();
+}
+
+
 PDFPool::PDFPool() {
   reset();
 }
@@ -1535,7 +1554,17 @@ PDFPool::add_pdf(PDF *pdf)
 {
   int index = (int)m_pool.size();
   m_pool.push_back(pdf);
+  m_likelihoods.resize(m_pool.size());
   return index;
+}
+
+
+void
+PDFPool::delete_pdf(int index)
+{
+  m_pool.erase(m_pool.begin()+index);
+  reset_cache();
+  m_likelihoods.resize(m_pool.size());
 }
 
 
@@ -1708,6 +1737,16 @@ PDFPool::split_gaussian(int index, int *new_index, double minocc, int minfeas)
   gaussian->split(*new_gaussian, 0.2);
   *new_index = add_pdf(new_gaussian);
   return true;
+}
+
+
+double
+PDFPool::get_gaussian_occupancy(int index) const
+{
+  Gaussian *gaussian = dynamic_cast< Gaussian* > (m_pool[index]);
+  if (gaussian != NULL && gaussian->accumulated(0))
+    return gaussian->m_accums[0]->gamma();
+  return -1;
 }
 
 

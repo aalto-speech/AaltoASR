@@ -382,7 +382,14 @@ public:
    * \param c2 the C2 constant
    */
   void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2); }
-  
+
+  /** Deletes Gaussians which occupancy count is below the given threshold.
+   * Assures that at least one Gaussian is left for each mixture.
+   * \param minocc Occupancy threshold
+   * \return The number of Gaussians deleted
+   */
+  int delete_gaussians(double minocc);
+
   /** Splits every Gaussian in the pool with some constrains
    * OBS!! ASSUMES CURRENTLY CONTINUOUS-DENSITY HMMS!!
    * \param minocc    Minimum occupancy count needed for splitting a gaussian
@@ -391,7 +398,6 @@ public:
    * \return          Amount of new Gaussians created to the pool
   */ 
   int split_gaussians(double minocc, int maxg);
-
   
 private:
 

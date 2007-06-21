@@ -78,7 +78,7 @@ public:
   void set_dim(int dim) { m_dim = dim; }
   /// The dimensionality of the distributions in this pool
   int dim() const { return m_dim; }
-  /// The dimensionality of the distributions in this pool
+  /// Number of distributions in this pool
   int size() const { return m_pool.size(); };
   /// Reset everything
   void reset();
@@ -92,6 +92,12 @@ public:
    * \return Index of the pdf in the pool
    */
   int add_pdf(PDF *pdf);
+
+  /** Deletes a pdf from the pool. Note that all indices after the deleted
+   *  pdf will decrease by one.
+   *  \param index PDF index
+   */
+  void delete_pdf(int index);
   
   /// Read the distributions from a .gk -file
   void read_gk(const std::string &filename);
@@ -140,8 +146,12 @@ public:
   */
   bool split_gaussian(int index, int *new_index, double minocc, int minfeas);
 
-  double get_minvar(void) { return m_minvar; }
-  double get_covsmooth(void) { return m_covsmooth; }
+  double get_minvar(void) const { return m_minvar; }
+  double get_covsmooth(void) const { return m_covsmooth; }
+
+  /** \param index PDF index
+   * \return Gaussian occupancy, -1 if not a Gaussian or not accumulated. */
+  double get_gaussian_occupancy(int index) const;
 
   void get_occ_sorted_gaussians(std::vector<int> &sorted_gaussians,
                                 double minocc);
@@ -487,24 +497,30 @@ public:
   int size() const { return m_pointers.size(); };
   void reset();
   void set_pool(PDFPool *pool);
-  /* Set the mixture components, clear existing mixture */
+  /** Set the mixture components, clear existing mixture */
   void set_components(const std::vector<int> &pointers,
 		      const std::vector<double> &weights);
-  /* Get a mixture component */
+  /** \return the mixture component */
   PDF* get_base_pdf(int index);
-  /* Get a pool index for a mixture component */
+
+  /** \return a pool index for a mixture component */
   int get_base_pdf_index(int index) { return m_pointers[index]; }
-  /* Get all the mixture components */
+
+  /** Get all the mixture components */
   void get_components(std::vector<int> &pointers,
 		      std::vector<double> &weights);
-  /* Add one new component to the mixture. 
-     Doesn't normalize the coefficients in between */
+  
+  /** Add one new component to the mixture. 
+   * Doesn't normalize the coefficients in between */
   void add_component(int pool_index, double weight);
-  /* Normalize the weights to have a sum of 1 */
+  
+  /** Normalize the weights to have a sum of 1 */
   void normalize_weights();
-  /* Changes the mixture coefficient for a mixture component*/
+  
+  /** Changes the mixture coefficient for a mixture component*/
   void set_mixture_coefficient(int index, double coeff) { m_weights[index] = coeff; }
-  /* Returns the mixture coefficient for a mixture component*/
+  
+  /** \return the mixture coefficient for a mixture component*/
   double get_mixture_coefficient(int index) const { return m_weights[index]; }
 
   /** Returns the relative component index of a PDF
@@ -512,6 +528,13 @@ public:
    * \return Index of the component in this mixture, -1 if not found
    */
   int component_index(int p);
+
+  /** Updates component indices and deletes removed components.
+   * Normalizes the weights after component deletion.
+   * \param cmap Reference to a vector which maps old indices to new ones
+   *             The deleted components are marked as -1.
+   */
+  void update_components(const std::vector<int> &cmap);
   
   // From pdf
   virtual void start_accumulating();

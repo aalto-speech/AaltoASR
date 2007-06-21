@@ -252,7 +252,7 @@ sub ml_estimate {
   my $extra_options = "";
 
   $extra_options = "--mllt $MLLT_MODULE_NAME" if ($mllt_flag);
-  $extra_options = $extra_options." --split --minocc $SPLIT_MIN_OCCUPANCY --maxg $SPLIT_MAX_GAUSSIANS" if ($split_flag);
+  $extra_options = $extra_options." --split $SPLIT_MIN_OCCUPANCY --maxg $SPLIT_MAX_GAUSSIANS" if ($split_flag);
 
   my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -t -i $VERBOSITY --minvar $minvar --ml -s ${BASE_ID}_loglikelihoods $extra_options\n");
   submit_and_wait($batch_info, 10); # Reduced batch check interval
