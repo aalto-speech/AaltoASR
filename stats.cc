@@ -18,7 +18,6 @@ int info;
 int accum_pos;
 bool transtat;
 float start_time, end_time;
-int start_frame, end_frame;
 double total_log_likelihood=0;
 
 conf::Config config;
