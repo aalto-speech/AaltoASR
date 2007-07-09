@@ -34,6 +34,7 @@ public:
     int end;
     int state;
     std::vector<std::string> label;
+    std::string speaker;
     std::string comment;
   };
 
@@ -68,6 +69,11 @@ public:
 
   virtual void set_collect_transition_probs(bool collect) { m_collect_transitions = collect; }
 
+  /** Sets phn type: normal / speakered (sphn = speakered phn)
+   * speakered phns have speaker ID between label and comment
+   */   
+  void set_speaker_phns(bool sphn);
+  
   void set_state_num_labels(bool l) { m_state_num_labels = l; }
   void set_relative_sample_numbers(bool r) { m_relative_sample_numbers = r; }
 
@@ -114,6 +120,9 @@ private:
 
   /// true if eof has been detected, or line/frame limits have been reached
   bool m_eof_flag;
+
+  /// true for speakered phns
+  bool m_speaker_phns;
   
   /// true if labels are state numbers instead of HMM labels
   bool m_state_num_labels;

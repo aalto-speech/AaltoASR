@@ -123,6 +123,13 @@ PhnReader::set_frame_limits(int first_frame, int last_frame)
 }
 
 
+void
+PhnReader::set_speaker_phns(bool sphn)
+{
+  m_speaker_phns = sphn;
+}
+
+
 bool
 PhnReader::init_utterance_segmentation(void)
 {
