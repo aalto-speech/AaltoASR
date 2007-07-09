@@ -274,15 +274,18 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
     m_accums[0]->get_mean_estimate(new_mean);
     m_accums[0]->get_covariance_estimate(new_covariance);
   }
+  else if (m_mode == MMI && !accumulated(1)) {
+    fprintf(stderr, "Warning: MMI statistics were not updated for this Gaussian, backing down to ML estimation\n");
+    m_accums[0]->get_mean_estimate(new_mean);
+    m_accums[0]->get_covariance_estimate(new_covariance);
+  }
   else if (m_mode == MMI) {
-
-    assert( accumulated(1) );
-
+    
     Vector old_mean;
     Matrix old_covariance;
     get_mean(old_mean);
     get_covariance(old_covariance);
-
+    
     // c & mu~ & sigma~
     double c = m_accums[0]->gamma() - m_accums[1]->gamma();
     LaVectorDouble mu_tilde;
@@ -334,12 +337,11 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
     LaGenMatComplex eigvecs;
     LinearAlgebra::generalized_eigenvalues(A,B,eigvals,eigvecs);
 
+    // Find a good D
     double d=0;
     for (int i=0; i<eigvals.size(); i++)
-      if (eigvals(i).i < 0.000000001)
-        d=std::max(d, eigvals(i).r);
-    
-    assert(d>0);
+      if (std::fabs(eigvals(i).i) < 0.000000001)
+        d=std::max(d, eigvals(i).r);    
     assert(c2>1);
     d=std::max(c1*m_accums[1]->gamma(), c2*d);
     
@@ -1412,32 +1414,58 @@ Mixture::estimate_parameters(void)
 
     double diff=1, norm;
 
-    // Iterate while the weights change
+    // Iterate until convergence
     std::vector<double> old_weights = m_weights;
-    while (diff > 0.0001) {
-
+    while (diff > 0.000001) {
       diff=0;
       std::vector<double> previous_weights = m_weights;
 
+      // Go through every mixture weight
       for (int i=0; i<size(); i++) {
-
-        // Set c_new = c_old * gam_num / gam_den
-        m_weights[i] = old_weights[i] * m_accums[0]->gamma[i]/m_accums[1]->gamma[i];
-
-        // Renormalize weights
-        norm=0;
+        // Solve a quadratic equation
+        // See Povey: Frame discrimination training ... 3.3 (9)
+        // Note: the equation isn't given explicitly, needs some derivation
+        double a, b, c, temp, sol1, sol2;
+        // a
+        a=0, temp=0;
         for (int j=0; j<size(); j++)
           if (i != j)
-            norm += m_weights[j];
-        norm = (1 - m_weights[i]) / norm;
-        for (int j=0; j<size(); j++) {
+            temp += previous_weights[j];
+        for (int j=0; j<size(); j++)
           if (i != j)
-            m_weights[j] *= norm;
-        }
+            a -= m_accums[1]->gamma[j] * previous_weights[j] / (old_weights[j] * temp);
+        a -= m_accums[1]->gamma[i] / old_weights[i];
+        // b
+        b = -a;
+        for (int j=0; j<size(); j++)
+            b -= m_accums[0]->gamma[j];
+        // c
+        c = m_accums[0]->gamma[i];
+        // Solve
+        sol1 = (-b-sqrt(b*b-4*a*c)) / (2*a);
+        sol2 = (-b+sqrt(b*b-4*a*c)) / (2*a);
+        assert(sol1 > 0); assert(sol1 < 1);
+        m_weights[i] = sol1;
       }
 
+      // Renormalize weights
+      norm=0;
       for (int i=0; i<size(); i++)
-        diff += std::abs(m_weights[i]-previous_weights[i]);
+        norm += m_weights[i];
+      for (int i=0; i<size(); i++)
+        m_weights[i] /= norm;
+      
+      // Compute abs difference to the previous weights
+      for (int i=0; i<size(); i++)
+        diff += std::fabs(m_weights[i]-previous_weights[i]);
+
+      // Compute function value
+      /*
+      double fval = 0;
+      for (int i=0; i<size(); i++)
+        fval += m_accums[0]->gamma[i] * m_weights[i] - m_accums[1]->gamma[i] * m_weights[i] / old_weights[i];
+      std::cout << "The function value is: " << fval << std::endl;
+      */
     }
   }  
 }
