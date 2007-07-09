@@ -192,6 +192,18 @@ public:
    */
   inline HmmTransition &transition(int t);
 
+  /** Returns a pointer to a base PDF in the pool
+   * \param index pool index
+   * \return a pointer to the pdf
+   */
+  PDF *get_pool_pdf(int index) { return m_pool.get_pdf(index); }
+
+  /** Returns a pointer to a mixture PDF in this model
+   * \param index emission pdf index
+   * \return a pointer to the mixture
+   */
+  Mixture *get_emission_pdf(int index) { return m_emission_pdfs[index]; }
+  
   /** Adds a pdf to the pool
    * \param pdf Pointer to PDF object
    * \return Index of the pdf in the pool
