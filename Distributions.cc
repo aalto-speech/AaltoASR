@@ -265,7 +265,8 @@ void
 Gaussian::estimate_parameters(double minvar, double covsmooth,
                               double c1, double c2)
 {
-  assert(accumulated(0));
+  if (!accumulated(0))
+    throw std::string("Parameters could not be estimated, ML statistics not accumulated");
 
   Vector new_mean;
   Matrix new_covariance;
@@ -1398,8 +1399,9 @@ Mixture::stop_accumulating()
 void
 Mixture::estimate_parameters(void)
 {
-  assert(accumulated(0));
-  
+  if (!accumulated(0))
+    throw std::string("Parameters could not be estimated, ML statistics not accumulated");
+
   if (m_mode == ML || !accumulated(1)) {    
     double total_gamma = 0;
     for (int i=0; i<size(); i++)
@@ -1645,10 +1647,16 @@ PDFPool::estimate_parameters(void)
   for (int i=0; i<size(); i++)
   {
     Gaussian *temp = dynamic_cast< Gaussian* > (m_pool[i]);
-    if (temp != NULL)
-      temp->estimate_parameters(m_minvar, m_covsmooth, m_c1, m_c2);
-    else
-      m_pool[i]->estimate_parameters();
+
+    try {
+      if (temp != NULL)
+        temp->estimate_parameters(m_minvar, m_covsmooth, m_c1, m_c2);
+      else
+        m_pool[i]->estimate_parameters();
+    } catch (std::string errstr) {
+      std::cout << "Warning: Gaussian number " << i
+                << ": " << errstr << std::endl;
+    }
   }
 }
 

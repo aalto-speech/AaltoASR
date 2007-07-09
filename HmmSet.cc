@@ -739,8 +739,14 @@ void
 HmmSet::estimate_parameters(void)
 {
   m_pool.estimate_parameters();
-  for (int s = 0; s < num_states(); s++)
-    m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
+  for (int s = 0; s < num_states(); s++) {
+    try {
+      m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
+    } catch (std::string errstr) {
+      std::cout << "Warning: emission pdf for state " << s
+                << ": " <<  errstr << std::endl;
+    }
+  }
 }
 
 
