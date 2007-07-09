@@ -11,12 +11,12 @@ MllrTrainer::MllrTrainer(HmmSet &model, FeatureGenerator &feagen) :
   m_dim = m_model.dim();
   
   // create vector and matrix arrays
-  k_array = new d_vector*[m_dim];
-  G_array = new d_matrix*[m_dim];
+  k_array = new Vector*[m_dim];
+  G_array = new Matrix*[m_dim];
   for (int i = 0; i < m_dim; i++)
   {
-    k_array[i] = new d_vector(m_dim+1);
-    G_array[i] = new d_matrix(m_dim+1, m_dim+1);
+    k_array[i] = new Vector(m_dim+1);
+    G_array[i] = new Matrix(m_dim+1, m_dim+1);
   }
 
   // set statistics to zero
@@ -39,85 +39,74 @@ MllrTrainer::~MllrTrainer()
 
 void MllrTrainer::find_probs(HmmState *state, const FeatureVec &feature)
 {
-  int k_index; // kernel index
-  int kernelcount = (state->weights).size();
-  float probs[kernelcount]; 
-  float prob_sum = 0;
+  // get the mixture
+  Mixture *mixture = m_model.get_emission_pdf(state->emission_pdf);
+  int gaussiancount = mixture->size();
 
+  double probs[gaussiancount]; 
+  double prob_sum = 0;
+  
   // check dim
-
   if (m_dim != m_feagen.dim())
-  {
     throw std::string("MllrTrainer: Model and feature dimensions disagree");
-  }
-    
+  
   // get probabilities
-
-  for (int k = 0; k < kernelcount; k++)
+  for (int g = 0; g < gaussiancount; g++)
   {  
-    k_index = (state->weights[k]).kernel;
+    DiagonalGaussian *gaussian =
+      dynamic_cast< DiagonalGaussian* > (mixture->get_base_pdf(g));
+    if (gaussian == NULL)
+      throw std::string("Warning: MLLR not supported for non-diagonal models");
     
-    if (((m_model.kernel(k_index)).cov).type() != HmmCovariance::DIAGONAL)
-    {
-      throw std::string("MllrTrainer: Expected diagonal covariance matrix");
-    }
-
-    probs[k] = m_model.compute_kernel_likelihood(k_index, feature);
-    prob_sum = prob_sum + probs[k];
+    probs[g] = gaussian->compute_likelihood(feature);
+    prob_sum += probs[g];
   }
   
   if (prob_sum != 0)
-  {  
-    for (int k = 0; k < kernelcount; k++)
-      probs[k] = probs[k]/prob_sum;
-  }
+    for (int g = 0; g < gaussiancount; g++)
+      probs[g] = probs[g]/prob_sum;
   else
-  {
     m_zero_prob_count++;
-  }
-
+  
   update_stats(state, probs, feature);
 }
 
 void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
 {
   int i, j; // rows, columns
-  d_matrix A(m_dim, m_dim);
-  float detA = 1;
-  dense1D<int> pivots(m_dim);
-  dense1D<int> pivots2(m_dim+1);
-  d_matrix cofactors(m_dim, m_dim);
-  d_matrix G(m_dim+1, m_dim+1);
-  d_matrix G_inv(m_dim+1, m_dim+1);
-  d_vector p(m_dim+1);
-  d_vector w(m_dim+1);
-  d_matrix trans(m_dim, m_dim+1);
+  Matrix A(m_dim, m_dim);
+  double detA = 1;
+  LaVectorLongInt pivots(m_dim);
+  LaVectorLongInt pivots2(m_dim+1);
+  Matrix cofactors(m_dim, m_dim);
+  Matrix G(m_dim+1, m_dim+1);
+  Matrix G_inv(m_dim+1, m_dim+1);
+  Vector p(m_dim+1);
+  Vector w(m_dim+1);
+  Matrix trans(m_dim, m_dim+1);
+  LaGenMatDouble identity = LaGenMatDouble::eye(m_dim);
   double alpha;
   
   // check that we have probabilities
   if (m_beta == 0)
-  {
     throw std::string("ERROR: No probabilities. See if .seg-file empty.");
-  }
 
   if (m_zero_prob_count > 0)
-  {
     printf("Warning: There were %i zero probability sample(s)\n",
            m_zero_prob_count);
-  }
-
+  
   // Initialize the transform with identity matrix
-  mtl::set(trans, 0);
+  trans=0;
   for (i = 0; i < m_dim; i++)
     trans(i,i+1) = 1;
   
   // calculate inverse of G
   for (i = 0; i < m_dim; i++)
   {
-    copy(*(G_array[i]), G);
-    lu_factor(G, pivots2);
-    lu_inverse(G, pivots2, G_inv);
-    copy(G_inv, *(G_array[i]));
+    G.copy(*(G_array[i]));
+    LUFactorizeIP(G, pivots2);
+    LaLUInverseIP(G, pivots2);
+    (*(G_array[i])).copy(G);
   }
 
   // calculate transformation
@@ -136,51 +125,57 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
     }
 
     // calculate cofactors
-    transpose(A);
-    lu_factor(A, pivots);
-    lu_inverse(A, pivots, cofactors);
-    
+
+    // transpose A
+    Matrix temp_matrix(A);
+    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity, A);
+    cofactors.copy(A);
+    LUFactorizeIP(cofactors, pivots);
+
     for (i = 0; i < m_dim; i++)
       detA *= A(i, i);
 
-    scale(cofactors, detA);
-    
+    LaLUInverseIP(cofactors, pivots); 
+    Blas_Scale(detA, cofactors);
+
     // cofactor vector
-    p[0] = 0;
+    p(0) = 0;
     for (j = 0; j < m_dim; j++)
-      p[j+1] = cofactors[row][j];
+      p(j+1) = cofactors(row,j);
     
-    // alpha parameter    
-    alpha = calculate_alpha(*(G_array[row]), p, *(k_array[row]), m_beta);
+    // alpha parameter
+    alpha = calculate_alpha(*(G_array[row]), p, *(k_array[row]), m_beta);    
     
     // calculate ith row of transformation matrix
-    scale(p, alpha);
-    add(*(k_array[row]), p);
-    transpose(*(G_array[row]));
+    Blas_Scale(alpha, p);
+    Blas_Add_Mult(p, 1.0, *(k_array[row]));
+    temp_matrix.copy(*(G_array[row]));
+    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity, *(G_array[row]));
 
-    mult(*(G_array[row]), p, w);
+    Blas_Mat_Vec_Mult(*(G_array[row]), p, w);
 
     for(j = 0; j < m_dim+1; j++)
-      trans(row, j) = w[j];
+      trans(row, j) = w(j);
     
-    transpose(*(G_array[row]));
+    temp_matrix.copy(*(G_array[row]));
+    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity, *(G_array[row]));
     
     row++; // next row 
   }
 
 
   // Accumulate the new matrix with the previous one
-  d_matrix A1(m_dim, m_dim);
-  d_vector b1(m_dim);
-  d_matrix A2(m_dim, m_dim);
-  d_vector b2(m_dim);
+  Matrix A1(m_dim, m_dim);
+  Vector b1(m_dim);
+  Matrix A2(m_dim, m_dim);
+  Vector b2(m_dim);
   const std::vector<float> *bias = mllr_mod->get_transformation_bias();
   const std::vector<float> *matrix = mllr_mod->get_transformation_matrix();
   
   for (i = 0; i < m_dim; i++)
   {
-    b1[i] = (*bias)[i];
-    b2[i] = trans(i, 0);
+    b1(i) = (*bias)[i];
+    b2(i) = trans(i, 0);
     for (j = 0; j < m_dim; j++)
     {
       A1(i, j) = (*matrix)[i*m_dim + j];
@@ -189,12 +184,11 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
   }
 
   // calculate A x + b =  A2 (A1 x + b1) + b2
-  d_vector b(m_dim);
-  mult(A2, A1, A);
-  mtl::set(A,0);
-  mult(A2, A1, A);
-  mult(A2, b1, b); 
-  add(b2, b);
+  Vector b(m_dim);
+  A=0;
+  Blas_Mat_Mat_Mult(A2, A1, A, 1.0, 0.0);
+  Blas_Mat_Vec_Mult(A2, b1, b);
+  Blas_Add_Mult(b, 1.0, b2);
 
   // Set the transformation
   std::vector<float> new_bias;
@@ -203,7 +197,7 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
   new_matrix.resize(m_dim*m_dim, 0);
   for (i = 0; i < m_dim; i++)
   {
-    new_bias[i] = b[i];
+    new_bias[i] = b(i);
     for (j = 0; j < m_dim; j++)
     {
       new_matrix[i*m_dim+j] = A(i, j);
@@ -237,75 +231,72 @@ void MllrTrainer::clear_stats()
 {
   for(int i = 0; i < m_dim; i++)
   {
-    mtl::set(*(k_array[i]), 0);
-    mtl::set(*(G_array[i]), 0);
+    *(k_array[i]) = 0;
+    *(G_array[i]) = 0;
   }
   m_beta = 0;
   m_zero_prob_count = 0;
 }
 
-void MllrTrainer::update_stats(HmmState *state, float *probs,
+void MllrTrainer::update_stats(HmmState *state, double *probs,
                               const FeatureVec &feature)
 {
-  typedef double d;
-  int i, j; // rows, columns
-  int k_index, kernelcount;
-  float k_mean, k_var;
+  int i; // rows, columns
+  int gaussiancount;
 
-  d_matrix matrix(m_dim+1, m_dim+1); 
+  Matrix matrix(m_dim+1, m_dim+1); 
 
   // extended feature vector
-
-  d_vector fea_vector(m_dim+1); fea_vector[0] = 1; 
-
-  for(i = 1; i < m_dim+1; i++) fea_vector[i] = (double)feature[i-1];
-
+  Vector fea_vector(m_dim+1); fea_vector(0) = 1;
+  for (i = 1; i < m_dim+1; i++) fea_vector(i) = feature[i-1];
+  
   // k array
-
-  kernelcount = (state->weights).size();
-
-  for (int k = 0; k < kernelcount; k++)
+  Mixture *mixture = m_model.get_emission_pdf(state->emission_pdf);
+  gaussiancount = mixture->size();
+    
+  for (int g = 0; g < gaussiancount; g++)
   {
-    k_index = (state->weights[k]).kernel;
+    DiagonalGaussian *gaussian =
+      dynamic_cast< DiagonalGaussian* > (mixture->get_base_pdf(g));
+    if (gaussian == NULL)
+      throw std::string("Warning: MLLR not supported for non-diagonal models");
 
+    // get gaussian statistics
+    Vector g_mean;
+    Vector g_var;
+    gaussian->get_mean(g_mean);
+    gaussian->get_covariance(g_var);
+    
+    // update k(i)
     for (int i = 0; i < m_dim; i++)
-    {
-      // get kernel statistics
-      k_mean = (m_model.kernel(k_index)).center[i];
-      k_var = ((m_model.kernel(k_index)).cov).diag(i);
-      
-      // update k(i)
-      add( scaled(fea_vector, (d)(k_mean/k_var * probs[k])), *(k_array[i]));
-    }
+      Blas_Add_Mult(*(k_array[i]), g_mean(i)/g_var(i)*probs[g], fea_vector);
   }
-
+  
   // G array
+  matrix=0;
+  Blas_R1_Update(matrix, fea_vector, fea_vector);
 
-  for (i = 0; i < m_dim+1; i++){
-    for (j = 0; j < m_dim+1; j++)
-      matrix[i][j] = fea_vector[i]*fea_vector[j];
-  }
-
-  for (int k = 0; k < kernelcount; k++)
+  for (int g = 0; g < gaussiancount; g++)
   {
-    k_index = (state->weights[k]).kernel;
+    DiagonalGaussian *gaussian =
+      dynamic_cast< DiagonalGaussian* > (mixture->get_base_pdf(g));
+    if (gaussian == NULL)
+      fprintf(stderr, "Warning: MLLR not supported for non-diagonal models");
 
-    for(int i = 0; i < m_dim; i++)
-    {
-      // get kernel statistics
-      k_var = ((m_model.kernel(k_index)).cov).diag(i);
-
-      // update G(i)
-      add( scaled(matrix, (d)(1/k_var * probs[k])), *(G_array[i]));
-    }
+    // get gaussian statistics
+    Vector g_var;
+    gaussian->get_covariance(g_var);
+    
+    for (int i = 0; i < m_dim; i++)
+      Blas_Add_Mat_Mult(*(G_array[i]), 1/g_var(i) * probs[g], matrix);
   }
 
-  for (int k = 0; k < kernelcount; k++)
-    m_beta += (d)probs[k];
+  for (int g = 0; g < gaussiancount; g++)
+    m_beta += probs[g];
 }
 
-double MllrTrainer::calculate_alpha(d_matrix &Gi, d_vector &p, 
-				 d_vector &k, double beta)
+double MllrTrainer::calculate_alpha(Matrix &Gi, Vector &p, 
+                                    Vector &k, double beta)
 {
 
   double c2 = quadratic(p, Gi, p);
@@ -328,17 +319,9 @@ double MllrTrainer::calculate_alpha(d_matrix &Gi, d_vector &p,
 
 }
 
-double MllrTrainer::quadratic(d_vector &x, d_matrix &A, d_vector &y)
+double MllrTrainer::quadratic(Vector &x, Matrix &A, Vector &y)
 {
-
-  double sum = 0;
-
-  for (int i = 0; i < (int)A.nrows(); i++)
-  {
-    for (int j = 0; j < (int)A.ncols(); j++)
-    {
-      sum += A[i][j] * x[i] * y[j];
-    }
-  }
-  return sum;
+  LaVectorDouble temp(x.size());
+  Blas_Mat_Vec_Mult(A, y, temp);
+  return Blas_Dot_Prod(temp, x);
 }

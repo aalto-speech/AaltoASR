@@ -23,7 +23,7 @@ conf::Config config;
 Recipe recipe;
 HmmSet model;
 FeatureGenerator fea_gen;
-PhnReader phn_reader;
+PhnReader *phn_reader;
 SpeakerConfig speaker_conf(fea_gen);
 
 typedef std::map<std::string, MllrTrainer*> MllrTrainerMap;
@@ -32,49 +32,6 @@ bool ordered_spk; // files for a speaker are arranged successively
 
 LinTransformModule *mllr_module;
 std::string cur_speaker;
-
-
-void
-open_files(const std::string &audio_file, const std::string &phn_file, 
-	   int first_phn_line, int last_phn_line)
-{
-  int first_sample;
-
-  // Open sph file
-  fea_gen.open(audio_file, raw_flag);
-
-  // Open transcription
-  phn_reader.open(phn_file);
-
-  // Start and end time
-
-  if(seg_files)
-  {
-    phn_deviation = (int)(start_time * fea_gen.frame_rate());
-  }
-  else
-  {
-    phn_deviation = 0;
-
-    // Note: PHN files always use time multiplied by 16000
-    phn_reader.set_sample_limit((int)(start_time * 16000), 
-				(int)(end_time * 16000));
-  }
-
-  // Start and end line
-
-  phn_reader.set_line_limit(first_phn_line, last_phn_line, 
-			    &first_sample);
-
-  float phn_time = (float)phn_deviation / fea_gen.frame_rate();
-
-  if (first_sample + 16000 * phn_time > 16000 * start_time) {
-    start_time = (float)(first_sample / 16000);
-    start_frame = (int)(fea_gen.frame_rate() * start_time) + phn_deviation;
-  }
-
-  // note: we calculate frame = sample / 16000 * frame_rate + phn_deviation
-}
 
 
 void
@@ -140,7 +97,7 @@ train_mllr(int start_frame, int end_frame, std::string &speaker,
   else
     cur_speaker = "";
 
-  while (phn_reader.next(phn))
+  while (phn_reader->next_phn_line(phn))
   {
     if (phn.state < 0)
       throw std::string("State segmented phn file is needed");
@@ -203,12 +160,13 @@ main(int argc, char *argv[])
     config("usage: mllr [OPTION...]\n")
       ('h', "help", "", "", "display help")
       ('b', "base=BASENAME", "arg", "", "base filename for model files")
-      ('g', "gk=FILE", "arg", "", "Gaussian kernels")
-      ('m', "mc=FILE", "arg", "", "kernel indices for states")
+      ('g', "gk=FILE", "arg", "", "Mixture base distributions")
+      ('m', "mc=FILE", "arg", "", "Mixture coefficients for the states")
       ('p', "ph=FILE", "arg", "", "HMM definitions")
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for adaptation")
+      ('H', "hmmnet", "", "", "use HMM networks for training")      
       ('R', "raw-input", "", "", "raw audio input")
       ('M', "mllr=MODULE", "arg must", "", "MLLR module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
@@ -217,6 +175,8 @@ main(int argc, char *argv[])
       ('\0', "sphn", "", "", "phn-files with speaker ID's in use")
       ('\0', "snl", "", "", "phn-files with state number labels")
       ('\0', "ords","", "", "files for each speaker are arranged successively")
+      ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
+      ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -241,23 +201,22 @@ main(int argc, char *argv[])
       throw std::string("Must give either --base or all --gk, --mc and --ph");
     }
 
+    // Some required switches
+    state_num_labels = config["snl"].specified;
     ordered_spk = config["ords"].specified;
+    seg_files = config["seg"].specified;
     
     // Read recipe file
-    recipe.read(io::Stream(config["recipe"].get_str()));
+    recipe.read(io::Stream(config["recipe"].get_str()),
+                config["batch"].get_int(), config["bindex"].get_int(),
+                true);    
 
+    // Read linear transformation
     mllr_module = dynamic_cast< LinTransformModule* >
       (fea_gen.module(config["mllr"].get_str()));
     if (mllr_module == NULL)
       throw std::string("Module ") + config["mllr"].get_str() +
         std::string(" is not a linear transformation module");
-
-    phn_reader.set_speaker_phns(config["sphn"].specified);
-
-    state_num_labels = config["snl"].specified;
-    phn_reader.set_state_num_labels(state_num_labels);
-
-    seg_files = config["seg"].specified;
 
     // Check the dimension
     if (model.dim() != fea_gen.dim()) {
@@ -268,6 +227,7 @@ main(int argc, char *argv[])
 
     speaker_conf.read_speaker_file(io::Stream(config["speakers"].get_str()));
 
+    // Process each recipe line
     for (int f = 0; f < (int)recipe.infos.size(); f++)
     {
       if (info > 0)
@@ -279,20 +239,24 @@ main(int argc, char *argv[])
                   recipe.infos[f].end_time);
         fprintf(stderr,"\n");
       }
-    
-      start_time = recipe.infos[f].start_time;
-      end_time = recipe.infos[f].end_time;
 
-      start_frame = (int)(start_time * fea_gen.frame_rate());
-      end_frame = (int)(end_time * fea_gen.frame_rate());
-    
-      // Open the audio and phn files from the given list.
-      open_files(recipe.infos[f].audio_path, 
-                 (config["ophn"].specified?recipe.infos[f].phn_out_path:
-                  recipe.infos[f].phn_path),
-                 (config["ophn"].specified?0:recipe.infos[f].start_line),
-                 (config["ophn"].specified?0:recipe.infos[f].end_line));
+      // Create phn_reader
+      bool skip;
+      phn_reader = 
+        recipe.infos[f].init_phn_files(&model, false, false,
+                                       config["ophn"].specified, &fea_gen,
+                                       config["raw-input"].specified, NULL);
+      phn_reader->set_speaker_phns(config["sphn"].specified);
+      phn_reader->set_state_num_labels(state_num_labels);
 
+      if (!phn_reader->init_utterance_segmentation())
+      {
+        fprintf(stderr, "Could not initialize the utterance for PhnReader.");
+        fprintf(stderr,"Current file was: %s\n",
+                recipe.infos[f].audio_path.c_str());
+        skip = true;
+      }
+      
       if (!config["sphn"].specified &&
           recipe.infos[f].speaker_id.size() == 0)
         throw std::string("Speaker ID is missing");
@@ -301,7 +265,7 @@ main(int argc, char *argv[])
                  recipe.infos[f].utterance_id);
 
       fea_gen.close();
-      phn_reader.close();
+      phn_reader->close();
     }
 
     // Compute the MLLR transformations
