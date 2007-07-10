@@ -487,7 +487,8 @@ HmmSet::accumulate_transition(int transition_index, double prior)
 void
 HmmSet::dump_statistics(const std::string base) const
 {
-  dump_ph_statistics(base+".phs");
+  if (m_mode == PDF::ML)
+    dump_ph_statistics(base+".phs");
   dump_mc_statistics(base+".mcs");
   dump_gk_statistics(base+".gks");
 }
@@ -609,7 +610,7 @@ HmmSet::accumulate_ph_from_dump(const std::string filename)
   std::ifstream phs(filename.c_str());
   if (!phs) {
     fprintf(stderr, "HmmSet::accumulate_ph_from_dump(): could not open %s\n", filename.c_str());
-    throw OpenError();
+    return;
   }
   
   unsigned int num_transitions;
