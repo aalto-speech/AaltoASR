@@ -720,6 +720,42 @@ PowerModule::generate(int frame)
 
 
 //////////////////////////////////////////////////////////////////
+// MelPowerModule
+//////////////////////////////////////////////////////////////////
+
+MelPowerModule::MelPowerModule()
+{
+  m_type_str = type_str();
+}
+
+void
+MelPowerModule::get_module_config(ModuleConfig &config)
+{
+}
+
+void
+MelPowerModule::set_module_config(const ModuleConfig &config)
+{
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+  m_dim = 1;
+}
+
+void
+MelPowerModule::generate(int frame)
+{
+  float power = 0;
+  int src_dim = m_sources.back()->dim();
+  const FeatureVec src = m_sources.back()->at(frame);
+
+  for (int i = 0; i < src_dim; i++)
+    power += exp(src[i]);
+
+  m_buffer[frame][0] = log(power + 1e-10);
+}
+
+
+//////////////////////////////////////////////////////////////////
 // DCTModule
 //////////////////////////////////////////////////////////////////
 

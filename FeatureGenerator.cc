@@ -119,6 +119,8 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new MelModule(this);
     else if (type == PowerModule::type_str())
       module = new PowerModule();
+    else if (type == MelPowerModule::type_str())
+      module = new MelPowerModule();
     else if (type == DCTModule::type_str())
       module = new DCTModule();
     else if (type == DeltaModule::type_str())

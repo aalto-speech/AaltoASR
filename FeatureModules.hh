@@ -301,6 +301,17 @@ private:
 };
 
 
+class MelPowerModule : public FeatureModule {
+public:
+  MelPowerModule();
+  static const char *type_str() { return "mel_power"; }
+private:
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
+  virtual void generate(int frame);
+};
+
+
 class DCTModule : public FeatureModule {
 public:
   DCTModule();
