@@ -11,8 +11,8 @@ MllrTrainer::MllrTrainer(HmmSet &model, FeatureGenerator &feagen) :
   m_dim = m_model.dim();
   
   // create vector and matrix arrays
-  k_array = new Vector*[m_dim];
-  G_array = new Matrix*[m_dim];
+  k_array.resize(m_dim);
+  G_array.resize(m_dim);
   for (int i = 0; i < m_dim; i++)
   {
     k_array[i] = new Vector(m_dim+1);
@@ -31,9 +31,6 @@ MllrTrainer::~MllrTrainer()
     delete k_array[i];
     delete G_array[i];
   }
-
-  delete [] k_array;
-  delete [] G_array;
 }
 
 
@@ -85,6 +82,7 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
   Vector w(m_dim+1);
   Matrix trans(m_dim, m_dim+1);
   LaGenMatDouble identity = LaGenMatDouble::eye(m_dim);
+  LaGenMatDouble identity_extended = LaGenMatDouble::eye(m_dim+1);
   double alpha;
   
   // check that we have probabilities
@@ -132,8 +130,10 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
     cofactors.copy(A);
     LUFactorizeIP(cofactors, pivots);
 
+//    for (i = 0; i < m_dim; i++)
+//      detA *= A(i, i);
     for (i = 0; i < m_dim; i++)
-      detA *= A(i, i);
+      detA *= cofactors(i, i);
 
     LaLUInverseIP(cofactors, pivots); 
     Blas_Scale(detA, cofactors);
@@ -150,7 +150,7 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
     Blas_Scale(alpha, p);
     Blas_Add_Mult(p, 1.0, *(k_array[row]));
     temp_matrix.copy(*(G_array[row]));
-    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity, *(G_array[row]));
+    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity_extended, *(G_array[row]));
 
     Blas_Mat_Vec_Mult(*(G_array[row]), p, w);
 
@@ -158,7 +158,7 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
       trans(row, j) = w(j);
     
     temp_matrix.copy(*(G_array[row]));
-    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity, *(G_array[row]));
+    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity_extended, *(G_array[row]));
     
     row++; // next row 
   }
@@ -185,6 +185,7 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
 
   // calculate A x + b =  A2 (A1 x + b1) + b2
   Vector b(m_dim);
+  b=0;
   A=0;
   Blas_Mat_Mat_Mult(A2, A1, A, 1.0, 0.0);
   Blas_Mat_Vec_Mult(A2, b1, b);
@@ -321,7 +322,14 @@ double MllrTrainer::calculate_alpha(Matrix &Gi, Vector &p,
 
 double MllrTrainer::quadratic(Vector &x, Matrix &A, Vector &y)
 {
-  LaVectorDouble temp(x.size());
-  Blas_Mat_Vec_Mult(A, y, temp);
-  return Blas_Dot_Prod(temp, x);
+  double sum = 0;
+  
+  for (int i = 0; i < (int)A.rows(); i++)
+  {
+    for (int j = 0; j < (int)A.cols(); j++)
+    {
+      sum += A(i,j) * x(i) * y(j);
+    }
+  }
+  return sum;
 }

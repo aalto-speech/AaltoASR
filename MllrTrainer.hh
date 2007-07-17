@@ -64,8 +64,8 @@ private:
 
   int m_dim; // model dimension / feature dimension
 
-  Vector **k_array; // holds statistics for vector k(i)
-  Matrix **G_array; // holds statistics for matrix G(i)
+  std::vector<Vector*> k_array; // holds statistics for vector k(i)
+  std::vector<Matrix*> G_array; // holds statistics for matrix G(i)
 
   double m_beta;  // holds statistics for variable beta
 
