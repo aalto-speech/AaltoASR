@@ -195,7 +195,7 @@ PrecisionSubspace::read_basis(const std::string &filename)
 
 
 void
-PrecisionSubspace::calculate_precision(const LaVectorDouble &lambda,
+PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
                                        LaGenMatDouble &precision)
 {
   assert(lambda.size() <= basis_dim());
@@ -210,18 +210,18 @@ PrecisionSubspace::calculate_precision(const LaVectorDouble &lambda,
 
 
 void
-PrecisionSubspace::calculate_precision(const LaVectorDouble &lambda,
+PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
                                        LaVectorDouble &precision)
 {
   LaGenMatDouble precision_matrix;
-  calculate_precision(lambda, precision_matrix);
+  compute_precision(lambda, precision_matrix);
   assert(LinearAlgebra::is_spd(precision_matrix));
   LinearAlgebra::map_m2v(precision_matrix, precision);
 }
 
 
 void
-PrecisionSubspace::calculate_precision(const HCL_RnVector_d &lambda,
+PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
                                        LaGenMatDouble &precision)
 {
   assert(lambda.Dim() <= basis_dim());
@@ -236,22 +236,22 @@ PrecisionSubspace::calculate_precision(const HCL_RnVector_d &lambda,
 
 
 void
-PrecisionSubspace::calculate_precision(const HCL_RnVector_d &lambda,
+PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
                                        LaVectorDouble &precision)
 {
   LaGenMatDouble precision_matrix;
-  calculate_precision(lambda, precision_matrix);
+  compute_precision(lambda, precision_matrix);
   assert(LinearAlgebra::is_spd(precision_matrix));
   LinearAlgebra::map_m2v(precision_matrix, precision);
 }
 
 
 void
-PrecisionSubspace::calculate_covariance(const LaVectorDouble &lambda,
+PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
                                         LaGenMatDouble &covariance)
 {
   LaVectorLongInt pivots(fea_dim());
-  calculate_precision(lambda, covariance);
+  compute_precision(lambda, covariance);
   LUFactorizeIP(covariance, pivots);
   LaLUInverseIP(covariance, pivots);
   assert(LinearAlgebra::is_spd(covariance));
@@ -259,33 +259,33 @@ PrecisionSubspace::calculate_covariance(const LaVectorDouble &lambda,
 
 
 void
-PrecisionSubspace::calculate_covariance(const LaVectorDouble &lambda,
+PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
                                         LaVectorDouble &covariance)
 {
   LaGenMatDouble covariance_matrix;
-  calculate_covariance(lambda, covariance_matrix);
+  compute_covariance(lambda, covariance_matrix);
   assert(LinearAlgebra::is_spd(covariance_matrix));
   LinearAlgebra::map_m2v(covariance_matrix, covariance);
 }
 
 
 void 
-PrecisionSubspace::calculate_covariance(const HCL_RnVector_d &lambda,
+PrecisionSubspace::compute_covariance(const HCL_RnVector_d &lambda,
                                         LaVectorDouble &covariance)
 {
   LaGenMatDouble covariance_matrix;
-  calculate_covariance(lambda, covariance_matrix);
+  compute_covariance(lambda, covariance_matrix);
   assert(LinearAlgebra::is_spd(covariance_matrix));
   LinearAlgebra::map_m2v(covariance_matrix, covariance);
 }
 
 
 void
-PrecisionSubspace::calculate_covariance(const HCL_RnVector_d &lambda,
+PrecisionSubspace::compute_covariance(const HCL_RnVector_d &lambda,
                                         LaGenMatDouble &covariance)
 {
   LaVectorLongInt pivots(fea_dim());
-  calculate_precision(lambda, covariance);
+  compute_precision(lambda, covariance);
   LUFactorizeIP(covariance, pivots);
   LaLUInverseIP(covariance, pivots);
   if (!LinearAlgebra::is_spd(covariance))
@@ -306,7 +306,7 @@ PrecisionSubspace::gradient_untied(const HCL_RnVector_d &lambda,
   
   LaGenMatDouble t;
   LaGenMatDouble curr_cov_estimate;
-  calculate_covariance(lambda, curr_cov_estimate);
+  compute_covariance(lambda, curr_cov_estimate);
 
   for (unsigned int i=0; i<fea_dim(); i++)
     for (unsigned int j=0; j<fea_dim(); j++)
@@ -462,22 +462,7 @@ PrecisionSubspace::precompute(const FeatureVec &f)
 
 
 void
-PrecisionSubspace::compute_precision(const Vector &lambda,
-                                     Matrix &precision)
-{
-  assert(lambda.size() <= subspace_dim());
-  assert(LinearAlgebra::is_spd(m_mspace.at(0)));
-  
-  precision.resize(feature_dim(),feature_dim());
-  precision=0;
-  LaGenMatDouble identity = LaGenMatDouble::eye(feature_dim());
-  for (int b=0; b<lambda.size(); b++)
-    Blas_Mat_Mat_Mult(identity, m_mspace[b], precision, lambda(b), 1);
-}
-
-
-void
-PrecisionSubspace::optimize_coefficients(const Matrix sample_cov, Vector &lambda)
+PrecisionSubspace::optimize_coefficients(const Matrix &sample_cov, Vector &lambda)
 {
   
   
@@ -525,7 +510,7 @@ double
 PcgmmLambdaFcnl::Value1(const HCL_Vector_d &x) const {
   double result;
   LaGenMatDouble t;
-  m_pcgmm.calculate_precision((HCL_RnVector_d&)x, t);
+  m_pcgmm.compute_precision((HCL_RnVector_d&)x, t);
   assert(LinearAlgebra::is_spd(t));
   result=m_pcgmm.G(t, m_sample_cov);
   // RETURN NEGATIVE VALUES BECAUSE HCL DOES MINIMIZATION!
@@ -573,7 +558,7 @@ void
 PcgmmLambdaFcnl::SetLineSearchStartingPoint(const HCL_Vector_d &base)
 {
   m_base.Copy(base);
-  m_pcgmm.calculate_precision(m_base, m_precision);
+  m_pcgmm.compute_precision(m_base, m_precision);
   assert(LinearAlgebra::is_spd(m_precision));
   m_fval_starting_point=m_pcgmm.G(m_precision, m_sample_cov);
   m_linevalue_const=-log(LinearAlgebra::determinant(m_precision));
@@ -584,7 +569,7 @@ void
 PcgmmLambdaFcnl::SetLineSearchDirection(const HCL_Vector_d & dir)
 {
   m_dir.Copy(dir);
-  m_pcgmm.calculate_precision(m_dir, m_R);
+  m_pcgmm.compute_precision(m_dir, m_R);
   m_pcgmm.limit_line_search(m_R, m_precision, m_eigs, m_max_step);
   LaGenMatDouble t(m_pcgmm.feature_dim(), m_pcgmm.feature_dim());
   Blas_Mat_Mat_Mult(m_sample_cov, m_R, t, 1.0, 0.0);
@@ -697,34 +682,9 @@ ExponentialSubspace::precompute(const FeatureVec &f)
 
 
 void
-ExponentialSubspace::compute_precision(const Vector &lambda,
-                                       Matrix &precision)
-{
-  assert(lambda.size() <= subspace_dim());
-  assert(LinearAlgebra::is_spd(m_basis_P.at(0)));
-  
-  precision.resize(feature_dim(),feature_dim());
-  precision=0;
-  LaGenMatDouble identity = LaGenMatDouble::eye(feature_dim());
-  for (int b=0; b<lambda.size(); b++)
-    Blas_Mat_Mat_Mult(identity, m_basis_P[b], precision, lambda(b), 1);
-}
-
-
-void
-ExponentialSubspace::compute_psi(const Vector &lambda, Vector &psi)
-{
-  assert(lambda.size() <= subspace_dim());
-  
-  psi.resize(feature_dim());
-  psi = 0;
-  for (int b=0; b<lambda.size(); b++)
-    Blas_Add_Mult(psi, lambda(b), m_basis_psi[b]);
-}
-
-
-void
-ExponentialSubspace::optimize_coefficients(const Matrix sample_cov, Vector &lambda)
+ExponentialSubspace::optimize_coefficients(const Vector &sample_mean,
+                                           const Matrix &sample_cov,
+                                           Vector &lambda)
 {
   
   
@@ -775,7 +735,7 @@ ExponentialSubspace::reset(const unsigned int subspace_dim,
 
 
 void 
-ExponentialSubspace::calculate_precision(const LaVectorDouble &lambda,
+ExponentialSubspace::compute_precision(const LaVectorDouble &lambda,
                                          LaGenMatDouble &precision)
 {
   assert(lambda.size()<=subspace_dim());
@@ -790,19 +750,19 @@ ExponentialSubspace::calculate_precision(const LaVectorDouble &lambda,
 
 
 void
-ExponentialSubspace::calculate_precision(const LaVectorDouble &lambda,
+ExponentialSubspace::compute_precision(const LaVectorDouble &lambda,
                                          LaVectorDouble &precision)
 {
   // Calculate precision in matrix form
   LaGenMatDouble mprecision;
   // Convert to vector
-  calculate_precision(lambda, mprecision);
+  compute_precision(lambda, mprecision);
   LinearAlgebra::map_m2v(mprecision, precision);
 }
 
 
 void 
-ExponentialSubspace::calculate_precision(const HCL_RnVector_d &lambda,
+ExponentialSubspace::compute_precision(const HCL_RnVector_d &lambda,
                                          LaGenMatDouble &precision)
 {
   assert(lambda.Dim()<=subspace_dim());
@@ -817,7 +777,7 @@ ExponentialSubspace::calculate_precision(const HCL_RnVector_d &lambda,
 
 
 void
-ExponentialSubspace::calculate_precision(const HCL_RnVector_d &lambda,
+ExponentialSubspace::compute_precision(const HCL_RnVector_d &lambda,
                                          LaVectorDouble &precision)
 {
   assert(lambda.Dim()<=subspace_dim());
@@ -825,20 +785,20 @@ ExponentialSubspace::calculate_precision(const HCL_RnVector_d &lambda,
   // Calculate precision in matrix form
   LaGenMatDouble mprecision;
   // Convert to vector
-  calculate_precision(lambda, mprecision);
+  compute_precision(lambda, mprecision);
   LinearAlgebra::map_m2v(mprecision, precision);
 }
 
 
 void 
-ExponentialSubspace::calculate_covariance(const LaVectorDouble &lambda,
+ExponentialSubspace::compute_covariance(const LaVectorDouble &lambda,
                                           LaGenMatDouble &covariance)
 {
   assert(lambda.size()<=subspace_dim());
 
   LaVectorLongInt pivots(feature_dim());
   // Calculate precision
-  calculate_precision(lambda, covariance);
+  compute_precision(lambda, covariance);
   // Invert precision -> covariance
   LUFactorizeIP(covariance, pivots);
   LaLUInverseIP(covariance, pivots);
@@ -846,7 +806,7 @@ ExponentialSubspace::calculate_covariance(const LaVectorDouble &lambda,
 
 
 void 
-ExponentialSubspace::calculate_covariance(const LaVectorDouble &lambda,
+ExponentialSubspace::compute_covariance(const LaVectorDouble &lambda,
                                           LaVectorDouble &covariance)
 {
   assert(lambda.size()<=subspace_dim());
@@ -854,20 +814,20 @@ ExponentialSubspace::calculate_covariance(const LaVectorDouble &lambda,
   // Calculate precision in matrix form
   LaGenMatDouble mcovariance;
   // Convert to vector
-  calculate_covariance(lambda, mcovariance);
+  compute_covariance(lambda, mcovariance);
   LinearAlgebra::map_m2v(mcovariance, covariance);
 }
 
 
 void 
-ExponentialSubspace::calculate_covariance(const HCL_RnVector_d &lambda,
+ExponentialSubspace::compute_covariance(const HCL_RnVector_d &lambda,
                                           LaGenMatDouble &covariance)
 {
   assert(lambda.Dim()<=subspace_dim());
 
   LaVectorLongInt pivots(feature_dim());
   // Calculate precision
-  calculate_precision(lambda, covariance);
+  compute_precision(lambda, covariance);
   // Invert precision -> covariance
   LUFactorizeIP(covariance, pivots);
   LaLUInverseIP(covariance, pivots);
@@ -875,7 +835,7 @@ ExponentialSubspace::calculate_covariance(const HCL_RnVector_d &lambda,
 
 
 void 
-ExponentialSubspace::calculate_covariance(const HCL_RnVector_d &lambda,
+ExponentialSubspace::compute_covariance(const HCL_RnVector_d &lambda,
                                           LaVectorDouble &covariance)
 {
   assert(lambda.Dim()<=subspace_dim());
@@ -883,13 +843,13 @@ ExponentialSubspace::calculate_covariance(const HCL_RnVector_d &lambda,
   // Calculate precision in matrix form
   LaGenMatDouble mcovariance;
   // Convert to vector
-  calculate_covariance(lambda, mcovariance);
+  compute_covariance(lambda, mcovariance);
   LinearAlgebra::map_m2v(mcovariance, covariance);
 }
 
 
 void 
-ExponentialSubspace::calculate_psi(const LaVectorDouble &lambda,
+ExponentialSubspace::compute_psi(const LaVectorDouble &lambda,
                                    LaVectorDouble &psi)
 {
   assert(lambda.size()<=subspace_dim());
@@ -902,7 +862,7 @@ ExponentialSubspace::calculate_psi(const LaVectorDouble &lambda,
 
 
 void 
-ExponentialSubspace::calculate_psi(const HCL_RnVector_d &lambda,
+ExponentialSubspace::compute_psi(const HCL_RnVector_d &lambda,
                                    LaVectorDouble &psi)
 {
   assert(lambda.Dim()<=subspace_dim());
@@ -915,7 +875,7 @@ ExponentialSubspace::calculate_psi(const HCL_RnVector_d &lambda,
 
 
 void
-ExponentialSubspace::calculate_mu(const LaVectorDouble &lambda,
+ExponentialSubspace::compute_mu(const LaVectorDouble &lambda,
                                   LaVectorDouble &mu)
 {
   assert(lambda.size()<=subspace_dim());
@@ -923,14 +883,14 @@ ExponentialSubspace::calculate_mu(const LaVectorDouble &lambda,
   mu.resize(feature_dim(),1);
   LaGenMatDouble cov;
   LaVectorDouble psi;
-  calculate_covariance(lambda, cov);
-  calculate_psi(lambda, psi);
+  compute_covariance(lambda, cov);
+  compute_psi(lambda, psi);
   Blas_Mat_Vec_Mult(cov, psi, mu);
 }
 
 
 void
-ExponentialSubspace::calculate_mu(const HCL_RnVector_d &lambda,
+ExponentialSubspace::compute_mu(const HCL_RnVector_d &lambda,
                                   LaVectorDouble &mu)
 {
   assert(lambda.Dim()<=subspace_dim());
@@ -938,14 +898,14 @@ ExponentialSubspace::calculate_mu(const HCL_RnVector_d &lambda,
   mu.resize(feature_dim(),1);
   LaGenMatDouble cov;
   LaVectorDouble psi;
-  calculate_covariance(lambda, cov);
-  calculate_psi(lambda, psi);
+  compute_covariance(lambda, cov);
+  compute_psi(lambda, psi);
   Blas_Mat_Vec_Mult(cov, psi, mu);
 }
 
 
 void
-ExponentialSubspace::calculate_theta(const LaVectorDouble &lambda,
+ExponentialSubspace::compute_theta(const LaVectorDouble &lambda,
                                      LaVectorDouble &theta)
 {
   assert(lambda.size()<=subspace_dim());
@@ -958,7 +918,7 @@ ExponentialSubspace::calculate_theta(const LaVectorDouble &lambda,
 
 
 void
-ExponentialSubspace::calculate_theta(const HCL_RnVector_d &lambda,
+ExponentialSubspace::compute_theta(const HCL_RnVector_d &lambda,
                                      LaVectorDouble &theta)
 {
   assert(lambda.Dim()<=subspace_dim());
@@ -1256,8 +1216,8 @@ ExponentialSubspace::gradient_untied(const HCL_RnVector_d &lambda,
 
   LaVectorDouble mean;
   LaGenMatDouble covariance;
-  calculate_covariance(lambda, covariance);
-  calculate_mu(lambda, mean);
+  compute_covariance(lambda, covariance);
+  compute_mu(lambda, mean);
 
   LaVectorDouble grad_psi(sample_mean);
   LaGenMatDouble grad_p(covariance);
@@ -1491,7 +1451,7 @@ double
 ScgmmLambdaFcnl::Value1(const HCL_Vector_d &x) const {
   double result;
   LaVectorDouble theta;
-  m_es.calculate_theta((HCL_RnVector_d&)x, theta);
+  m_es.compute_theta((HCL_RnVector_d&)x, theta);
   result = m_es.H(theta, m_f);
   return -result;
 }
@@ -1541,10 +1501,10 @@ ScgmmLambdaFcnl::SetLineSearchStartingPoint(const HCL_Vector_d &base)
 {
   m_base.Copy(base);
   
-  m_es.calculate_precision(m_base, m_precision);
+  m_es.compute_precision(m_base, m_precision);
   assert(LinearAlgebra::is_spd(m_precision));
-  m_es.calculate_psi(m_base, m_psi);
-  m_es.calculate_theta(m_base, m_theta);
+  m_es.compute_psi(m_base, m_psi);
+  m_es.compute_theta(m_base, m_theta);
   
   m_fval_starting_point=m_es.H(m_theta, m_f);
 }
@@ -1558,7 +1518,7 @@ ScgmmLambdaFcnl::SetLineSearchDirection(const HCL_Vector_d & dir)
   
   int d=m_es.feature_dim();
   
-  m_es.calculate_precision(m_dir, m_R);
+  m_es.compute_precision(m_dir, m_R);
   m_es.limit_line_search(m_R, m_precision, m_eigvals, m_eigvecs, m_max_step);
   
   LaGenMatDouble t=LaGenMatDouble::zeros(d);
@@ -1569,12 +1529,12 @@ ScgmmLambdaFcnl::SetLineSearchDirection(const HCL_Vector_d & dir)
   m_v.resize(d,1);
   m_dv.resize(d,1);
   LaVectorDouble d_psi;
-  m_es.calculate_psi(m_dir, d_psi);
+  m_es.compute_psi(m_dir, d_psi);
   Blas_Mat_Vec_Mult(t2, m_psi, m_v);
   Blas_Mat_Vec_Mult(t2, d_psi, m_dv);
   
   LaVectorDouble d_theta;
-  m_es.calculate_theta(m_dir, d_theta);
+  m_es.compute_theta(m_dir, d_theta);
   m_beta = Blas_Dot_Prod(d_theta, m_f);
 }
 

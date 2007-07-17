@@ -21,19 +21,18 @@
 
 class PrecisionSubspace {
 
-
 private:
   int m_subspace_dim;
-  int m_feature_dim;  
+  int m_feature_dim;
   std::vector<Vector> m_vspace;
   std::vector<Matrix> m_mspace;
   
   bool m_computed;
   Vector m_quadratic_features;
 
-  
+
 public:
-  
+
   PrecisionSubspace(int subspace_dim, int feature_dim);
   ~PrecisionSubspace();
   void set_subspace_dim(int subspace_dim);
@@ -44,72 +43,53 @@ public:
   void precompute(const FeatureVec &f);
   void reset_cache() { m_computed = false; }
   bool computed() { return m_computed; }
-  void compute_precision(const Vector &lambda, Matrix &precision);
-  void optimize_coefficients(const Matrix sample_cov, Vector &lambda);
+  void optimize_coefficients(const Matrix &sample_cov, Vector &lambda);
   inline unsigned int fea_dim() { return m_feature_dim; }
   inline int basis_dim() { return m_subspace_dim; }
-  
+
   void copy(const PrecisionSubspace &orig);
-
-  void calculate_precision(const LaVectorDouble &lambda,
+  void compute_precision(const LaVectorDouble &lambda,
 			   LaGenMatDouble &precision);
-  
-  void calculate_precision(const LaVectorDouble &lambda,
+  void compute_precision(const LaVectorDouble &lambda,
 			   LaVectorDouble &precision);
-
-  void calculate_precision(const HCL_RnVector_d &lambda,
+  void compute_precision(const HCL_RnVector_d &lambda,
 			   LaGenMatDouble &precision);
-  
-  void calculate_precision(const HCL_RnVector_d &lambda,
+  void compute_precision(const HCL_RnVector_d &lambda,
 			   LaVectorDouble &precision);
-  
-  void calculate_covariance(const LaVectorDouble &lambda,
+  void compute_covariance(const LaVectorDouble &lambda,
 			    LaGenMatDouble &covariance);
-
-  void calculate_covariance(const LaVectorDouble &lambda,
+  void compute_covariance(const LaVectorDouble &lambda,
 			    LaVectorDouble &covariance);
-
-  void calculate_covariance(const HCL_RnVector_d &lambda,
+  void compute_covariance(const HCL_RnVector_d &lambda,
 			    LaVectorDouble &covariance);
-
-  void calculate_covariance(const HCL_RnVector_d &lambda,
+  void compute_covariance(const HCL_RnVector_d &lambda,
 			    LaGenMatDouble &covariance);
-
   void read_basis(const std::string &filename);
   void write_basis(const std::string &filename);
-  
   void reset(const unsigned int subspace_dim,
              const unsigned int feature_dim);
-
-  void initialize_basis_pca(const std::vector<double> &weights, 
-			    const std::vector<LaGenMatDouble> &sample_covs, 
+  void initialize_basis_pca(const std::vector<double> &weights,
+			    const std::vector<LaGenMatDouble> &sample_covs,
 			    const unsigned int basis_dim);
-  
   void gradient_untied(const HCL_RnVector_d &lambda,
 		       const LaGenMatDouble &sample_cov,
 		       HCL_RnVector_d &grad,
 		       bool affine);
-  
   void limit_line_search(const LaGenMatDouble &R,
-			 const LaGenMatDouble &curr_prec_estimate, 
+			 const LaGenMatDouble &curr_prec_estimate,
 			 LaVectorDouble &eigs,
 			 double &max_interval);
-  
   void optimize_lambda(const LaGenMatDouble &sample_cov,
 		       LaVectorDouble &lambda);
-  
   void optimize_basis(const std::vector<LaGenMatDouble> &sample_covs,
 		      const std::vector<LaVectorDouble> &lambda,
 		      const std::vector<double> &c);
-
   double G(const LaGenMatDouble &precision,
 	   const LaGenMatDouble &sample_cov);
-  
   double eval_linesearch_value(const LaVectorDouble &eigs,
 			       double step,
 			       double beta,
 			       double c);
-  
   double eval_linesearch_derivative(const LaVectorDouble &eigs,
 				    double step,
 				    double beta);
@@ -128,30 +108,19 @@ public:
 		  PrecisionSubspace &pcgmm,
 		  const LaGenMatDouble &sample_cov,
 		  bool affine);
-  
   ~PcgmmLambdaFcnl();
-  
   ostream & Write(ostream & o) const;
-  
   HCL_VectorSpace_d & Domain() const;
-  
   virtual double Value1(const HCL_Vector_d &x) const;
-  
   virtual void Gradient1(const HCL_Vector_d & x,
 			 HCL_Vector_d & g) const;
-  
   virtual void HessianImage(const HCL_Vector_d & x,
 			    const HCL_Vector_d & dx,
 			    HCL_Vector_d & dy ) const;
-  
   virtual double LineSearchValue(double mu) const;
-  
   virtual double LineSearchDerivative(double mu) const;
-  
   virtual void SetLineSearchStartingPoint(const HCL_Vector_d &base);
-  
-  virtual void SetLineSearchDirection(const HCL_Vector_d & dir);
-  
+  virtual void SetLineSearchDirection(const HCL_Vector_d & dir);  
   virtual double MaxStep(const HCL_Vector_d & x, 
 			 const HCL_Vector_d & dir) const;
 
@@ -181,7 +150,6 @@ private:
 
 class ExponentialSubspace {
 
-
 private:
   int m_subspace_dim;
   int m_feature_dim;
@@ -195,15 +163,12 @@ private:
   bool m_computed;
   Vector m_quadratic_features;
   
-  
 public:
-  
-  
 
-ExponentialSubspace(int subspace_dim, int feature_dim);
-~ExponentialSubspace();
-
-void set_subspace_dim(int subspace_dim);
+  ExponentialSubspace(int subspace_dim, int feature_dim);
+  ~ExponentialSubspace();
+  
+  void set_subspace_dim(int subspace_dim);
   void set_feature_dim(int feature_dim);
   int subspace_dim() const;
   int feature_dim() const;
@@ -212,109 +177,82 @@ void set_subspace_dim(int subspace_dim);
   void precompute(const FeatureVec &f);
   void reset_cache() { m_computed = false; }
   bool computed() { return m_computed; }
-  void compute_precision(const Vector &lambda, Matrix &precision);
-  void compute_psi(const Vector &lambda, Vector &transformed_mean);
-  void optimize_coefficients(const Matrix sample_cov, Vector &lambda);
+  void optimize_coefficients(const Vector &sample_mean,
+                             const Matrix &sample_cov,
+                             Vector &lambda);
   
   inline unsigned int feature_dim() { return m_feature_dim; };
   inline unsigned int exponential_dim() { return m_exponential_dim; };
   inline int subspace_dim() { return m_subspace_dim; };
   
   void copy(const ExponentialSubspace &orig);
-
-  void calculate_precision(const Vector &lambda,
-			   Matrix &precision);
-  
-  void calculate_precision(const Vector &lambda,
-			   Vector &precision);
-
-  void calculate_precision(const HCL_RnVector_d &lambda,
-			   Matrix &precision);
-  
-  void calculate_precision(const HCL_RnVector_d &lambda,
-			   Vector &precision);
-  
-  void calculate_covariance(const Vector &lambda,
-			    Matrix &covariance);
-  
-  void calculate_covariance(const Vector &lambda,
-			    Vector &covariance);
-
-  void calculate_covariance(const HCL_RnVector_d &lambda,
-			    Matrix &covariance);
-  
-  void calculate_covariance(const HCL_RnVector_d &lambda,
-			    Vector &covariance);
-
-  void calculate_psi(const Vector &lambda,
-		     Vector &psi);
-  
-  void calculate_psi(const HCL_RnVector_d &lambda,
-		     Vector &psi);
-
-  void calculate_mu(const Vector &lambda,
-		    Vector &mu);
-
-  void calculate_mu(const HCL_RnVector_d &lambda,
-		    Vector &mu);
-
-  void calculate_theta(const Vector &lambda,
-		       Vector &theta);
-
-  void calculate_theta(const HCL_RnVector_d &lambda,
-		       Vector &theta);
-
+  void compute_precision(const Vector &lambda,
+                         Matrix &precision);
+  void compute_precision(const Vector &lambda,
+                         Vector &precision);
+  void compute_precision(const HCL_RnVector_d &lambda,
+                         Matrix &precision);
+  void compute_precision(const HCL_RnVector_d &lambda,
+                         Vector &precision);
+  void compute_covariance(const Vector &lambda,
+                          Matrix &covariance);
+  void compute_covariance(const Vector &lambda,
+                          Vector &covariance);
+  void compute_covariance(const HCL_RnVector_d &lambda,
+                          Matrix &covariance);
+  void compute_covariance(const HCL_RnVector_d &lambda,
+                          Vector &covariance);
+  void compute_psi(const Vector &lambda,
+                   Vector &psi);
+  void compute_psi(const HCL_RnVector_d &lambda,
+                   Vector &psi);
+  void compute_mu(const Vector &lambda,
+                  Vector &mu);
+  void compute_mu(const HCL_RnVector_d &lambda,
+                  Vector &mu);
+  void compute_theta(const Vector &lambda,
+                     Vector &theta);
+  void compute_theta(const HCL_RnVector_d &lambda,
+                     Vector &theta);
   void read_basis(const std::string &filename);
   void write_basis(const std::string &filename);
-
   void reset(const unsigned int subspace_dim,
 	     const unsigned int feature_dim);
-
   void initialize_basis_pca(const std::vector<double> &weights,
 			    const std::vector<Matrix> &covs,
 			    const std::vector<Vector> &means,
 			    const unsigned int basis_dim);
-
   double K(const Matrix &sample_cov,
 	   const Vector &sample_mean);
-
   double K(const Vector &theta);
-
   double H(const Vector &theta,
 	   const Vector &f);
-
   void gradient_untied(const HCL_RnVector_d &lambda,
 		       const Vector &mean,
 		       const Matrix &secondmoment,
 		       HCL_RnVector_d &grad,
 		       bool affine);
-
   void limit_line_search(const Matrix &R,
-			 const Matrix &curr_prec_estimate, 
+			 const Matrix &curr_prec_estimate,
 			 Vector &eigvals,
 			 Matrix &eigvecs,
 			 double &max_interval);
-
   double eval_linesearch_value(const Vector &eigs,
 			       const Vector &v,
 			       const Vector &dv,
 			       double step,
 			       double beta);
-
   double eval_linesearch_derivative(const Vector &eigs,
 				    const Vector &v,
 				    const Vector &dv,
 				    double step,
 				    double beta);
-
   void f_to_gaussian_params(const Vector &f,
 			    Vector &sample_mu,
 			    Matrix &sample_sigma);
-
   void gaussian_params_to_f(const Vector &sample_mu,
 			    const Matrix &sample_sigma,
 			    Vector &f);
-  
   void theta_to_gaussian_params(const Vector &theta,
 				Vector &mu,
 				Matrix &sigma);

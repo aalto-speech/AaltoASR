@@ -1124,6 +1124,7 @@ void
 SubspaceConstrainedGaussian::write(std::ostream &os) const
 {
   os << "scgmm ";
+  os << subspace_dim() << " ";
   for (int i=0; i<m_coeffs.size()-1; i++)
     os << m_coeffs(i) << " ";
   os << m_coeffs(m_coeffs.size()-1);
@@ -1133,9 +1134,28 @@ SubspaceConstrainedGaussian::write(std::ostream &os) const
 void
 SubspaceConstrainedGaussian::read(std::istream &is)
 {
-  
+  int ss_dim;
 
+  is >> ss_dim;
+  m_coeffs.resize(ss_dim);
+  for (int i=0; i<m_coeffs.size()-1; i++)
+    is >> m_coeffs(i);
+  is >> m_coeffs(m_coeffs.size()-1);
+
+  Vector psi;
+  Matrix precision;
+  Matrix covariance;
   
+  m_es->compute_psi(m_coeffs, psi);
+  m_es->compute_precision(m_coeffs, precision);
+  LinearAlgebra::inverse(precision, covariance);
+  m_constant = LinearAlgebra::determinant(precision);
+  m_constant = log(m_constant);
+
+  Vector t(psi);
+  Blas_Mat_Vec_Mult(covariance, psi, t);
+  m_constant -= Blas_Dot_Prod(psi, t);
+  m_constant -= m_es->feature_dim() * log(2*3.1416);
 }
 
 
@@ -1157,18 +1177,21 @@ SubspaceConstrainedGaussian::start_accumulating()
 void
 SubspaceConstrainedGaussian::get_mean(Vector &mean) const
 {
+  m_es->compute_mu(m_coeffs, mean);
 }
 
 
 void
 SubspaceConstrainedGaussian::get_covariance(Matrix &covariance) const
 {
+  m_es->compute_covariance(m_coeffs, covariance);
 }
 
 
 void
 SubspaceConstrainedGaussian::set_mean(const Vector &mean)
 {
+  std::cout << "Warning: don't use set_mean() for Scgmms, use set_parameters() instead" << std::endl;
 }
 
 
@@ -1176,6 +1199,14 @@ void
 SubspaceConstrainedGaussian::set_covariance(const Matrix &covariance,
                                             bool finish_statistics)
 {
+  std::cout << "Warning: don't use set_covariance() for Scgmms, use set_parameters instead" << std::endl;
+}
+
+
+void
+SubspaceConstrainedGaussian::set_parameters(const Vector &mean, const Matrix &covariance)
+{
+  m_es->optimize_coefficients(mean, covariance, m_coeffs);
 }
 
 

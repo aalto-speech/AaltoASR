@@ -278,6 +278,9 @@ public:
   virtual void get_mean(Vector &mean) const = 0;
   /* Returns the covariance matrix for this Gaussian */
   virtual void get_covariance(Matrix &covariance) const = 0;
+  /* Sets the parameters for this Gaussian */
+  virtual void set_parameters(const Vector &mean, const Matrix &covariance)
+  { set_mean(mean); set_covariance(covariance); }
   /* Sets the mean vector for this Gaussian */
   virtual void set_mean(const Vector &mean) = 0;
   /* Sets the covariance matrix for this Gaussian */
@@ -465,6 +468,7 @@ public:
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
+  virtual void set_parameters(const Vector &mean, const Matrix &covariance);
   virtual Gaussian* copy_gaussian(void) { return new SubspaceConstrainedGaussian(*this); }
 
   // SCGMM-specific
