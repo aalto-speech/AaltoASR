@@ -24,7 +24,7 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est gconvert
+PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est gconvert mllr
 
 PROGS_SRCS = $(PROGS:=.cc)
 
@@ -33,7 +33,8 @@ CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	PhnReader.cc SpeakerConfig.cc \
 	Recipe.cc conf.cc io.cc str.cc endian.cc Distributions.cc \
 	LinearAlgebra.cc Subspaces.cc HmmNetBaumWelch.cc \
-	Lattice.cc Viterbi.cc PhonePool.cc
+	Lattice.cc Viterbi.cc PhonePool.cc \
+	MllrTrainer.cc
 
 CLASS_OBJS = $(CLASS_SRCS:.cc=.o)
 
