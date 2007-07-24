@@ -67,6 +67,7 @@ my $split_stop_iter = 14; # Iteration after which no more splits are done
 
 # Adaptation settings
 my $VTLN_MODULE = "vtln";
+my $MLLR_MODULE = "mllr";
 my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
 
 # Misc settings
@@ -105,6 +106,9 @@ estimate_dur_model($om);
 # VTLN
 #align($tempdir, $om, $RECIPE);
 #estimate_vtln($tempdir, $om, $RECIPE, $om.".spkc");
+
+# MLLR
+#estimate_mllr($tempdir, $om, $RECIPE, $om.".spkc");
 
 
 # Generate lnas for the final model
@@ -298,6 +302,41 @@ sub align {
 }
 
 
+# This version runs Baum-Welch
+sub estimate_mllr {
+  my $temp_dir = shift(@_);
+  my $model = shift(@_);
+  my $recipe = shift(@_);
+  my $out_file = shift(@_);
+  my ($scriptfile, $keyfile, $touch_keyfile, $temp_out);
+  my $batch_info = get_empty_batch_info();
+  my $fh;
+  my $batch_options;
+  $scriptfile = "mllr_${BASE_ID}.sh";
+  $keyfile = "mllr_ready";
+  $touch_keyfile = $keyfile;
+  $temp_out = $out_file;
+  if ($NUM_BATCHES > 1) {
+    $touch_keyfile = $touch_keyfile."_\$SGE_TASK_ID";
+    $temp_out = "mllr_temp_\$SGE_TASK_ID.spkc";
+  }
+  $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
+  open $fh, "> $scriptfile" || die "Could not open $scriptfile";
+  print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
+  print $fh "$BINDIR/mllr -b $model -c $model.cfg -r $recipe -H -F $FORWARD_BEAM -W $BACKWARD_BEAM $FILEFORMAT -M $MLLR_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i 1\n";
+  print $fh "touch $touch_keyfile\n";
+  close($fh);
+
+  push @{$batch_info->{"script"}}, $scriptfile;
+  fill_aku_batch_keys($NUM_BATCHES, $keyfile, $batch_info);
+
+  submit_and_wait($batch_info);
+  if ($NUM_BATCHES > 1) {
+    system("cat mllr_temp_*.spkc > $out_file") && die("mllr estimation failed");
+  }
+}
+
+
 # NOTE: Uses alignments
 sub estimate_vtln {
   my $temp_dir = shift(@_);
@@ -331,6 +370,7 @@ sub estimate_vtln {
     system("cat vtln_temp_*.spkc > $out_file") && die("vtln estimation failed");
   }
 }
+
 
 
 # NOTE: Uses alignments
