@@ -12,18 +12,11 @@
 #include "MllrTrainer.hh"
 
 int info;
-bool raw_flag;
-float start_time, end_time;
-int start_frame, end_frame;
-bool state_num_labels;
-int phn_deviation = 0;
-bool seg_files;
 
 conf::Config config;
 Recipe recipe;
 HmmSet model;
 FeatureGenerator fea_gen;
-PhnReader *phn_reader;
 SpeakerConfig speaker_conf(fea_gen);
 
 typedef std::map<std::string, MllrTrainer*> MllrTrainerMap;
@@ -32,6 +25,10 @@ bool ordered_spk; // files for a speaker are arranged successively
 
 LinTransformModule *mllr_module;
 std::string cur_speaker;
+
+std::set<std::string> updated_speakers;
+
+double total_log_likelihood = 0;
 
 
 void
@@ -43,6 +40,7 @@ calculate_mllr_transform(const std::string &speaker)
     speaker_conf.set_speaker(speaker);
   (mllr_trainers[speaker])->calculate_transform(mllr_module);
   (mllr_trainers[speaker])->clear_stats();
+  updated_speakers.insert(speaker);
   if (cur_speaker != speaker)
     speaker_conf.set_speaker(cur_speaker);
 }
@@ -78,84 +76,35 @@ set_speaker(std::string new_speaker)
 
 
 void
-train_mllr(int start_frame, int end_frame, std::string &speaker,
-           std::string &utterance)
+train_mllr(Segmentator *seg)
 {
-  Hmm hmm;
   HmmState state;
-  PhnReader::Phn phn;
-  int state_index;
-  int phn_start_frame, phn_end_frame;
-  int f;
-
-  if (speaker.size() > 0)
+  int i;
+  
+  while (seg->next_frame())
   {
-    set_speaker(speaker);
-    if (utterance.size() > 0)
-      speaker_conf.set_utterance(utterance);
-  }
-  else
-    cur_speaker = "";
-
-  while (phn_reader->next_phn_line(phn))
-  {
-    if (phn.state < 0)
-      throw std::string("State segmented phn file is needed");
-
-    phn_start_frame = (int)((double)phn.start/16000.0*fea_gen.frame_rate()
-                            +0.5);
-    phn_end_frame = (int)((double)phn.end/16000.0*fea_gen.frame_rate()+0.5);
-
-    phn_start_frame = phn_start_frame + phn_deviation;
-    phn_end_frame = phn_end_frame + phn_deviation;
-
-    if (phn_start_frame < start_frame)
-    {
-      assert( phn_end_frame > start_frame );
-      phn_start_frame = start_frame;
-    }
-    if (end_frame != 0 && phn_end_frame > end_frame)
-    {
-      assert( phn_start_frame < end_frame );
-      phn_end_frame = end_frame;
-    }
-
-    if (phn.speaker.size() > 0 && phn.speaker != cur_speaker)
-    {
-      set_speaker(phn.speaker);
-      if (utterance.size() > 0)
-        speaker_conf.set_utterance(utterance);
-    }
-
-    if (cur_speaker.size() == 0)
-      throw std::string("Speaker ID is missing");
-
-    if (state_num_labels)
-      state = model.state(phn.state);
-    else
-    {
-      hmm = model.hmm(model.hmm_index(phn.label[0]));
-      state_index = hmm.state(phn.state);
-      state = model.state(state_index);
-    }
-
-    for (f = phn_start_frame; f < phn_end_frame; f++)
-    {
-      FeatureVec fea_vec = fea_gen.generate(f);
-      if (fea_gen.eof())
-        break;
-
-      (mllr_trainers[cur_speaker])->find_probs(&state, fea_vec);
-    }
-    if (f < phn_end_frame)
+    const std::vector<Segmentator::IndexProbPair> &pdfs =
+      seg->pdf_probs();
+    FeatureVec fea_vec = fea_gen.generate(seg->current_frame());
+    if (fea_gen.eof())
       break; // EOF in FeatureGenerator
+
+    for (i = 0; i < (int)pdfs.size(); i++)
+    {
+      state = model.state(pdfs[i].index);
+      (mllr_trainers[cur_speaker])->find_probs(pdfs[i].prob, &state, fea_vec);
+    }
   }
+  if (seg->computes_total_log_likelihood())
+    total_log_likelihood += seg->get_total_log_likelihood();
 }
 
 
 int
 main(int argc, char *argv[])
 {
+  Segmentator *segmentator;
+  
   try {
     config("usage: mllr [OPTION...]\n")
       ('h', "help", "", "", "display help")
@@ -166,14 +115,15 @@ main(int argc, char *argv[])
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for adaptation")
-      ('H', "hmmnet", "", "", "use HMM networks for training")      
+      ('H', "hmmnet", "", "", "use HMM networks for training")
       ('R', "raw-input", "", "", "raw audio input")
       ('M', "mllr=MODULE", "arg must", "", "MLLR module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('o', "out=FILE", "arg", "", "output speaker configuration file")
-      ('\0', "seg", "", "", "decoder given state sequence hypothesis")
-      ('\0', "sphn", "", "", "phn-files with speaker ID's in use")
+      ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
+      ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
       ('\0', "snl", "", "", "phn-files with state number labels")
+      ('\0', "rsamp", "", "", "phn sample numbers are relative to start time")
       ('\0', "ords","", "", "files for each speaker are arranged successively")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
@@ -182,7 +132,6 @@ main(int argc, char *argv[])
     config.default_parse(argc, argv);
     
     info = config["info"].get_int();
-    raw_flag = config["raw-input"].specified;
     fea_gen.load_configuration(io::Stream(config["config"].get_str()));
 
     if (config["base"].specified)
@@ -201,10 +150,7 @@ main(int argc, char *argv[])
       throw std::string("Must give either --base or all --gk, --mc and --ph");
     }
 
-    // Some required switches
-    state_num_labels = config["snl"].specified;
     ordered_spk = config["ords"].specified;
-    seg_files = config["seg"].specified;
     
     // Read recipe file
     recipe.read(io::Stream(config["recipe"].get_str()),
@@ -240,32 +186,71 @@ main(int argc, char *argv[])
         fprintf(stderr,"\n");
       }
 
-      // Create phn_reader
-      bool skip;
-      phn_reader = 
-        recipe.infos[f].init_phn_files(&model, false, false,
-                                       config["ophn"].specified, &fea_gen,
-                                       config["raw-input"].specified, NULL);
-      phn_reader->set_speaker_phns(config["sphn"].specified);
-      phn_reader->set_state_num_labels(state_num_labels);
+      bool skip = false;
 
-      if (!phn_reader->init_utterance_segmentation())
-      {
-        fprintf(stderr, "Could not initialize the utterance for PhnReader.");
-        fprintf(stderr,"Current file was: %s\n",
-                recipe.infos[f].audio_path.c_str());
-        skip = true;
-      }
-      
-      if (!config["sphn"].specified &&
-          recipe.infos[f].speaker_id.size() == 0)
+      if (recipe.infos[f].speaker_id.size() == 0)
         throw std::string("Speaker ID is missing");
 
-      train_mllr(start_frame, end_frame, recipe.infos[f].speaker_id,
-                 recipe.infos[f].utterance_id);
+      if (config["hmmnet"].specified)
+      {
+        // Open files and configure
+        HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
+          &model, false, &fea_gen, config["raw-input"].specified, NULL);
+        lattice->set_pruning_thresholds(config["bw-beam"].get_float(),
+                                        config["fw-beam"].get_float());
+
+        set_speaker(recipe.infos[f].speaker_id);
+        if (recipe.infos[f].utterance_id.size() > 0)
+          speaker_conf.set_utterance(recipe.infos[f].utterance_id);
+        
+        double orig_beam = lattice->get_backward_beam();
+        int counter = 1;
+        while (!lattice->init_utterance_segmentation())
+        {
+          if (counter >= 5)
+          {
+            fprintf(stderr, "Could not run Baum-Welch for file %s\n",
+                    recipe.infos[f].audio_path.c_str());
+            fprintf(stderr, "The HMM network may be incorrect or initial beam too low.\n");
+            skip = true;
+            break;
+          }
+          fprintf(stderr,
+                  "Warning: Backward phase failed, increasing beam to %.1f\n",
+                  ++counter*orig_beam);
+          lattice->set_pruning_thresholds(counter*orig_beam, 0);
+        }
+        segmentator = lattice;
+      }
+      else
+      {
+        // Create phn_reader
+        PhnReader *phn_reader = 
+          recipe.infos[f].init_phn_files(&model,
+                                         config["rsamp"].specified,
+                                         config["snl"].specified,
+                                         config["ophn"].specified, &fea_gen,
+                                         config["raw-input"].specified, NULL);
+        
+        set_speaker(recipe.infos[f].speaker_id);
+        if (recipe.infos[f].utterance_id.size() > 0)
+          speaker_conf.set_utterance(recipe.infos[f].utterance_id);
+        
+        if (!phn_reader->init_utterance_segmentation())
+        {
+          fprintf(stderr, "Could not initialize the utterance for PhnReader.");
+          fprintf(stderr,"Current file was: %s\n",
+                  recipe.infos[f].audio_path.c_str());
+          skip = true;
+        }
+        segmentator = phn_reader;
+      }
+
+      train_mllr(segmentator);
 
       fea_gen.close();
-      phn_reader->close();
+      segmentator->close();
+      delete segmentator;
     }
 
     // Compute the MLLR transformations
@@ -277,8 +262,26 @@ main(int argc, char *argv[])
     
     // Write new speaker configuration
     if (config["out"].specified)
+    {
+      std::set<std::string> *speaker_set = NULL, *utterance_set = NULL;
+      std::set<std::string> empty_ut;
+
+      if (config["batch"].get_int() > 1)
+      {
+        if (config["bindex"].get_int() == 1)
+          updated_speakers.insert(std::string("default"));
+        speaker_set = &updated_speakers;
+        utterance_set = &empty_ut;
+      }
+
       speaker_conf.write_speaker_file(
-        io::Stream(config["out"].get_str(), "w"));
+        io::Stream(config["out"].get_str(), "w"), speaker_set, utterance_set);
+    }
+
+    if (info > 0 && total_log_likelihood != 0)
+    {
+      fprintf(stderr, "Total log likelihood: %f\n", total_log_likelihood);
+    }
   }
   catch (HmmSet::UnknownHmm &e) {
     fprintf(stderr, 

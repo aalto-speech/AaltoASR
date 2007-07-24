@@ -34,7 +34,8 @@ MllrTrainer::~MllrTrainer()
 }
 
 
-void MllrTrainer::find_probs(HmmState *state, const FeatureVec &feature)
+void MllrTrainer::find_probs(double prior, HmmState *state,
+                             const FeatureVec &feature)
 {
   // get the mixture
   Mixture *mixture = m_model.get_emission_pdf(state->emission_pdf);
@@ -55,7 +56,7 @@ void MllrTrainer::find_probs(HmmState *state, const FeatureVec &feature)
     if (gaussian == NULL)
       throw std::string("Warning: MLLR not supported for non-diagonal models");
     
-    probs[g] = gaussian->compute_likelihood(feature);
+    probs[g] = prior*gaussian->compute_likelihood(feature);
     prob_sum += probs[g];
   }
   
@@ -75,14 +76,11 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
   double detA = 1;
   LaVectorLongInt pivots(m_dim);
   LaVectorLongInt pivots2(m_dim+1);
-  Matrix cofactors(m_dim, m_dim);
   Matrix G(m_dim+1, m_dim+1);
   Matrix G_inv(m_dim+1, m_dim+1);
   Vector p(m_dim+1);
   Vector w(m_dim+1);
   Matrix trans(m_dim, m_dim+1);
-  LaGenMatDouble identity = LaGenMatDouble::eye(m_dim);
-  LaGenMatDouble identity_extended = LaGenMatDouble::eye(m_dim+1);
   double alpha;
   
   // check that we have probabilities
@@ -119,29 +117,22 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
     for (i = 0; i < m_dim; i++)
     {
       for (j = 0; j < m_dim; j++)
-	A(i, j) = trans(i, j+1);
+	A(j, i) = trans(i, j+1);  // Transposed
     }
 
     // calculate cofactors
+    LUFactorizeIP(A, pivots);
 
-    // transpose A
-    Matrix temp_matrix(A);
-    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity, A);
-    cofactors.copy(A);
-    LUFactorizeIP(cofactors, pivots);
-
-//    for (i = 0; i < m_dim; i++)
-//      detA *= A(i, i);
     for (i = 0; i < m_dim; i++)
-      detA *= cofactors(i, i);
+      detA *= A(i, i);
 
-    LaLUInverseIP(cofactors, pivots); 
-    Blas_Scale(detA, cofactors);
+    LaLUInverseIP(A, pivots); 
+    Blas_Scale(detA, A);
 
     // cofactor vector
     p(0) = 0;
     for (j = 0; j < m_dim; j++)
-      p(j+1) = cofactors(row,j);
+      p(j+1) = A(row,j);
     
     // alpha parameter
     alpha = calculate_alpha(*(G_array[row]), p, *(k_array[row]), m_beta);    
@@ -149,17 +140,11 @@ void MllrTrainer::calculate_transform(LinTransformModule *mllr_mod)
     // calculate ith row of transformation matrix
     Blas_Scale(alpha, p);
     Blas_Add_Mult(p, 1.0, *(k_array[row]));
-    temp_matrix.copy(*(G_array[row]));
-    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity_extended, *(G_array[row]));
-
-    Blas_Mat_Vec_Mult(*(G_array[row]), p, w);
+    Blas_Mat_Trans_Vec_Mult(*(G_array[row]), p, w);
 
     for(j = 0; j < m_dim+1; j++)
       trans(row, j) = w(j);
-    
-    temp_matrix.copy(*(G_array[row]));
-    Blas_Mat_Trans_Mat_Mult(temp_matrix, identity_extended, *(G_array[row]));
-    
+        
     row++; // next row 
   }
 

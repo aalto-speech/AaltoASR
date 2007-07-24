@@ -19,10 +19,11 @@ public:
   ~MllrTrainer();
 
   /** find the kernel probabilities
-   *  \param state current hmm state
-   *  \param feature current feature
+   * \param prior prior probability of the state
+   * \param state current hmm state
+   * \param feature current feature
    */
-  void find_probs(HmmState *state, const FeatureVec &feature);
+  void find_probs(double prior, HmmState *state, const FeatureVec &feature);
 
   /** calculate the transformation matrix and set the transformation module
    *  \param name name of the transformation module
