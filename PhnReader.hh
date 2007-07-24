@@ -68,11 +68,6 @@ public:
   virtual void set_frame_limits(int first_frame, int last_frame);
 
   virtual void set_collect_transition_probs(bool collect) { m_collect_transitions = collect; }
-
-  /** Sets phn type: normal / speakered (sphn = speakered phn)
-   * speakered phns have speaker ID between label and comment
-   */   
-  void set_speaker_phns(bool sphn);
   
   void set_state_num_labels(bool l) { m_state_num_labels = l; }
   void set_relative_sample_numbers(bool r) { m_relative_sample_numbers = r; }
