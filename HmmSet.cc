@@ -3,6 +3,7 @@
 #include <math.h>
 #include <iostream>
 #include <values.h>
+#include <algorithm>
 
 #include "HmmSet.hh"
 #include "util.hh"
@@ -1062,6 +1063,73 @@ HmmSet::delete_gaussians(double minocc)
   {
     m_emission_pdfs[p]->update_components(index_map);
     assert( m_emission_pdfs[p]->size() > 0 );
+  }
+  return index_offset; // Return the number of Gaussians deleted
+}
+
+
+int HmmSet::remove_mixture_components(double min_weight)
+{
+  std::vector<int> gauss_count;
+  int orig_pool_size = m_pool.size();
+
+  gauss_count.resize(orig_pool_size);
+  fill(gauss_count.begin(), gauss_count.end(), 0);
+
+  // Iterate through mixtures
+  for (int m = 0; m < num_emission_pdfs(); m++)
+  {
+    for (;;)
+    {
+      // Find the minimum weight
+      double cur_min_weight = m_emission_pdfs[m]->get_mixture_coefficient(0);
+      int min_index = 0;
+      for (int i = 1; i < m_emission_pdfs[m]->size(); i++)
+      {
+        if (m_emission_pdfs[m]->get_mixture_coefficient(i) < cur_min_weight)
+        {
+          cur_min_weight = m_emission_pdfs[m]->get_mixture_coefficient(i);
+          min_index = i;
+        }
+      }
+      if (cur_min_weight <= min_weight)
+        break; // Nothing to remove from this mixture
+      m_emission_pdfs[m]->remove_component(min_index);
+    }
+    // Finished removing the components, fill the Gaussian counts
+    for (int i = 0; i < m_emission_pdfs[m]->size(); i++)
+      gauss_count[m_emission_pdfs[m]->get_base_pdf_index(i)]++;
+  }
+
+  // Delete Gaussians which no longer have references
+  std::vector<int> index_map;
+  int cur_index = 0, index_offset = 0;
+  index_map.resize(orig_pool_size);
+  // Fill the index map
+  for (int i = 0; i < orig_pool_size; i++)
+  {
+    if (gauss_count[i] == 0)
+      index_map[i] = -1;
+    else
+      index_map[i] = cur_index++;
+  }
+
+  if (cur_index < orig_pool_size)
+  {
+    // Delete the Gaussians
+    for (int i = 0; i < orig_pool_size; i++)
+      if (index_map[i] < 0)
+      {
+        m_pool.delete_pdf(i-index_offset);
+        index_offset++;
+      }
+    
+    // Update the mixtures
+    for (int p = 0; p < num_emission_pdfs(); p++)
+    {
+      m_emission_pdfs[p]->update_components(index_map);
+      assert( m_emission_pdfs[p]->size() > 0 );
+    }
   }
   return index_offset; // Return the number of Gaussians deleted
 }

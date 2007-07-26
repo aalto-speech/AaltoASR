@@ -539,6 +539,11 @@ public:
    *             The deleted components are marked as -1.
    */
   void update_components(const std::vector<int> &cmap);
+
+  /** Deletes one component from the mixture and normalizes the weights
+   * \param index Component index
+   */
+  void remove_component(int index);
   
   // From pdf
   virtual void start_accumulating();

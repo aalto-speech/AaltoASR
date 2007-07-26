@@ -398,9 +398,18 @@ public:
   /** Deletes Gaussians which occupancy count is below the given threshold.
    * Assures that at least one Gaussian is left for each mixture.
    * \param minocc Occupancy threshold
-   * \return The number of Gaussians deleted
+   * \return Number of Gaussians deleted
    */
   int delete_gaussians(double minocc);
+
+  /** Removes mixture components whose weights are below the given threshold.
+   * The removal is done one component at a time, after which the weights of
+   * the remaining components are normalized before a new comparison against
+   * the threshold.
+   * \param min_weight Weight threshold
+   * \return Number of Gaussians deleted
+   */
+  int remove_mixture_components(double min_weight);
 
   /** Splits every Gaussian in the pool with some constrains
    * OBS!! ASSUMES CURRENTLY CONTINUOUS-DENSITY HMMS!!

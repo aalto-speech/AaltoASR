@@ -1561,6 +1561,16 @@ Mixture::update_components(const std::vector<int> &cmap)
 }
 
 
+void
+Mixture::remove_component(int index)
+{
+  assert( index >= 0 && index < (int)m_pointers.size() );
+  m_pointers.erase(m_pointers.begin()+index);
+  m_weights.erase(m_weights.begin()+index);
+  normalize_weights();
+}
+
+
 PDFPool::PDFPool() {
   reset();
 }
