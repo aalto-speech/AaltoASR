@@ -1467,7 +1467,7 @@ Mixture::estimate_parameters(void)
         for (int j=0; j<size(); j++)
           if (i != j)
             a -= m_accums[1]->gamma[j] * previous_weights[j] / (old_weights[j] * temp);
-        a -= m_accums[1]->gamma[i] / old_weights[i];
+        a += m_accums[1]->gamma[i] / old_weights[i];
         // b
         b = -a;
         for (int j=0; j<size(); j++)
