@@ -293,8 +293,8 @@ double MllrTrainer::calculate_alpha(Matrix &Gi, Vector &p,
   double a1 = (-c1 + sqrt(c1*c1 + 4*c2*beta))/(2*c2);
   double a2 = (-c1 - sqrt(c1*c1 + 4*c2*beta))/(2*c2);
 
-  double m1 = beta*log10(fabs(a1*c2 + c1))-(c2/2)*a1*a1;
-  double m2 = beta*log10(fabs(a2*c2 + c1))-(c2/2)*a2*a2;
+  double m1 = beta*log(fabs(a1*c2 + c1))-(c2/2)*a1*a1;
+  double m2 = beta*log(fabs(a2*c2 + c1))-(c2/2)*a2*a2;
 
   // select the maximizing value
 
@@ -308,13 +308,8 @@ double MllrTrainer::calculate_alpha(Matrix &Gi, Vector &p,
 double MllrTrainer::quadratic(Vector &x, Matrix &A, Vector &y)
 {
   double sum = 0;
-  
-  for (int i = 0; i < (int)A.rows(); i++)
-  {
-    for (int j = 0; j < (int)A.cols(); j++)
-    {
-      sum += A(i,j) * x(i) * y(j);
-    }
-  }
+  LaVectorDouble t(x.size());
+  Blas_Mat_Vec_Mult(A, y, t);
+  sum = Blas_Dot_Prod(x, t);
   return sum;
 }
