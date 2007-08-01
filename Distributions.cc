@@ -1445,12 +1445,14 @@ Mixture::estimate_parameters(void)
   // This implementation follows Woodland & Povey, '02
   else if (m_mode == MMI) {
 
-    double diff=1, norm;
+    double currfval=0, oldfval=0, diff=1, norm;
 
     // Iterate until convergence
     std::vector<double> old_weights = m_weights;
-    while (diff > 0.000001) {
-      diff=0;
+    int iter=0;
+    while (diff > 0.00001 && iter < 1000) {
+      iter++;
+      diff = 0;
       std::vector<double> previous_weights = m_weights;
 
       // Go through every mixture weight
@@ -1479,26 +1481,21 @@ Mixture::estimate_parameters(void)
         sol2 = (-b+sqrt(b*b-4*a*c)) / (2*a);
         assert(sol1 > 0); assert(sol1 < 1);
         m_weights[i] = sol1;
+
+        // Renormalize weights
+        norm=0;
+        for (int i=0; i<size(); i++)
+          norm += m_weights[i];
+        for (int i=0; i<size(); i++)
+          m_weights[i] /= norm;
       }
-
-      // Renormalize weights
-      norm=0;
-      for (int i=0; i<size(); i++)
-        norm += m_weights[i];
-      for (int i=0; i<size(); i++)
-        m_weights[i] /= norm;
       
-      // Compute abs difference to the previous weights
-      for (int i=0; i<size(); i++)
-        diff += std::fabs(m_weights[i]-previous_weights[i]);
-
       // Compute function value
-      /*
-      double fval = 0;
+      oldfval = currfval;
+      currfval = 0;
       for (int i=0; i<size(); i++)
-        fval += m_accums[0]->gamma[i] * m_weights[i] - m_accums[1]->gamma[i] * m_weights[i] / old_weights[i];
-      std::cout << "The function value is: " << fval << std::endl;
-      */
+        currfval += m_accums[0]->gamma[i] * m_weights[i] - m_accums[1]->gamma[i] * m_weights[i] / old_weights[i];
+      diff = std::fabs(oldfval-currfval);
     }
   }  
 }
