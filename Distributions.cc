@@ -539,7 +539,29 @@ Gaussian::full_stats_accumulated() const
   return accumulated();
 }
 
-  
+
+void
+Gaussian::set_covariance(const Vector &covariance,
+               bool finish_statistics)
+{
+  Matrix cov(covariance.size(), covariance.size());
+  cov=0;
+  for (int i=0; i<covariance.size(); i++)
+    cov(i,i)=covariance(i);
+  set_covariance(cov, finish_statistics);
+}
+
+
+void
+Gaussian::get_covariance(Vector &covariance) const
+{
+  Matrix cov;
+  get_covariance(cov);
+  covariance.resize(cov.rows());
+  for (int i=0; i<covariance.size(); i++)
+    covariance(i)=cov(i,i);
+}
+
 DiagonalGaussian::DiagonalGaussian(int dim)
 {
   reset(dim);

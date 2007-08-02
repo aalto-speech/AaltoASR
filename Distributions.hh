@@ -286,7 +286,12 @@ public:
   /* Sets the covariance matrix for this Gaussian */
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true) = 0;
-  /// Returns a copy of this Gaussian object
+  /* Get the diagonal of the covariance matrix */
+  virtual void get_covariance(Vector &covariance) const;
+  /* Set the diagonal of the covariance matrix and off-diagonal to zero */
+  virtual void set_covariance(const Vector &covariance,
+                              bool finish_statistics = true);
+/// Returns a copy of this Gaussian object
   virtual Gaussian* copy_gaussian(void) = 0;
   
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
@@ -351,10 +356,10 @@ public:
   
   // Diagonal-specific
   /// Get the diagonal of the covariance matrix
-  void get_covariance(Vector &covariance) const;
+  virtual void get_covariance(Vector &covariance) const;
   /// Set the diagonal of the covariance matrix
-  void set_covariance(const Vector &covariance,
-                      bool finish_statistics = true);
+  virtual void set_covariance(const Vector &covariance,
+                              bool finish_statistics = true);
 
   /// Sets the constant after the precisions have been set
   void set_constant(void); 
