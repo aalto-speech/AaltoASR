@@ -51,10 +51,9 @@ void MllrTrainer::find_probs(double prior, HmmState *state,
   // get probabilities
   for (int g = 0; g < gaussiancount; g++)
   {  
-    DiagonalGaussian *gaussian =
-      dynamic_cast< DiagonalGaussian* > (mixture->get_base_pdf(g));
+    Gaussian *gaussian = dynamic_cast< Gaussian* > (mixture->get_base_pdf(g));
     if (gaussian == NULL)
-      throw std::string("Warning: MLLR not supported for non-diagonal models");
+      throw std::string("Warning: MLLR not supported for non-Gaussian models");
     
     probs[g] = prior*gaussian->compute_likelihood(feature);
     prob_sum += probs[g];
@@ -242,10 +241,9 @@ void MllrTrainer::update_stats(HmmState *state, double *probs,
     
   for (int g = 0; g < gaussiancount; g++)
   {
-    DiagonalGaussian *gaussian =
-      dynamic_cast< DiagonalGaussian* > (mixture->get_base_pdf(g));
+    Gaussian *gaussian = dynamic_cast< Gaussian* > (mixture->get_base_pdf(g));
     if (gaussian == NULL)
-      throw std::string("Warning: MLLR not supported for non-diagonal models");
+      throw std::string("Warning: MLLR not supported for non-Gaussian models");
 
     // get gaussian statistics
     Vector g_mean;
@@ -264,10 +262,9 @@ void MllrTrainer::update_stats(HmmState *state, double *probs,
 
   for (int g = 0; g < gaussiancount; g++)
   {
-    DiagonalGaussian *gaussian =
-      dynamic_cast< DiagonalGaussian* > (mixture->get_base_pdf(g));
+    Gaussian *gaussian = dynamic_cast< Gaussian* > (mixture->get_base_pdf(g));
     if (gaussian == NULL)
-      fprintf(stderr, "Warning: MLLR not supported for non-diagonal models");
+      fprintf(stderr, "Warning: MLLR not supported for non-Gaussian models");
 
     // get gaussian statistics
     Vector g_var;
