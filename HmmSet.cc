@@ -1092,7 +1092,7 @@ int HmmSet::remove_mixture_components(double min_weight)
           min_index = i;
         }
       }
-      if (cur_min_weight <= min_weight)
+      if (cur_min_weight > min_weight)
         break; // Nothing to remove from this mixture
       m_emission_pdfs[m]->remove_component(min_index);
     }
