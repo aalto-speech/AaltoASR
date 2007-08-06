@@ -14,6 +14,7 @@ main(int argc, char *argv[])
       ('o', "out=FILE", "arg must", "", "converted file (.gk)")
       ('d', "to-diagonal", "", "", "convert Gaussians to diagonal")
       ('f', "to-full", "", "", "convert Gaussians to full covariances")
+      ('\0', "minvar=FLOAT", "arg", "0", "minimum diagonal variance")
       ;
     config.default_parse(argc, argv);
 
@@ -47,6 +48,15 @@ main(int argc, char *argv[])
       // Convert
       gaussian->get_covariance(covariance);
       gaussian->get_mean(mean);
+
+      if (config["minvar"].specified)
+      {
+        double minvar = config["minvar"].get_float();
+        for (int j = 0; j < gaussian->dim(); j++)
+          if (covariance(j,j) < minvar)
+            covariance(j,j) = minvar;
+      }
+      
       new_gaussian->set_covariance(covariance);
       new_gaussian->set_mean(mean);
 
