@@ -140,7 +140,12 @@ void
 HmmNetBaumWelch::close(void)
 {
   clear_bw_scores();
+  
+  m_transition_prob.clear();
+  m_active_transition_table.clear();
   m_pdf_prob.clear();
+  m_active_pdf_table.clear();
+  
   m_active_node_table[0].clear();
   m_active_node_table[1].clear();
   m_nodes.clear();
@@ -178,6 +183,10 @@ HmmNetBaumWelch::reset(void)
       m_nodes[m_active_node_table[b][i]].prob[b] = loglikelihoods.zero();
     m_active_node_table[b].clear();
   }
+  m_transition_prob.clear();
+  m_active_transition_table.clear();
+  m_pdf_prob.clear();
+  m_active_pdf_table.clear();
 }
 
 
