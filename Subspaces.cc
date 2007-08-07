@@ -141,17 +141,15 @@ PrecisionSubspace::reset(const unsigned int subspace_dim,
 
 
 void 
-PrecisionSubspace::write_basis(const std::string &filename)
+PrecisionSubspace::write_basis(std::ofstream &out)
 {
-  std::ofstream out(filename.c_str());
-  
   // Write header line
-  out << fea_dim() << " pcgmm " << basis_dim() << std::endl;
+  out << "precision_subspace\n" << feature_dim() << subspace_dim() << std::endl;
   
   // Write precision basis
-  for (int b=0; b<basis_dim(); b++) {
-    for (unsigned int i=0; i<fea_dim(); i++)
-      for (unsigned int j=0; j<fea_dim(); j++)
+  for (int b=0; b<subspace_dim(); b++) {
+    for (int i=0; i<feature_dim(); i++)
+      for (int j=0; j<feature_dim(); j++)
 	out << m_mspace[b](i,j) << " ";
     out << std::endl;
   }
@@ -159,25 +157,14 @@ PrecisionSubspace::write_basis(const std::string &filename)
 
 
 void
-PrecisionSubspace::read_basis(const std::string &filename)
+PrecisionSubspace::read_basis(std::ifstream &in)
 {
-  std::ifstream in(filename.c_str());
-  if (!in) {
-    fprintf(stderr, "PrecisionSubspace::read_gk(): could not open %s\n", 
-	    filename.c_str());
-    assert(false);
-  }
+  if (!in)
+    throw std::string("PrecisionSubspace::read_basis(): error reading stream\n");
   
-  int basis_dim=0, fea_dim=0;
-  std::string cov_str;
-
   // Read header line
-  in >> fea_dim >> cov_str;
-  
-  if (!(cov_str == "pcgmm")) {
-    throw std::string("Model type not pcgmm");
-    assert(false);
-  }
+  int basis_dim=0, fea_dim=0;
+  in >> fea_dim >> basis_dim;
   
   // Read precision basis
   in >> basis_dim;
@@ -196,14 +183,14 @@ PrecisionSubspace::read_basis(const std::string &filename)
 
 void
 PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
-                                       LaGenMatDouble &precision)
+                                     LaGenMatDouble &precision)
 {
-  assert(lambda.size() <= basis_dim());
+  assert(lambda.size() <= subspace_dim());
   assert(LinearAlgebra::is_spd(m_mspace.at(0)));
   
-  precision.resize(fea_dim(),fea_dim());
-  precision(LaIndex(0,fea_dim()-1),LaIndex(0,fea_dim()-1))=0;
-  LaGenMatDouble identity = LaGenMatDouble::eye(fea_dim());
+  precision.resize(feature_dim(),feature_dim());
+  precision(LaIndex(0,feature_dim()-1),LaIndex(0,feature_dim()-1))=0;
+  LaGenMatDouble identity = LaGenMatDouble::eye(feature_dim());
   for (int b=0; b<lambda.size(); b++)
     Blas_Mat_Mat_Mult(identity, m_mspace[b], precision, lambda(b), 1);
 }
@@ -224,12 +211,12 @@ void
 PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
                                        LaGenMatDouble &precision)
 {
-  assert(lambda.Dim() <= basis_dim());
+  assert(lambda.Dim() <= subspace_dim());
   assert(LinearAlgebra::is_spd(m_mspace.at(0)));
   
-  precision.resize(fea_dim(),fea_dim());
-  precision(LaIndex(0,fea_dim()-1),LaIndex(0,fea_dim()-1))=0;
-  LaGenMatDouble identity = LaGenMatDouble::eye(fea_dim());
+  precision.resize(feature_dim(),feature_dim());
+  precision(LaIndex(0,feature_dim()-1),LaIndex(0,feature_dim()-1))=0;
+  LaGenMatDouble identity = LaGenMatDouble::eye(feature_dim());
   for (int b=0; b<lambda.Dim(); b++)
     Blas_Mat_Mat_Mult(identity, m_mspace[b], precision, lambda(b+1), 1);
 }
@@ -250,7 +237,7 @@ void
 PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
                                         LaGenMatDouble &covariance)
 {
-  LaVectorLongInt pivots(fea_dim());
+  LaVectorLongInt pivots(feature_dim());
   compute_precision(lambda, covariance);
   LUFactorizeIP(covariance, pivots);
   LaLUInverseIP(covariance, pivots);
@@ -284,7 +271,7 @@ void
 PrecisionSubspace::compute_covariance(const HCL_RnVector_d &lambda,
                                         LaGenMatDouble &covariance)
 {
-  LaVectorLongInt pivots(fea_dim());
+  LaVectorLongInt pivots(feature_dim());
   compute_precision(lambda, covariance);
   LUFactorizeIP(covariance, pivots);
   LaLUInverseIP(covariance, pivots);
@@ -301,18 +288,18 @@ PrecisionSubspace::gradient_untied(const HCL_RnVector_d &lambda,
                                    bool affine)
 {
   assert(sample_cov.rows() == sample_cov.cols());
-  assert(lambda.Dim() <= basis_dim());
+  assert(lambda.Dim() <= subspace_dim());
   assert(lambda.Dim() == grad.Dim());
   
   LaGenMatDouble t;
   LaGenMatDouble curr_cov_estimate;
   compute_covariance(lambda, curr_cov_estimate);
 
-  for (unsigned int i=0; i<fea_dim(); i++)
-    for (unsigned int j=0; j<fea_dim(); j++)
+  for (int i=0; i<feature_dim(); i++)
+    for (int j=0; j<feature_dim(); j++)
       curr_cov_estimate(i,j) -= sample_cov(i,j);
   
-  t.resize(fea_dim(), fea_dim());
+  t.resize(feature_dim(), feature_dim());
   for (int i=0; i<lambda.Dim(); i++) {
     Blas_Mat_Mat_Mult(m_mspace.at(i), curr_cov_estimate, t, 1.0, 0.0);
     grad(i+1)=t.trace();
@@ -1094,28 +1081,15 @@ ExponentialSubspace::initialize_basis_pca(const std::vector<double> &c,
 
 
 void
-ExponentialSubspace::read_basis(const std::string &filename)
+ExponentialSubspace::read_basis(std::ifstream &in)
 {
-  std::ifstream in(filename.c_str());
-  if (!in) {
-    fprintf(stderr, "ExponentialSubspace::read_basis(): could not open %s\n", 
-	    filename.c_str());
-    assert(false);
-  }
-  
-  int b_temp=0;
-  std::string cov_str;
+  if (!in) 
+    throw std::string("ExponentialSubspace::read_basis(): error reading stream\n");
 
   // Read header line
-  in >> m_feature_dim >> cov_str;
+  int b_temp=0;
+  in >> m_feature_dim >> b_temp;
   m_exponential_dim=m_feature_dim+m_feature_dim*(m_feature_dim+1)/2;
-
-  if (!(cov_str == "scgmm")) {
-    throw std::string("Basis type not scgmm");
-    assert(false);
-  }
-
-  in >> b_temp;
   reset(b_temp, m_feature_dim);
 
   // Read exponential basis
@@ -1134,12 +1108,10 @@ ExponentialSubspace::read_basis(const std::string &filename)
 
 
 void
-ExponentialSubspace::write_basis(const std::string &filename)
+ExponentialSubspace::write_basis(std::ofstream &out)
 {
-  std::ofstream out(filename.c_str());
-
   // Write header line
-  out << feature_dim() << " scgmm " << subspace_dim() << std::endl;
+  out << "exponential_subspace\n" << feature_dim() << subspace_dim() << std::endl;
   
   // Write exponential basis
   for (int b=0; b<subspace_dim(); b++) {

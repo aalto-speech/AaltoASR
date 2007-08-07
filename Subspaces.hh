@@ -44,8 +44,6 @@ public:
   void reset_cache() { m_computed = false; }
   bool computed() { return m_computed; }
   void optimize_coefficients(const Matrix &sample_cov, Vector &lambda);
-  inline unsigned int fea_dim() { return m_feature_dim; }
-  inline int basis_dim() { return m_subspace_dim; }
 
   void copy(const PrecisionSubspace &orig);
   void compute_precision(const LaVectorDouble &lambda,
@@ -64,8 +62,8 @@ public:
 			    LaVectorDouble &covariance);
   void compute_covariance(const HCL_RnVector_d &lambda,
 			    LaGenMatDouble &covariance);
-  void read_basis(const std::string &filename);
-  void write_basis(const std::string &filename);
+  void read_basis(std::ifstream &in);
+  void write_basis(std::ofstream &out);
   void reset(const unsigned int subspace_dim,
              const unsigned int feature_dim);
   void initialize_basis_pca(const std::vector<double> &weights,
@@ -214,8 +212,8 @@ public:
                      Vector &theta);
   void compute_theta(const HCL_RnVector_d &lambda,
                      Vector &theta);
-  void read_basis(const std::string &filename);
-  void write_basis(const std::string &filename);
+  void read_basis(std::ifstream &in);
+  void write_basis(std::ofstream &out);
   void reset(const unsigned int subspace_dim,
 	     const unsigned int feature_dim);
   void initialize_basis_pca(const std::vector<double> &weights,
