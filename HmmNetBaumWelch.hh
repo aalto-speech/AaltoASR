@@ -14,6 +14,8 @@ public:
   /** Special transition_id values used in arcs. */
   enum { EPSILON = -1, FINAL_TRANSITION = -2 };
 
+  enum { MODE_BAUM_WELCH = 1, MODE_VITERBI = 2 };
+  
   static struct LLType {
     double zero(void) { return -1e15; }
     double one(void) { return 0; }
@@ -136,6 +138,9 @@ private:
 
   std::vector<int> m_active_node_table[2]; //!< Active nodes (two buffers)
 
+  /// Segmenting mode
+  int m_mode;
+  
   int m_current_frame; //!< Current frame while computing the probabilities
 
   /// first frame to be included (0-N)

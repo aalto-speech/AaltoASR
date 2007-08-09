@@ -17,6 +17,9 @@ HmmNetBaumWelch::HmmNetBaumWelch(FeatureGenerator &fea_gen, HmmSet &model)
   m_collect_transitions = 0;
   m_acoustic_scale = 1;
 
+  // Default mode
+  m_mode = MODE_BAUM_WELCH;
+
   // Default pruning thresholds
   m_forward_beam = 15;
   m_backward_beam = 100;
@@ -421,6 +424,7 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
     if (m_arcs[arc_id].epsilon())
     {
       // Propagate through epsilon arc
+      // FIXME: Could add the new score to the next node if it is active
       double new_score = loglikelihoods.times(cur_score,m_arcs[arc_id].score);
       double temp = propagate_node_arcs(next_node_id, forward,
                                         new_score, target_buffer, fea_vec);
@@ -493,7 +497,7 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
                                                 total_score);
         }
 
-        // Add the probability of the arc to the next node
+        // Propagate the probability of the arc to the next node
         if (m_nodes[next_node_id].prob[target_buffer] <=
             loglikelihoods.zero())
         {
@@ -503,10 +507,20 @@ HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
         }
         else
         {
-          // Node had a probability already, add the new probability
-          m_nodes[next_node_id].prob[target_buffer] =
-            loglikelihoods.add(m_nodes[next_node_id].prob[target_buffer],
-                               total_score);
+          // Node had a probability already
+          if (m_mode == MODE_BAUM_WELCH)
+          {
+            // Add the new probability to the previous one
+            m_nodes[next_node_id].prob[target_buffer] =
+              loglikelihoods.add(m_nodes[next_node_id].prob[target_buffer],
+                                 total_score);
+          }
+          else if (m_mode == MODE_VITERBI)
+          {
+            // Update the probability if it is smaller than the new one
+            if (m_nodes[next_node_id].prob[target_buffer] < total_score)
+              m_nodes[next_node_id].prob[target_buffer] = total_score;
+          }
         }
         // Save the maximum node probability for pruning
         if (m_nodes[next_node_id].prob[target_buffer] > cur_max_prob)
@@ -557,6 +571,16 @@ HmmNetBaumWelch::clear_bw_scores(void)
 void
 HmmNetBaumWelch::FrameProbs::add_log_prob(int frame, double prob)
 {
+  // The backward probabilities that use FrameProbs class are filled
+  // sequentially in decreasing order, so to check whether the probability
+  // already exists, it is enough to check the latest frame
+  if (!frame_blocks.empty() && frame_blocks.back().start == frame)
+  {
+    log_prob_table[num_probs-1] =
+      loglikelihoods.add(log_prob_table[num_probs-1], prob);
+    return;
+  }
+  
   if (num_probs == prob_table_size)
   {
     // Increase the size of the probability table
