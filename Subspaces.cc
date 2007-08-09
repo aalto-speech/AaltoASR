@@ -116,6 +116,28 @@ PrecisionSubspace::initialize_basis_pca(const std::vector<double> &c,
     Blas_Mat_Mat_Mult(matrix_t2, m_sqrt, m_mspace.at(i), 1.0, 0.0);
     LinearAlgebra::map_m2v(m_mspace.at(i), m_vspace.at(i));
   }
+  assert(LinearAlgebra::is_spd(m_mspace.at(0)));
+}
+
+
+void
+PrecisionSubspace::optimize_coefficients(const Matrix &sample_cov,
+                                         Vector &lambda)
+{
+  
+  // Optimization space
+  HCL_RnSpace_d vs(subspace_dim());
+  
+  PcgmmLambdaFcnl f(vs, subspace_dim(), *this, sample_cov, true);
+  HCL_RnVector_d x((HCL_RnSpace_d&)(f.Domain()));
+  
+  for (int i=0; i<subspace_dim(); i++)
+    x(i+1)=lambda(i);
+
+  m_bfgs->Minimize(f, x);
+
+  for (int i=0; i<subspace_dim(); i++)
+    lambda(i)=x(i+1);
 }
 
 
@@ -189,7 +211,7 @@ PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
   assert(LinearAlgebra::is_spd(m_mspace.at(0)));
   
   precision.resize(feature_dim(),feature_dim());
-  precision(LaIndex(0,feature_dim()-1),LaIndex(0,feature_dim()-1))=0;
+  precision=0;
   LaGenMatDouble identity = LaGenMatDouble::eye(feature_dim());
   for (int b=0; b<lambda.size(); b++)
     Blas_Mat_Mat_Mult(identity, m_mspace[b], precision, lambda(b), 1);
@@ -215,7 +237,7 @@ PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
   assert(LinearAlgebra::is_spd(m_mspace.at(0)));
   
   precision.resize(feature_dim(),feature_dim());
-  precision(LaIndex(0,feature_dim()-1),LaIndex(0,feature_dim()-1))=0;
+  precision=0;
   LaGenMatDouble identity = LaGenMatDouble::eye(feature_dim());
   for (int b=0; b<lambda.Dim(); b++)
     Blas_Mat_Mat_Mult(identity, m_mspace[b], precision, lambda(b+1), 1);
@@ -448,14 +470,6 @@ PrecisionSubspace::precompute(const FeatureVec &f)
 }
 
 
-void
-PrecisionSubspace::optimize_coefficients(const Matrix &sample_cov, Vector &lambda)
-{
-  
-  
-}
-
-
 PcgmmLambdaFcnl::PcgmmLambdaFcnl(HCL_RnSpace_d &vs,
 				 int basis_dim,
 				 PrecisionSubspace &pcgmm,
@@ -644,6 +658,27 @@ ExponentialSubspace::dotproduct(const Vector &lambda) const
 
 
 void
+ExponentialSubspace::optimize_coefficients(const Vector &sample_mean,
+                                           const Matrix &sample_cov,
+                                           Vector &lambda)
+{
+  // Optimization space
+  HCL_RnSpace_d vs(subspace_dim());
+  
+  ScgmmLambdaFcnl f(vs, subspace_dim(), *this, sample_cov, sample_mean);
+  HCL_RnVector_d x((HCL_RnSpace_d&)(f.Domain()));
+  
+  for (int i=0; i<subspace_dim(); i++)
+    x(i+1)=lambda(i);
+  
+  m_bfgs->Minimize(f, x);
+
+  for (int i=0; i<subspace_dim(); i++)
+    lambda(i)=x(i+1);
+}
+
+
+void
 ExponentialSubspace::precompute(const FeatureVec &f)
 {
   if (!m_computed) {
@@ -665,16 +700,6 @@ ExponentialSubspace::precompute(const FeatureVec &f)
 
     m_computed=true;
   }
-}
-
-
-void
-ExponentialSubspace::optimize_coefficients(const Vector &sample_mean,
-                                           const Matrix &sample_cov,
-                                           Vector &lambda)
-{
-  
-  
 }
 
 
@@ -750,7 +775,7 @@ ExponentialSubspace::compute_precision(const LaVectorDouble &lambda,
 
 void 
 ExponentialSubspace::compute_precision(const HCL_RnVector_d &lambda,
-                                         LaGenMatDouble &precision)
+                                       LaGenMatDouble &precision)
 {
   assert(lambda.Dim()<=subspace_dim());
   
@@ -765,7 +790,7 @@ ExponentialSubspace::compute_precision(const HCL_RnVector_d &lambda,
 
 void
 ExponentialSubspace::compute_precision(const HCL_RnVector_d &lambda,
-                                         LaVectorDouble &precision)
+                                       LaVectorDouble &precision)
 {
   assert(lambda.Dim()<=subspace_dim());
 
@@ -779,7 +804,7 @@ ExponentialSubspace::compute_precision(const HCL_RnVector_d &lambda,
 
 void 
 ExponentialSubspace::compute_covariance(const LaVectorDouble &lambda,
-                                          LaGenMatDouble &covariance)
+                                        LaGenMatDouble &covariance)
 {
   assert(lambda.size()<=subspace_dim());
 
@@ -794,7 +819,7 @@ ExponentialSubspace::compute_covariance(const LaVectorDouble &lambda,
 
 void 
 ExponentialSubspace::compute_covariance(const LaVectorDouble &lambda,
-                                          LaVectorDouble &covariance)
+                                        LaVectorDouble &covariance)
 {
   assert(lambda.size()<=subspace_dim());
 
@@ -808,10 +833,10 @@ ExponentialSubspace::compute_covariance(const LaVectorDouble &lambda,
 
 void 
 ExponentialSubspace::compute_covariance(const HCL_RnVector_d &lambda,
-                                          LaGenMatDouble &covariance)
+                                        LaGenMatDouble &covariance)
 {
   assert(lambda.Dim()<=subspace_dim());
-
+  
   LaVectorLongInt pivots(feature_dim());
   // Calculate precision
   compute_precision(lambda, covariance);
@@ -823,7 +848,7 @@ ExponentialSubspace::compute_covariance(const HCL_RnVector_d &lambda,
 
 void 
 ExponentialSubspace::compute_covariance(const HCL_RnVector_d &lambda,
-                                          LaVectorDouble &covariance)
+                                        LaVectorDouble &covariance)
 {
   assert(lambda.Dim()<=subspace_dim());
 
@@ -837,7 +862,7 @@ ExponentialSubspace::compute_covariance(const HCL_RnVector_d &lambda,
 
 void 
 ExponentialSubspace::compute_psi(const LaVectorDouble &lambda,
-                                   LaVectorDouble &psi)
+                                 LaVectorDouble &psi)
 {
   assert(lambda.size()<=subspace_dim());
 
@@ -850,7 +875,7 @@ ExponentialSubspace::compute_psi(const LaVectorDouble &lambda,
 
 void 
 ExponentialSubspace::compute_psi(const HCL_RnVector_d &lambda,
-                                   LaVectorDouble &psi)
+                                 LaVectorDouble &psi)
 {
   assert(lambda.Dim()<=subspace_dim());
 
@@ -863,7 +888,7 @@ ExponentialSubspace::compute_psi(const HCL_RnVector_d &lambda,
 
 void
 ExponentialSubspace::compute_mu(const LaVectorDouble &lambda,
-                                  LaVectorDouble &mu)
+                                LaVectorDouble &mu)
 {
   assert(lambda.size()<=subspace_dim());
 
@@ -878,7 +903,7 @@ ExponentialSubspace::compute_mu(const LaVectorDouble &lambda,
 
 void
 ExponentialSubspace::compute_mu(const HCL_RnVector_d &lambda,
-                                  LaVectorDouble &mu)
+                                LaVectorDouble &mu)
 {
   assert(lambda.Dim()<=subspace_dim());
 
@@ -893,7 +918,7 @@ ExponentialSubspace::compute_mu(const HCL_RnVector_d &lambda,
 
 void
 ExponentialSubspace::compute_theta(const LaVectorDouble &lambda,
-                                     LaVectorDouble &theta)
+                                   LaVectorDouble &theta)
 {
   assert(lambda.size()<=subspace_dim());
 
@@ -906,7 +931,7 @@ ExponentialSubspace::compute_theta(const LaVectorDouble &lambda,
 
 void
 ExponentialSubspace::compute_theta(const HCL_RnVector_d &lambda,
-                                     LaVectorDouble &theta)
+                                   LaVectorDouble &theta)
 {
   assert(lambda.Dim()<=subspace_dim());
 
@@ -1163,7 +1188,7 @@ ExponentialSubspace::K(const LaVectorDouble &theta)
 
 double
 ExponentialSubspace::H(const LaVectorDouble &theta,
-	 const LaVectorDouble &f)
+                       const LaVectorDouble &f)
 {
   double result;
   result = K(theta);
@@ -1433,10 +1458,10 @@ void
 ScgmmLambdaFcnl::Gradient1(const HCL_Vector_d & x,
 			   HCL_Vector_d & g) const {
   m_es.gradient_untied((HCL_RnVector_d&)x,
-			  m_sample_mean,
-			  m_sample_secondmoment,
-			  (HCL_RnVector_d&)g,
-			  m_affine);
+                       m_sample_mean,
+                       m_sample_secondmoment,
+                       (HCL_RnVector_d&)g,
+                       m_affine);
   // RETURN NEGATIVE VALUES BECAUSE HCL DOES MINIMIZATION!
   g.Mul(-1);
 }

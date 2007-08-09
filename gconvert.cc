@@ -6,6 +6,29 @@ conf::Config config;
 PrecisionSubspace *ps;
 ExponentialSubspace *es;
 
+
+void bfgs_set_defaults(HCL_UMin_lbfgs_d &bfgs) {
+  bfgs.Parameters().PutValue("MaxItn", 100);
+  bfgs.Parameters().PutValue("Typf", 1.0);
+  bfgs.Parameters().PutValue("TypxNorm", 1.0);
+  bfgs.Parameters().PutValue("GradTol", 1.0e-2);
+  bfgs.Parameters().PutValue("MinStep", 1e-20);
+  bfgs.Parameters().PutValue("MaxStep", 1e+20);
+  bfgs.Parameters().PutValue("CscMaxLimit", 5);
+  bfgs.Parameters().PutValue("MaxUpdates", 4);
+}
+
+
+void line_set_defaults(HCL_LineSearch_MT_d &ls) {
+  ls.Parameters().PutValue("FcnDecreaseTol", 1e-4);
+  ls.Parameters().PutValue("SlopeDecreaseTol", 9e-1);
+  ls.Parameters().PutValue("MinStep", 1e-20);
+  ls.Parameters().PutValue("MaxStep", 1e+20);
+  ls.Parameters().PutValue("MaxSample", 8);
+  ls.Parameters().PutValue("BracketIncrease", 4);
+}
+
+
 int
 main(int argc, char *argv[])
 {
@@ -21,6 +44,8 @@ main(int argc, char *argv[])
       ('i', "info=INT", "arg", "0", "info level")
       ('\0', "ssdim=INT", "arg", "0", "subspace dimensionality")
       ('\0', "minvar=FLOAT", "arg", "0", "minimum diagonal variance")
+      ('\0', "hcl_bfgs_cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
+      ('\0', "hcl_line_cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
       ;
     config.default_parse(argc, argv);
 
@@ -44,6 +69,15 @@ main(int argc, char *argv[])
     pool.read_gk(config["gk"].get_str());
     new_pool.set_dim(pool.dim());
 
+    // Linesearch for subspace models
+    HCL_LineSearch_MT_d ls;
+    if (config["hcl_line_cfg"].specified)
+      ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());
+    
+    // lmBFGS for subspace models
+    HCL_UMin_lbfgs_d bfgs(&ls);
+    if (config["hcl_bfgs_cfg"].specified)
+      bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
     
     // Initialize precision subspace if needed
     if (config["to-pcgmm"].specified) {
@@ -69,6 +103,7 @@ main(int argc, char *argv[])
       }
 
       ps->initialize_basis_pca(weights, covs, config["ssdim"].get_int());
+      ps->set_bfgs(&bfgs);
     }
 
     // Initialize exponential subspace if needed
@@ -98,8 +133,10 @@ main(int argc, char *argv[])
       }
       
       es->initialize_basis_pca(weights, covs, means, config["ssdim"].get_int());
+      es->set_bfgs(&bfgs);
     }
-    
+
+    // Go through every Gaussian in the pool
     Matrix covariance;
     Vector mean;
     for (int i=0; i<pool.size(); i++) {
@@ -123,7 +160,7 @@ main(int argc, char *argv[])
       if (config["to-scgmm"].specified)
         new_gaussian = new SubspaceConstrainedGaussian(es);
       
-      // Convert
+      // Get the old Gaussian parameters
       gaussian->get_covariance(covariance);
       gaussian->get_mean(mean);
 
@@ -134,12 +171,28 @@ main(int argc, char *argv[])
           if (covariance(j,j) < minvar)
             covariance(j,j) = minvar;
       }
-      
-      new_gaussian->set_parameters(mean, covariance);
+        
+      // Set parameters
+      try {
+        new_gaussian->set_parameters(mean, covariance);
+      } catch(LaException &e) {
+        // Try optimizing in subspace parameters in 'safe mode' if things go bad
+        bfgs_set_defaults(bfgs);
+        line_set_defaults(ls);
+        try {
+        new_gaussian->set_parameters(mean, covariance);
+        } catch(LaException e) {}	  
+        if (config["hcl_line_cfg"].specified)
+          ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());  
+        if (config["hcl_bfgs_cfg"].specified)
+          bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
+      }
 
+      // Insert the converted Gaussian into the pool
       new_pool.set_pdf(i, new_gaussian);
     }
 
+    // Write out
     new_pool.write_gk(config["out"].get_str());
   }
   catch (std::exception &e) {

@@ -1005,14 +1005,18 @@ PrecisionConstrainedGaussian::PrecisionConstrainedGaussian()
 PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(PrecisionSubspace *space)
 {
   m_ps = space;
+  m_coeffs.resize(space->subspace_dim());
+  reset(space->feature_dim());
 }
 
 
 PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(const PrecisionConstrainedGaussian &g)
 {
-  g.get_mean(m_transformed_mean);
-  g.get_precision_coeffs(m_coeffs);
+  m_transformed_mean.copy(g.m_transformed_mean);
+  m_coeffs.copy(g.m_coeffs);
   m_ps = g.get_subspace();
+  m_constant = g.m_constant;
+  m_full_stats = true;
 }
 
 
@@ -1029,7 +1033,7 @@ PrecisionConstrainedGaussian::reset(int feature_dim)
   
   m_transformed_mean.resize(feature_dim);
   m_transformed_mean=0;
-  m_coeffs=0;
+  m_coeffs=0; m_coeffs(0)=1;
   
   m_constant=0;
   m_full_stats=true;
@@ -1162,6 +1166,8 @@ SubspaceConstrainedGaussian::SubspaceConstrainedGaussian()
 SubspaceConstrainedGaussian::SubspaceConstrainedGaussian(ExponentialSubspace *space)
 {
   m_es = space;
+  m_dim = space->feature_dim();
+  m_coeffs.resize(space->subspace_dim());
 }
 
 

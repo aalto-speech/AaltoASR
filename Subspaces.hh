@@ -29,7 +29,7 @@ private:
   
   bool m_computed;
   Vector m_quadratic_features;
-
+  HCL_UMin_lbfgs_d *m_bfgs;
 
 public:
 
@@ -43,8 +43,8 @@ public:
   void precompute(const FeatureVec &f);
   void reset_cache() { m_computed = false; }
   bool computed() { return m_computed; }
-  void optimize_coefficients(const Matrix &sample_cov, Vector &lambda);
-
+  void optimize_coefficients(const Matrix &sample_cov,
+                             Vector &lambda);
   void copy(const PrecisionSubspace &orig);
   void compute_precision(const LaVectorDouble &lambda,
 			   LaGenMatDouble &precision);
@@ -77,8 +77,6 @@ public:
 			 const LaGenMatDouble &curr_prec_estimate,
 			 LaVectorDouble &eigs,
 			 double &max_interval);
-  void optimize_lambda(const LaGenMatDouble &sample_cov,
-		       LaVectorDouble &lambda);
   void optimize_basis(const std::vector<LaGenMatDouble> &sample_covs,
 		      const std::vector<LaVectorDouble> &lambda,
 		      const std::vector<double> &c);
@@ -91,6 +89,7 @@ public:
   double eval_linesearch_derivative(const LaVectorDouble &eigs,
 				    double step,
 				    double beta);
+  void set_bfgs(HCL_UMin_lbfgs_d *bfgs) { m_bfgs = bfgs; }
 };
 
 
@@ -160,6 +159,7 @@ private:
   
   bool m_computed;
   Vector m_quadratic_features;
+  HCL_UMin_lbfgs_d *m_bfgs;
   
 public:
 
@@ -178,7 +178,6 @@ public:
   void optimize_coefficients(const Vector &sample_mean,
                              const Matrix &sample_cov,
                              Vector &lambda);
-  
   inline unsigned int feature_dim() { return m_feature_dim; };
   inline unsigned int exponential_dim() { return m_exponential_dim; };
   inline int subspace_dim() { return m_subspace_dim; };
@@ -254,6 +253,7 @@ public:
   void theta_to_gaussian_params(const Vector &theta,
 				Vector &mu,
 				Matrix &sigma);
+  void set_bfgs(HCL_UMin_lbfgs_d *bfgs) { m_bfgs = bfgs; }
 };
 
 

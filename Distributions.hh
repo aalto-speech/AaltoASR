@@ -279,7 +279,8 @@ public:
   /* Returns the covariance matrix for this Gaussian */
   virtual void get_covariance(Matrix &covariance) const = 0;
   /* Sets the parameters for this Gaussian */
-  virtual void set_parameters(const Vector &mean, const Matrix &covariance)
+  virtual void set_parameters(const Vector &mean,
+                              const Matrix &covariance)
   { set_mean(mean); set_covariance(covariance); }
   /* Sets the mean vector for this Gaussian */
   virtual void set_mean(const Vector &mean) = 0;
@@ -450,7 +451,6 @@ public:
   void get_precision_coeffs(Vector &coeffs) const { coeffs.copy(m_coeffs); }
   /* Set the coefficients for the subspace constrained precision matrix */
   void set_precision_coeffs(const Vector &coeffs) { m_coeffs.copy(coeffs); }
-
   /* Get the subspace dimensionality */
   int subspace_dim() const { return m_coeffs.size(); }
   /* Get the subspace */
@@ -487,7 +487,8 @@ public:
   virtual void set_mean(const Vector &mean);
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
-  virtual void set_parameters(const Vector &mean, const Matrix &covariance);
+  virtual void set_parameters(const Vector &mean,
+                              const Matrix &covariance);
   virtual Gaussian* copy_gaussian(void) { return new SubspaceConstrainedGaussian(*this); }
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
@@ -498,6 +499,8 @@ public:
   void get_subspace_coeffs(Vector &coeffs) const { coeffs.copy(m_coeffs); }
   /* Set the coefficients for the subspace constrained exponential parameters */
   void set_subspace_coeffs(const Vector &coeffs) { m_coeffs.copy(coeffs); }
+  /* Set the limited memory BFGS algorithm class for parameter optimization */
+  void set_bfgs(HCL_UMin_lbfgs_d *bfgs) { m_bfgs = bfgs; }
 
   /* Get the subspace dimensionality */
   int subspace_dim() const { return m_coeffs.size(); }
@@ -509,6 +512,7 @@ public:
 private:
   Vector m_coeffs;
   ExponentialSubspace *m_es;
+  HCL_UMin_lbfgs_d *m_bfgs;
 };
 
 
