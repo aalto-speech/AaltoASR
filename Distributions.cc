@@ -542,7 +542,7 @@ Gaussian::full_stats_accumulated() const
 
 void
 Gaussian::set_covariance(const Vector &covariance,
-               bool finish_statistics)
+                         bool finish_statistics)
 {
   Matrix cov(covariance.size(), covariance.size());
   cov=0;
@@ -627,6 +627,20 @@ DiagonalGaussian::compute_log_likelihood(const FeatureVec &f) const
   ll += m_constant;
 
   return ll;
+}
+
+
+double
+DiagonalGaussian::compute_likelihood_exponential(const Vector &exponential_feature) const
+{
+  throw std::string("compute_likelihood_exponential not implemented for DiagonalGaussian\n");
+}
+
+
+double
+DiagonalGaussian::compute_log_likelihood_exponential(const Vector &exponential_feature) const
+{
+  throw std::string("compute_log_likelihood_exponential not implemented for DiagonalGaussian\n");
 }
 
 
@@ -798,9 +812,10 @@ FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
 {
   reset(g.dim());
   g.get_mean(m_mean);
-  g.get_covariance(m_covariance);
   m_precision.copy(g.m_precision);
+  m_exponential_parameters.copy(g.m_exponential_parameters);
   m_constant = g.m_constant;
+  m_exponential_normalizer = g.m_exponential_normalizer;
 }
 
 
@@ -817,9 +832,8 @@ FullCovarianceGaussian::reset(int dim)
   m_mode=ML;
   
   m_mean.resize(dim);
-  m_covariance.resize(dim,dim);
   m_precision.resize(dim,dim);
-  m_mean=0; m_covariance=0; m_precision=0;
+  m_mean=0; m_precision=0;
 
   m_constant=0;
   m_full_stats=true;
@@ -836,15 +850,34 @@ FullCovarianceGaussian::compute_likelihood(const FeatureVec &f) const
 double
 FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f) const
 {
-  double ll=0;
+  double ll;
 
   Vector diff(*(f.get_vector()));
   Vector t(f.dim());
 
   Blas_Add_Mult(diff, -1, m_mean);
   Blas_Mat_Vec_Mult(m_precision, diff, t, 1, 0);
-  ll = Blas_Dot_Prod(diff, t);
-  ll *= -0.5;
+  ll = -0.5 * Blas_Dot_Prod(diff, t);
+  ll += m_constant;
+
+  return ll;
+}
+
+
+double
+FullCovarianceGaussian::compute_likelihood_exponential(const Vector &exponential_feature) const
+{
+  return exp(compute_log_likelihood_exponential(exponential_feature));
+}
+
+
+double
+FullCovarianceGaussian::compute_log_likelihood_exponential(const Vector &exponential_feature) const
+{
+  double ll;
+
+  ll = Blas_Dot_Prod(exponential_feature, m_exponential_parameters);
+  ll += m_exponential_normalizer;
   ll += m_constant;
 
   return ll;
@@ -854,36 +887,32 @@ FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f) const
 void
 FullCovarianceGaussian::write(std::ostream &os) const
 {
+  Matrix covariance;
+  get_covariance(covariance);
+  
   os << "full ";
   for (int i=0; i<dim(); i++)
     os << m_mean(i) << " ";
   for (int i=0; i<dim(); i++)
     for (int j=0; j<dim(); j++)
       if (!(i==dim()-1 && j==dim()-1))
-	os << m_covariance(i,j) << " ";
-  os << m_covariance(dim()-1, dim()-1);
+	os << covariance(i,j) << " ";
+  os << covariance(dim()-1, dim()-1);
 }
 
 
 void
 FullCovarianceGaussian::read(std::istream &is)
 {
+  Matrix covariance(dim(), dim());
+  
   for (int i=0; i<dim(); i++)
     is >> m_mean(i);
   for (int i=0; i<dim(); i++)
     for (int j=0; j<dim(); j++)
-      is >> m_covariance(i,j);
-
-  if (LinearAlgebra::is_spd(m_covariance))
-  {
-    LinearAlgebra::inverse(m_covariance, m_precision);
-    m_constant = log(sqrt(LinearAlgebra::spd_determinant(m_precision)));
-  }
-  else
-  {
-    m_precision = 0;
-    m_constant = 0;
-  }
+      is >> covariance(i,j);
+  
+  set_covariance(covariance);
 }
 
 
@@ -912,7 +941,29 @@ FullCovarianceGaussian::get_mean(Vector &mean) const
 void
 FullCovarianceGaussian::get_covariance(Matrix &covariance) const
 {
-  covariance.copy(m_covariance);
+  covariance.resize(m_precision.rows(), m_precision.cols());
+  LinearAlgebra::inverse(m_precision, covariance);
+}
+
+
+void
+FullCovarianceGaussian::recompute_exponential_parameters()
+{
+  // Constant
+  Vector transformed_mean(m_mean.size());  
+  Blas_Mat_Vec_Mult(m_precision, m_mean, transformed_mean);
+  m_exponential_normalizer = -0.5 * Blas_Dot_Prod(transformed_mean, m_mean);
+
+  // Linear part
+  m_exponential_parameters.resize((int)(dim()*(dim()+3)/2));
+  for (int i=0; i<dim(); i++)
+    m_exponential_parameters(i) = transformed_mean(i);
+
+  // Quadratic part
+  Vector vectorized_precision;
+  LinearAlgebra::map_m2v(m_precision, vectorized_precision);
+  for (int i=0; i<vectorized_precision.size(); i++)
+    m_exponential_parameters(dim()+i) = -0.5 * vectorized_precision(i);
 }
 
 
@@ -921,6 +972,7 @@ FullCovarianceGaussian::set_mean(const Vector &mean)
 {
   assert(mean.size()==dim());
   m_mean.copy(mean);
+  recompute_exponential_parameters();
 }
 
 
@@ -930,12 +982,12 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance,
 {
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
-  
-  m_covariance.copy(covariance);
-  if (finish_statistics && LinearAlgebra::is_spd(m_covariance))
+
+  if (finish_statistics && LinearAlgebra::is_spd(covariance))
   {
-    LinearAlgebra::inverse(m_covariance, m_precision);
+    LinearAlgebra::inverse(covariance, m_precision);
     m_constant = log(sqrt(LinearAlgebra::spd_determinant(m_precision)));
+    recompute_exponential_parameters();
   }
   else
   {
@@ -1001,6 +1053,20 @@ PrecisionConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
     +Blas_Dot_Prod(m_transformed_mean, *f.get_vector())
     +m_ps->dotproduct(m_coeffs);
   return result;
+}
+
+
+double
+PrecisionConstrainedGaussian::compute_log_likelihood_exponential(const Vector &exponential_feature) const
+{
+  throw std::string("compute_log_likelihood_exponential not implemented for PrecisionConstrainedGaussian\n");
+}
+
+
+double
+PrecisionConstrainedGaussian::compute_likelihood_exponential(const Vector &exponential_feature) const
+{
+  throw std::string("compute_likelihood_exponential not implemented for PrecisionConstrainedGaussian\n");
 }
 
 
@@ -1139,6 +1205,20 @@ SubspaceConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
   
   double result=m_constant+m_es->dotproduct(m_coeffs);
   return result;
+}
+
+
+double
+SubspaceConstrainedGaussian::compute_log_likelihood_exponential(const Vector &exponential_feature) const
+{
+  throw std::string("compute_log_likelihood_exponential not implemented for SubspaceConstrainedGaussian\n");
+}
+
+
+double
+SubspaceConstrainedGaussian::compute_likelihood_exponential(const Vector &exponential_feature) const
+{
+  throw std::string("compute_likelihood_exponential not implemented for SubspaceConstrainedGaussian\n");
 }
 
 
@@ -1683,8 +1763,25 @@ void
 PDFPool::precompute_likelihoods(const FeatureVec &f)
 {
   reset_cache();
+
+  Vector exponential_feature_vector((int)(dim()*(dim()+3)/2));
+  for (int i=0; i<dim(); i++)
+    exponential_feature_vector(i) = f[i];
+  Matrix tmat(dim(), dim()); tmat=0;
+  const Vector *feature = f.get_vector();
+  Blas_R1_Update(tmat, *feature, *feature, 1.0);
+  Vector tvec;
+  LinearAlgebra::map_m2v(tmat, tvec);
+  for (int i=0; i<tvec.size(); i++)
+    exponential_feature_vector(dim()+i) = tvec(i);
+  
   for (int i=0; i<size(); i++) {
-    m_likelihoods[i] = m_pool[i]->compute_likelihood(f);
+
+    FullCovarianceGaussian *fcgaussian = dynamic_cast< FullCovarianceGaussian* > (m_pool[i]);
+    if (fcgaussian != NULL)
+      m_likelihoods[i] = fcgaussian->compute_likelihood_exponential(exponential_feature_vector);
+    else
+      m_likelihoods[i] = m_pool[i]->compute_likelihood(f);
     m_valid_likelihoods.push_back(i);
   }
 }

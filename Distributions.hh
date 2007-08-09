@@ -291,8 +291,12 @@ public:
   /* Set the diagonal of the covariance matrix and off-diagonal to zero */
   virtual void set_covariance(const Vector &covariance,
                               bool finish_statistics = true);
-/// Returns a copy of this Gaussian object
+  /// Returns a copy of this Gaussian object
   virtual Gaussian* copy_gaussian(void) = 0;
+  /// The likelihood of the current feature given this model using exponential feature vector
+  virtual double compute_likelihood_exponential(const Vector &exponential_feature) const = 0;
+    /// The log likelihood of the current feature given this model using exponential feature vector
+  virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const = 0;
   
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
 
@@ -311,12 +315,12 @@ public:
                      bool finish_statistics = true);
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
-
+  
   /* Set the full statistics to be accumulated */
   void set_full_stats(bool full_stats) { m_full_stats = full_stats; }
   /* Tells if full statistics have been accumulated for this Gaussian */
   bool full_stats_accumulated() const;
-  
+
 protected:
   double m_constant;
   bool m_full_stats;
@@ -353,7 +357,9 @@ public:
                               bool finish_statistics = true);
   virtual Gaussian* copy_gaussian(void) { return new DiagonalGaussian(*this); }
   virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2) const;
-  
+  virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
+  virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
+
   // Diagonal-specific
   /// Get the diagonal of the covariance matrix
   virtual void get_covariance(Vector &covariance) const;
@@ -393,11 +399,17 @@ public:
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
   virtual Gaussian* copy_gaussian(void) { return new FullCovarianceGaussian(*this); }
+  virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
+  virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
 
+  // Full-covariance-specific
+  void recompute_exponential_parameters();
+  
 private:
   Vector m_mean;
-  Matrix m_covariance;
   Matrix m_precision;
+  Vector m_exponential_parameters;
+  double m_exponential_normalizer;
 };
 
 
@@ -424,6 +436,8 @@ public:
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
   virtual Gaussian* copy_gaussian(void) { return new PrecisionConstrainedGaussian(*this); }
+  virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
+  virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
 
   // PCGMM-specific
 
@@ -475,6 +489,8 @@ public:
                               bool finish_statistics = true);
   virtual void set_parameters(const Vector &mean, const Matrix &covariance);
   virtual Gaussian* copy_gaussian(void) { return new SubspaceConstrainedGaussian(*this); }
+  virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
+  virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
 
   // SCGMM-specific
 
