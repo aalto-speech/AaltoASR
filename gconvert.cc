@@ -104,6 +104,7 @@ main(int argc, char *argv[])
 
       ps->initialize_basis_pca(weights, covs, config["ssdim"].get_int());
       ps->set_bfgs(&bfgs);
+      new_pool.set_precision_subspace(1, ps);
     }
 
     // Initialize exponential subspace if needed
@@ -134,8 +135,10 @@ main(int argc, char *argv[])
       
       es->initialize_basis_pca(weights, covs, means, config["ssdim"].get_int());
       es->set_bfgs(&bfgs);
+      new_pool.set_exponential_subspace(1, es);
     }
 
+    
     // Go through every Gaussian in the pool
     Matrix covariance;
     Vector mean;

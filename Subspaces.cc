@@ -163,10 +163,10 @@ PrecisionSubspace::reset(const unsigned int subspace_dim,
 
 
 void 
-PrecisionSubspace::write_basis(std::ofstream &out)
+PrecisionSubspace::write_subspace(std::ofstream &out)
 {
   // Write header line
-  out << "precision_subspace\n" << feature_dim() << subspace_dim() << std::endl;
+  out << feature_dim() << " " << subspace_dim() << std::endl;
   
   // Write precision basis
   for (int b=0; b<subspace_dim(); b++) {
@@ -179,10 +179,10 @@ PrecisionSubspace::write_basis(std::ofstream &out)
 
 
 void
-PrecisionSubspace::read_basis(std::ifstream &in)
+PrecisionSubspace::read_subspace(std::ifstream &in)
 {
   if (!in)
-    throw std::string("PrecisionSubspace::read_basis(): error reading stream\n");
+    throw std::string("PrecisionSubspace::read_subspace(): error reading stream\n");
   
   // Read header line
   int basis_dim=0, fea_dim=0;
@@ -401,6 +401,11 @@ PrecisionSubspace::limit_line_search(const LaGenMatDouble &R,
 }
 
 
+PrecisionSubspace::PrecisionSubspace()
+{
+}
+
+
 PrecisionSubspace::PrecisionSubspace(int subspace_dim, int feature_dim)
 {
   set_subspace_dim(subspace_dim);
@@ -589,6 +594,10 @@ PcgmmLambdaFcnl::MaxStep(const HCL_Vector_d & x,
   return m_max_step;
 }
 
+
+ExponentialSubspace::ExponentialSubspace()
+{
+}
 
 
 ExponentialSubspace::ExponentialSubspace(int subspace_dim, int feature_dim)
@@ -1106,7 +1115,7 @@ ExponentialSubspace::initialize_basis_pca(const std::vector<double> &c,
 
 
 void
-ExponentialSubspace::read_basis(std::ifstream &in)
+ExponentialSubspace::read_subspace(std::ifstream &in)
 {
   if (!in) 
     throw std::string("ExponentialSubspace::read_basis(): error reading stream\n");
@@ -1133,10 +1142,10 @@ ExponentialSubspace::read_basis(std::ifstream &in)
 
 
 void
-ExponentialSubspace::write_basis(std::ofstream &out)
+ExponentialSubspace::write_subspace(std::ofstream &out)
 {
   // Write header line
-  out << "exponential_subspace\n" << feature_dim() << subspace_dim() << std::endl;
+  out << feature_dim() << " " << subspace_dim() << std::endl;
   
   // Write exponential basis
   for (int b=0; b<subspace_dim(); b++) {

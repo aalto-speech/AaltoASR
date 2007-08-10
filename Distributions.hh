@@ -149,6 +149,14 @@ public:
   double get_minvar(void) const { return m_minvar; }
   double get_covsmooth(void) const { return m_covsmooth; }
 
+  /** Functions for accessing subspaces for Gaussian parameters */
+  void set_precision_subspace(int id, PrecisionSubspace *ps);
+  void set_exponential_subspace(int id, ExponentialSubspace *es);
+  PrecisionSubspace *get_precision_subspace(int id);
+  ExponentialSubspace *get_exponential_subspace(int id);
+  void remove_precision_subspace(int id);
+  void remove_exponential_subspace(int id);
+  
   /** \param index PDF index
    * \return Gaussian occupancy, -1 if not a Gaussian or not accumulated. */
   double get_gaussian_occupancy(int index) const;
@@ -168,6 +176,9 @@ private:
   double m_covsmooth;
   double m_c1;
   double m_c2;
+
+  std::map<int, PrecisionSubspace*> m_precision_subspaces;
+  std::map<int, ExponentialSubspace*> m_exponential_subspaces;
 };
 
 

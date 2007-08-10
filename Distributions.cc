@@ -1077,10 +1077,9 @@ PrecisionConstrainedGaussian::compute_likelihood_exponential(const Vector &expon
 void
 PrecisionConstrainedGaussian::write(std::ostream &os) const
 {
-  os << "pcgmm ";
+  os << "pcgmm " << subspace_dim() << " ";
   for (int i=0; i<dim(); i++)
     os << m_transformed_mean(i) << " ";
-  os << subspace_dim() << " ";
   for (int i=0; i<subspace_dim()-1; i++)
     os << m_coeffs(i) << " ";
   os << m_coeffs(subspace_dim()-1);  
@@ -1091,11 +1090,11 @@ void
 PrecisionConstrainedGaussian::read(std::istream &is)
 {
   int ss_dim;
-  
+
+  is >> ss_dim;  
+  m_coeffs.resize(ss_dim);
   for (int i=0; i<dim(); i++)
     is >> m_transformed_mean(i);
-  is >> ss_dim;
-  m_coeffs.resize(ss_dim);
   for (int i=0; i<subspace_dim(); i++)
     is >> m_coeffs(i);
 
@@ -1832,6 +1831,7 @@ PDFPool::read_gk(const std::string &filename)
     throw std::string("PDFPool::read_gk(): could not open %s\n", filename.c_str());
   
   int pdfs = 0;
+  int ssid;
   std::string type_str;
   in >> pdfs >> m_dim >> type_str;
   m_pool.resize(pdfs);
@@ -1845,6 +1845,18 @@ PDFPool::read_gk(const std::string &filename)
     for (int i=0; i<pdfs; i++) {
       in >> type_str;
 
+      if (type_str == "precision_subspace") {
+        in >> ssid;
+        PrecisionSubspace *ps = new PrecisionSubspace();
+        ps->read_subspace(in);
+        m_precision_subspaces[ssid]=ps;
+      }
+      if (type_str == "exponential_subspace") {
+        in >> ssid;
+        ExponentialSubspace *es = new ExponentialSubspace();
+        es->read_subspace(in);
+        m_exponential_subspaces[ssid]=es;
+      }
       if (type_str == "diag") {
         m_pool[i]=new DiagonalGaussian(m_dim);
         m_pool[i]->read(in);
@@ -1854,11 +1866,13 @@ PDFPool::read_gk(const std::string &filename)
         m_pool[i]->read(in);
       }
       else if (type_str == "pcgmm") {
-	m_pool[i]=new PrecisionConstrainedGaussian();
+        in >> ssid;
+	m_pool[i]=new PrecisionConstrainedGaussian(m_precision_subspaces[ssid]);
         m_pool[i]->read(in);
       }
       else if (type_str == "scgmm") {
-	m_pool[i]=new SubspaceConstrainedGaussian();
+        in >> ssid;
+	m_pool[i]=new SubspaceConstrainedGaussian(m_exponential_subspaces[ssid]);
         m_pool[i]->read(in);
       }
       else
@@ -1910,6 +1924,20 @@ PDFPool::write_gk(const std::string &filename) const
   
   out << m_pool.size() << " " << m_dim << " variable\n";
 
+  std::map<int, PrecisionSubspace*>::const_iterator pitr;
+  for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr) {
+    out << "precision_subspace ";
+    out << (*pitr).first << " "; 
+    (*pitr).second->write_subspace(out);
+  }
+
+  std::map<int, ExponentialSubspace*>::const_iterator eitr;
+  for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr) {
+    out << "exponential_subspace ";
+    out << (*eitr).first << " ";
+    (*eitr).second->write_subspace(out);
+  }
+
   for (unsigned int i=0; i<m_pool.size(); i++) {
     m_pool[i]->write(out);
     out << std::endl;
@@ -1917,6 +1945,48 @@ PDFPool::write_gk(const std::string &filename) const
 
   if (!out)
     throw std::string("PDFPool::write_gk(): error writing file: %s\n", filename.c_str());
+}
+
+
+void
+PDFPool::set_precision_subspace(int id, PrecisionSubspace *ps)
+{
+  m_precision_subspaces[id] = ps;
+}
+
+
+void
+PDFPool::set_exponential_subspace(int id, ExponentialSubspace *es)
+{
+  m_exponential_subspaces[id] = es;
+}
+
+
+PrecisionSubspace*
+PDFPool::get_precision_subspace(int id)
+{
+  return m_precision_subspaces[id];
+}
+
+
+ExponentialSubspace*
+PDFPool::get_exponential_subspace(int id)
+{
+  return m_exponential_subspaces[id];
+}
+
+
+void
+PDFPool::remove_precision_subspace(int id)
+{
+  m_precision_subspaces.erase(id);
+}
+
+
+void
+PDFPool::remove_exponential_subspace(int id)
+{
+  m_exponential_subspaces.erase(id);
 }
 
 

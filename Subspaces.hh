@@ -33,6 +33,7 @@ private:
 
 public:
 
+  PrecisionSubspace();
   PrecisionSubspace(int subspace_dim, int feature_dim);
   ~PrecisionSubspace();
   void set_subspace_dim(int subspace_dim);
@@ -62,8 +63,8 @@ public:
 			    LaVectorDouble &covariance);
   void compute_covariance(const HCL_RnVector_d &lambda,
 			    LaGenMatDouble &covariance);
-  void read_basis(std::ifstream &in);
-  void write_basis(std::ofstream &out);
+  void read_subspace(std::ifstream &in);
+  void write_subspace(std::ofstream &out);
   void reset(const unsigned int subspace_dim,
              const unsigned int feature_dim);
   void initialize_basis_pca(const std::vector<double> &weights,
@@ -163,6 +164,7 @@ private:
   
 public:
 
+  ExponentialSubspace();
   ExponentialSubspace(int subspace_dim, int feature_dim);
   ~ExponentialSubspace();
   
@@ -211,8 +213,8 @@ public:
                      Vector &theta);
   void compute_theta(const HCL_RnVector_d &lambda,
                      Vector &theta);
-  void read_basis(std::ifstream &in);
-  void write_basis(std::ofstream &out);
+  void read_subspace(std::ifstream &in);
+  void write_subspace(std::ofstream &out);
   void reset(const unsigned int subspace_dim,
 	     const unsigned int feature_dim);
   void initialize_basis_pca(const std::vector<double> &weights,
