@@ -1750,6 +1750,14 @@ PDFPool::reset_cache()
     m_likelihoods[m_valid_likelihoods.back()]=-1.0;
     m_valid_likelihoods.pop_back();
   }
+
+  std::map<int, PrecisionSubspace*>::const_iterator pitr;
+  for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr)
+    (*pitr).second->reset_cache();
+  
+  std::map<int, ExponentialSubspace*>::const_iterator eitr;
+  for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr)
+    (*eitr).second->reset_cache();
 }
 
 
@@ -1850,14 +1858,16 @@ PDFPool::read_gk(const std::string &filename)
         PrecisionSubspace *ps = new PrecisionSubspace();
         ps->read_subspace(in);
         m_precision_subspaces[ssid]=ps;
+        i--;
       }
-      if (type_str == "exponential_subspace") {
+      else if (type_str == "exponential_subspace") {
         in >> ssid;
         ExponentialSubspace *es = new ExponentialSubspace();
         es->read_subspace(in);
         m_exponential_subspaces[ssid]=es;
+        i--;
       }
-      if (type_str == "diag") {
+      else if (type_str == "diag") {
         m_pool[i]=new DiagonalGaussian(m_dim);
         m_pool[i]->read(in);
       }
@@ -1876,7 +1886,7 @@ PDFPool::read_gk(const std::string &filename)
         m_pool[i]->read(in);
       }
       else
-        throw std::string("Unknown model type\n");
+        throw std::string("Unknown model type\n");        
     }
   }
 

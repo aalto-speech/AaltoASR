@@ -145,6 +145,9 @@ void
 PrecisionSubspace::reset(const unsigned int subspace_dim, 
                          const unsigned int feature_dim)
 {
+  m_subspace_dim=subspace_dim;
+  m_feature_dim=feature_dim;
+  
   unsigned int d_vec=(unsigned int)feature_dim*(feature_dim+1)/2;
   m_mspace.resize(subspace_dim);
   m_vspace.resize(subspace_dim);
@@ -189,7 +192,6 @@ PrecisionSubspace::read_subspace(std::ifstream &in)
   in >> fea_dim >> basis_dim;
   
   // Read precision basis
-  in >> basis_dim;
   reset(basis_dim, fea_dim);
   for (int b=0; b<basis_dim; b++) {
     for (int i=0; i<fea_dim; i++)
@@ -733,6 +735,7 @@ void
 ExponentialSubspace::reset(const unsigned int subspace_dim,
                            const unsigned int feature_dim)
 {
+  m_subspace_dim=subspace_dim;
   m_feature_dim=feature_dim;
   m_vectorized_dim=feature_dim*(feature_dim+1)/2;
   m_exponential_dim=m_feature_dim+m_vectorized_dim;
