@@ -263,7 +263,7 @@ Gaussian::accumulated(int accum_pos) const
 
 void
 Gaussian::estimate_parameters(double minvar, double covsmooth,
-                              double c1, double c2)
+                              double c1, double c2, double ismooth)
 {
   if (!accumulated(0))
     throw std::string("Parameters could not be estimated, ML statistics not accumulated");
@@ -286,18 +286,22 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
     Matrix old_covariance;
     get_mean(old_mean);
     get_covariance(old_covariance);
+
+    double smooth_factor = 1 + ismooth/m_accums[0]->gamma();
     
     // c & mu~ & sigma~
-    double c = m_accums[0]->gamma() - m_accums[1]->gamma();
+    double c = smooth_factor * m_accums[0]->gamma() - m_accums[1]->gamma();
     LaVectorDouble mu_tilde;
     LaVectorDouble temp_denominator_mu;
     m_accums[0]->get_accumulated_mean(mu_tilde);
+    Blas_Scale(smooth_factor, mu_tilde);
     m_accums[1]->get_accumulated_mean(temp_denominator_mu);
     Blas_Add_Mult(mu_tilde, -1, temp_denominator_mu);
 
     LaGenMatDouble sigma_tilde;
     LaGenMatDouble temp_denominator_sigma;
     m_accums[0]->get_accumulated_second_moment(sigma_tilde);
+    Blas_Scale(smooth_factor, sigma_tilde);
     m_accums[1]->get_accumulated_second_moment(temp_denominator_sigma);
     Blas_Add_Mat_Mult(sigma_tilde, -1, temp_denominator_sigma);
     
@@ -1098,10 +1102,7 @@ PrecisionConstrainedGaussian::read(std::istream &is)
   for (int i=0; i<subspace_dim(); i++)
     is >> m_coeffs(i);
 
-  Matrix precision;
-  m_ps->compute_precision(m_coeffs, precision);
-  m_constant = LinearAlgebra::determinant(precision);
-  m_constant = log(sqrt(m_constant));
+  recompute_constant();
 }
 
 
@@ -1123,10 +1124,8 @@ PrecisionConstrainedGaussian::start_accumulating()
 void
 PrecisionConstrainedGaussian::get_mean(Vector &mean) const
 {
-  Matrix precision;
   Matrix covariance;
-  m_ps->compute_precision(m_coeffs, precision);
-  LinearAlgebra::inverse(precision, covariance);
+  m_ps->compute_covariance(m_coeffs, covariance);
   Blas_Mat_Vec_Mult(covariance, m_transformed_mean, mean);
 }
 
@@ -1134,9 +1133,7 @@ PrecisionConstrainedGaussian::get_mean(Vector &mean) const
 void
 PrecisionConstrainedGaussian::get_covariance(Matrix &covariance) const
 {
-  Matrix precision;
-  m_ps->compute_precision(m_coeffs, precision);
-  LinearAlgebra::inverse(precision, covariance);
+  m_ps->compute_covariance(m_coeffs, covariance);
 }
 
 
@@ -1153,7 +1150,39 @@ void
 PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance,
                                              bool finish_statistics)
 {
+  // Save the old covariance
+  Matrix old_covariance;
+  m_ps->compute_covariance(m_coeffs, old_covariance);
+  
+  // Optimize
   m_ps->optimize_coefficients(covariance, m_coeffs);
+
+  // Compute the new precision
+  Matrix precision;
+  m_ps->compute_precision(m_coeffs, precision);
+
+  // Retransform the mean parameters
+  Vector mean(m_transformed_mean);
+  Blas_Mat_Vec_Mult(old_covariance, m_transformed_mean, mean);
+  Blas_Mat_Vec_Mult(precision, mean, m_transformed_mean);
+
+  // Recompute the constant
+  recompute_constant();
+}
+
+
+void
+PrecisionConstrainedGaussian::recompute_constant()
+{
+  Matrix precision;
+  m_ps->compute_precision(m_coeffs, precision);
+  m_constant = log(sqrt(LinearAlgebra::spd_determinant(precision)));
+
+  Vector mean(m_transformed_mean);
+  Matrix covariance;
+  m_ps->compute_covariance(m_coeffs, covariance);
+  Blas_Mat_Vec_Mult(covariance, m_transformed_mean, mean);
+  m_constant += -0.5 * Blas_Dot_Prod(m_transformed_mean, mean);
 }
 
 
@@ -1802,12 +1831,13 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
 
 void
 PDFPool::set_gaussian_parameters(double minvar, double covsmooth,
-                                 double c1, double c2)
+                                 double c1, double c2, double ismooth)
 {
   m_minvar = minvar;
   m_covsmooth = covsmooth;
   m_c1 = c1;
   m_c2 = c2;
+  m_ismooth = ismooth;
 }
 
 
@@ -1820,7 +1850,7 @@ PDFPool::estimate_parameters(void)
 
     try {
       if (temp != NULL)
-        temp->estimate_parameters(m_minvar, m_covsmooth, m_c1, m_c2);
+        temp->estimate_parameters(m_minvar, m_covsmooth, m_c1, m_c2, m_ismooth);
       else
         m_pool[i]->estimate_parameters();
     } catch (std::string errstr) {

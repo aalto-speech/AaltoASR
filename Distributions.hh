@@ -132,9 +132,10 @@ public:
    * \param covsmooth Covariance smoothing value
    * \param c1        MMI C1 constant
    * \param c2        MMI C2 constant
+   * \param ismooth   MMI I-smoothing constant
    */
   void set_gaussian_parameters(double minvar = 0, double covsmooth = 0,
-                               double c1 = 0, double c2 = 0);
+                               double c1 = 0, double c2 = 0, double ismooth = 0);
 
   /** Splits a Gaussian in the pool with some constrains
   * \param index     Index of the Gaussian to be split
@@ -176,6 +177,7 @@ private:
   double m_covsmooth;
   double m_c1;
   double m_c2;
+  double m_ismooth;
 
   std::map<int, PrecisionSubspace*> m_precision_subspaces;
   std::map<int, ExponentialSubspace*> m_exponential_subspaces;
@@ -279,9 +281,9 @@ public:
   /* Tells if this Gaussian has been accumulated */
   virtual bool accumulated(int accum_pos = 0) const;
   /* Use the accumulated statistics to update the current model parameters. */
-  virtual void estimate_parameters(void) { estimate_parameters(0, 0, 0, 0); }
+  virtual void estimate_parameters(void) { estimate_parameters(0, 0, 1, 2, 0); }
   virtual void estimate_parameters(double minvar, double covsmooth,
-                                   double c1, double c2);
+                                   double c1, double c2, double ismooth);
   
   // GAUSSIAN SPECIFIC
   
@@ -468,6 +470,9 @@ public:
   PrecisionSubspace* get_subspace() const { return m_ps; }
   /* Set the subspace */
   void set_subspace(PrecisionSubspace *space) { m_ps = space; }
+  /* Recomputes the m_constant */
+  void recompute_constant();
+  
 
 private:
   Vector m_transformed_mean;

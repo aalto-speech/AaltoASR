@@ -46,6 +46,7 @@ main(int argc, char *argv[])
       ('\0', "covsmooth", "arg", "0", "covariance smoothing (default 0.0)")
       ('\0', "C1=FLOAT", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
       ('\0', "C2=FLOAT", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
+      ('\0', "ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for discriminative training (default 0.0)")
       ('\0', "delete=FLOAT", "arg", "0.0", "delete Gaussians with occupancies below the threshold")
       ('\0', "mremove=FLOAT", "arg", "0.0", "remove mixture components below the weight threshold")
       ('\0', "split=FLOAT", "arg", "0.0", "split a Gaussian if the occupancy exceeds the threshold")
@@ -126,7 +127,8 @@ main(int argc, char *argv[])
     model.set_gaussian_parameters(config["minvar"].get_double(),
                                   config["covsmooth"].get_double(),
                                   config["C1"].get_double(),
-                                  config["C2"].get_double());
+                                  config["C2"].get_double(),
+                                  config["ismooth"].get_double());
 
     if (transtat)
       model.estimate_transition_parameters();

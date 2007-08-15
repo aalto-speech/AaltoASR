@@ -48,21 +48,21 @@ public:
                              Vector &lambda);
   void copy(const PrecisionSubspace &orig);
   void compute_precision(const LaVectorDouble &lambda,
-			   LaGenMatDouble &precision);
+                         LaGenMatDouble &precision);
   void compute_precision(const LaVectorDouble &lambda,
-			   LaVectorDouble &precision);
+                         LaVectorDouble &precision);
   void compute_precision(const HCL_RnVector_d &lambda,
-			   LaGenMatDouble &precision);
+                         LaGenMatDouble &precision);
   void compute_precision(const HCL_RnVector_d &lambda,
-			   LaVectorDouble &precision);
+                         LaVectorDouble &precision);
   void compute_covariance(const LaVectorDouble &lambda,
-			    LaGenMatDouble &covariance);
+                          LaGenMatDouble &covariance);
   void compute_covariance(const LaVectorDouble &lambda,
-			    LaVectorDouble &covariance);
+                          LaVectorDouble &covariance);
   void compute_covariance(const HCL_RnVector_d &lambda,
-			    LaVectorDouble &covariance);
+                          LaVectorDouble &covariance);
   void compute_covariance(const HCL_RnVector_d &lambda,
-			    LaGenMatDouble &covariance);
+                          LaGenMatDouble &covariance);
   void read_subspace(std::ifstream &in);
   void write_subspace(std::ofstream &out);
   void reset(const unsigned int subspace_dim,
@@ -98,7 +98,7 @@ public:
 
 // Define A HCL Functional for optimizing untied parameters
 class PcgmmLambdaFcnl : public HCL_Functional_d {
-
+  
 public:
   
   PcgmmLambdaFcnl(HCL_RnSpace_d &vs,

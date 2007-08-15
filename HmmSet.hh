@@ -392,8 +392,9 @@ public:
    * \param covsmooth Smoothing value for off-diagonal covariance terms
    * \param c1 the C1 constant
    * \param c2 the C2 constant
+   * \param ismooth the I-smoothing constant
    */
-  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2); }
+  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, ismooth); }
 
   /** Deletes Gaussians which occupancy count is below the given threshold.
    * Assures that at least one Gaussian is left for each mixture.
