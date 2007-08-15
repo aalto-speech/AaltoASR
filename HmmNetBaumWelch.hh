@@ -14,7 +14,7 @@ public:
   /** Special transition_id values used in arcs. */
   enum { EPSILON = -1, FINAL_TRANSITION = -2 };
 
-  enum { MODE_BAUM_WELCH = 1, MODE_VITERBI = 2 };
+  enum { MODE_BAUM_WELCH = 1, MODE_VITERBI = 2, MODE_EXTENDED_VITERBI = 3};
   
   static struct LLType {
     double zero(void) { return -1e15; }
@@ -26,7 +26,7 @@ public:
   
   class FrameProbs {
   public:
-    void add_log_prob(int frame, double prob);
+    void add_log_prob(int frame, double prob, int mode);
     double get_log_prob(int frame);
     void clear(void); //!< Frees the allocated memory
     FrameProbs() : log_prob_table(NULL), num_probs(0), prob_table_size(0) { }
@@ -94,7 +94,10 @@ public:
   void set_pruning_thresholds(double backward, double forward);
 
   double get_backward_beam(void) { return m_backward_beam; }
-  double get_forward_beam(void) { return m_forward_beam; }  
+  double get_forward_beam(void) { return m_forward_beam; }
+
+  /// Set the segmentation mode
+  void set_mode(int mode) { m_mode = mode; }
 
   /// Set the scaling for acoustic log likelihoods
   void set_acoustic_scaling(double scale) { m_acoustic_scale = scale; }
@@ -121,8 +124,11 @@ private:
 
   double propagate_node_arcs(int node_id, bool forward,
                              double cur_score, int target_buffer,
-                             FeatureVec &fea_vec);
-  double compute_sum_bw_loglikelihoods(int node_id, int frame);
+                             FeatureVec &fea_vec,
+                             std::vector<Segmentator::IndexProbPair> *best_arcs = NULL);
+  double compute_sum_bw_loglikelihoods(int node_id, int frame,
+                                       double prior = 0,
+                                       std::map<int, double> *sprob = NULL);
   void clear_bw_scores(void);
   
 private:

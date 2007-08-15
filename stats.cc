@@ -97,6 +97,8 @@ main(int argc, char *argv[])
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for HMM networks)")
+      ('E', "extvit", "", "", "Use extended Viterbi over HMM networks")
+      ('V', "vit", "", "", "Use Viterbi over HMM networks")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
@@ -198,6 +200,10 @@ main(int argc, char *argv[])
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
+        if (config["extvit"].specified)
+          lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
+        else if (config["vit"].specified)
+          lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
         
         double orig_beam = lattice->get_backward_beam();
         int counter = 1;
