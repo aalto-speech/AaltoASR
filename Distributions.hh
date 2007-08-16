@@ -421,9 +421,11 @@ public:
   
 private:
   Vector m_mean;
+  Matrix m_covariance;
   Matrix m_precision;
   Vector m_exponential_parameters;
   double m_exponential_normalizer;
+  bool m_statistics_finished;
 };
 
 

@@ -816,10 +816,12 @@ FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
 {
   reset(g.dim());
   g.get_mean(m_mean);
+  m_covariance.copy(g.m_covariance);
   m_precision.copy(g.m_precision);
   m_exponential_parameters.copy(g.m_exponential_parameters);
   m_constant = g.m_constant;
   m_exponential_normalizer = g.m_exponential_normalizer;
+  m_statistics_finished = g.m_statistics_finished;
 }
 
 
@@ -841,6 +843,7 @@ FullCovarianceGaussian::reset(int dim)
 
   m_constant=0;
   m_full_stats=true;
+  m_statistics_finished=false;
 }
 
 
@@ -945,8 +948,12 @@ FullCovarianceGaussian::get_mean(Vector &mean) const
 void
 FullCovarianceGaussian::get_covariance(Matrix &covariance) const
 {
-  covariance.resize(m_precision.rows(), m_precision.cols());
-  LinearAlgebra::inverse(m_precision, covariance);
+  if (m_statistics_finished) {
+    covariance.resize(m_precision.rows(), m_precision.cols());
+    LinearAlgebra::inverse(m_precision, covariance);
+  }
+  else
+    covariance.copy(m_covariance);
 }
 
 
@@ -992,11 +999,14 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance,
     LinearAlgebra::inverse(covariance, m_precision);
     m_constant = log(sqrt(LinearAlgebra::spd_determinant(m_precision)));
     recompute_exponential_parameters();
+    m_statistics_finished = true;
   }
   else
   {
+    m_covariance.copy(covariance);
     m_precision = 0;
     m_constant = 0;
+    m_statistics_finished=false;
   }
 }
 
