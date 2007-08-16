@@ -41,6 +41,7 @@ main(int argc, char *argv[])
       ('f', "to-full", "", "", "convert Gaussians to full covariances")
       ('p', "to-pcgmm", "", "", "convert Gaussians to have a subspace constraint on precisions")
       ('s', "to-scgmm", "", "", "convert Gaussians to have an exponential subspace constraint")
+      ('b', "subspace=FILE", "arg", "", "use an already initialized subspace")
       ('i', "info=INT", "arg", "0", "info level")
       ('\0', "ssdim=INT", "arg", "0", "subspace dimensionality")
       ('\0', "minvar=FLOAT", "arg", "0", "minimum diagonal variance")
@@ -78,66 +79,92 @@ main(int argc, char *argv[])
     HCL_UMin_lbfgs_d bfgs(&ls);
     if (config["hcl_bfgs_cfg"].specified)
       bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
+
     
-    // Initialize precision subspace if needed
+    // Initialize the Pcgmm case
     if (config["to-pcgmm"].specified) {
-      if (config["ssdim"].get_int() <= 0)
-        throw std::string("The subspace dimensionality must be above zero!");
+
       ps = new PrecisionSubspace(config["ssdim"].get_int(), pool.dim());
-
-      if (config["info"].get_int() > 0)
-        std::cout << "Initializing the precision subspace\n";
-        
-      std::vector<double> weights;
-      std::vector<LaGenMatDouble> covs;
-      weights.resize(pool.size());
-      covs.resize(pool.size());
       
-      for (int i=0; i<pool.size(); i++) {        
-        // Fetch source Gaussian
-        Gaussian *gaussian = dynamic_cast< Gaussian* > (pool.get_pdf(i));
-        if (gaussian == NULL)
-          continue;
-        gaussian->get_covariance(covs[i]);
-        weights[i] = 1;
+      // Read from file
+      if (config["subspace"].specified) {
+        std::ifstream in(config["subspace"].get_str().c_str());
+        std::string skip;
+        in >> skip;
+        ps->read_subspace(in);
+        in.close();
       }
-
-      ps->initialize_basis_pca(weights, covs, config["ssdim"].get_int());
+      // Or initialize
+      else {
+        if (config["ssdim"].get_int() <= 0)
+          throw std::string("The subspace dimensionality must be above zero!");
+        
+        if (config["info"].get_int() > 0)
+          std::cout << "Initializing the precision subspace\n";
+        
+        std::vector<double> weights;
+        std::vector<LaGenMatDouble> covs;
+        weights.resize(pool.size());
+        covs.resize(pool.size());
+        
+        for (int i=0; i<pool.size(); i++) {
+          // Fetch source Gaussian
+          Gaussian *gaussian = dynamic_cast< Gaussian* > (pool.get_pdf(i));
+          if (gaussian == NULL)
+            continue;
+          gaussian->get_covariance(covs[i]);
+          weights[i] = 1;
+        }
+        
+        ps->initialize_basis_pca(weights, covs, config["ssdim"].get_int());
+      }
       ps->set_bfgs(&bfgs);
       new_pool.set_precision_subspace(1, ps);
     }
-
-    // Initialize exponential subspace if needed
+    
+    // Initialize the Scgmm case
     if (config["to-scgmm"].specified) {
-      if (config["ssdim"].get_int() <= 0)
-        throw std::string("The subspace dimensionality must be above zero!");
+
       es = new ExponentialSubspace(config["ssdim"].get_int(), pool.dim());
 
-      if (config["info"].get_int() > 0)
-        std::cout << "Initializing the exponential subspace\n";
-      
-      std::vector<double> weights;
-      std::vector<LaVectorDouble> means;
-      std::vector<LaGenMatDouble> covs;
-      weights.resize(pool.size());
-      covs.resize(pool.size());
-      means.resize(pool.size());
-      
-      for (int i=0; i<pool.size(); i++) {        
-        // Fetch source Gaussian
-        Gaussian *gaussian = dynamic_cast< Gaussian* > (pool.get_pdf(i));
-        if (gaussian == NULL)
-          continue;
-        gaussian->get_covariance(covs[i]);
-        gaussian->get_mean(means[i]);
-        weights[i] = 1;
+      // Read from file
+      if (config["subspace"].specified) {
+        std::ifstream in(config["subspace"].get_str().c_str());
+        std::string skip;
+        in >> skip;
+        es->read_subspace(in);
+        in.close();
       }
-      
-      es->initialize_basis_pca(weights, covs, means, config["ssdim"].get_int());
+      // Or initialize
+      else {
+        if (config["ssdim"].get_int() <= 0)
+          throw std::string("The subspace dimensionality must be above zero!");
+        
+        if (config["info"].get_int() > 0)
+          std::cout << "Initializing the exponential subspace\n";
+        
+        std::vector<double> weights;
+        std::vector<LaVectorDouble> means;
+        std::vector<LaGenMatDouble> covs;
+        weights.resize(pool.size());
+        covs.resize(pool.size());
+        means.resize(pool.size());
+        
+        for (int i=0; i<pool.size(); i++) {        
+          // Fetch source Gaussian
+          Gaussian *gaussian = dynamic_cast< Gaussian* > (pool.get_pdf(i));
+          if (gaussian == NULL)
+            continue;
+          gaussian->get_covariance(covs[i]);
+          gaussian->get_mean(means[i]);
+          weights[i] = 1;
+        }
+        
+        es->initialize_basis_pca(weights, covs, means, config["ssdim"].get_int());
+      }
       es->set_bfgs(&bfgs);
       new_pool.set_exponential_subspace(1, es);
     }
-
     
     // Go through every Gaussian in the pool
     Matrix covariance;
@@ -145,7 +172,7 @@ main(int argc, char *argv[])
     for (int i=0; i<pool.size(); i++) {
 
       if (config["info"].get_int() > 0)
-        std::cout << "Converting Gaussian: " << i << "/" << pool.size() << std::endl;
+        std::cout << "Converting Gaussian: " << i << "/" << pool.size();
       
       // Fetch source Gaussian
       Gaussian *gaussian = dynamic_cast< Gaussian* > (pool.get_pdf(i));
@@ -179,7 +206,7 @@ main(int argc, char *argv[])
       try {
         new_gaussian->set_parameters(mean, covariance);
       } catch(LaException &e) {
-        // Try optimizing in subspace parameters in 'safe mode' if things go bad
+        // Try optimizing subspace parameters in 'safe mode' if things go bad
         bfgs_set_defaults(bfgs);
         line_set_defaults(ls);
         try {
@@ -193,6 +220,13 @@ main(int argc, char *argv[])
 
       // Insert the converted Gaussian into the pool
       new_pool.set_pdf(i, new_gaussian);
+
+      // Print kullback-leibler
+      if (config["info"].get_int() > 0) {
+        if (config["to-pcgmm"].specified || config["to-scgmm"].specified)
+          std::cout << "\tkl-divergence: " << gaussian->kullback_leibler(*new_gaussian);
+        std::cout << std::endl;
+      }      
     }
 
     // Write out

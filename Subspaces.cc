@@ -123,8 +123,7 @@ PrecisionSubspace::initialize_basis_pca(const std::vector<double> &c,
 void
 PrecisionSubspace::optimize_coefficients(const Matrix &sample_cov,
                                          Vector &lambda)
-{
-  
+{  
   // Optimization space
   HCL_RnSpace_d vs(subspace_dim());
   
@@ -145,23 +144,8 @@ void
 PrecisionSubspace::reset(const unsigned int subspace_dim, 
                          const unsigned int feature_dim)
 {
-  m_subspace_dim=subspace_dim;
-  m_feature_dim=feature_dim;
-  
-  unsigned int d_vec=(unsigned int)feature_dim*(feature_dim+1)/2;
-  m_mspace.resize(subspace_dim);
-  m_vspace.resize(subspace_dim);
-  m_quadratic_features.resize(subspace_dim,1);
-  
-  for (unsigned int i=0; i<subspace_dim; i++) {
-    m_mspace.at(i).resize(feature_dim,feature_dim);
-    m_vspace.at(i).resize(d_vec,1);
-    for (unsigned int j=0; j<feature_dim; j++)
-      for (unsigned int k=0; k<feature_dim; k++)
-	(m_mspace.at(i))(j,k)=0;
-    for (unsigned int l=0; l<d_vec; l++)
-      m_vspace.at(i)(l)=0;
-  }
+  set_subspace_dim(subspace_dim);
+  set_feature_dim(feature_dim);
 }
 
 
@@ -222,7 +206,7 @@ PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
 
 void
 PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
-                                       LaVectorDouble &precision)
+                                     LaVectorDouble &precision)
 {
   LaGenMatDouble precision_matrix;
   compute_precision(lambda, precision_matrix);
@@ -233,7 +217,7 @@ PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
 
 void
 PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
-                                       LaGenMatDouble &precision)
+                                     LaGenMatDouble &precision)
 {
   assert(lambda.Dim() <= subspace_dim());
   assert(LinearAlgebra::is_spd(m_mspace.at(0)));
@@ -248,7 +232,7 @@ PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
 
 void
 PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
-                                       LaVectorDouble &precision)
+                                     LaVectorDouble &precision)
 {
   LaGenMatDouble precision_matrix;
   compute_precision(lambda, precision_matrix);
@@ -259,7 +243,7 @@ PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
 
 void
 PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
-                                        LaGenMatDouble &covariance)
+                                      LaGenMatDouble &covariance)
 {
   LaVectorLongInt pivots(feature_dim());
   compute_precision(lambda, covariance);
@@ -271,7 +255,7 @@ PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
 
 void
 PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
-                                        LaVectorDouble &covariance)
+                                      LaVectorDouble &covariance)
 {
   LaGenMatDouble covariance_matrix;
   compute_covariance(lambda, covariance_matrix);
@@ -282,7 +266,7 @@ PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
 
 void 
 PrecisionSubspace::compute_covariance(const HCL_RnVector_d &lambda,
-                                        LaVectorDouble &covariance)
+                                      LaVectorDouble &covariance)
 {
   LaGenMatDouble covariance_matrix;
   compute_covariance(lambda, covariance_matrix);
@@ -293,7 +277,7 @@ PrecisionSubspace::compute_covariance(const HCL_RnVector_d &lambda,
 
 void
 PrecisionSubspace::compute_covariance(const HCL_RnVector_d &lambda,
-                                        LaGenMatDouble &covariance)
+                                      LaGenMatDouble &covariance)
 {
   LaVectorLongInt pivots(feature_dim());
   compute_precision(lambda, covariance);
@@ -1121,7 +1105,7 @@ void
 ExponentialSubspace::read_subspace(std::ifstream &in)
 {
   if (!in) 
-    throw std::string("ExponentialSubspace::read_basis(): error reading stream\n");
+    throw std::string("ExponentialSubspace::read_subspace(): error reading stream\n");
 
   // Read header line
   int b_temp=0;

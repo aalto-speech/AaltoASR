@@ -509,25 +509,26 @@ Gaussian::kullback_leibler(Gaussian &g) const
   assert(dim()==g.dim());
   
   LaVectorLongInt pivots(dim(),1);
-  LaGenMatDouble t1; g.get_covariance(t1);
-  LaGenMatDouble t2; g.get_covariance(t2);
-  LaVectorDouble t3; g.get_mean(t3);
-  LaVectorDouble t4; g.get_mean(t4);
-  LUFactorizeIP(t1, pivots);
-  LaLUInverseIP(t1, pivots);
+  LaGenMatDouble other_covariance; g.get_covariance(other_covariance);
+  LaGenMatDouble other_precision; g.get_covariance(other_precision);
+  LaVectorDouble other_mean; g.get_mean(other_mean);
+  LaVectorDouble diff; g.get_mean(diff);
+  LaVectorDouble temp_vector; g.get_mean(temp_vector);
+  LUFactorizeIP(other_precision, pivots);
+  LaLUInverseIP(other_precision, pivots);
     
   LaGenMatDouble cov; get_covariance(cov);
   LaVectorDouble mean; get_mean(mean);
-  Blas_Mat_Mat_Mult(t1, cov, t2, 1.0, 0.0);
-  Blas_Add_Mult(t3, -1, mean); 
-  Blas_Mat_Vec_Mult(t1, t3, t4);
+  LaGenMatDouble temp_matrix(other_covariance);
+  Blas_Mat_Mat_Mult(other_precision, cov, temp_matrix, 1.0, 0.0);
+  Blas_Add_Mult(diff, -1, mean); 
+  Blas_Mat_Vec_Mult(other_precision, diff, temp_vector);
   
-  double value=LinearAlgebra::determinant(t1)
+  double value=LinearAlgebra::determinant(other_covariance)
     /LinearAlgebra::determinant(cov);
-  //  FIXME: logarithm ok?
-  value = log2(value);
-  value += t2.trace();
-  value += Blas_Dot_Prod(t3, t4);
+  value = log(value);
+  value += temp_matrix.trace();
+  value += Blas_Dot_Prod(diff, temp_vector);
   value -= dim();
   value *= 0.5;
 
@@ -1134,6 +1135,7 @@ PrecisionConstrainedGaussian::start_accumulating()
 void
 PrecisionConstrainedGaussian::get_mean(Vector &mean) const
 {
+  mean.resize(dim());
   Matrix covariance;
   m_ps->compute_covariance(m_coeffs, covariance);
   Blas_Mat_Vec_Mult(covariance, m_transformed_mean, mean);
