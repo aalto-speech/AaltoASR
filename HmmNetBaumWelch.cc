@@ -148,7 +148,7 @@ HmmNetBaumWelch::close(void)
   m_active_transition_table.clear();
   m_pdf_prob.clear();
   m_active_pdf_table.clear();
-  
+  m_active_arcs.clear();
   m_active_node_table[0].clear();
   m_active_node_table[1].clear();
   m_nodes.clear();
@@ -190,6 +190,7 @@ HmmNetBaumWelch::reset(void)
   m_active_transition_table.clear();
   m_pdf_prob.clear();
   m_active_pdf_table.clear();
+  m_active_arcs.clear();
 }
 
 
@@ -486,6 +487,29 @@ HmmNetBaumWelch::next_frame(void)
   }
 
   return true;
+}
+
+
+void
+HmmNetBaumWelch::fill_arc_info(std::vector<ArcInfo> &traversed_arcs)
+{
+  traversed_arcs.clear();
+  double normalizing_score = m_sum_total_loglikelihood; 
+  if (m_mode == MODE_VITERBI)
+  {
+    assert( m_active_arcs.size() == 1 );
+    normalizing_score = m_active_arcs.back().score;
+  }
+  for (int i = 0; i < (int)m_active_arcs.size(); i++)
+  {
+    HmmTransition &tr = m_model.transition(
+      m_arcs[m_active_arcs[i].arc_id].transition_id);
+    int pdf_id = m_model.emission_pdf_index(tr.source_index);
+    double cur_arc_prob = exp(loglikelihoods.divide(m_active_arcs[i].score,
+                                                    normalizing_score));
+    traversed_arcs.push_back(ArcInfo(m_arcs[m_active_arcs[i].arc_id].out_str,
+                                     cur_arc_prob, pdf_id));
+  }
 }
 
 

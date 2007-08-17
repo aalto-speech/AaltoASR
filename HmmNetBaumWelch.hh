@@ -90,6 +90,15 @@ public:
     TraversedArc(int i, double s) : arc_id(i), score(s) { }
   };
 
+  /** Arc information used in \ref fill_arc_info */
+  struct ArcInfo {
+    std::string label; //!< Arc label
+    double prob; //!< Probability of arc traversal during last frame
+    int pdf_index; //!< PDF index associated with this arc
+    ArcInfo(std::string &l, double p, int pdf) : label(l), prob(p), pdf_index(pdf) { }
+  };
+  
+
   HmmNetBaumWelch(FeatureGenerator &fea_gen, HmmSet &model);
   virtual ~HmmNetBaumWelch();
 
@@ -109,6 +118,9 @@ public:
 
   /// Set the scaling for acoustic log likelihoods
   void set_acoustic_scaling(double scale) { m_acoustic_scale = scale; }
+
+  /// Fills in information about traversed arcs
+  void fill_arc_info(std::vector<ArcInfo> &traversed_arcs);
 
   // Segmentator interface
   virtual void open(std::string ref_file);
