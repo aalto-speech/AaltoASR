@@ -451,7 +451,7 @@ void
 PrecisionSubspace::precompute(const FeatureVec &f)
 {
   if (!m_computed) {
-    LaVectorDouble y=LaVectorDouble(m_feature_dim);
+    LaVectorDouble y(m_feature_dim);
     for (int i=0; i<m_subspace_dim; i++) {
       Blas_Mat_Vec_Mult(m_mspace.at(i), *f.get_vector(), y);
       m_quadratic_features(i)=-0.5*Blas_Dot_Prod(*f.get_vector(),y);

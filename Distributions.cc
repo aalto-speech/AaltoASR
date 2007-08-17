@@ -1155,6 +1155,9 @@ PrecisionConstrainedGaussian::set_mean(const Vector &mean)
   Matrix precision;
   m_ps->compute_precision(m_coeffs, precision);
   Blas_Mat_Vec_Mult(precision, mean, m_transformed_mean);
+
+  // Recompute the constant
+  recompute_constant();
 }
 
 
@@ -1818,6 +1821,14 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
 {
   reset_cache();
 
+  std::map<int, PrecisionSubspace*>::const_iterator pitr;
+  for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr)
+    (*pitr).second->precompute(f);
+
+  std::map<int, ExponentialSubspace*>::const_iterator eitr;
+  for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr)
+    (*eitr).second->precompute(f);
+  
   Vector exponential_feature_vector((int)(dim()*(dim()+3)/2));
   for (int i=0; i<dim(); i++)
     exponential_feature_vector(i) = f[i];
@@ -1830,7 +1841,6 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
     exponential_feature_vector(dim()+i) = tvec(i);
   
   for (int i=0; i<size(); i++) {
-
     FullCovarianceGaussian *fcgaussian = dynamic_cast< FullCovarianceGaussian* > (m_pool[i]);
     if (fcgaussian != NULL)
       m_likelihoods[i] = fcgaussian->compute_likelihood_exponential(exponential_feature_vector);
@@ -1919,11 +1929,13 @@ PDFPool::read_gk(const std::string &filename)
       }
       else if (type_str == "pcgmm") {
         in >> ssid;
+        assert(m_precision_subspaces[ssid] != NULL);
 	m_pool[i]=new PrecisionConstrainedGaussian(m_precision_subspaces[ssid]);
         m_pool[i]->read(in);
       }
       else if (type_str == "scgmm") {
         in >> ssid;
+        assert(m_exponential_subspaces[ssid] != NULL);
 	m_pool[i]=new SubspaceConstrainedGaussian(m_exponential_subspaces[ssid]);
         m_pool[i]->read(in);
       }
