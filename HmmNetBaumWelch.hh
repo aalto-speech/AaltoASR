@@ -82,6 +82,14 @@ public:
     double prob[2]; //!< Log sum of the likelihoods, two buffers
   };
 
+
+  /** Information on arcs traversed at last frame during forward phase */
+  struct TraversedArc {
+    int arc_id; //!< Index in m_arcs
+    double score; //!< Current log probability
+    TraversedArc(int i, double s) : arc_id(i), score(s) { }
+  };
+
   HmmNetBaumWelch(FeatureGenerator &fea_gen, HmmSet &model);
   virtual ~HmmNetBaumWelch();
 
@@ -125,7 +133,7 @@ private:
   double propagate_node_arcs(int node_id, bool forward,
                              double cur_score, int target_buffer,
                              FeatureVec &fea_vec,
-                             std::vector<Segmentator::IndexProbPair> *best_arcs = NULL);
+                             std::vector<TraversedArc> *best_arcs = NULL);
   double compute_sum_bw_loglikelihoods(int node_id, int frame,
                                        double prior = 0,
                                        std::map<int, double> *sprob = NULL);
@@ -181,6 +189,9 @@ private:
 
   /// Table of active transitions in the forward phase
   std::vector<int> m_active_transition_table;
+
+  /// Table of active arcs in the forward phase
+  std::vector<TraversedArc> m_active_arcs;
 
   /// A vector which holds the possible PDFs and their probabilities
   std::vector<Segmentator::IndexProbPair> m_pdf_prob_pairs;
