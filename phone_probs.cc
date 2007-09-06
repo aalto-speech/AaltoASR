@@ -260,5 +260,6 @@ main(int argc, char *argv[])
     fprintf(stderr, "exception: %s\n", str.c_str());
     abort();
   }
+  return 0;
 }
 

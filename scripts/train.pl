@@ -137,7 +137,7 @@ sub convert_full_to_diagonal {
   my $gk = $im.".gk";
   my $gk_backup = $im."_full.gk";
   
-  system("cp $gk $gk_backup");
+  system("mv $gk $gk_backup");
   system("$BINDIR/gconvert -g $gk_backup -o $gk -d");
 }
 

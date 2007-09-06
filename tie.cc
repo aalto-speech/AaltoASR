@@ -247,6 +247,7 @@ main(int argc, char *argv[])
           hmmnet_collect_phone_stats(lattice, &phone_pool);
         if (mfea_gen != &fea_gen) // fea_gen is closed elsewhere
           mfea_gen->close();
+        delete lattice;
       }
       else
       {
