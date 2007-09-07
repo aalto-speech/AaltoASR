@@ -1186,3 +1186,15 @@ HmmSet::split_gaussians(double minocc, int maxg)
   }
   return num_splits;
 }
+
+
+void
+HmmSet::set_clustering(const std::string &filename,
+                       double min_clusters,
+                       double min_gaussians)
+{
+  m_pool.read_clustering(filename);
+  m_pool.set_evaluate_min_clusters(int(min_clusters*m_pool.number_of_clusters()));
+  m_pool.set_evaluate_min_gaussians(int(min_gaussians*m_pool.size()));
+  m_pool.set_use_clustering(true);
+}

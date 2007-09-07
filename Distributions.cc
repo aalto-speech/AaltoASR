@@ -1810,6 +1810,8 @@ PDFPool::compute_likelihood(const FeatureVec &f, int index)
 {
   if (m_likelihoods[index] > 0)
     return m_likelihoods[index];
+//  if (use_clustering())
+//    return m_clustering_threshold;
   m_likelihoods[index] = m_pool[index]->compute_likelihood(f);
   m_valid_likelihoods.push_back(index);
   return m_likelihoods[index];
@@ -1828,25 +1830,68 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
   std::map<int, ExponentialSubspace*>::const_iterator eitr;
   for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr)
     (*eitr).second->precompute(f);
-  
-  Vector exponential_feature_vector((int)(dim()*(dim()+3)/2));
-  for (int i=0; i<dim(); i++)
-    exponential_feature_vector(i) = f[i];
-  Matrix tmat(dim(), dim()); tmat=0;
-  const Vector *feature = f.get_vector();
-  Blas_R1_Update(tmat, *feature, *feature, 1.0);
-  Vector tvec;
-  LinearAlgebra::map_m2v(tmat, tvec);
-  for (int i=0; i<tvec.size(); i++)
-    exponential_feature_vector(dim()+i) = tvec(i);
-  
-  for (int i=0; i<size(); i++) {
-    FullCovarianceGaussian *fcgaussian = dynamic_cast< FullCovarianceGaussian* > (m_pool[i]);
-    if (fcgaussian != NULL)
-      m_likelihoods[i] = fcgaussian->compute_likelihood_exponential(exponential_feature_vector);
-    else
-      m_likelihoods[i] = m_pool[i]->compute_likelihood(f);
-    m_valid_likelihoods.push_back(i);
+
+  // Clustering not in use
+  if (!use_clustering()) {
+    Vector exponential_feature_vector((int)(dim()*(dim()+3)/2));
+    for (int i=0; i<dim(); i++)
+      exponential_feature_vector(i) = f[i];
+    Matrix tmat(dim(), dim()); tmat=0;
+    const Vector *feature = f.get_vector();
+    Blas_R1_Update(tmat, *feature, *feature, 1.0);
+    Vector tvec;
+    LinearAlgebra::map_m2v(tmat, tvec);
+    for (int i=0; i<tvec.size(); i++)
+      exponential_feature_vector(dim()+i) = tvec(i);
+    
+    for (int i=0; i<size(); i++) {
+      FullCovarianceGaussian *fcgaussian = dynamic_cast< FullCovarianceGaussian* > (m_pool[i]);
+      if (fcgaussian != NULL)
+        m_likelihoods[i] = fcgaussian->compute_likelihood_exponential(exponential_feature_vector);
+      else
+        m_likelihoods[i] = m_pool[i]->compute_likelihood(f);
+      m_valid_likelihoods.push_back(i);
+    }
+  }
+
+  // Gaussian clustering in use
+  else { 
+    // Push the clusters to a priority queue
+    ClusterLikelihoods cluster_likelihoods;
+    double likelihood;
+    for (int i=0; i<number_of_clusters(); i++) {
+      likelihood = m_cluster_centers[i]->compute_likelihood(f);
+      cluster_likelihoods.push(ClusterLikelihoodPair(i, likelihood));
+    }
+
+    // Precompute Gaussians as long as needed
+    int total_clusters_evaluated=0, total_gaussians_evaluated=0, cluster_pos, gauss_pos;
+    ClusterLikelihoodPair current_cluster;
+    while((total_clusters_evaluated < evaluate_min_clusters()) || (total_gaussians_evaluated < evaluate_min_gaussians())) {
+      current_cluster = cluster_likelihoods.top();
+      cluster_pos = current_cluster.first;
+      for (unsigned int j=0; j<m_cluster_to_gaussians[cluster_pos].size(); j++) {
+        gauss_pos = m_cluster_to_gaussians[cluster_pos][j];
+        m_likelihoods[gauss_pos] = m_pool[gauss_pos]->compute_likelihood(f);
+        m_valid_likelihoods.push_back(gauss_pos);
+      }
+      total_clusters_evaluated++;
+      total_gaussians_evaluated += m_cluster_to_gaussians[cluster_pos].size();
+      cluster_likelihoods.pop();
+    }
+
+    // For the rest, use the cluster center likelihood
+    while(!cluster_likelihoods.empty()) {
+      current_cluster = cluster_likelihoods.top();
+      cluster_pos = current_cluster.first;
+      for (unsigned int j=0; j<m_cluster_to_gaussians[cluster_pos].size(); j++) {
+        gauss_pos = m_cluster_to_gaussians[cluster_pos][j];
+        m_likelihoods[gauss_pos] = current_cluster.second;
+        m_valid_likelihoods.push_back(gauss_pos);
+      }
+      cluster_likelihoods.pop();
+    }
+    
   }
 }
 
@@ -2104,5 +2149,60 @@ PDFPool::get_occ_sorted_gaussians(std::vector<int> &sorted_gaussians,
     // Sort the Gaussians according to occupancy
     std::sort(sorted_gaussians.begin(), sorted_gaussians.end(),
               PDFPool::Gaussian_occ_comp(m_pool));
+  }
+}
+
+
+void
+PDFPool::read_clustering(const std::string &filename)
+{
+  std::ifstream in(filename.c_str());
+  if (!in)
+    throw std::string("PDFPool::read_clustering(): could not open %s\n", filename.c_str());
+
+  in >> m_number_of_clusters;
+  m_gaussian_to_cluster.resize(size());
+  m_cluster_to_gaussians.resize(m_number_of_clusters);
+  m_cluster_centers.resize(m_number_of_clusters);
+  
+  if (m_number_of_clusters > 0.3*size())
+    throw std::string("PDFPool::read_clustering(): Are you sure that this clustering makes sense?\n");
+
+  // Read all gaussian-cluster pairs
+  while (in) {
+    int gauss_index;
+    int cluster_index;
+    in >> gauss_index >> cluster_index;
+    gauss_index--; cluster_index--;
+    
+    if (gauss_index >= size())
+      throw std::string("PDFPool::read_clustering(): Gauss index out of bounds\n");
+    if (cluster_index >= number_of_clusters())
+      throw std::string("PDFPool::read_clustering(): Cluster index out of bounds\n");
+
+    m_gaussian_to_cluster[gauss_index] = cluster_index;
+    m_cluster_to_gaussians[cluster_index].push_back(gauss_index);
+  }
+
+  // Compute cluster centers
+  for (int i=0; i<number_of_clusters(); i++) {
+
+    // Collect all Gaussians that belong to this cluster
+    std::vector<const Gaussian*> gaussians;
+    std::vector<double> weights;
+    for (unsigned int j=0; j<m_cluster_to_gaussians[i].size(); j++) {
+      Gaussian *gaussian = dynamic_cast< Gaussian* > (m_pool[m_cluster_to_gaussians[i][j]]);
+      if (gaussian != NULL) {
+        gaussians.push_back(gaussian);
+        weights.push_back(1.0);
+      }
+      else
+        throw std::string("PDFPool::read_clustering(): the distribution at index %i wasn't Gaussian\n", m_cluster_to_gaussians[i][j]);
+    }
+
+    // Compute the center by merging
+    DiagonalGaussian *dg = new DiagonalGaussian(dim());
+    dg->merge(weights, gaussians, true);
+    m_cluster_centers[i] = dg;
   }
 }

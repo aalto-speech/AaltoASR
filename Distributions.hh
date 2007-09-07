@@ -1,6 +1,8 @@
 #ifndef DISTRIBUTIONS_HH
 #define DISTRIBUTIONS_HH
 
+#include <queue>
+
 #include "FeatureBuffer.hh"
 #include "FeatureModules.hh"
 #include "LinearAlgebra.hh"
@@ -63,6 +65,7 @@ protected:
   int m_dim;
   EstimationMode m_mode;
 };
+
 
 
 class PDFPool {
@@ -167,20 +170,57 @@ public:
 
   struct Gaussian_occ_comp;
   
+  /********************************************************************/
+  /* Methods for Gaussian clustering                                  */
+  /********************************************************************/
+
+  bool use_clustering() { return m_use_clustering; }
+  int number_of_clusters() { return m_number_of_clusters; }
+  int evaluate_min_clusters() { return m_evaluate_min_clusters; }
+  int evaluate_min_gaussians() { return m_evaluate_min_gaussians; }
+
+  void set_use_clustering(bool use) { m_use_clustering = use; }
+  void set_number_of_clusters(int n) { m_number_of_clusters = n; }
+  void set_evaluate_min_clusters(int n) { m_evaluate_min_clusters = n; }
+  void set_evaluate_min_gaussians(int n) { m_evaluate_min_gaussians = n; }
+
+  void read_clustering(const std::string &filename);
+  
 private:
+  // Standard things
   std::vector<PDF*> m_pool;
   std::vector<double> m_likelihoods;
   std::vector<int> m_valid_likelihoods;
   int m_dim;
 
+  // Estimation constants
   double m_minvar;
   double m_covsmooth;
   double m_c1;
   double m_c2;
   double m_ismooth;
 
+  // Subspaces
   std::map<int, PrecisionSubspace*> m_precision_subspaces;
   std::map<int, ExponentialSubspace*> m_exponential_subspaces;
+
+  // Clustering
+  bool m_use_clustering;
+  std::vector<PDF*> m_cluster_centers;
+  std::vector<int> m_gaussian_to_cluster;
+  std::vector<std::vector<int> > m_cluster_to_gaussians;
+  int m_number_of_clusters;
+  int m_evaluate_min_clusters;
+  int m_evaluate_min_gaussians;
+  typedef std::pair<int,double> ClusterLikelihoodPair;
+  struct cl_compare
+  {
+    bool operator()(ClusterLikelihoodPair cl1, ClusterLikelihoodPair cl2) const
+    {
+      return cl1.second < cl2.second;
+    }
+  };
+  typedef std::priority_queue<ClusterLikelihoodPair, std::vector<ClusterLikelihoodPair>, cl_compare> ClusterLikelihoods;
 };
 
 
@@ -345,7 +385,6 @@ protected:
   friend class PDFPool;
   friend struct PDFPool::Gaussian_occ_comp;
 };
-
 
 
 
@@ -637,5 +676,8 @@ struct PDFPool::Gaussian_occ_comp
 private:
   std::vector<PDF*> &m_pool;
 };
+
+
+
 
 #endif /* DISTRIBUTIONS_HH */

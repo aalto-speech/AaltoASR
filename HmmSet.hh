@@ -420,6 +420,17 @@ public:
    * \return          Amount of new Gaussians created to the pool
   */ 
   int split_gaussians(double minocc, int maxg);
+
+
+  /** Splits every Gaussian in the pool with some constrains
+   * \param filename       File with the clustering information
+   * \param min_clusters   The number of best clusters to evaluate per frame as a percentage [0,1]
+   * \param min_gaussians  The minimum number of Gaussians to evaluate per frame as a percentage [0,1]
+  */ 
+  void set_clustering(const std::string &filename,
+                      double min_clusters=1.0,
+                      double min_gaussians=0.0);
+
   
 private:
 
