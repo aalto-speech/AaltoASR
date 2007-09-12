@@ -10,6 +10,7 @@ $SIG{PIPE} = 'IGNORE';
 setrlimit(RLIMIT_CORE, 0, 0); # Repress core dumps
 
 
+my $USE_MORPHS = shift @ARGV;
 my $VOCABULARY = shift @ARGV;
 my $LMMODEL = shift @ARGV;
 my $RECIPE = shift @ARGV;
@@ -24,7 +25,7 @@ my @BATCH_FILES;
 
 
 # Binaries
-my $LATTICE_RESCORE = "/home/thirsima/Work/lattice_rescore/lattice_rescore";
+my $LATTICE_RESCORE = "/home/jpylkkon/aku/lattice_rescore/lattice_rescore";
 my $SRI_LATTICE_TOOL = "/share/puhe/srilm-1.5.1/bin/i686-m64/lattice-tool";
 my $MORPH_LATTICE = "/home/thirsima/Work/morph_lattice/morph_lattice";
 
@@ -33,6 +34,7 @@ my $FSM2HTK = "$SCRIPTDIR/fsm2htk.pl";
 my $PHN2TRANSCRIPT = "$SCRIPTDIR/phn2transcript.pl";
 my $HTK2FST = "$SCRIPTDIR/htk2fst.pl";
 my $RMB = "$SCRIPTDIR/rmb.pl";
+my $TRANSCRIPT2FSM = "$SCRIPTDIR/transcript2fsm.pl";
 
 
 load_recipe($RECIPE, $BATCH_INDEX, $NUM_BATCHES);
@@ -99,7 +101,12 @@ sub make_transcript_word_fsts {
   open(LIST, "> $list_file");
   for $l (@BATCH_FILES) {
     print LIST $l->[1]."\n";
-    system("$PHN2TRANSCRIPT ".$l->[0]." | $MORPH_LATTICE $VOCABULARY - - | $FSM2HTK > ".$l->[1]) == 0 || die "system error $7\n";
+    if ($USE_MORPHS) {
+      system("$PHN2TRANSCRIPT ".$l->[0]." | $MORPH_LATTICE $VOCABULARY - - | $FSM2HTK > ".$l->[1]) == 0 || die "system error $7\n";
+    } else {
+      print "$PHN2TRANSCRIPT ".$l->[0]." | $TRANSCRIPT2FSM | $FSM2HTK > ".$l->[1]."\n";
+      system("$PHN2TRANSCRIPT ".$l->[0]." | $TRANSCRIPT2FSM | $FSM2HTK > ".$l->[1]) == 0 || die "system error $7\n";
+    }
   }
   close(LIST);
 
@@ -137,6 +144,6 @@ sub make_denominator_hmmnets {
       $r = system("$LATTICE_RESCORE -l $LMMODEL -i ".$l->[2]." -o - | $SRI_LATTICE_TOOL -posterior-prune $LATTICE_THRESHOLD -read-htk -in-lattice - -write-htk -out-lattice - -htk-lmscale $LMSCALE -htk-acscale 1 -posterior-scale $LMSCALE | $HTK2FST - | fst_concatenate optional_silence.fst - - | fst_concatenate - optional_silence.fst - | fst_concatenate - sentence_end.fst - | fst_union ${TEMPDIR}/".$l->[1]." - - | fst_optimize -A - - | fst_compose -t L.fst - - | fst_optimize -A - - | fst_compose -t C.fst - - | fst_optimize -A - - | fst_compose -t H.fst - - | $RMB | fst_optimize -A - ".$l->[3]);
       last if ($r == 0);
     }
-    die "Could not process file ".$l->[2]."\n" if ($c >= 4);
+    die "Could not process file ".$l->[2]."\n" if ($c >= 10);
   }
 }

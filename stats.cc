@@ -267,6 +267,8 @@ main(int argc, char *argv[])
     std::ofstream lls_file(lls_file_name.c_str());
     if (lls_file)
     {
+      if (accum_pos == 1) // Denominator
+        total_log_likelihood = -total_log_likelihood;
       lls_file << total_log_likelihood << std::endl;
       lls_file.close();
     }
