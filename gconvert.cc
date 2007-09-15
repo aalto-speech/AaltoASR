@@ -89,8 +89,6 @@ main(int argc, char *argv[])
       // Read from file
       if (config["subspace"].specified) {
         std::ifstream in(config["subspace"].get_str().c_str());
-        std::string skip;
-        in >> skip;
         ps->read_subspace(in);
         in.close();
       }
@@ -130,8 +128,6 @@ main(int argc, char *argv[])
       // Read from file
       if (config["subspace"].specified) {
         std::ifstream in(config["subspace"].get_str().c_str());
-        std::string skip;
-        in >> skip;
         es->read_subspace(in);
         in.close();
       }

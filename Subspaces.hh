@@ -67,9 +67,9 @@ public:
   void write_subspace(std::ofstream &out);
   void reset(const unsigned int subspace_dim,
              const unsigned int feature_dim);
-  void initialize_basis_pca(const std::vector<double> &weights,
-			    const std::vector<LaGenMatDouble> &sample_covs,
-			    const unsigned int basis_dim);
+  void initialize_basis_pca(std::vector<double> &weights,
+			    std::vector<LaGenMatDouble> &sample_covs,
+			    unsigned int basis_dim);
   void gradient_untied(const HCL_RnVector_d &lambda,
 		       const LaGenMatDouble &sample_cov,
 		       HCL_RnVector_d &grad,
@@ -217,10 +217,10 @@ public:
   void write_subspace(std::ofstream &out);
   void reset(const unsigned int subspace_dim,
 	     const unsigned int feature_dim);
-  void initialize_basis_pca(const std::vector<double> &weights,
-			    const std::vector<Matrix> &covs,
-			    const std::vector<Vector> &means,
-			    const unsigned int basis_dim);
+  void initialize_basis_pca(std::vector<double> &weights,
+			    std::vector<Matrix> &covs,
+			    std::vector<Vector> &means,
+			    unsigned int basis_dim);
   double K(const Matrix &sample_cov,
 	   const Vector &sample_mean);
   double K(const Vector &theta);

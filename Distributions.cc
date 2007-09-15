@@ -840,7 +840,7 @@ FullCovarianceGaussian::reset(int dim)
   
   m_mean.resize(dim);
   m_precision.resize(dim,dim);
-  m_mean=0; m_precision=0;
+  m_mean=0; m_precision=0; m_covariance=0;
 
   m_constant=0;
   m_full_stats=true;
@@ -1191,8 +1191,10 @@ PrecisionConstrainedGaussian::recompute_constant()
 {
   Matrix precision;
   m_ps->compute_precision(m_coeffs, precision);
-  m_constant = log(sqrt(LinearAlgebra::spd_determinant(precision)));
-
+  m_constant = LinearAlgebra::spd_determinant(precision);
+  m_constant /= pow(2*3.1416, dim());
+  m_constant = log(sqrt(m_constant));
+  
   Vector mean(m_transformed_mean);
   Matrix covariance;
   m_ps->compute_covariance(m_coeffs, covariance);
@@ -1233,6 +1235,7 @@ SubspaceConstrainedGaussian::reset(int feature_dim)
   m_mode=ML;
   
   m_coeffs=0;
+  m_coeffs(0)=1;
   
   m_constant=0;
   m_full_stats=true;

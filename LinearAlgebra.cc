@@ -379,10 +379,11 @@ namespace LinearAlgebra {
     LaVectorDouble eigs=LaVectorDouble(m.rows());
     LaEigSolveSymmetricVecIP(t,eigs);
 
-    for (int i=0; i<eigs.size(); i++)
+    for (int i=0; i<eigs.size(); i++) {
+//      std::cout << eigs(i) << std::endl;
       if (eigs(i)<=0)
         return false;
-
+    }
     return true;
   }
 

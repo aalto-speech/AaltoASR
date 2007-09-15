@@ -19,9 +19,9 @@ PrecisionSubspace::copy(const PrecisionSubspace &orig)
 
 
 void 
-PrecisionSubspace::initialize_basis_pca(const std::vector<double> &c,
-                                        const std::vector<LaGenMatDouble> &sample_covs, 
-                                        const unsigned int basis_dim)
+PrecisionSubspace::initialize_basis_pca(std::vector<double> &c,
+                                        std::vector<LaGenMatDouble> &sample_covs, 
+                                        unsigned int basis_dim)
 {
   assert(c.size() == sample_covs.size());
   
@@ -61,7 +61,10 @@ PrecisionSubspace::initialize_basis_pca(const std::vector<double> &c,
   sample_precs.resize(num_covs);
   for (unsigned int i=0; i<num_covs; i++) {
     // Calculate precisions
+    if (!LinearAlgebra::is_spd(sample_covs.at(i)))
+      LinearAlgebra::force_min_eig(sample_covs.at(i), 0.01);
     sample_precs.at(i).copy(sample_covs.at(i));
+    
     LaVectorLongInt pivots(d);
     LUFactorizeIP(sample_precs.at(i), pivots);
     LaLUInverseIP(sample_precs.at(i), pivots);
@@ -81,18 +84,18 @@ PrecisionSubspace::initialize_basis_pca(const std::vector<double> &c,
   LaGenMatDouble C=LaGenMatDouble::zeros(d_vec, d_vec);
   vector_t1.resize(d_vec,1);
   matrix_t1.resize(d_vec,d_vec);
-  vector_t1(LaIndex())=0;
-  matrix_t1(LaIndex(),LaIndex())=0;
-  m_mspace.at(0)(LaIndex(),LaIndex())=0;
+  vector_t1=0;
+  matrix_t1=0;
+  m_mspace.at(0)=0;
 
   for (unsigned int i=0; i<num_covs; i++) {
     assert(sample_prec_vectors.at(i).rows()==d_vec);
     Blas_Mat_Mat_Mult(identity, sample_precs.at(i), m_mspace.at(0), c.at(i)/c_sum , 1);
-    Blas_Add_Mult(vector_t1, c.at(i)/c_sum , sample_prec_vectors.at(i));
+    Blas_Add_Mult(vector_t1, c.at(i)/c_sum, sample_prec_vectors.at(i));
     Blas_R1_Update(C, sample_prec_vectors.at(i), sample_prec_vectors.at(i), c.at(i)/c_sum);
   }
   // Remove mean squared
-  Blas_R1_Update(matrix_t1, vector_t1, vector_t1, -1);
+  Blas_R1_Update(C, vector_t1, vector_t1, -1);
 
   // PCA for C
   vector_t1.resize(C.rows(),1);
@@ -116,14 +119,15 @@ PrecisionSubspace::initialize_basis_pca(const std::vector<double> &c,
     Blas_Mat_Mat_Mult(matrix_t2, m_sqrt, m_mspace.at(i), 1.0, 0.0);
     LinearAlgebra::map_m2v(m_mspace.at(i), m_vspace.at(i));
   }
-  assert(LinearAlgebra::is_spd(m_mspace.at(0)));
+
+  assert(!LinearAlgebra::is_singular(m_mspace.at(0)));
 }
 
 
 void
 PrecisionSubspace::optimize_coefficients(const Matrix &sample_cov,
                                          Vector &lambda)
-{  
+{
   // Optimization space
   HCL_RnSpace_d vs(subspace_dim());
   
@@ -744,7 +748,7 @@ ExponentialSubspace::reset(const unsigned int subspace_dim,
 
 void 
 ExponentialSubspace::compute_precision(const LaVectorDouble &lambda,
-                                         LaGenMatDouble &precision)
+                                       LaGenMatDouble &precision)
 {
   assert(lambda.size()<=subspace_dim());
   
@@ -759,7 +763,7 @@ ExponentialSubspace::compute_precision(const LaVectorDouble &lambda,
 
 void
 ExponentialSubspace::compute_precision(const LaVectorDouble &lambda,
-                                         LaVectorDouble &precision)
+                                       LaVectorDouble &precision)
 {
   // Calculate precision in matrix form
   LaGenMatDouble mprecision;
@@ -939,10 +943,10 @@ ExponentialSubspace::compute_theta(const HCL_RnVector_d &lambda,
 
 
 void 
-ExponentialSubspace::initialize_basis_pca(const std::vector<double> &c,
-                                          const std::vector<LaGenMatDouble> &covs, 
-                                          const std::vector<LaVectorDouble> &means, 
-                                          const unsigned int subspace_dim)
+ExponentialSubspace::initialize_basis_pca(std::vector<double> &c,
+                                          std::vector<LaGenMatDouble> &covs, 
+                                          std::vector<LaVectorDouble> &means, 
+                                          unsigned int subspace_dim)
 {
   assert(c.size() == covs.size());
 
@@ -992,6 +996,7 @@ ExponentialSubspace::initialize_basis_pca(const std::vector<double> &c,
   // Calculate total covariance
   LaGenMatDouble identity=LaGenMatDouble::eye(d);
   for (unsigned int i=0; i<c.size(); i++) {
+    LinearAlgebra::force_min_eig(covs.at(i), 0.01);
     Blas_Mat_Mat_Mult(identity, covs.at(i), total_covariance, c.at(i)/c_sum, 1);
     Blas_R1_Update(total_covariance, means.at(i), means.at(i), c.at(i)/c_sum);
   }
@@ -1064,6 +1069,7 @@ ExponentialSubspace::initialize_basis_pca(const std::vector<double> &c,
 
     // First basis is total_theta
     if (i==0) {
+      assert(!LinearAlgebra::is_singular(total_precision));
       m_basis_psi.at(i).copy(total_psi);
       m_basis_P.at(i).copy(total_precision);
       LinearAlgebra::map_m2v(m_basis_P.at(i), m_basis_Pvec.at(i));
