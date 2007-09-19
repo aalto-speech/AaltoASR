@@ -315,8 +315,8 @@ sub collect_mmi_stats {
   # Numerator
   $scriptfile = "genstats_numerator_${BASE_ID}.sh";
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
-  $statsfile = "stats_numerator";
-  $keyfile = "stats_ready_numerator";
+  $statsfile = "stats";
+  $keyfile = "stats_ready";
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   if ($NUM_BATCHES > 1) {
     for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
@@ -344,8 +344,6 @@ sub collect_mmi_stats {
   # Denominator
   $scriptfile = "genstats_denominator_${BASE_ID}.sh";
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
-  $statsfile = "stats_denominator";
-  $keyfile = "stats_ready_denominator";
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   if ($NUM_BATCHES > 1) {
     for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
