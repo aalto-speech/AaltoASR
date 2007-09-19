@@ -14,15 +14,17 @@ use strict;
 my $BASE_ID="mfcc";
 
 # Path settings
-my $BINDIR="/home/jpylkkon/bin/aku";
+my $BINDIR="/home/mavarjok/aku";
 my $SCRIPTDIR="$BINDIR/scripts";
-my $HMMDIR="/share/puhe/jpylkkon/hmms";
-my $workdir="/share/work/jpylkkon/aku_work";
-my $lna_outdir = "/share/work/jpylkkon/lnas/".$BASE_ID;
+my $HMMDIR="/share/puhe/mavarjok/fin_recognizer/hmms";
+my $workdir="/share/work/mavarjok/aku_work";
+my $devel_lna_outdir = "/share/work/mavarjok/lnas/".$BASE_ID."_devel";
+my $eval_lna_outdir = "/share/work/mavarjok/lnas/".$BASE_ID."_eval";
 
 # Training file list
-my $RECIPE="/share/puhe/jpylkkon/train/train.recipe";
-my $lna_recipe="/share/puhe/jpylkkon/train/test.recipe";
+my $RECIPE="/share/puhe/mavarjok/fin_recognizer/recipes/speecon_train_clean_mfcc_cms_split8_19kmorphs_2gram.recipe";
+my $devel_lna_recipe="/share/puhe/mavarjok/fin_recognizer/recipes/speecon_devel.recipe";
+my $eval_lna_recipe="/share/puhe/mavarjok/fin_recognizer/recipes/speecon_eval.recipe";
 
 # Initial model names
 my $init_model = $HMMDIR."/".$BASE_ID;      # Created in tying
@@ -30,12 +32,14 @@ my $init_cfg = $HMMDIR."/".$BASE_ID.".cfg"; # Used in tying and training
 
 # Batch settings
 my $NUM_BATCHES = 2; # Number of processes in parallel
+my $NUM_MMI_BATCHES = 4; # Number of processes in parallel when doing MMI training
 
 # Baum-Welch settings
 my $USE_BAUM_WELCH = 1; # If 0, the script must call align appropriately
-my $FORWARD_BEAM = 15;
+my $FORWARD_BEAM = 30;
 my $BACKWARD_BEAM = 200;
 my $AC_SCALE = 1; # Acustic scaling (For ML 1, for MMI 1/LMSCALE)
+my $AC_MMI_SCALE = 0.029;
 
 # Alignment settings
 my $ALIGN_WINDOW = 4000;
@@ -61,7 +65,8 @@ my $mllt_start_iter = 14; # At which iteration MLLT estimation should begin
 my $MLLT_MODULE_NAME = "transform";
 
 # Training iterations
-my $num_train_iter = 22;
+my $num_ml_train_iter = 22;
+my $num_mmi_train_iter = 4;
 my $split_frequency = 3; # How many EM iterations between Gaussian splits
 my $split_stop_iter = 14; # Iteration after which no more splits are done
 
@@ -95,25 +100,36 @@ convert_full_to_diagonal($init_model);
 generate_hmmnet_files($tempdir, $init_model);
 
 # ML/EM training
-my $om;
-$om=ml_train($tempdir, 1, $num_train_iter, $init_model, $init_cfg,
-             $mllt_start_iter, $split_frequency, $split_stop_iter);
+my $ml_model;
+$ml_model=ml_train($tempdir, 1, $num_ml_train_iter, $init_model, $init_cfg,
+                   $mllt_start_iter, $split_frequency, $split_stop_iter);
 
 # Estimate duration model
-align($tempdir, $om, $RECIPE);
-estimate_dur_model($om);
+align($tempdir, $ml_model, $RECIPE);
+estimate_dur_model($ml_model);
 
 # VTLN
-#align($tempdir, $om, $RECIPE);
-#estimate_vtln($tempdir, $om, $RECIPE, $om.".spkc");
+align($tempdir, $om, $RECIPE);
+estimate_vtln($tempdir, $ml_model, $RECIPE, $om.".spkc");
 
 # MLLR
-#estimate_mllr($tempdir, $om, $RECIPE, $om.".spkc");
+estimate_mllr($tempdir, $ml_model, $RECIPE, $om.".spkc");
 
+# MMI
+$AC_SCALE=$AC_MMI_SCALE;
+$NUM_BATCHES=$NUM_MMI_BATCHES;
+my $mmi_model;
+$mmi_model=mmi_train($tempdir, 1, $num_mmi_train_iter, $ml_model, $ml_model.".cfg");
 
 # Generate lnas for the final model
-generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
-
+if ($num_mmi_train_iter > 0) {
+    generate_lnas($tempdir, $mmi_model, $devel_lna_recipe, $devel_lna_outdir);
+    generate_lnas($tempdir, $mmi_model, $eval_lna_recipe, $eval_lna_outdir);
+}
+else {
+    generate_lnas($tempdir, $ml_model, $devel_lna_recipe, $devel_lna_outdir);
+    generate_lnas($tempdir, $ml_model, $eval_lna_recipe, $eval_lna_outdir);
+}
 
 
 sub context_phone_tying {
@@ -171,7 +187,7 @@ sub ml_train {
 
     $mllt_flag = 1 if ($mllt_start && $i >= $mllt_start);
 
-    collect_stats($temp_dir, $im, $im_cfg, $stats_list_file,
+    collect_ml_stats($temp_dir, $im, $im_cfg, $stats_list_file,
                   $mllt_flag);
 
     $split_flag = 0;
@@ -193,7 +209,43 @@ sub ml_train {
 }
 
 
-sub collect_stats {
+sub mmi_train {
+  my $temp_dir = shift(@_);
+  my $iter_init = shift(@_);
+  my $iter_end = shift(@_);
+
+  my $im = shift(@_);
+  my $im_cfg = shift(@_);
+
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $dstring = "$mday.".($mon+1).".".(1900+$year);
+  my $model_base = "$HMMDIR/${BASE_ID}_${dstring}";
+
+  my $stats_list_file = "stats.lst";
+  my $batch_info;
+
+  for (my $i = $iter_init; $i <= $iter_end ; $i ++) {
+
+    print "Iteration ".$i."\n" if ($VERBOSITY > 0);
+    my $om = $model_base."_".$i;
+
+    collect_mmi_stats($temp_dir, $im, $im_cfg, $stats_list_file);
+    mmi_estimate($temp_dir, $im, $im_cfg, $om, $stats_list_file, $MINVAR);
+    
+    # Check the models were really created
+    if (!(-e $om.".ph")) {
+      die "Error in training, no models were written\n";
+    }
+
+    # Read input from previously written model
+    $im = $om;
+    $im_cfg = $om.".cfg";
+  }
+  return $im;
+}
+
+
+sub collect_ml_stats {
   my $temp_dir = shift(@_);
   my $model_base = shift(@_);
   my $cfg = shift(@_);
@@ -244,6 +296,83 @@ sub collect_stats {
 }
 
 
+
+sub collect_mmi_stats {
+  my $temp_dir = shift(@_);
+  my $model_base = shift(@_);
+  my $cfg = shift(@_);
+  my $stats_list_file = shift(@_);
+  my $batch_options;
+  my ($scriptfile, $statsfile, $keyfile);
+  my $fh;
+  my $batch_info = get_empty_batch_info();
+  my $list_fh;
+  my $spkc_switch = "";
+  $spkc_switch = "-S $SPKC_FILE" if ($SPKC_FILE ne "");
+
+  open $list_fh, "> $stats_list_file" || die "Could not open $stats_list_file";
+
+  # Numerator
+  $scriptfile = "genstats_numerator_${BASE_ID}.sh";
+  open $fh, "> $scriptfile" || die "Could not open $scriptfile";
+  $statsfile = "stats_numerator";
+  $keyfile = "stats_ready_numerator";
+  $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
+  if ($NUM_BATCHES > 1) {
+    for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
+      my $cur_keyfile = $keyfile."_numerator_$i";
+      my $cur_statsfile = $statsfile."_numerator_$i";
+      print $list_fh $cur_statsfile."\n";
+      unlink(glob($cur_statsfile.".*"));
+      push @{$batch_info->{"key"}}, $cur_keyfile;
+    }
+    $statsfile = $statsfile."_\$SGE_TASK_ID";
+    $keyfile = $keyfile."_\$SGE_TASK_ID";
+  } else {
+    unlink(glob($statsfile.".*"));
+    push @{$batch_info->{"key"}}, $keyfile;
+    print $list_fh $statsfile."\n";
+  }
+  print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
+  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE -H -V -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
+  print $fh "touch $keyfile\n";
+  close($fh);
+  push @{$batch_info->{"script"}}, $scriptfile;
+  close($list_fh);
+  submit_and_wait($batch_info);
+
+  # Denominator
+  $scriptfile = "genstats_denominator_${BASE_ID}.sh";
+  open $fh, "> $scriptfile" || die "Could not open $scriptfile";
+  $statsfile = "stats_denominator";
+  $keyfile = "stats_ready_denominator";
+  $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
+  if ($NUM_BATCHES > 1) {
+    for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
+      my $cur_keyfile = $keyfile."_denominator_$i";
+      my $cur_statsfile = $statsfile."_denominator_$i";
+      print $list_fh $cur_statsfile."\n";
+      unlink(glob($cur_statsfile.".*"));
+      push @{$batch_info->{"key"}}, $cur_keyfile;
+    }
+    $statsfile = $statsfile."_\$SGE_TASK_ID";
+    $keyfile = $keyfile."_\$SGE_TASK_ID";
+  } else {
+    unlink(glob($statsfile.".*"));
+    push @{$batch_info->{"key"}}, $keyfile;
+    print $list_fh $statsfile."\n";
+  }
+  print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
+  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE -D -E -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
+  print $fh "touch $keyfile\n";
+  close($fh);
+  push @{$batch_info->{"script"}}, $scriptfile;
+  close($list_fh);
+  submit_and_wait($batch_info);
+}
+
+
+
 sub ml_estimate {
   my $temp_dir = shift(@_);
   my $im = shift(@_);
@@ -259,6 +388,19 @@ sub ml_estimate {
   $extra_options = $extra_options." --split $SPLIT_MIN_OCCUPANCY --maxg $SPLIT_MAX_GAUSSIANS" if ($split_flag);
 
   my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -t -i $VERBOSITY --minvar $minvar --ml -s ${BASE_ID}_loglikelihoods $extra_options\n");
+  submit_and_wait($batch_info, 10); # Reduced batch check interval
+}
+
+
+sub mmi_estimate {
+  my $temp_dir = shift(@_);
+  my $im = shift(@_);
+  my $im_cfg = shift(@_);
+  my $om = shift(@_);
+  my $stats_list_file = shift(@_);
+  my $minvar = shift(@_);
+
+  my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -i $VERBOSITY --minvar $minvar --mmi -s ${BASE_ID}_conditionalloglikelihood\n");
   submit_and_wait($batch_info, 10); # Reduced batch check interval
 }
 
