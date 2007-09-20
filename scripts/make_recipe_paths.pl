@@ -14,6 +14,8 @@ my $recipe = shift;
 my $key = shift;
 my $fh;
 
+die "Usage make_recipe_paths.pl RECIPE key" if (!defined $key);
+
 open($fh, "<$recipe") || die "Could not open recipe file $recipe\n";
 
 while (<$fh>) {

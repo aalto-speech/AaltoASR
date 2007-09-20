@@ -14,17 +14,15 @@ use strict;
 my $BASE_ID="mfcc";
 
 # Path settings
-my $BINDIR="/home/mavarjok/aku";
+my $BINDIR="/home/".$ENV{"USER"}."/aku";
 my $SCRIPTDIR="$BINDIR/scripts";
-my $HMMDIR="/share/puhe/mavarjok/fin_recognizer/hmms";
-my $workdir="/share/work/mavarjok/aku_work";
-my $devel_lna_outdir = "/share/work/mavarjok/lnas/".$BASE_ID."_devel";
-my $eval_lna_outdir = "/share/work/mavarjok/lnas/".$BASE_ID."_eval";
+my $HMMDIR="/share/puhe/".$ENV{"USER"}."/hmms";
+my $workdir="/share/work/".$ENV{"USER"}."/aku_work";
+my $lna_outdir = "/share/work/".$ENV{"USER"}."/lnas";
 
 # Training file list
-my $RECIPE="/share/puhe/mavarjok/fin_recognizer/recipes/speecon_train_clean_mfcc_cms_split8_19kmorphs_2gram.recipe";
-my $devel_lna_recipe="/share/puhe/mavarjok/fin_recognizer/recipes/speecon_devel.recipe";
-my $eval_lna_recipe="/share/puhe/mavarjok/fin_recognizer/recipes/speecon_eval.recipe";
+my $RECIPE="/share/puhe/jpylkkon/speecon_new/speecon_new_train.recipe";
+my $lna_recipe="/share/puhe/jpylkkon/speecon_new/speecon_new_devel.recipe";
 
 # Initial model names
 my $init_model = $HMMDIR."/".$BASE_ID;      # Created in tying
@@ -32,14 +30,12 @@ my $init_cfg = $HMMDIR."/".$BASE_ID.".cfg"; # Used in tying and training
 
 # Batch settings
 my $NUM_BATCHES = 2; # Number of processes in parallel
-my $NUM_MMI_BATCHES = 4; # Number of processes in parallel when doing MMI training
 
 # Baum-Welch settings
 my $USE_BAUM_WELCH = 1; # If 0, the script must call align appropriately
 my $FORWARD_BEAM = 30;
 my $BACKWARD_BEAM = 200;
 my $AC_SCALE = 1; # Acustic scaling (For ML 1, for MMI 1/LMSCALE)
-my $AC_MMI_SCALE = 0.029;
 
 # Alignment settings
 my $ALIGN_WINDOW = 4000;
@@ -59,6 +55,10 @@ my $SPLIT_MAX_GAUSSIANS = 24;  # Per state
 
 # Minimum variance
 my $MINVAR = 0.1;
+
+# Gaussian clustering options
+my $NUM_GAUSS_CLUSTERS = 700; # 0 if no clustering
+my $GAUSS_EVAL_RATIO = 0.1;
 
 # MLLT options
 my $mllt_start_iter = 14; # At which iteration MLLT estimation should begin
@@ -103,33 +103,33 @@ generate_hmmnet_files($tempdir, $init_model);
 my $ml_model;
 $ml_model=ml_train($tempdir, 1, $num_ml_train_iter, $init_model, $init_cfg,
                    $mllt_start_iter, $split_frequency, $split_stop_iter);
+my $om = $ml_model;
 
 # Estimate duration model
-align($tempdir, $ml_model, $RECIPE);
-estimate_dur_model($ml_model);
+align($tempdir, $om, $RECIPE);
+estimate_dur_model($om);
 
 # VTLN
-align($tempdir, $om, $RECIPE);
-estimate_vtln($tempdir, $ml_model, $RECIPE, $om.".spkc");
+# align($tempdir, $om, $RECIPE);
+# estimate_vtln($tempdir, $om, $RECIPE, $om.".spkc");
 
-# MLLR
-estimate_mllr($tempdir, $ml_model, $RECIPE, $om.".spkc");
+# # MLLR
+# estimate_mllr($tempdir, $om, $RECIPE, $om.".spkc");
+
+# Cluster the Gaussians
+if ($NUM_GAUSS_CLUSTERS > 0) {
+  cluster_gaussians($tempdir, $om);
+}
 
 # MMI
-$AC_SCALE=$AC_MMI_SCALE;
-$NUM_BATCHES=$NUM_MMI_BATCHES;
-my $mmi_model;
-$mmi_model=mmi_train($tempdir, 1, $num_mmi_train_iter, $ml_model, $ml_model.".cfg");
+#my $mmi_model;
+#$mmi_model=mmi_train($tempdir, 1, $num_mmi_train_iter, $ml_model, $ml_model.".cfg");
+#$om = $mmi_model;
 
 # Generate lnas for the final model
-if ($num_mmi_train_iter > 0) {
-    generate_lnas($tempdir, $mmi_model, $devel_lna_recipe, $devel_lna_outdir);
-    generate_lnas($tempdir, $mmi_model, $eval_lna_recipe, $eval_lna_outdir);
-}
-else {
-    generate_lnas($tempdir, $ml_model, $devel_lna_recipe, $devel_lna_outdir);
-    generate_lnas($tempdir, $ml_model, $eval_lna_recipe, $eval_lna_outdir);
-}
+generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
+
+
 
 
 sub context_phone_tying {
@@ -431,7 +431,7 @@ sub align {
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/align -b $model -c $model.cfg -r $recipe --swins $ALIGN_WINDOW --beam $ALIGN_BEAM --sbeam $ALIGN_SBEAM $FILEFORMAT $spkc_switch $batch_options -i 1\n";
+  print $fh "$BINDIR/align -b $model -c $model.cfg -r $recipe --swins $ALIGN_WINDOW --beam $ALIGN_BEAM --sbeam $ALIGN_SBEAM $FILEFORMAT $spkc_switch $batch_options -i $VERBOSITY\n";
   print $fh "touch $touch_keyfile\n";
   close($fh);
 
@@ -463,7 +463,7 @@ sub estimate_mllr {
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/mllr -b $model -c $model.cfg -r $recipe -H -F $FORWARD_BEAM -W $BACKWARD_BEAM $FILEFORMAT -M $MLLR_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i 1\n";
+  print $fh "$BINDIR/mllr -b $model -c $model.cfg -r $recipe -H -F $FORWARD_BEAM -W $BACKWARD_BEAM $FILEFORMAT -M $MLLR_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY\n";
   print $fh "touch $touch_keyfile\n";
   close($fh);
 
@@ -498,7 +498,7 @@ sub estimate_vtln {
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/vtln -b $model -c $model.cfg -r $recipe -O $FILEFORMAT -v $VTLN_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i 1\n";
+  print $fh "$BINDIR/vtln -b $model -c $model.cfg -r $recipe -O $FILEFORMAT -v $VTLN_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY\n";
   print $fh "touch $touch_keyfile\n";
   close($fh);
 
@@ -520,6 +520,15 @@ sub estimate_dur_model {
 }
 
 
+sub cluster_gaussians {
+  my $temp_dir = shift(@_);
+  my $im = shift(@_);
+  my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/gcluster -g $im.gk -o $im.gcl -C $NUM_GAUSS_CLUSTERS -i $VERBOSITY");
+  submit_and_wait($batch_info);
+}
+
+
+
 sub generate_lnas {
   my $temp_dir = shift(@_);
   my $model = shift(@_);
@@ -530,6 +539,7 @@ sub generate_lnas {
   my $fh;
   my $batch_options;
   my $batch_info = get_empty_batch_info();
+  my $cluster_options = "";
 
   my $spkc_switch = "";
   $spkc_switch = "-S $spkc_file" if ($spkc_file ne "");
@@ -541,11 +551,13 @@ sub generate_lnas {
   $touch_keyfile = $keyfile;
   $touch_keyfile = $touch_keyfile."_\$SGE_TASK_ID" if ($NUM_BATCHES > 1);
 
+  $cluster_options = "-C $model.gcl --eval-ming $GAUSS_EVAL_RATIO" if ($NUM_GAUSS_CLUSTERS);
+
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
     
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/phone_probs -b $model -c $model.cfg -r $recipe -o $out_dir $FILEFORMAT $spkc_switch $batch_options -i 1\n";
+  print $fh "$BINDIR/phone_probs -b $model -c $model.cfg -r $recipe -o $out_dir $FILEFORMAT $spkc_switch $batch_options -i $VERBOSITY $cluster_options\n";
   print $fh "touch $touch_keyfile\n";
   close($fh);
 

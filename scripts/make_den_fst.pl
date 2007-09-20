@@ -25,7 +25,7 @@ my @BATCH_FILES;
 
 
 # Binaries
-my $LATTICE_RESCORE = "/home/jpylkkon/aku/lattice_rescore/lattice_rescore";
+my $LATTICE_RESCORE = "/home/thirsima/Work/lattice_rescore/lattice_rescore";
 my $SRI_LATTICE_TOOL = "/share/puhe/srilm-1.5.1/bin/i686-m64/lattice-tool";
 my $MORPH_LATTICE = "/home/thirsima/Work/morph_lattice/morph_lattice";
 

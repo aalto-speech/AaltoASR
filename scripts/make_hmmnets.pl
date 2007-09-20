@@ -28,9 +28,15 @@ my $retry;
 
 while (<>) {
   chomp;
-  /transcript=(\S*)/;
+  if (!/transcript=(\S*)/) {
+    print "Missing transcript field, skipping...\n";
+    next;
+  }
   $phn_file = $1;
-  /hmmnet=(\S*)/;
+  if (!/hmmnet=(\S*)/) {
+    print "Missing hmmnet field, skipping...\n";
+    next;
+  }
   $hmmnet_file = $1;
   for ($retry = 0; $retry < 4; $retry++) {
     open $fh, "| fst_optimize -A - $hmmnet_file" or die "can't run fst_optimize: $!";
