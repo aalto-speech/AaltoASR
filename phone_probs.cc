@@ -70,8 +70,8 @@ main(int argc, char *argv[])
       ('n', "no-overwrite", "", "", "prevent overwriting existing files")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('C', "clusters=FILE", "arg", "", "Gaussian clustering file")
-      ('\0', "eval-min-clusters=FLOAT", "arg", "0", "minimum percentage of top clusters to evaluate per frame [0,1] (default 0.0)")
-      ('\0', "eval-min-gaussians=FLOAT", "arg", "0", "minimum percentage of Gaussians to evaluate per frame [0,1] (default 0.0)")
+      ('\0', "eval-minc=FLOAT", "arg", "0", "minimum ratio of top clusters to evaluate")
+      ('\0', "eval-ming=FLOAT", "arg", "0", "minimum ratio of Gaussians to evaluate")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
@@ -109,8 +109,8 @@ main(int argc, char *argv[])
 
     if (config["clusters"].specified)
       model.set_clustering(config["clusters"].get_str(),
-                           config["eval-min-clusters"].get_double(),
-                           config["eval-min-gaussians"].get_double());
+                           config["eval-minc"].get_double(),
+                           config["eval-ming"].get_double());
     
     if (model.dim() != gen.dim())
     {

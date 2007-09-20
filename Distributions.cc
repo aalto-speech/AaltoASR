@@ -2176,7 +2176,7 @@ PDFPool::read_clustering(const std::string &filename)
     int gauss_index;
     int cluster_index;
     in >> gauss_index >> cluster_index;
-    gauss_index--; cluster_index--;
+    //gauss_index--; cluster_index--;
     
     if (gauss_index >= size())
       throw std::string("PDFPool::read_clustering(): Gauss index out of bounds\n");

@@ -258,26 +258,28 @@ PhnReader::next_frame(void)
 
 bool
 PhnReader::next_phn_line(Phn &phn)
-{  
-  // Read line at time
-  if (!str::read_line(&m_line, m_file)) {
-    if (ferror(m_file)) {
-      throw str::fmt(1024,
-                     "PhnReader::next_phn_line(): read error on line %d: %s\n",
-                     m_current_line, strerror(errno));
-    }
-
-    if (feof(m_file))
-      return false;
-    
-    assert(false);
-  }
-
+{
   if (m_last_line > 0 && m_current_line >= m_last_line)
-    return false; 
+    return false;
+
+  do {
+    // Read line at time
+    if (!str::read_line(&m_line, m_file)) {
+      if (ferror(m_file)) {
+        throw str::fmt(1024,
+                       "PhnReader::next_phn_line(): read error on line %d: %s\n",
+                       m_current_line, strerror(errno));
+      }
+      
+      if (feof(m_file))
+        return false;
+      
+      assert(false);
+    }
+    str::chomp(&m_line);
+  } while (m_line.size() == 0);
 
   // Parse the line in fields.
-  str::chomp(&m_line);
   std::vector<std::string> fields;
 
   phn.state = -1; // state default value !
