@@ -67,6 +67,7 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
   m_sentence_start_id = -1;
   m_sentence_end_id = -1;
   m_generate_word_graph = false;
+  m_use_lm_cache = true;
   m_best_final_token = NULL;
   m_require_sentence_end = false;
 }
@@ -1624,6 +1625,9 @@ float
 TokenPassSearch::get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,
                               int lm_hist_code)
 {
+  if (!m_use_lm_cache)
+    return compute_lm_log_prob(lm_hist);
+
   float score;
   LMScoreInfo *info, *old;
   bool collision = false;
@@ -1642,7 +1646,7 @@ TokenPassSearch::get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,
       }
       wh = wh->previous;
     }
-    if (info->lm_hist.size() <= m_similar_lm_hist_span)
+    if (info->lm_hist.size() <= m_ngram->order())
     {
       if (wh->word_id != -1 && wh->word_id != m_sentence_end_id)
       {
@@ -1665,7 +1669,7 @@ TokenPassSearch::get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,
   info = new LMScoreInfo;
   info->lm_score = score;
   TPLexPrefixTree::LMHistory *wh = lm_hist;
-  for (i = 0; i <= m_similar_lm_hist_span && wh->word_id != -1; i++)
+  for (i = 0; i <= m_ngram->order() && wh->word_id != -1; i++)
   {
     info->lm_hist.push_back(wh->word_id);
     if (wh->word_id == m_sentence_start_id)

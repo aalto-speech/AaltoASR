@@ -72,6 +72,7 @@ public:
   void set_ngram(TreeGram *ngram);
   void set_lookahead_ngram(TreeGram *ngram);
   void set_generate_word_graph(bool value) { m_generate_word_graph = value; }
+  void set_use_lm_cache(bool value) { m_use_lm_cache = value; }
 
   int frame(void) { return m_frame; }
 
@@ -215,6 +216,7 @@ private:
   bool m_use_sentence_boundary;
   bool m_generate_word_graph;
   bool m_require_sentence_end;
+  bool m_use_lm_cache;
 
   float m_current_glob_beam;
   float m_current_we_beam;

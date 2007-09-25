@@ -162,6 +162,7 @@ public:
   void set_sentence_boundary(const std::string &start, const std::string &end);
   void set_dummy_word_boundaries(bool value);
 	void set_generate_word_graph(bool value);
+	void set_use_lm_cache(bool value);
   void set_require_sentence_end(bool s);
 
   void set_optional_short_silence(bool state);

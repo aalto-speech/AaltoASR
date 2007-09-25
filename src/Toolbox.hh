@@ -161,6 +161,8 @@ public:
   void prune_lm_lookahead_buffers(int min_delta, int max_depth) { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
   void set_generate_word_graph(bool value)
   { m_tp_search.set_generate_word_graph(value); }
+  void set_use_lm_cache(bool value)
+  { m_tp_search.set_use_lm_cache(value); }
 
   // Debug
   void print_prunings()
