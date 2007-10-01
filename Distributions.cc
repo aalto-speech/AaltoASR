@@ -1189,12 +1189,11 @@ PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance,
 void
 PrecisionConstrainedGaussian::recompute_constant()
 {
-  Matrix precision, t;
-  m_ps->compute_precision(m_coeffs, precision);
-  LinearAlgebra::matrix_power(precision, t, 0.5);
-  m_constant = LinearAlgebra::spd_determinant(t);
-  m_constant /= pow(2*3.1416, dim());
-  m_constant = log(m_constant);
+  Matrix t,t2;
+  m_ps->compute_precision(m_coeffs, t);
+  t.scale(1/(2*3.1416));
+  LinearAlgebra::matrix_power(t, t2, 0.5);
+  m_constant = log(LinearAlgebra::spd_determinant(t2));
   
   Vector mean(m_transformed_mean);
   Matrix covariance;
