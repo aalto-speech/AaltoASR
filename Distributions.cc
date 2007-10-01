@@ -1189,11 +1189,12 @@ PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance,
 void
 PrecisionConstrainedGaussian::recompute_constant()
 {
-  Matrix precision;
+  Matrix precision, t;
   m_ps->compute_precision(m_coeffs, precision);
-  m_constant = LinearAlgebra::spd_determinant(precision);
+  LinearAlgebra::matrix_power(precision, t, 0.5);
+  m_constant = LinearAlgebra::spd_determinant(t);
   m_constant /= pow(2*3.1416, dim());
-  m_constant = log(sqrt(m_constant));
+  m_constant = log(m_constant);
   
   Vector mean(m_transformed_mean);
   Matrix covariance;
@@ -2051,6 +2052,25 @@ PDFPool::write_gk(const std::string &filename) const
   }
 
   for (unsigned int i=0; i<m_pool.size(); i++) {
+
+    PrecisionConstrainedGaussian *pcg = dynamic_cast< PrecisionConstrainedGaussian* > (m_pool[i]);
+    if (pcg != NULL) {
+      PrecisionSubspace *ps = pcg->get_subspace();
+      for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr) {
+        if ((*pitr).second == ps)
+          out << (*pitr).first << " "; 
+      }      
+    }
+
+    SubspaceConstrainedGaussian *scg = dynamic_cast< SubspaceConstrainedGaussian* > (m_pool[i]);
+    if (scg != NULL) {
+      ExponentialSubspace *es = scg->get_subspace();
+      for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr) {
+        if ((*eitr).second == es)
+          out << (*eitr).first << " "; 
+      }      
+    }
+    
     m_pool[i]->write(out);
     out << std::endl;
   }
