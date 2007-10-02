@@ -30,16 +30,16 @@ my $num_virtual_batches = $NUM_BATCHES*$NUM_BLOCKS;
 for (my $i = 1; $i <= $NUM_BLOCKS; $i++) {
   my $cur_batch = ($BATCH_ID-1)*$NUM_BLOCKS + $i;
 
-  # TEMPORARY! Check if word graphs have been generated already
+  # Load recipe to check if the files already exist (NOTE! only checks
+  # the first and the last files in the batch!)
   my $wgs = load_recipe($RECIPE, $cur_batch, $num_virtual_batches, $tempdir);
   print "Checking ".$wgs->[0][0]." and ".$wgs->[1][0]."\n";
 
+  # Check if word graph files already exist
   if (!(-e $wgs->[0][0] && -e $wgs->[1][0])) {
-    print "Generate LNAs\n";
     # Generate LNAs
     system("$AKUBINDIR/phone_probs -b $HMMMODEL -c $HMMMODEL.cfg -r $RECIPE -o $tempdir -B $num_virtual_batches -I $cur_batch $LNA_OPTIONS -i 1") && die "phone_probs failed\n";
     
-    print "Generate lattices\n";
     # Generate lattices
     system("$LATTICERECSCRIPT $HMMMODEL $LEXICON $RECIPE $tempdir $num_virtual_batches $cur_batch") && die "recognition failed\n";
     
@@ -47,12 +47,10 @@ for (my $i = 1; $i <= $NUM_BLOCKS; $i++) {
     system("rm $tempdir/*.lna");
   }
 
-  # TEMPORARY! Check if denominator hmmnets have been generated already
+  # Check if denominator hmmnets have been generated already
   if (!(-e $wgs->[0][1] && -e $wgs->[1][1])) {
     # Generate hmmnets
     system("$SCRIPTDIR/make_den_fst.pl $USE_MORPHS $VOCABULARY $LMMODEL $RECIPE $tempdir $SCRIPTDIR $num_virtual_batches $cur_batch $LATTICE_THRESHOLD $LMSCALE") && die "hmmnet generation failed\n";
-    # Remove temporary transcript files
-    system("rm $tempdir/*.tmptr");
   }
 }
 

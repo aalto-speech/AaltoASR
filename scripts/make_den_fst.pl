@@ -41,6 +41,9 @@ load_recipe($RECIPE, $BATCH_INDEX, $NUM_BATCHES);
 make_transcript_word_fsts();
 make_denominator_hmmnets();
 
+# Remove the temporary transcript files
+system("rm $TEMPDIR/*.tmptr");
+
 
 sub load_recipe {
   my $recipe_file = shift(@_);
@@ -104,7 +107,6 @@ sub make_transcript_word_fsts {
     if ($USE_MORPHS) {
       system("$PHN2TRANSCRIPT ".$l->[0]." | $MORPH_LATTICE $VOCABULARY - - | $FSM2HTK > ".$l->[1]) == 0 || die "system error $7\n";
     } else {
-      print "$PHN2TRANSCRIPT ".$l->[0]." | $TRANSCRIPT2FSM | $FSM2HTK > ".$l->[1]."\n";
       system("$PHN2TRANSCRIPT ".$l->[0]." | $TRANSCRIPT2FSM | $FSM2HTK > ".$l->[1]) == 0 || die "system error $7\n";
     }
   }

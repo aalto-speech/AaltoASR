@@ -2,7 +2,7 @@
 
 # DO NOT USE THIS SCRIPT DIRECTLY! Copy it to your own directory and
 # modify appropriately. You MUST modify at least the path settings,
-# training file list and BASE_ID/Initial model names!
+# training file list and BASE_ID/initial model names!
 
 # Run this script at itl-cl1, as it uses GridEngine for scheduling
 # the parallel processes.
@@ -35,7 +35,7 @@ my $NUM_BATCHES = 2; # Number of processes in parallel
 my $USE_BAUM_WELCH = 1; # If 0, the script must call align appropriately
 my $FORWARD_BEAM = 30;
 my $BACKWARD_BEAM = 200;
-my $AC_SCALE = 1; # Acustic scaling (For ML 1, for MMI 1/LMSCALE)
+my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/ln(10)))
 
 # Alignment settings
 my $ALIGN_WINDOW = 4000;
