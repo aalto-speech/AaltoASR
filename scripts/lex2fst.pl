@@ -42,6 +42,7 @@ while (<$fh>) {
     split(/\s+/);
     my $morph = shift(@_);
     $morph =~ s/\([0-9\.]+\)//;
+    $morph = "<w>" if ($morph eq "_"); # Convert short silence to <w>
 
     my $src = $fsm->initial;
     my $tgt;
