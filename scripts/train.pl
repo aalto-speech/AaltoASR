@@ -75,6 +75,12 @@ my $VTLN_MODULE = "vtln";
 my $MLLR_MODULE = "mllr";
 my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
 
+# MMI settings
+my $NUM_OPTIONS = "-H -V";
+my $DEN_OPTIONS = "-D -E";
+my $MMI_AC_SCALE = 0.067;
+
+
 # Misc settings
 my $DUR_SKIP_MODELS = 8; # Models without duration model (silences/noises)
 my $FILEFORMAT = "-R"; # Empty for wav files, -R for raw
@@ -123,6 +129,7 @@ if ($NUM_GAUSS_CLUSTERS > 0) {
 
 # MMI
 #my $mmi_model;
+#$AC_SCALE=$MMI_AC_SCALE;    # for MMI 1/(LMSCALE/ln(10)))
 #$mmi_model=mmi_train($tempdir, 1, $num_mmi_train_iter, $ml_model, $ml_model.".cfg");
 #$om = $mmi_model;
 
@@ -334,7 +341,7 @@ sub collect_mmi_stats {
     print $list_fh $statsfile."\n";
   }
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE -H -V -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
+  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $NUM_OPTIONS -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
   print $fh "touch $keyfile\n";
   close($fh);
   push @{$batch_info->{"script"}}, $scriptfile;
@@ -361,7 +368,7 @@ sub collect_mmi_stats {
     print $list_fh $statsfile."\n";
   }
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE -D -E -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
+  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $DEN_OPTIONS -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
   print $fh "touch $keyfile\n";
   close($fh);
   push @{$batch_info->{"script"}}, $scriptfile;
