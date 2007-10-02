@@ -44,7 +44,7 @@ for (my $i = 1; $i <= $NUM_BLOCKS; $i++) {
     system("$LATTICERECSCRIPT $HMMMODEL $LEXICON $RECIPE $tempdir $num_virtual_batches $cur_batch") && die "recognition failed\n";
     
     # Remove LNA files
-    system("rm $tempdir/*.lna");
+    system("rm -f $tempdir/*.lna");
   }
 
   # Check if denominator hmmnets have been generated already

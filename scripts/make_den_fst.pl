@@ -42,7 +42,7 @@ make_transcript_word_fsts();
 make_denominator_hmmnets();
 
 # Remove the temporary transcript files
-system("rm $TEMPDIR/*.tmptr");
+system("rm -f $TEMPDIR/*.tmptr");
 
 
 sub load_recipe {
