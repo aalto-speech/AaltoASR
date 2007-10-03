@@ -2140,15 +2140,29 @@ TokenPassSearch::write_word_graph(const std::string &file_name)
 void
 TokenPassSearch::write_word_graph(FILE *file)
 {
-  if (m_best_final_token == NULL) {
-    fprintf(stderr, "ERROR: trying to write word graph before best final token"
- 	    "has been decided\n");
-    exit(1);
+  TPLexPrefixTree::Token *best_token = m_best_final_token;
+  
+  if (best_token == NULL) {
+//     fprintf(stderr, "ERROR: trying to write word graph before best final token"
+//  	    "has been decided\n");
+//     exit(1);
+    // jpylkkon 11.9.2007: Temporary fix
+    // FIXME: What should we do if we do not want to abort?
+    for (int i = 0; i < m_active_token_list->size(); i++) {
+      TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
+      
+      if (token == NULL)
+        continue;
+      
+      if (best_token == NULL || 
+          token->total_log_prob > best_token->total_log_prob)
+        best_token = token;
+    }
   }
 
   if (1) {
     word_graph.reset_reachability();
-    word_graph.mark_reachable_nodes(m_best_final_token->recent_word_graph_node); 
+    word_graph.mark_reachable_nodes(best_token->recent_word_graph_node); 
   }
   else
     word_graph.reset_reachability(true);
@@ -2179,7 +2193,7 @@ TokenPassSearch::write_word_graph(FILE *file)
 	  "lmscale=%f wdpenalty=%f\n"
 	  "N=%d\tL=%d\n"
 	  "start=0 end=%d\n", m_lm_scale, m_insertion_penalty, nodes, arcs, 
-	  m_best_final_token->recent_word_graph_node);
+	  best_token->recent_word_graph_node);
   
   for (int n = 0; n < word_graph.nodes.size(); n++) {
 
