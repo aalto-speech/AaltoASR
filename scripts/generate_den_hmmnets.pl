@@ -34,7 +34,8 @@ my $NUM_BLOCKS = 50; # In how many blocks the data is generated in one batch
 my $LATTICE_THRESHOLD = 0.00001; # Lattice pruning threshold, [0, 1)
 my $LMSCALE = 32;
 
-my $LNA_OPTIONS = "\'--clusters ${HMMMODEL}.gcl --eval-ming=0.1\'";
+# $LNA_OPTIONS must include -R in case of raw audio files!
+my $LNA_OPTIONS = "\'-R --clusters ${HMMMODEL}.gcl --eval-ming=0.1\'";
 
 my $tempdir = $workdir."/".$ID;
 mkdir $tempdir;
