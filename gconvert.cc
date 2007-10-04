@@ -206,14 +206,14 @@ main(int argc, char *argv[])
         bfgs_set_defaults(bfgs);
         line_set_defaults(ls);
         try {
-        new_gaussian->set_parameters(mean, covariance);
+          new_gaussian->set_parameters(mean, covariance);
         } catch(LaException e) {}	  
         if (config["hcl_line_cfg"].specified)
           ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());  
         if (config["hcl_bfgs_cfg"].specified)
           bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
       }
-
+      
       // Insert the converted Gaussian into the pool
       new_pool.set_pdf(i, new_gaussian);
 

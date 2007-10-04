@@ -1211,8 +1211,8 @@ SubspaceConstrainedGaussian::SubspaceConstrainedGaussian()
 SubspaceConstrainedGaussian::SubspaceConstrainedGaussian(ExponentialSubspace *space)
 {
   m_es = space;
-  m_dim = space->feature_dim();
   m_coeffs.resize(space->subspace_dim());
+  reset(space->feature_dim());  
 }
 
 
