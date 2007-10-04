@@ -33,7 +33,7 @@ my $NUM_BATCHES = 2; # Number of processes in parallel
 
 # Baum-Welch settings
 my $USE_BAUM_WELCH = 1; # If 0, the script must call align appropriately
-my $FORWARD_BEAM = 30;
+my $FORWARD_BEAM = 20;
 my $BACKWARD_BEAM = 200;
 my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/ln(10)))
 
@@ -45,19 +45,19 @@ my $ALIGN_SBEAM = 100;
 # Context phone tying options
 my $TIE_USE_OUT_PHN = 0; # 0=read transcript field, 1=read alignment field
 my $TIE_RULES = "$SCRIPTDIR/finnish_rules.txt";
-my $TIE_MIN_COUNT = 1500; # Minimum number of features per state
-my $TIE_MIN_GAIN = 1200; # Minimum loglikelihood gain for a state split
-my $TIE_MAX_LOSS = 1200; # Maximum loglikelihood loss for merging states
+my $TIE_MIN_COUNT = 1000; # Minimum number of features per state
+my $TIE_MIN_GAIN = 3500;  # Minimum loglikelihood gain for a state split
+my $TIE_MAX_LOSS = 3500;  # Maximum loglikelihood loss for merging states
 
 # Gaussian splitting options
-my $SPLIT_MIN_OCCUPANCY = 250; # Accumulated state probability
-my $SPLIT_MAX_GAUSSIANS = 24;  # Per state
+my $SPLIT_MIN_OCCUPANCY = 300; # Accumulated state probability
+my $SPLIT_MAX_GAUSSIANS = 100; # Per state
 
 # Minimum variance
 my $MINVAR = 0.1;
 
 # Gaussian clustering options
-my $NUM_GAUSS_CLUSTERS = 700; # 0 if no clustering
+my $NUM_GAUSS_CLUSTERS = 1000; # 0 if no clustering
 my $GAUSS_EVAL_RATIO = 0.1;
 
 # MLLT options
@@ -65,10 +65,10 @@ my $mllt_start_iter = 14; # At which iteration MLLT estimation should begin
 my $MLLT_MODULE_NAME = "transform";
 
 # Training iterations
-my $num_ml_train_iter = 22;
+my $num_ml_train_iter = 20;
 my $num_mmi_train_iter = 4;
-my $split_frequency = 3; # How many EM iterations between Gaussian splits
-my $split_stop_iter = 14; # Iteration after which no more splits are done
+my $split_frequency = 2; # How many EM iterations between Gaussian splits
+my $split_stop_iter = 16; # Iteration after which no more splits are done
 
 # Adaptation settings
 my $VTLN_MODULE = "vtln";
