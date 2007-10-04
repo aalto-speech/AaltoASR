@@ -82,7 +82,7 @@ my $MMI_AC_SCALE = 0.067;
 
 
 # Misc settings
-my $DUR_SKIP_MODELS = 8; # Models without duration model (silences/noises)
+my $DUR_SKIP_MODELS = 6; # Models without duration model (silences/noises)
 my $FILEFORMAT = "-R"; # Empty for wav files, -R for raw
 my $VERBOSITY = 1;
 
