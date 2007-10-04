@@ -10,7 +10,7 @@ use strict;
 my $ID="mfcc_mmi";
 
 # Path settings
-my $AKUBINDIR="/home/".$ENV{"USER"}."/bin/aku";
+my $AKUBINDIR="/home/".$ENV{"USER"}."/aku";
 my $SCRIPTDIR="/home/".$ENV{"USER"}."/aku/scripts";
 my $HMMDIR="/share/puhe/".$ENV{"USER"}."/hmms";
 my $workdir="/share/work/".$ENV{"USER"}."/aku_work";
