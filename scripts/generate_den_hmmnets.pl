@@ -48,7 +48,7 @@ my $batch_info = make_single_batch($tempdir, $ID,
 "$SCRIPTDIR/lex2fst.pl $LEXICON > L.fst\n".
 "$SCRIPTDIR/hmms2fsm.pl ${HMMMODEL}.ph . | fst_closure -p - H.fst\n" .
 "$SCRIPTDIR/hmms2trinet.pl ${HMMMODEL}.ph . | fst_optimize -A - - > C.fst\n");
-#submit_and_wait($batch_info, 10);
+submit_and_wait($batch_info, 10);
 
 my $fh;
 
