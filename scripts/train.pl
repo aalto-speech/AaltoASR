@@ -322,13 +322,13 @@ sub collect_mmi_stats {
   # Numerator
   $scriptfile = "genstats_numerator_${BASE_ID}.sh";
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
-  $statsfile = "stats";
-  $keyfile = "stats_ready";
+  $statsfile = "stats_numerator";
+  $keyfile = "stats_ready_numerator";
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   if ($NUM_BATCHES > 1) {
     for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
-      my $cur_keyfile = $keyfile."_numerator_$i";
-      my $cur_statsfile = $statsfile."_numerator_$i";
+      my $cur_keyfile = $keyfile."_$i";
+      my $cur_statsfile = $statsfile."_$i";
       print $list_fh $cur_statsfile."\n";
       unlink(glob($cur_statsfile.".*"));
       push @{$batch_info->{"key"}}, $cur_keyfile;
@@ -345,27 +345,29 @@ sub collect_mmi_stats {
   print $fh "touch $keyfile\n";
   close($fh);
   push @{$batch_info->{"script"}}, $scriptfile;
-  close($list_fh);
   submit_and_wait($batch_info);
 
   # Denominator
+  $batch_info = get_empty_batch_info();
   $scriptfile = "genstats_denominator_${BASE_ID}.sh";
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
+  $statsfile = "stats_denominator";
+  $keyfile = "stats_ready_denominator";
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   if ($NUM_BATCHES > 1) {
-    for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
-      my $cur_keyfile = $keyfile."_denominator_$i";
-      my $cur_statsfile = $statsfile."_denominator_$i";
-      print $list_fh $cur_statsfile."\n";
-      unlink(glob($cur_statsfile.".*"));
-      push @{$batch_info->{"key"}}, $cur_keyfile;
-    }
-    $statsfile = $statsfile."_\$SGE_TASK_ID";
-    $keyfile = $keyfile."_\$SGE_TASK_ID";
+      for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
+	  my $cur_keyfile = $keyfile."_$i";
+	  my $cur_statsfile = $statsfile."_$i";
+	  print $list_fh $cur_statsfile."\n";
+	  unlink(glob($cur_statsfile.".*"));
+	  push @{$batch_info->{"key"}}, $cur_keyfile;
+      }
+      $statsfile = $statsfile."_\$SGE_TASK_ID";
+      $keyfile = $keyfile."_\$SGE_TASK_ID";
   } else {
-    unlink(glob($statsfile.".*"));
-    push @{$batch_info->{"key"}}, $keyfile;
-    print $list_fh $statsfile."\n";
+      unlink(glob($statsfile.".*"));
+      push @{$batch_info->{"key"}}, $keyfile;
+      print $list_fh $statsfile."\n";
   }
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
   print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $DEN_OPTIONS -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
