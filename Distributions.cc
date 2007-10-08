@@ -1092,7 +1092,7 @@ PrecisionConstrainedGaussian::compute_likelihood_exponential(const Vector &expon
 void
 PrecisionConstrainedGaussian::write(std::ostream &os) const
 {
-  os << "pcgmm " << subspace_dim() << " ";
+  os << " " << subspace_dim() << " ";
   for (int i=0; i<dim(); i++)
     os << m_transformed_mean(i) << " ";
   for (int i=0; i<subspace_dim()-1; i++)
@@ -1277,8 +1277,7 @@ SubspaceConstrainedGaussian::compute_likelihood_exponential(const Vector &expone
 void
 SubspaceConstrainedGaussian::write(std::ostream &os) const
 {
-  os << "scgmm ";
-  os << subspace_dim() << " ";
+  os << " " << subspace_dim() << " ";
   for (int i=0; i<m_coeffs.size()-1; i++)
     os << m_coeffs(i) << " ";
   os << m_coeffs(m_coeffs.size()-1);
@@ -1988,7 +1987,7 @@ PDFPool::read_gk(const std::string &filename)
         m_pool[i]->read(in);
       }
       else
-        throw std::string("Unknown model type\n");        
+        throw std::string("Unknown model type\n") + type_str;
     }
   }
 
@@ -2054,19 +2053,21 @@ PDFPool::write_gk(const std::string &filename) const
 
     PrecisionConstrainedGaussian *pcg = dynamic_cast< PrecisionConstrainedGaussian* > (m_pool[i]);
     if (pcg != NULL) {
+      out << "pcgmm ";
       PrecisionSubspace *ps = pcg->get_subspace();
       for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr) {
         if ((*pitr).second == ps)
-          out << (*pitr).first << " "; 
+          out << (*pitr).first;
       }      
     }
 
     SubspaceConstrainedGaussian *scg = dynamic_cast< SubspaceConstrainedGaussian* > (m_pool[i]);
     if (scg != NULL) {
+      out << "scgmm ";
       ExponentialSubspace *es = scg->get_subspace();
       for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr) {
         if ((*eitr).second == es)
-          out << (*eitr).first << " "; 
+          out << (*eitr).first; 
       }      
     }
     
