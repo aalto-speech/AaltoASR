@@ -52,7 +52,7 @@ all: $(PROGS) lib
 objs: $(ALL_OBJS)
 
 lib: $(CLASS_OBJS)
-	ar r libakumod.a $(CLASS_OBJS)	
+	ar r libaku.a $(CLASS_OBJS)	
 
 %.o: %.cc
 	$(CXX) -c $(CXXFLAGS) $< -o $@
