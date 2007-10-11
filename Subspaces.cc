@@ -132,13 +132,25 @@ PrecisionSubspace::optimize_coefficients(const Matrix &sample_cov,
   HCL_RnSpace_d vs(subspace_dim());
   
   PcgmmLambdaFcnl f(vs, subspace_dim(), *this, sample_cov, true);
-  HCL_RnVector_d x((HCL_RnSpace_d&)(f.Domain()));
+  HCL_RnVector_d x(vs);
   
   for (int i=0; i<subspace_dim(); i++)
     x(i+1)=lambda(i);
-
-  m_bfgs->Minimize(f, x);
-
+  
+  // Set parameters
+  try {
+    m_bfgs->Minimize(f, x);
+  } catch(LaException &e) {
+    // Try optimizing subspace parameters in 'safe mode' if things go bad
+    bfgs_set_defaults();
+    ls_set_defaults();
+    try {
+      m_bfgs->Minimize(f, x);
+    } catch(LaException e) {}
+    ls_set_config();
+    bfgs_set_config();
+  }
+  
   for (int i=0; i<subspace_dim(); i++)
     lambda(i)=x(i+1);
 }
@@ -465,6 +477,57 @@ PrecisionSubspace::precompute(const FeatureVec &f)
 }
 
 
+void
+PrecisionSubspace::set_hcl_optimization(HCL_LineSearch_MT_d *ls,
+                                        HCL_UMin_lbfgs_d *bfgs,
+                                        std::string ls_cfg_file,
+                                        std::string bfgs_cfg_file)
+{
+  m_ls = ls;
+  m_bfgs = bfgs;
+  m_ls_cfg_file = ls_cfg_file;
+  m_bfgs_cfg_file = bfgs_cfg_file;
+}
+
+
+void
+PrecisionSubspace::bfgs_set_defaults() {
+  m_bfgs->Parameters().PutValue("MaxItn", 100);
+  m_bfgs->Parameters().PutValue("Typf", 1.0);
+  m_bfgs->Parameters().PutValue("TypxNorm", 1.0);
+  m_bfgs->Parameters().PutValue("GradTol", 1.0e-2);
+  m_bfgs->Parameters().PutValue("MinStep", 1e-20);
+  m_bfgs->Parameters().PutValue("MaxStep", 1e+20);
+  m_bfgs->Parameters().PutValue("CscMaxLimit", 5);
+  m_bfgs->Parameters().PutValue("MaxUpdates", 4);
+}
+
+
+void
+PrecisionSubspace::ls_set_defaults() {
+  m_ls->Parameters().PutValue("FcnDecreaseTol", 1e-4);
+  m_ls->Parameters().PutValue("SlopeDecreaseTol", 9e-1);
+  m_ls->Parameters().PutValue("MinStep", 1e-20);
+  m_ls->Parameters().PutValue("MaxStep", 1e+20);
+  m_ls->Parameters().PutValue("MaxSample", 8);
+  m_ls->Parameters().PutValue("BracketIncrease", 4);
+}
+
+
+void
+PrecisionSubspace::bfgs_set_config() {
+  if (m_bfgs_cfg_file != "")
+    m_bfgs->Parameters().Merge(m_bfgs_cfg_file.c_str());
+}
+
+
+void
+PrecisionSubspace::ls_set_config() {
+  if (m_ls_cfg_file != "")
+    m_ls->Parameters().Merge(m_ls_cfg_file.c_str());
+}
+
+
 PcgmmLambdaFcnl::PcgmmLambdaFcnl(HCL_RnSpace_d &vs,
 				 int basis_dim,
 				 PrecisionSubspace &pcgmm,
@@ -669,9 +732,21 @@ ExponentialSubspace::optimize_coefficients(const Vector &sample_mean,
   
   for (int i=0; i<subspace_dim(); i++)
     x(i+1)=lambda(i);
-  
-  m_bfgs->Minimize(f, x);
 
+  // Set parameters
+  try {
+    m_bfgs->Minimize(f, x);
+  } catch(LaException &e) {
+    // Try optimizing subspace parameters in 'safe mode' if things go bad
+    bfgs_set_defaults();
+    ls_set_defaults();
+    try {
+      m_bfgs->Minimize(f, x);
+    } catch(LaException e) {}
+    ls_set_config();
+    bfgs_set_config();
+  }
+  
   for (int i=0; i<subspace_dim(); i++)
     lambda(i)=x(i+1);
 }
@@ -1400,6 +1475,56 @@ ExponentialSubspace::theta_to_gaussian_params(const LaVectorDouble &theta,
   assert(LinearAlgebra::is_spd(sigma));
 }
 
+
+void
+ExponentialSubspace::set_hcl_optimization(HCL_LineSearch_MT_d *ls,
+                                          HCL_UMin_lbfgs_d *bfgs,
+                                          std::string ls_cfg_file,
+                                          std::string bfgs_cfg_file)
+{
+  m_ls = ls;
+  m_bfgs = bfgs;
+  m_ls_cfg_file = ls_cfg_file;
+  m_bfgs_cfg_file = bfgs_cfg_file;
+}
+
+
+void
+ExponentialSubspace::bfgs_set_defaults() {
+  m_bfgs->Parameters().PutValue("MaxItn", 100);
+  m_bfgs->Parameters().PutValue("Typf", 1.0);
+  m_bfgs->Parameters().PutValue("TypxNorm", 1.0);
+  m_bfgs->Parameters().PutValue("GradTol", 1.0e-2);
+  m_bfgs->Parameters().PutValue("MinStep", 1e-20);
+  m_bfgs->Parameters().PutValue("MaxStep", 1e+20);
+  m_bfgs->Parameters().PutValue("CscMaxLimit", 5);
+  m_bfgs->Parameters().PutValue("MaxUpdates", 4);
+}
+
+
+void
+ExponentialSubspace::ls_set_defaults() {
+  m_ls->Parameters().PutValue("FcnDecreaseTol", 1e-4);
+  m_ls->Parameters().PutValue("SlopeDecreaseTol", 9e-1);
+  m_ls->Parameters().PutValue("MinStep", 1e-20);
+  m_ls->Parameters().PutValue("MaxStep", 1e+20);
+  m_ls->Parameters().PutValue("MaxSample", 8);
+  m_ls->Parameters().PutValue("BracketIncrease", 4);
+}
+
+
+void
+ExponentialSubspace::bfgs_set_config() {
+  if (m_bfgs_cfg_file != "")
+    m_bfgs->Parameters().Merge(m_bfgs_cfg_file.c_str());
+}
+
+
+void
+ExponentialSubspace::ls_set_config() {
+  if (m_ls_cfg_file != "")
+    m_ls->Parameters().Merge(m_ls_cfg_file.c_str());
+}
 
 
 ScgmmLambdaFcnl::ScgmmLambdaFcnl(HCL_RnSpace_d &vs,

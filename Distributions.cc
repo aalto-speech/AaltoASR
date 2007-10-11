@@ -1911,10 +1911,34 @@ PDFPool::set_gaussian_parameters(double minvar, double covsmooth,
 
 
 void
+PDFPool::set_hcl_optimization(HCL_LineSearch_MT_d *ls,
+                              HCL_UMin_lbfgs_d *bfgs,
+                              std::string ls_cfg_file,
+                              std::string bfgs_cfg_file)
+{
+  std::map<int, PrecisionSubspace*>::const_iterator pitr;
+  for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr) {
+    (*pitr).second->set_hcl_optimization(ls, bfgs, ls_cfg_file, bfgs_cfg_file);
+  }
+  
+  std::map<int, ExponentialSubspace*>::const_iterator eitr;
+  for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr) {
+    (*eitr).second->set_hcl_optimization(ls, bfgs, ls_cfg_file, bfgs_cfg_file);
+  }
+}
+
+
+void
 PDFPool::estimate_parameters(void)
 {
   for (int i=0; i<size(); i++)
   {
+    PrecisionConstrainedGaussian *pctemp = dynamic_cast< PrecisionConstrainedGaussian* > (m_pool[i]);
+    SubspaceConstrainedGaussian *sctemp = dynamic_cast< SubspaceConstrainedGaussian* > (m_pool[i]);
+
+    if (pctemp != NULL || sctemp != NULL)
+      std::cout << "Training Gaussian: " << i << "/" << size() << std::endl;
+    
     Gaussian *temp = dynamic_cast< Gaussian* > (m_pool[i]);
 
     try {

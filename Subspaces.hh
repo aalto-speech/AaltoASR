@@ -29,7 +29,10 @@ private:
   
   bool m_computed;
   Vector m_quadratic_features;
+  HCL_LineSearch_MT_d *m_ls;
   HCL_UMin_lbfgs_d *m_bfgs;
+  std::string m_ls_cfg_file;
+  std::string m_bfgs_cfg_file;
 
 public:
 
@@ -90,7 +93,16 @@ public:
   double eval_linesearch_derivative(const LaVectorDouble &eigs,
 				    double step,
 				    double beta);
-  void set_bfgs(HCL_UMin_lbfgs_d *bfgs) { m_bfgs = bfgs; }
+
+  void set_hcl_optimization(HCL_LineSearch_MT_d *ls,
+                            HCL_UMin_lbfgs_d *bfgs,
+                            std::string ls_cfg_file,
+                            std::string bfgs_cfg_file);
+
+  void ls_set_defaults();
+  void bfgs_set_defaults();
+  void ls_set_config();
+  void bfgs_set_config();
 };
 
 
@@ -161,6 +173,9 @@ private:
   bool m_computed;
   Vector m_quadratic_features;
   HCL_UMin_lbfgs_d *m_bfgs;
+  HCL_LineSearch_MT_d *m_ls;
+  std::string m_ls_cfg_file;
+  std::string m_bfgs_cfg_file;
   
 public:
 
@@ -255,7 +270,16 @@ public:
   void theta_to_gaussian_params(const Vector &theta,
 				Vector &mu,
 				Matrix &sigma);
-  void set_bfgs(HCL_UMin_lbfgs_d *bfgs) { m_bfgs = bfgs; }
+
+  void set_hcl_optimization(HCL_LineSearch_MT_d *ls,
+                            HCL_UMin_lbfgs_d *bfgs,
+                            std::string ls_cfg_file,
+                            std::string bfgs_cfg_file);
+
+  void ls_set_defaults();
+  void bfgs_set_defaults();
+  void ls_set_config();
+  void bfgs_set_config();
 };
 
 

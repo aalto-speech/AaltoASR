@@ -52,6 +52,8 @@ main(int argc, char *argv[])
       ('\0', "split=FLOAT", "arg", "0.0", "split a Gaussian if the occupancy exceeds the threshold")
       ('\0', "maxg=INT", "arg", "0", "maximum number of Gaussians per state for splitting")
       ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihood)")
+      ('\0', "hcl_bfgs_cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
+      ('\0', "hcl_line_cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
       ;
     config.default_parse(argc, argv);
 
@@ -130,6 +132,18 @@ main(int argc, char *argv[])
                                   config["C2"].get_double(),
                                   config["ismooth"].get_double());
 
+    // Linesearch for subspace models
+    HCL_LineSearch_MT_d ls;
+    if (config["hcl_line_cfg"].specified)
+      ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());
+
+    // lmBFGS for subspace models
+    HCL_UMin_lbfgs_d bfgs(&ls);
+    if (config["hcl_bfgs_cfg"].specified)
+      bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
+
+    model.set_hcl_optimization(&ls, &bfgs, config["hcl_line_cfg"].get_str(), config["hcl_bfgs_cfg"].get_str());
+    
     if (transtat)
       model.estimate_transition_parameters();
     if (config["mllt"].specified)

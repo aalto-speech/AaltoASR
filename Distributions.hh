@@ -140,6 +140,17 @@ public:
   void set_gaussian_parameters(double minvar = 0, double covsmooth = 0,
                                double c1 = 0, double c2 = 0, double ismooth = 0);
 
+  /** Set the HCL objects and settings for optimization
+   * \param ls            HCL linesearch
+   * \param bfgs          HCL BFGS optimization algorithm
+   * \param ls_cfg_file   HCL linesearch configuration file
+   * \param bfgs_cfg_file HCL BFGS optimization algorithm configuration file
+   */
+  void set_hcl_optimization(HCL_LineSearch_MT_d *ls,
+                            HCL_UMin_lbfgs_d *bfgs,
+                            std::string ls_cfg_file,
+                            std::string bfgs_cfg_file);
+  
   /** Splits a Gaussian in the pool with some constrains
   * \param index     Index of the Gaussian to be split
   * \param new_index The index of the newly created Gaussian is saved

@@ -7,28 +7,6 @@ PrecisionSubspace *ps;
 ExponentialSubspace *es;
 
 
-void bfgs_set_defaults(HCL_UMin_lbfgs_d &bfgs) {
-  bfgs.Parameters().PutValue("MaxItn", 100);
-  bfgs.Parameters().PutValue("Typf", 1.0);
-  bfgs.Parameters().PutValue("TypxNorm", 1.0);
-  bfgs.Parameters().PutValue("GradTol", 1.0e-2);
-  bfgs.Parameters().PutValue("MinStep", 1e-20);
-  bfgs.Parameters().PutValue("MaxStep", 1e+20);
-  bfgs.Parameters().PutValue("CscMaxLimit", 5);
-  bfgs.Parameters().PutValue("MaxUpdates", 4);
-}
-
-
-void line_set_defaults(HCL_LineSearch_MT_d &ls) {
-  ls.Parameters().PutValue("FcnDecreaseTol", 1e-4);
-  ls.Parameters().PutValue("SlopeDecreaseTol", 9e-1);
-  ls.Parameters().PutValue("MinStep", 1e-20);
-  ls.Parameters().PutValue("MaxStep", 1e+20);
-  ls.Parameters().PutValue("MaxSample", 8);
-  ls.Parameters().PutValue("BracketIncrease", 4);
-}
-
-
 int
 main(int argc, char *argv[])
 {
@@ -79,7 +57,7 @@ main(int argc, char *argv[])
     HCL_UMin_lbfgs_d bfgs(&ls);
     if (config["hcl_bfgs_cfg"].specified)
       bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
-
+    
     
     // Initialize the Pcgmm case
     if (config["to-pcgmm"].specified) {
@@ -116,7 +94,8 @@ main(int argc, char *argv[])
         
         ps->initialize_basis_pca(weights, covs, config["ssdim"].get_int());
       }
-      ps->set_bfgs(&bfgs);
+
+      ps->set_hcl_optimization(&ls, &bfgs, config["hcl_line_cfg"].get_str(), config["hcl_bfgs_cfg"].get_str());
       new_pool.set_precision_subspace(1, ps);
     }
     
@@ -158,7 +137,7 @@ main(int argc, char *argv[])
         
         es->initialize_basis_pca(weights, covs, means, config["ssdim"].get_int());
       }
-      es->set_bfgs(&bfgs);
+      es->set_hcl_optimization(&ls, &bfgs, config["hcl_line_cfg"].get_str(), config["hcl_bfgs_cfg"].get_str());
       new_pool.set_exponential_subspace(1, es);
     }
     
@@ -199,20 +178,7 @@ main(int argc, char *argv[])
       }
         
       // Set parameters
-      try {
-        new_gaussian->set_parameters(mean, covariance);
-      } catch(LaException &e) {
-        // Try optimizing subspace parameters in 'safe mode' if things go bad
-        bfgs_set_defaults(bfgs);
-        line_set_defaults(ls);
-        try {
-          new_gaussian->set_parameters(mean, covariance);
-        } catch(LaException e) {}	  
-        if (config["hcl_line_cfg"].specified)
-          ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());  
-        if (config["hcl_bfgs_cfg"].specified)
-          bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
-      }
+      new_gaussian->set_parameters(mean, covariance);
       
       // Insert the converted Gaussian into the pool
       new_pool.set_pdf(i, new_gaussian);

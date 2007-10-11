@@ -396,6 +396,17 @@ public:
    */
   void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, ismooth); }
 
+  /** Set the HCL objects and settings for optimization
+   * \param ls            HCL linesearch
+   * \param bfgs          HCL BFGS optimization algorithm
+   * \param ls_cfg_file   HCL linesearch configuration file
+   * \param bfgs_cfg_file HCL BFGS optimization algorithm configuration file
+   */
+  void set_hcl_optimization(HCL_LineSearch_MT_d *ls,
+                            HCL_UMin_lbfgs_d *bfgs,
+                            std::string ls_cfg_file,
+                            std::string bfgs_cfg_file) { m_pool.set_hcl_optimization(ls, bfgs, ls_cfg_file, bfgs_cfg_file); }
+  
   /** Deletes Gaussians which occupancy count is below the given threshold.
    * Assures that at least one Gaussian is left for each mixture.
    * \param minocc Occupancy threshold
