@@ -240,8 +240,8 @@ sub mmi_train {
     mkdir $curr_temp_dir;
     chdir $curr_temp_dir || die("Could not chdir to $curr_temp_dir");
 
-    collect_mmi_stats($temp_dir, $im, $im_cfg, $stats_list_file);
-    mmi_estimate($temp_dir, $im, $im_cfg, $om, $stats_list_file, $MINVAR);
+    collect_mmi_stats($curr_temp_dir, $im, $im_cfg, $stats_list_file);
+    mmi_estimate($curr_temp_dir, $im, $im_cfg, $om, $stats_list_file, $MINVAR);
     
     # Check the models were really created
     if (!(-e $om.".ph")) {
