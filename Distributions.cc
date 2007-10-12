@@ -1488,7 +1488,10 @@ Mixture::start_accumulating()
   }
   
   for (int i=0; i<size(); i++)
-    get_base_pdf(i)->start_accumulating();
+  {
+    if (!get_base_pdf(i)->is_accumulating())
+      get_base_pdf(i)->start_accumulating();
+  }
 }
 
 

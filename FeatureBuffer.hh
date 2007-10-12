@@ -52,6 +52,13 @@ public:
       vec[i] = (*m_ptr)(i);
   }
 
+  void get(std::vector<float> &vec) const
+  {
+    vec.resize(m_dim);
+    for (int i = 0; i < m_dim; i++)
+      vec[i] = (*m_ptr)(i);
+  }
+  
   /** Constant access to feature vector values. */
   const double &operator[](int index) const 
   { 

@@ -24,6 +24,10 @@ public:
 
   /* Initializes the accumulator buffers */  
   virtual void start_accumulating() = 0;
+  /** Has accumulating been started
+   * \returns true if start_accumulating has been called, false otherwise
+   */
+  virtual bool is_accumulating() = 0;
   /* Accumulates the statistics for this pdf */
   virtual void accumulate(double prior,
 			  const FeatureVec &f, 
@@ -318,6 +322,7 @@ public:
 
   /* Initializes the accumulator buffers */  
   virtual void start_accumulating() = 0;
+  virtual bool is_accumulating() { return (m_accums.size()>0?true:false); }
   /* Accumulates the maximum likelihood statistics for the Gaussian
      weighed with a prior. */
   virtual void accumulate(double prior, const FeatureVec &f, 
@@ -640,6 +645,7 @@ public:
   
   // From pdf
   virtual void start_accumulating();
+  virtual bool is_accumulating() { return (m_accums.size()>0?true:false); }
   virtual void accumulate(double prior,
 			  const FeatureVec &f,
 			  int accum_pos = 0);

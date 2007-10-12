@@ -944,7 +944,14 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
   // instead of HmmSet::estimate_parameters(), we need to estimate
   // mixture parameters as well
   for (int s = 0; s < num_states(); s++)
-    m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
+  {
+    try {
+      m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
+    } catch (std::string errstr) {
+      std::cout << "Warning: emission pdf for state " << s
+                << ": " <<  errstr << std::endl;
+    }
+  }
 }
 
 
