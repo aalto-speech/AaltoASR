@@ -236,6 +236,10 @@ sub mmi_train {
     print "Iteration ".$i."\n" if ($VERBOSITY > 0);
     my $om = $model_base."_".$i;
 
+    my $curr_temp_dir = $temp_dir . "/iter_" . $i;
+    mkdir $curr_temp_dir;
+    chdir $curr_temp_dir || die("Could not chdir to $curr_temp_dir");
+
     collect_mmi_stats($temp_dir, $im, $im_cfg, $stats_list_file);
     mmi_estimate($temp_dir, $im, $im_cfg, $om, $stats_list_file, $MINVAR);
     
