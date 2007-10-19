@@ -1635,6 +1635,15 @@ Mixture::estimate_parameters(void)
         // Solve
         sol1 = (-b-sqrt(b*b-4*a*c)) / (2*a);
         sol2 = (-b+sqrt(b*b-4*a*c)) / (2*a);
+
+        // Mixture component was removed
+        if (sol1 <= 0) {
+          std::cout << "Warning: mixture component " << i << " was removed." << std::endl;
+          remove_component(i);
+          diff = 100;
+          break;
+        }
+        
         assert(sol1 > 0); assert(sol1 < 1);
         m_weights[i] = sol1;
 
