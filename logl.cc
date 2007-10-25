@@ -84,7 +84,7 @@ main(int argc, char *argv[])
 {
   Segmentator *segmentator;
   try {
-    config("usage: stats [OPTION...]\n")
+    config("usage: logl [OPTION...]\n")
       ('h', "help", "", "", "display help")
       ('b', "base=BASENAME", "arg", "", "base filename for model files")
       ('g', "gk=FILE", "arg", "", "Mixture base distributions")
