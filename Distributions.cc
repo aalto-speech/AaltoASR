@@ -507,25 +507,32 @@ double
 Gaussian::kullback_leibler(Gaussian &g) const
 {
   assert(dim()==g.dim());
-  
+
+  // Values for the other Gaussian
   LaVectorLongInt pivots(dim(),1);
   LaGenMatDouble other_covariance; g.get_covariance(other_covariance);
   LaGenMatDouble other_precision; g.get_covariance(other_precision);
   LaVectorDouble other_mean; g.get_mean(other_mean);
-  LaVectorDouble diff; g.get_mean(diff);
-  LaVectorDouble temp_vector; g.get_mean(temp_vector);
   LUFactorizeIP(other_precision, pivots);
   LaLUInverseIP(other_precision, pivots);
-    
+  
+  // This Gaussian
   LaGenMatDouble cov; get_covariance(cov);
   LaVectorDouble mean; get_mean(mean);
-  LaGenMatDouble temp_matrix(other_covariance);
+
+  // Temporary modifiers
+  LaGenMatDouble temp_matrix(dim(), dim());
+  LaVectorDouble diff; g.get_mean(diff);
+  LaVectorDouble temp_vector; g.get_mean(temp_vector);
+
+  // Precomputations
   Blas_Mat_Mat_Mult(other_precision, cov, temp_matrix, 1.0, 0.0);
   Blas_Add_Mult(diff, -1, mean); 
   Blas_Mat_Vec_Mult(other_precision, diff, temp_vector);
-  
-  double value=LinearAlgebra::determinant(other_covariance)
-    /LinearAlgebra::determinant(cov);
+
+  // Actual KL-divergence
+  double value=LinearAlgebra::spd_determinant(other_covariance)
+    /LinearAlgebra::spd_determinant(cov);
   value = log(value);
   value += temp_matrix.trace();
   value += Blas_Dot_Prod(diff, temp_vector);
