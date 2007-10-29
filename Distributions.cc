@@ -490,8 +490,8 @@ Gaussian::merge(const std::vector<double> &weights,
     gaussians[i]->get_covariance(cur_covariance);
     gaussians[i]->get_mean(cur_mean);
     Blas_R1_Update(cur_covariance, cur_mean, cur_mean);
-    //Blas_Mat_Mat_Mult(cur_covariance, eye, new_covariance, weights[i], 1.0);
-    Blas_Add_Mat_Mult(new_covariance, weights[i], cur_covariance);
+    Blas_Mat_Mat_Mult(cur_covariance, eye, new_covariance, weights[i], 1.0);
+    //Blas_Add_Mat_Mult(new_covariance, weights[i], cur_covariance);
     Blas_Add_Mult(new_mean, weights[i], cur_mean);
     weight_sum += weights[i];
   }
@@ -1196,16 +1196,17 @@ PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance,
 void
 PrecisionConstrainedGaussian::recompute_constant()
 {
-  Matrix t,t2;
+  Matrix t;
   m_ps->compute_precision(m_coeffs, t);
-  t.scale(1/(2*3.1416));
-  LinearAlgebra::matrix_power(t, t2, 0.5);
-  m_constant = log(LinearAlgebra::spd_determinant(t2));
+  m_constant = log(sqrt(LinearAlgebra::spd_determinant(t)));
   
-  Vector mean(m_transformed_mean);
-  Matrix covariance;
-  m_ps->compute_covariance(m_coeffs, covariance);
-  Blas_Mat_Vec_Mult(covariance, m_transformed_mean, mean);
+  Vector mean(dim());
+
+  LaVectorLongInt pivots(dim());
+  LUFactorizeIP(t, pivots);
+  LaLUInverseIP(t, pivots);
+  
+  Blas_Mat_Vec_Mult(t, m_transformed_mean, mean);
   m_constant += -0.5 * Blas_Dot_Prod(m_transformed_mean, mean);
 }
 
@@ -1831,8 +1832,6 @@ PDFPool::compute_likelihood(const FeatureVec &f, int index)
 {
   if (m_likelihoods[index] > 0)
     return m_likelihoods[index];
-//  if (use_clustering())
-//    return m_clustering_threshold;
   m_likelihoods[index] = m_pool[index]->compute_likelihood(f);
   m_valid_likelihoods.push_back(index);
   return m_likelihoods[index];

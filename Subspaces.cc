@@ -210,7 +210,6 @@ PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
                                      LaGenMatDouble &precision)
 {
   assert(lambda.size() <= subspace_dim());
-  assert(LinearAlgebra::is_spd(m_mspace.at(0)));
   
   precision.resize(feature_dim(),feature_dim());
   precision=0;
@@ -226,7 +225,6 @@ PrecisionSubspace::compute_precision(const LaVectorDouble &lambda,
 {
   LaGenMatDouble precision_matrix;
   compute_precision(lambda, precision_matrix);
-  assert(LinearAlgebra::is_spd(precision_matrix));
   LinearAlgebra::map_m2v(precision_matrix, precision);
 }
 
@@ -236,8 +234,6 @@ PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
                                      LaGenMatDouble &precision)
 {
   assert(lambda.Dim() <= subspace_dim());
-  assert(LinearAlgebra::is_spd(m_mspace.at(0)));
-  
   precision.resize(feature_dim(),feature_dim());
   precision=0;
   LaGenMatDouble identity = LaGenMatDouble::eye(feature_dim());
@@ -252,7 +248,6 @@ PrecisionSubspace::compute_precision(const HCL_RnVector_d &lambda,
 {
   LaGenMatDouble precision_matrix;
   compute_precision(lambda, precision_matrix);
-  assert(LinearAlgebra::is_spd(precision_matrix));
   LinearAlgebra::map_m2v(precision_matrix, precision);
 }
 
@@ -265,7 +260,6 @@ PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
   compute_precision(lambda, covariance);
   LUFactorizeIP(covariance, pivots);
   LaLUInverseIP(covariance, pivots);
-  assert(LinearAlgebra::is_spd(covariance));
 }
 
 
@@ -275,7 +269,6 @@ PrecisionSubspace::compute_covariance(const LaVectorDouble &lambda,
 {
   LaGenMatDouble covariance_matrix;
   compute_covariance(lambda, covariance_matrix);
-  assert(LinearAlgebra::is_spd(covariance_matrix));
   LinearAlgebra::map_m2v(covariance_matrix, covariance);
 }
 
@@ -286,7 +279,6 @@ PrecisionSubspace::compute_covariance(const HCL_RnVector_d &lambda,
 {
   LaGenMatDouble covariance_matrix;
   compute_covariance(lambda, covariance_matrix);
-  assert(LinearAlgebra::is_spd(covariance_matrix));
   LinearAlgebra::map_m2v(covariance_matrix, covariance);
 }
 
@@ -301,7 +293,6 @@ PrecisionSubspace::compute_covariance(const HCL_RnVector_d &lambda,
   LaLUInverseIP(covariance, pivots);
   if (!LinearAlgebra::is_spd(covariance))
     lambda.Write(std::cout);
-  assert(LinearAlgebra::is_spd(covariance));
 }
 
 
@@ -570,7 +561,6 @@ PcgmmLambdaFcnl::Value1(const HCL_Vector_d &x) const {
   double result;
   LaGenMatDouble t;
   m_pcgmm.compute_precision((HCL_RnVector_d&)x, t);
-  assert(LinearAlgebra::is_spd(t));
   result=m_pcgmm.G(t, m_sample_cov);
   // RETURN NEGATIVE VALUES BECAUSE HCL DOES MINIMIZATION!
   return -result;
@@ -618,7 +608,6 @@ PcgmmLambdaFcnl::SetLineSearchStartingPoint(const HCL_Vector_d &base)
 {
   m_base.Copy(base);
   m_pcgmm.compute_precision(m_base, m_precision);
-  assert(LinearAlgebra::is_spd(m_precision));
   m_fval_starting_point=m_pcgmm.G(m_precision, m_sample_cov);
   m_linevalue_const=-log(LinearAlgebra::determinant(m_precision));
 }
@@ -1257,8 +1246,6 @@ ExponentialSubspace::K(const LaVectorDouble &theta)
   psi.copy(theta(LaIndex(0,d-1)));
   LinearAlgebra::map_v2m(theta(LaIndex(d,d_exp-1)), precision);
   
-  assert(LinearAlgebra::is_spd(precision));
-
   return K(precision, psi);
 }
 
@@ -1413,8 +1400,6 @@ ExponentialSubspace::f_to_gaussian_params(const LaVectorDouble &f,
   Blas_Scale(-2, t);
   LinearAlgebra::map_v2m(t, sample_sigma);
   Blas_R1_Update(sample_sigma, sample_mu, sample_mu, -1);
-
-  assert(LinearAlgebra::is_spd(sample_sigma));
 }
 
 
@@ -1425,7 +1410,6 @@ ExponentialSubspace::gaussian_params_to_f(const LaVectorDouble &sample_mu,
 {
   assert(sample_mu.size()==sample_sigma.rows());
   assert(sample_sigma.rows()==sample_sigma.cols());
-  assert(LinearAlgebra::is_spd(sample_sigma));
 
   int d=sample_mu.size();
   int d_vec=(int)(d*(d+1)/2);
@@ -1471,8 +1455,6 @@ ExponentialSubspace::theta_to_gaussian_params(const LaVectorDouble &theta,
   // mu
   mu.resize(d,1);
   Blas_Mat_Vec_Mult(sigma, psi, mu);
-
-  assert(LinearAlgebra::is_spd(sigma));
 }
 
 
@@ -1626,7 +1608,6 @@ ScgmmLambdaFcnl::SetLineSearchStartingPoint(const HCL_Vector_d &base)
   m_base.Copy(base);
   
   m_es.compute_precision(m_base, m_precision);
-  assert(LinearAlgebra::is_spd(m_precision));
   m_es.compute_psi(m_base, m_psi);
   m_es.compute_theta(m_base, m_theta);
   
