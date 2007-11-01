@@ -20,9 +20,15 @@ HmmNetBaumWelch::HmmNetBaumWelch(FeatureGenerator &fea_gen, HmmSet &model)
   // Default mode
   m_mode = MODE_BAUM_WELCH;
 
+  m_custom_data_callback = NULL; // Not in use by default
+
   // Default pruning thresholds
   m_forward_beam = 15;
   m_backward_beam = 100;
+
+  // Total statistics
+  m_sum_total_loglikelihood = loglikelihoods.zero();
+  m_sum_total_custom_score = 0;
 }
 
 HmmNetBaumWelch::~HmmNetBaumWelch()
@@ -91,8 +97,8 @@ HmmNetBaumWelch::read_fst(FILE *file)
       int source = -1;
       int target = -1;
       int in = -1;
-      std::string out = "";
-      double score = 0;
+      std::string label = "";
+      double score = loglikelihoods.one();
 
       if (fields.size() < 3 || fields.size() > 6)
         ok = false;
@@ -104,21 +110,38 @@ HmmNetBaumWelch::read_fst(FILE *file)
             in = EPSILON;
           else
           {
-            in = str::str2long(&fields[3], &ok);
+            if (fields[3].substr(0, 1) == "#")
+            {
+              // Special epsilon arc with triphone label
+              in = EPSILON;
+              label = fields[3].substr(1);
+            }
+            else
+            {
+              int n = fields[3].find_first_of('-');
+              if (n > 0 && n < (int)fields[3].size())
+              {
+                std::string num = fields[3].substr(0, n);
+                in = str::str2long(&num, &ok);
+                label = fields[3].substr(n+1);
+              }
+              else
+                throw std::string("HmmNetBaumWelch: Invalid input symbol ") + fields[3];
+            }
           }
         }
-        if (fields.size() > 4) {
-          if (fields[4] == m_epsilon_string)
-            out = "";
-          else
-            out = fields[4];
-        }
+//         if (fields.size() > 4) {
+//           if (fields[4] == m_epsilon_string)
+//             out = "";
+//           else
+//             out = fields[4];
+//         }
         if (fields.size() > 5)
           score = str::str2float(&fields[5], &ok);
       }
 
       if (!ok || source < 0 || target < 0)
-        throw std::string("invalid transition specification: ") + line;
+        throw std::string("HmmNetBaumWelch: Invalid transition specification: ") + line;
 
       while ((int)m_nodes.size() <= source || (int)m_nodes.size() <= target)
         m_nodes.push_back(Node(m_nodes.size()));
@@ -126,7 +149,7 @@ HmmNetBaumWelch::read_fst(FILE *file)
       Node &src_node = m_nodes.at(source);
       Node &target_node = m_nodes.at(target);
       int arc_index = m_arcs.size();
-      m_arcs.push_back(Arc(arc_index, source, target, in, out, score));
+      m_arcs.push_back(Arc(arc_index, source, target, in, label, score));
       src_node.out_arcs.push_back(arc_index);
       target_node.in_arcs.push_back(arc_index);
     }
@@ -136,6 +159,8 @@ HmmNetBaumWelch::read_fst(FILE *file)
     throw std::string("initial node not specified");
   if (m_final_node_id < 0)
     throw std::string("final node not specified");
+
+  check_network_structure();
 }
 
 
@@ -175,15 +200,92 @@ HmmNetBaumWelch::set_pruning_thresholds(double backward, double forward)
 
 
 void
+HmmNetBaumWelch::check_network_structure(void)
+{
+  for (int i = 0; i < (int)m_nodes.size(); i++)
+  {
+    bool epsilon_transitions = false;
+    int non_eps_in_transitions = 0;
+    bool self_transition = false;
+    
+    // Check the in arcs
+    for (int j = 0; j < (int)m_nodes[i].in_arcs.size(); j++)
+    {
+      int arc_id = m_nodes[i].in_arcs[j];
+      if (m_arcs[arc_id].epsilon())
+      {
+        if (m_arcs[arc_id].target == m_arcs[arc_id].source)
+          throw std::string("HmmNetBaumWelch: Epsilon self loops are not allowed");
+        if (non_eps_in_transitions > 0)
+          throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+        epsilon_transitions = true;
+      }
+      else if (m_arcs[arc_id].target != m_arcs[arc_id].source)
+      {
+        if (epsilon_transitions)
+          throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+        non_eps_in_transitions++;
+      }
+      else
+        self_transition = true;
+    }
+
+    int eps_out_transitions = 0;
+    int non_eps_out_transitions = 0;
+
+    // Check the out arcs
+    for (int j = 0; j < (int)m_nodes[i].out_arcs.size(); j++)
+    {
+      int arc_id = m_nodes[i].out_arcs[j];
+      if (m_arcs[arc_id].epsilon())
+      {
+        if (m_arcs[arc_id].target == m_arcs[arc_id].source)
+          throw std::string("HmmNetBaumWelch: Epsilon self loops are not allowed");
+        if (non_eps_out_transitions > 0)
+          throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+        eps_out_transitions++;
+      }
+      else if (m_arcs[arc_id].target != m_arcs[arc_id].source)
+      {
+        if (eps_out_transitions > 0)
+          throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+        non_eps_out_transitions++;
+      }
+      else
+        self_transition = true;
+    }
+
+    if (non_eps_out_transitions > 1)
+      throw std::string("HmmNetBaumWelch: Only one non epsilon transition from a node is allowed");
+    if (non_eps_in_transitions>1 && (!eps_out_transitions || self_transition))
+      throw std::string("HmmNetBaumWelch: Multiple non epsilon transitions to a node are allowed only when the node has only epsilon out transitions");
+
+    if (eps_out_transitions > 1 && self_transition)
+      throw std::string("HmmNetBaumWelch: A node may not have a self transition if it has multiple (epsilon) out transitions");
+
+    if (non_eps_out_transitions == 0 && eps_out_transitions > 0)
+      m_nodes[i].epsilon_out = true;
+  }
+
+  if (!m_nodes[m_initial_node_id].epsilon_out)
+    throw std::string("HmmNetBaumWelch: Initial node must have only epsilon out arcs!");
+  if (m_nodes[m_initial_node_id].in_arcs.size() > 0)
+    throw std::string("HmmNetBaumWelch: Initial node may not have in arcs!");
+  if (m_nodes[m_final_node_id].out_arcs.size() > 0)
+    throw std::string("HmmNetBaumWelch: Final node may not have out arcs!");
+}
+
+
+void
 HmmNetBaumWelch::reset(void)
 {
   m_eof_flag = false;
   m_current_frame = -1;
-  // Clear the probabilities of possible active nodes
+  // Clear the probabilities of the possibly active nodes
   for (int b = 0; b < 2; b++)
   {
     for (int i = 0; i < (int)m_active_node_table[b].size(); i++)
-      m_nodes[m_active_node_table[b][i]].prob[b] = loglikelihoods.zero();
+      m_nodes[m_active_node_table[b][i]].log_prob[b] = loglikelihoods.zero();
     m_active_node_table[b].clear();
   }
   m_transition_prob.clear();
@@ -191,6 +293,9 @@ HmmNetBaumWelch::reset(void)
   m_pdf_prob.clear();
   m_active_pdf_table.clear();
   m_active_arcs.clear();
+
+  m_sum_total_loglikelihood = loglikelihoods.zero();
+  m_sum_total_custom_score = 0;
 }
 
 
@@ -211,8 +316,7 @@ HmmNetBaumWelch::init_utterance_segmentation(void)
 
   // Compute the total likelihood and check the backward phase got
   // proper probabilities for the initial nodes
-  m_sum_total_loglikelihood=compute_sum_bw_loglikelihoods(m_initial_node_id,
-                                                          m_first_frame);
+  compute_total_bw_scores();
   if (m_sum_total_loglikelihood <= loglikelihoods.zero())
     return false; // Backward beam should be increased
   
@@ -224,8 +328,8 @@ bool
 HmmNetBaumWelch::fill_backward_probabilities(void)
 {
   int target_buffer = 0;
-  double max_prob;
-  double prev_max_prob = loglikelihoods.one();
+  double max_log_prob;
+  double prev_max_log_prob = loglikelihoods.one();
   
   clear_bw_scores();
   if (m_last_frame > 0)
@@ -234,10 +338,22 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     m_current_frame = m_fea_gen.last_frame() + 1;
 
   // Initialize the final node
-  m_nodes[m_final_node_id].prob[target_buffer] = loglikelihoods.one();
+  m_nodes[m_final_node_id].log_prob[target_buffer] = loglikelihoods.one();
+  m_nodes[m_final_node_id].custom_score[target_buffer] = 0;
   assert( m_active_node_table[0].empty() );
   assert( m_active_node_table[1].empty() );
   m_active_node_table[target_buffer].push_back(m_final_node_id);
+
+  // Propagate the epsilon arcs leading to the final node
+  for (int i = 0; i < (int)m_active_node_table[target_buffer].size(); i++)
+  {
+    FeatureVec empty_fea_vec;
+    backward_propagate_node_arcs(
+      m_active_node_table[target_buffer][i],
+      m_nodes[m_active_node_table[target_buffer][i]].log_prob[target_buffer],
+      m_nodes[m_active_node_table[target_buffer][i]].custom_score[target_buffer],
+      target_buffer, true, empty_fea_vec);
+  }
 
   while (m_current_frame > m_first_frame)
   {
@@ -245,89 +361,70 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     int source_buffer = target_buffer;
     target_buffer ^= 1;
 
-    max_prob = loglikelihoods.zero();
+    max_log_prob = loglikelihoods.zero();
 
     m_model.reset_cache();
 
-    // Iterate through active nodes and fill the backward probabilities
-    // for the arcs. The probability of a node is the log sum of all arcs
-    // leaving from that node.
+    // Iterate through active nodes and propagate the normal transitions.
+    // Fill the backward probabilities for the arcs.
     for (int i = 0; i < (int)m_active_node_table[source_buffer].size(); i++)
     {
       double cur_node_score =
-        m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer];
+        m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer];
 
       // Propagate the node only if its loglikelihood is within the beam
-      if (loglikelihoods.divide(cur_node_score, prev_max_prob) >
+      if (loglikelihoods.divide(cur_node_score, prev_max_log_prob) >
           -m_backward_beam)
       {
-        double temp = propagate_node_arcs(
-          m_active_node_table[source_buffer][i], false, cur_node_score,
-          target_buffer, fea_vec);
-        if (temp > max_prob)
-          max_prob = temp;
+        double temp = backward_propagate_node_arcs(
+          m_active_node_table[source_buffer][i], cur_node_score,
+          m_nodes[m_active_node_table[source_buffer][i]].custom_score[source_buffer],
+          target_buffer, false, fea_vec);
+        
+        if (temp > max_log_prob)
+          max_log_prob = temp;
       }
 
       // Reset the probability
-      m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer] =
+      m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer] =
         loglikelihoods.zero();
     }
+
+    // Clear the old active nodes
+    m_active_node_table[source_buffer].clear();
 
     if (m_active_node_table[target_buffer].empty())
     {
       // All tokens were pruned, backward beam should be increased
       return false;
     }
-
-    if (m_mode == MODE_EXTENDED_VITERBI)
+    
+    // Iterate through active nodes and propagate the epsilon transitions.
+    // The new active nodes are appended to the end of m_active_node_table.
+    // The previous probabilities are taken from the target buffer. Also
+    // fills the backward probabilities of epsilon arcs.
+    for (int i = 0; i < (int)m_active_node_table[target_buffer].size(); i++)
     {
-      // Recompute the node probabilities. Among the different segmentations
-      // of the same sequence only the best is maintained, but the
-      // probabilities of different sequences are summed together.
-      for (int i = 0; i < (int)m_active_node_table[target_buffer].size(); i++)
+      double cur_node_score =
+        m_nodes[m_active_node_table[target_buffer][i]].log_prob[target_buffer];
+      // Propagate the node only if its loglikelihood is within the beam
+      if (loglikelihoods.divide(cur_node_score, prev_max_log_prob) >
+          -m_backward_beam)
       {
-        std::vector<int> &arcs =
-          m_nodes[m_active_node_table[target_buffer][i]].out_arcs;
-        std::map<int, double> active_arcs;
-        for (int a = 0; a < (int)arcs.size(); a++)
-        {
-          double ll = m_arcs[arcs[a]].bw_scores.get_log_prob(m_current_frame);
-          if (ll > loglikelihoods.zero())
-          {
-            int source_index =
-              m_model.transition(m_arcs[arcs[a]].transition_id).source_index;
-            std::map<int, double>::iterator it=active_arcs.find(source_index);
-            if (it == active_arcs.end())
-              active_arcs[source_index] = ll;
-            else
-              (*it).second = std::max((*it).second, ll);
-          }
-        }
-        // Sum the likelihoods of different sequences
-        double new_loglikelihood = loglikelihoods.zero();
-        for (std::map<int, double>::iterator it = active_arcs.begin();
-             it != active_arcs.end(); it++)
-        {
-          new_loglikelihood = loglikelihoods.add(new_loglikelihood,
-                                                 (*it).second);
-        }
-        m_nodes[m_active_node_table[target_buffer][i]].prob[target_buffer] =
-          new_loglikelihood;
-        if (new_loglikelihood > max_prob)
-          max_prob = new_loglikelihood;
+        backward_propagate_node_arcs(
+          m_active_node_table[target_buffer][i], cur_node_score,
+          m_nodes[m_active_node_table[target_buffer][i]].custom_score[target_buffer],
+          target_buffer, true, fea_vec);
       }
     }
 
     // Use previous maximum probability for pruning
-    prev_max_prob = max_prob;
-    
-    // Clear the old active nodes
-    m_active_node_table[source_buffer].clear();
+    prev_max_log_prob = max_log_prob;    
   }
 
   // Clear the active nodes
   for (int i = 0; i < (int)m_active_node_table[target_buffer].size(); i++)
-    m_nodes[m_active_node_table[target_buffer][i]].prob[target_buffer] =
+    m_nodes[m_active_node_table[target_buffer][i]].log_prob[target_buffer] =
       loglikelihoods.zero();
   m_active_node_table[target_buffer].clear();
   
@@ -358,7 +455,8 @@ HmmNetBaumWelch::next_frame(void)
       for (int i = 0; i < (int)m_transition_prob.size(); i++)
         m_transition_prob[i] = loglikelihoods.zero();
     }
-    m_nodes[m_initial_node_id].prob[m_cur_buffer] = loglikelihoods.one();
+    m_nodes[m_initial_node_id].log_prob[m_cur_buffer] = loglikelihoods.one();
+    m_nodes[m_initial_node_id].custom_score[m_cur_buffer] = 0;
     m_active_node_table[m_cur_buffer].push_back(m_initial_node_id);
   }
   else
@@ -366,7 +464,7 @@ HmmNetBaumWelch::next_frame(void)
     m_current_frame++;
   }
 
-  // Check frame limit
+  // Check the frame limit
   if (m_last_frame > 0 && m_current_frame >= m_last_frame)
   {
     m_eof_flag = true;
@@ -386,16 +484,43 @@ HmmNetBaumWelch::next_frame(void)
   m_active_arcs.clear();
   m_model.reset_cache();
 
+  // Iterate through active nodes and propagate the epsilon transitions.
+  // The new active nodes are appended to the end of m_active_node_table.
+  for (int i = 0; i < (int)m_active_node_table[source_buffer].size(); i++)
+  {
+    forward_propagate_node_arcs(
+      m_active_node_table[source_buffer][i],
+      m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer],
+      m_nodes[m_active_node_table[source_buffer][i]].custom_score[source_buffer],
+      source_buffer, true, fea_vec);
+  }
+
+  // In Viterbi only the last node is active anymore, the others (if many)
+  // have only epsilon out transitions which were just propagated.
+  if (m_mode == MODE_VITERBI)
+  {
+    // Clear the other active nodes and leave the last one active
+    for (int i = 0; i < (int)m_active_node_table[source_buffer].size()-1; i++)
+    {
+      m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer] =
+        loglikelihoods.zero();
+    }
+    m_active_node_table[source_buffer].erase(
+      m_active_node_table[source_buffer].begin(),
+      m_active_node_table[source_buffer].end()-1);
+  }
+
   // Iterate through active nodes and compute the PDF occupancy
   // probabilities
   for (int i = 0; i < (int)m_active_node_table[source_buffer].size(); i++)
   {
-    propagate_node_arcs(
-      m_active_node_table[source_buffer][i], true,
-      m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer],
-      m_cur_buffer, fea_vec);
+    forward_propagate_node_arcs(
+      m_active_node_table[source_buffer][i],
+      m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer],
+      m_nodes[m_active_node_table[source_buffer][i]].custom_score[source_buffer],
+      m_cur_buffer, false, fea_vec);
     // Clear the source probability of the active node
-    m_nodes[m_active_node_table[source_buffer][i]].prob[source_buffer] =
+    m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer] =
       loglikelihoods.zero();
   }
 
@@ -507,273 +632,321 @@ HmmNetBaumWelch::fill_arc_info(std::vector<ArcInfo> &traversed_arcs)
     int pdf_id = m_model.emission_pdf_index(tr.source_index);
     double cur_arc_prob = exp(loglikelihoods.divide(m_active_arcs[i].score,
                                                     normalizing_score));
-    traversed_arcs.push_back(ArcInfo(m_arcs[m_active_arcs[i].arc_id].out_str,
-                                     cur_arc_prob, pdf_id));
+    traversed_arcs.push_back(ArcInfo(m_arcs[m_active_arcs[i].arc_id].label,
+                                     cur_arc_prob, pdf_id,
+                                     m_active_arcs[i].custom_score));
   }
 }
 
 
 double
-HmmNetBaumWelch::propagate_node_arcs(int node_id, bool forward,
-                                     double cur_score, int target_buffer,
-                                     FeatureVec &fea_vec,
-                                     std::vector<TraversedArc> *best_arcs)
+HmmNetBaumWelch::backward_propagate_node_arcs(int node_id, double cur_score,
+                                              double cur_custom_score,
+                                              int target_buffer, bool epsilons,
+                                              FeatureVec &fea_vec)
 {
-  double cur_max_prob = loglikelihoods.zero();
-  int num_arcs = (int)(forward?m_nodes[node_id].out_arcs.size():
-                       m_nodes[node_id].in_arcs.size());
-  std::vector<TraversedArc> local_best_arcs;
-  std::vector<TraversedArc> *cur_best_arcs =
-    (best_arcs == NULL ? &local_best_arcs : best_arcs);
-
-  if (m_mode == MODE_VITERBI && best_arcs == NULL)
-    local_best_arcs.push_back(TraversedArc(-1, loglikelihoods.zero()));
-
-  for (int a = 0; a < num_arcs; a++)
+  double cur_max_log_prob = loglikelihoods.zero();
+  double arc_score;
+  double new_score;
+  double arc_custom_score;
+  
+  for (int a = 0; a < (int)m_nodes[node_id].in_arcs.size(); a++)
   {
-    int arc_id = (forward?m_nodes[node_id].out_arcs[a]:
-                  m_nodes[node_id].in_arcs[a]);
-    int next_node_id = (forward?m_arcs[arc_id].target:
-                        m_arcs[arc_id].source);
+    int arc_id = m_nodes[node_id].in_arcs[a];
+    int next_node_id = m_arcs[arc_id].source;
+    if ((!epsilons && m_arcs[arc_id].epsilon()) ||
+        (epsilons && !m_arcs[arc_id].epsilon()))
+      continue;
 
-    if (m_arcs[arc_id].epsilon())
+    fill_arc_scores(arc_id, fea_vec, cur_custom_score, &arc_score,
+                    &arc_custom_score);
+
+    new_score = loglikelihoods.times(cur_score, arc_score);
+
+    if (new_score > loglikelihoods.zero())
     {
-      // Propagate through epsilon arc
-      double new_score = loglikelihoods.times(cur_score,m_arcs[arc_id].score);
-      double temp = propagate_node_arcs(
-        next_node_id, forward, new_score, target_buffer, fea_vec,
-        (m_mode == MODE_VITERBI?cur_best_arcs:NULL));
-      if (temp > cur_max_prob)
-        cur_max_prob = temp;
+      // Fill in the backward probability for the arc
+      m_arcs[arc_id].bw_scores.safe_set_score(m_current_frame, new_score);
+      if (m_custom_data_callback != NULL)
+      {
+        m_arcs[arc_id].bw_custom_data.safe_set_score(m_current_frame,
+                                                     arc_custom_score);
+      }
+
+      // Propagate the probability of the arc to the next node
+      if (m_nodes[next_node_id].log_prob[target_buffer] <=
+          loglikelihoods.zero())
+      {
+        // The node was empty, make it active
+        m_active_node_table[target_buffer].push_back(next_node_id);
+        m_nodes[next_node_id].log_prob[target_buffer] = new_score;
+        m_nodes[next_node_id].custom_score[target_buffer] = arc_custom_score;
+      }
+      else
+      {
+        // Node had a probability already
+        if (m_mode == MODE_BAUM_WELCH || (m_mode == MODE_EXTENDED_VITERBI &&
+                                          m_nodes[next_node_id].epsilon_out))
+        {
+          // Add the new probability to the previous one
+          double prev_log_prob = m_nodes[next_node_id].log_prob[target_buffer];
+          m_nodes[next_node_id].log_prob[target_buffer] =
+            loglikelihoods.add(prev_log_prob, new_score);
+          if (m_custom_data_callback != NULL)
+          {
+            update_node_custom_score(next_node_id, target_buffer,
+                                     prev_log_prob,new_score,arc_custom_score);
+          }
+        }
+        else  // m_mode == MODE_VITERBI || (m_mode == MODE_EXTENDED_VITERBI &&
+              //                            !m_nodes[next_node_id].epsilon_out)
+        {
+          // Update the probability if it is smaller than the new one
+          if (m_nodes[next_node_id].log_prob[target_buffer] < new_score)
+          {
+            m_nodes[next_node_id].log_prob[target_buffer] = new_score;
+            m_nodes[next_node_id].custom_score[target_buffer]=arc_custom_score;
+          }
+        }
+      }
+      // Save the maximum node probability for pruning
+      if (m_nodes[next_node_id].log_prob[target_buffer] > cur_max_log_prob)
+        cur_max_log_prob = m_nodes[next_node_id].log_prob[target_buffer];
+    }
+  }
+  return cur_max_log_prob;
+}
+
+
+void
+HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
+                                             double cur_custom_score,
+                                             int target_buffer, bool epsilons,
+                                             FeatureVec &fea_vec)
+{
+  double arc_score;
+  double new_score;
+  double arc_custom_score;
+  double viterbi_best_ll = loglikelihoods.zero();
+  double viterbi_best_new_score = loglikelihoods.zero();
+  double viterbi_best_custom_score = 0;
+  int viterbi_best_arc_id = -1;
+  
+  for (int a = 0; a < (int)m_nodes[node_id].out_arcs.size(); a++)
+  {
+    int arc_id = m_nodes[node_id].out_arcs[a];
+    int next_node_id = m_arcs[arc_id].target;
+    if ((!epsilons && m_arcs[arc_id].epsilon()) ||
+        (epsilons && !m_arcs[arc_id].epsilon()))
+      continue;
+
+    fill_arc_scores(arc_id, fea_vec, cur_custom_score, &arc_score,
+                    &arc_custom_score);
+
+    new_score = loglikelihoods.times(cur_score, arc_score);
+
+    if (new_score > loglikelihoods.zero())
+    {
+      if (!epsilons && m_mode == MODE_BAUM_WELCH)
+      {
+        double backward_loglikelihood =
+          m_arcs[arc_id].bw_scores.get_score(m_current_frame);
+        double total_arc_loglikelihood =
+          loglikelihoods.times(cur_score, backward_loglikelihood);
+        double total_custom_score = cur_custom_score;
+        
+        // If the total likelihood (forward+backward) of the path
+        // is worse than the forward beam compared to the sum of
+        // likelihoods of all paths, discard this path.
+        // NOTE: This handles also the case when backward score is zero
+        if (total_arc_loglikelihood <
+            m_sum_total_loglikelihood - m_forward_beam)
+          continue;
+
+        if (m_custom_data_callback != NULL)
+        {
+          total_custom_score +=
+            m_arcs[arc_id].bw_custom_data.get_score(m_current_frame);
+        }
+
+        m_active_arcs.push_back(TraversedArc(arc_id, total_arc_loglikelihood,
+                                             total_custom_score));
+      }
+
+      if (m_mode == MODE_BAUM_WELCH ||
+          (m_mode == MODE_EXTENDED_VITERBI && m_nodes[node_id].epsilon_out))
+      {
+        // Propagate the probability of the arc to the next node
+        if (m_nodes[next_node_id].log_prob[target_buffer] <=
+            loglikelihoods.zero())
+        {
+          // The node was empty, make it active
+          m_active_node_table[target_buffer].push_back(next_node_id);
+          m_nodes[next_node_id].log_prob[target_buffer] = new_score;
+          m_nodes[next_node_id].custom_score[target_buffer] = arc_custom_score;
+        }
+        else
+        {
+          // Node had a probability already
+          // Add the new probability to the previous one
+          double prev_log_prob = m_nodes[next_node_id].log_prob[target_buffer];
+          m_nodes[next_node_id].log_prob[target_buffer] =
+            loglikelihoods.add(prev_log_prob, new_score);
+          if (m_custom_data_callback != NULL)
+          {
+            update_node_custom_score(next_node_id, target_buffer,
+                                     prev_log_prob,new_score,arc_custom_score);
+          }
+        }
+      }
+      else // m_mode == MODE_VITERBI || (m_mode == MODE_EXTENDED_VITERBI &&
+           //                            !m_nodes[node_id].epsilon_out)
+      {
+        double backward_loglikelihood =
+          m_arcs[arc_id].bw_scores.get_score(m_current_frame);
+        double total_arc_loglikelihood =
+          loglikelihoods.times(cur_score, backward_loglikelihood);
+
+        if (m_mode == MODE_EXTENDED_VITERBI &&
+            total_arc_loglikelihood < m_sum_total_loglikelihood-m_forward_beam)
+          continue;
+        
+        if (total_arc_loglikelihood > viterbi_best_ll)
+        {
+          viterbi_best_ll = total_arc_loglikelihood;
+          viterbi_best_new_score = new_score;
+          viterbi_best_arc_id = arc_id;
+          viterbi_best_custom_score = arc_custom_score;
+        }
+      }
+    }
+  }
+
+  if (viterbi_best_arc_id != -1)
+  {
+    int next_node_id = m_arcs[viterbi_best_arc_id].target;
+    assert( m_mode == MODE_EXTENDED_VITERBI ||
+            (m_mode == MODE_VITERBI &&
+             m_nodes[next_node_id].log_prob[target_buffer] <=
+             loglikelihoods.zero()) );
+
+    if (!m_arcs[viterbi_best_arc_id].epsilon())
+    {
+      // For MODE_VITERBI, this is the only non epsilon arc traversed at
+      // this frame. For MODE_EXTENDED_VITERBI this is the only non epsilon
+      // arc traversed at this frame in this particular path or sum
+      // of paths (branching occurs only in epsilon arcs!).
+      m_active_arcs.push_back(TraversedArc(viterbi_best_arc_id,
+                                           viterbi_best_ll,
+                                           viterbi_best_custom_score));
+    }
+
+    if (m_mode == MODE_VITERBI ||
+        m_nodes[next_node_id].log_prob[target_buffer] <= loglikelihoods.zero())
+    {
+      // The node was empty, make it active
+      m_active_node_table[target_buffer].push_back(next_node_id);
+      m_nodes[next_node_id].log_prob[target_buffer] = viterbi_best_new_score;
+      m_nodes[next_node_id].custom_score[target_buffer] =
+        viterbi_best_custom_score;
     }
     else
     {
-      if (forward && (m_mode == MODE_VITERBI ||
-                      m_mode == MODE_EXTENDED_VITERBI))
+      // Node had a probability already (m_mode == MODE_EXTENDED_VITERBI).
+      // Add the new probability to the previous one
+      double prev_log_prob = m_nodes[next_node_id].log_prob[target_buffer];
+      m_nodes[next_node_id].log_prob[target_buffer] =
+        loglikelihoods.add(prev_log_prob, viterbi_best_new_score);
+      if (m_custom_data_callback != NULL)
       {
-        double arc_score = cur_score +
-          m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame);
-        if (m_mode == MODE_VITERBI)
-        {
-          if (cur_best_arcs->back().arc_id == -1 ||
-              (arc_score > cur_best_arcs->back().score +
-               m_arcs[cur_best_arcs->back().arc_id].bw_scores.get_log_prob(m_current_frame)))
-          {
-            cur_best_arcs->back().arc_id = arc_id;
-            cur_best_arcs->back().score = cur_score;
-          }
-        }
-        else if (m_mode == MODE_EXTENDED_VITERBI)
-        {
-          // Iterate through the current best arcs. If an arc with the
-          // same source state is found, pick the best one, otherwise
-          // add the new arc to the list of best arcs. This way only
-          // the best segmentation from each unique state sequence
-          // (leaving from one node) is kept.
-          int source_index =
-            m_model.transition(m_arcs[arc_id].transition_id).source_index;
-          int i;
-          for (i = 0; i < (int)cur_best_arcs->size(); i++)
-          {
-            HmmTransition &tr = m_model.transition(
-              m_arcs[(*cur_best_arcs)[i].arc_id].transition_id);
-            if (tr.source_index == source_index)
-            {
-              // Found the same source state
-              if (arc_score > (*cur_best_arcs)[i].score +
-                  m_arcs[(*cur_best_arcs)[i].arc_id].bw_scores.get_log_prob(m_current_frame))
-              {
-                // Update
-                (*cur_best_arcs)[i].arc_id = arc_id;
-                (*cur_best_arcs)[i].score = cur_score;
-              }
-              break;
-            }
-          }
-          if (i == (int)cur_best_arcs->size())
-          {
-            // A new sequence
-            cur_best_arcs->push_back(TraversedArc(arc_id, cur_score));
-          }
-        }
-      }
-      else
-      {
-        HmmTransition &tr = m_model.transition(m_arcs[arc_id].transition_id);
-        double model_score = m_model.state_likelihood(tr.source_index,
-                                                      fea_vec);
-        double arc_score = loglikelihoods.times(
-          m_acoustic_scale*(util::safe_log(model_score * tr.prob)),
-          m_arcs[arc_id].score);
-        double total_score = loglikelihoods.times(cur_score, arc_score);
-
-        if (total_score > loglikelihoods.zero())
-        {
-          if (forward) // m_mode == MODE_BAUM_WELCH
-          {
-            double backward_loglikelihood =
-              m_arcs[arc_id].bw_scores.get_log_prob(m_current_frame);
-            double cur_arc_likelihood =
-              loglikelihoods.times(cur_score, backward_loglikelihood);
-
-            // If the total likelihood (forward+backward) of the path
-            // is worse than the forward beam compared to the sum of
-            // likelihoods of all paths, discard this path.
-            // NOTE: This handles also the case when backward score is zero
-            if (cur_arc_likelihood < m_sum_total_loglikelihood - m_forward_beam)
-              continue;
-
-            m_active_arcs.push_back(TraversedArc(arc_id, cur_arc_likelihood));
-          }
-          else // !forward
-          {
-            // Fill in the backward probability for the arc
-            m_arcs[arc_id].bw_scores.add_log_prob(m_current_frame,
-                                                  total_score, m_mode);
-          }
-
-          // Propagate the probability of the arc to the next node
-          if (m_nodes[next_node_id].prob[target_buffer] <=
-              loglikelihoods.zero())
-          {
-            // Node was empty (at next frame), make it active
-            m_active_node_table[target_buffer].push_back(next_node_id);
-            m_nodes[next_node_id].prob[target_buffer] = total_score;
-          }
-          else
-          {
-            // Node had a probability already
-            if (m_mode == MODE_BAUM_WELCH)
-            {
-              // Add the new probability to the previous one
-              m_nodes[next_node_id].prob[target_buffer] =
-                loglikelihoods.add(m_nodes[next_node_id].prob[target_buffer],
-                                   total_score);
-            }
-            else if (m_mode == MODE_VITERBI) // !forward due to else clause
-            {
-              // Update the probability if it is smaller than the new one
-              if (m_nodes[next_node_id].prob[target_buffer] < total_score)
-              {
-                m_nodes[next_node_id].prob[target_buffer] = total_score;
-              }
-            }
-            // For m_mode == MODE_EXTENDED_VITERBI in !forward the node
-            // probabilities are computed after all arcs have been propagated
-          }
-          // Save the maximum node probability for pruning
-          if (m_nodes[next_node_id].prob[target_buffer] > cur_max_prob)
-            cur_max_prob = m_nodes[next_node_id].prob[target_buffer];
-        }
+        update_node_custom_score(next_node_id, target_buffer,
+                                 prev_log_prob, viterbi_best_new_score,
+                                 viterbi_best_custom_score);
       }
     }
   }
-  if (forward && best_arcs == NULL && (m_mode == MODE_VITERBI ||
-                                       m_mode == MODE_EXTENDED_VITERBI) &&
-    cur_best_arcs->size() > 0 && cur_best_arcs->back().arc_id >= 0)
-  {
-    // Fill the node, PDF and possibly the transition probabilities
-    assert( m_mode == MODE_EXTENDED_VITERBI || cur_best_arcs->size() == 1 );
-
-    for (int i = 0; i < (int)cur_best_arcs->size(); i++)
-    {
-      int next_node_id = m_arcs[(*cur_best_arcs)[i].arc_id].target;
-      double total_score = (*cur_best_arcs)[i].score + m_arcs[(*cur_best_arcs)[i].arc_id].bw_scores.get_log_prob(m_current_frame);
-      double next_node_prob = 1;
-      HmmTransition &tr =
-        m_model.transition(m_arcs[(*cur_best_arcs)[i].arc_id].transition_id);
-      if (m_mode == MODE_EXTENDED_VITERBI)
-      {
-        double model_score = m_model.state_likelihood(tr.source_index,
-                                                      fea_vec);
-        double arc_score = loglikelihoods.times(
-          m_acoustic_scale*(util::safe_log(model_score * tr.prob)),
-          m_arcs[(*cur_best_arcs)[i].arc_id].score);
-        next_node_prob = loglikelihoods.times((*cur_best_arcs)[i].score,
-                                              arc_score);
-        if (total_score < m_sum_total_loglikelihood - m_forward_beam)
-          continue;
-      }
-      if (m_nodes[next_node_id].prob[target_buffer] <=
-          loglikelihoods.zero())
-      {
-        // Node was empty (at next frame), make it active
-        m_active_node_table[target_buffer].push_back(next_node_id);
-        m_nodes[next_node_id].prob[target_buffer] = next_node_prob;
-      }
-      else if (m_mode == MODE_EXTENDED_VITERBI)
-      {
-        // Add the probability. This occurs when two different sequences
-        // join together for the rest of the utterance
-        m_nodes[next_node_id].prob[target_buffer] =
-          loglikelihoods.add(m_nodes[next_node_id].prob[target_buffer],
-                             next_node_prob);
-      }
-      else
-      {
-        fprintf(stderr, "Error: Multiple paths in Viterbi segmentation\n");
-        abort();
-      }
-
-      m_active_arcs.push_back(TraversedArc((*cur_best_arcs)[i].arc_id,
-                                           total_score));
-    }
-  }
-  return cur_max_prob;
 }
 
 
-double
-HmmNetBaumWelch::compute_sum_bw_loglikelihoods(int node_id, int frame,
-                                               double prior,
-                                               std::map<int, double> *sprob)
+void
+HmmNetBaumWelch::fill_arc_scores(int arc_id, FeatureVec &fea_vec,
+                                 double cur_custom_score,
+                                 double *arc_score, double *arc_custom_score)
 {
-  double sum = loglikelihoods.zero();
-  std::map<int, double> local_sprob;
-  std::map<int, double> *cur_sprob = (sprob == NULL? &local_sprob : sprob);
+  *arc_custom_score = cur_custom_score;
+  if (m_arcs[arc_id].epsilon())
+    *arc_score = m_arcs[arc_id].score;
+  else
+  {
+    HmmTransition &tr = m_model.transition(m_arcs[arc_id].transition_id);
+    double model_score = m_model.state_likelihood(tr.source_index,
+                                                  fea_vec);
+    *arc_score = loglikelihoods.times(
+      m_acoustic_scale*(util::safe_log(model_score * tr.prob)),
+      m_arcs[arc_id].score);
+    if (m_custom_data_callback != NULL)
+    {
+      *arc_custom_score +=
+        m_custom_data_callback->custom_data_value(m_current_frame,
+                                                  m_arcs[arc_id]);
+    }
+  }
+}
 
+
+void
+HmmNetBaumWelch::update_node_custom_score(int node_id, int target_buffer,
+                                          double old_log_prob,
+                                          double new_log_prob,
+                                          double new_custom_score)
+{
+  double p1 =
+    exp(old_log_prob - m_nodes[node_id].log_prob[target_buffer]);
+  double p2 =
+    exp(new_log_prob - m_nodes[node_id].log_prob[target_buffer]);
+  m_nodes[node_id].custom_score[target_buffer] =
+    m_nodes[node_id].custom_score[target_buffer] * p1 +
+    new_custom_score * p2;
+}
+
+
+void
+HmmNetBaumWelch::compute_total_bw_scores(void)
+{
+  double ll_sum = loglikelihoods.zero();
+  double custom_sum = 0;
+  int node_id = m_initial_node_id;
+  int frame = m_first_frame;
+
+  assert( m_nodes[node_id].epsilon_out );
+  
   for (int i = 0; i < (int)m_nodes[node_id].out_arcs.size(); i++)
   {
     int arc_id = m_nodes[node_id].out_arcs[i];
-    double cur_addition;
-    if (m_arcs[arc_id].epsilon())
-    {
-      cur_addition = 
-        compute_sum_bw_loglikelihoods(m_arcs[arc_id].target, frame,
-                                      prior+m_arcs[arc_id].score, cur_sprob);
-    }
-    else
-    {
-      cur_addition = loglikelihoods.times(
-        m_arcs[arc_id].bw_scores.get_log_prob(frame), prior);
-    }
+    double cur_addition = m_arcs[arc_id].bw_scores.get_score(frame);
+    double cur_custom_score = m_arcs[arc_id].bw_custom_data.get_score(frame);
     if (cur_addition > loglikelihoods.zero())
     {
-      if (m_mode == MODE_BAUM_WELCH)
-        sum = loglikelihoods.add(sum, cur_addition);
-      else if (m_mode == MODE_VITERBI)
-        sum = std::max(sum, cur_addition);
-      else if (m_mode == MODE_EXTENDED_VITERBI && !m_arcs[arc_id].epsilon())
+      if (m_mode == MODE_BAUM_WELCH || m_mode == MODE_EXTENDED_VITERBI)
       {
-        int source_index =
-          m_model.transition(m_arcs[arc_id].transition_id).source_index;
-        std::map<int, double>::iterator it = cur_sprob->find(source_index);
-        if (it == cur_sprob->end())
-          (*cur_sprob)[source_index] = cur_addition;
-        else
-          (*it).second = std::max((*it).second, cur_addition);
+        double prev_sum = ll_sum;
+        ll_sum = loglikelihoods.add(ll_sum, cur_addition);
+        double p1 = exp(prev_sum - ll_sum);
+        double p2 = exp(cur_addition - ll_sum);
+        custom_sum = custom_sum * p1 + cur_custom_score * p2;
+      }
+      else if (m_mode == MODE_VITERBI)
+      {
+        if (cur_addition > ll_sum)
+        {
+          ll_sum = cur_addition;
+          custom_sum = cur_custom_score;
+        }
       }
     }
   }
-  if (m_mode == MODE_EXTENDED_VITERBI && sprob == NULL)
-  {
-    for (std::map<int, double>::iterator it = cur_sprob->begin();
-         it != cur_sprob->end(); it++)
-    {
-      sum = loglikelihoods.add(sum, (*it).second);
-    }
-  }
-  return sum;
+
+  m_sum_total_loglikelihood = ll_sum;
 }
 
 
@@ -786,54 +959,56 @@ HmmNetBaumWelch::clear_bw_scores(void)
 }
 
 
+void
+HmmNetBaumWelch::FrameScores::safe_set_score(int frame, double score)
+{
+  assert( frame_blocks.empty() || frame_blocks.back().start > frame );
+  set_new_score(frame, score);
+}
+
 
 void
-HmmNetBaumWelch::FrameProbs::add_log_prob(int frame, double prob, int mode)
+HmmNetBaumWelch::FrameScores::set_score(int frame, double score)
 {
-  // The backward probabilities that use FrameProbs class are filled
-  // sequentially in decreasing order, so to check whether the probability
-  // already exists, it is enough to check the latest frame
   if (!frame_blocks.empty() && frame_blocks.back().start == frame)
+    score_table[num_scores-1] = score;
+  else
+    set_new_score(frame, score);
+}
+
+void
+HmmNetBaumWelch::FrameScores::set_new_score(int frame, double score)
+{
+  if (num_scores == score_table_size)
   {
-    if (mode == MODE_BAUM_WELCH || mode == MODE_EXTENDED_VITERBI)
-      log_prob_table[num_probs-1] =
-        loglikelihoods.add(log_prob_table[num_probs-1], prob);
-    else if (mode == MODE_VITERBI)
-      log_prob_table[num_probs-1] =
-        std::max(log_prob_table[num_probs-1], prob);
-    return;
-  }
-  
-  if (num_probs == prob_table_size)
-  {
-    // Increase the size of the probability table
-    int new_size = std::max(prob_table_size*2, prob_table_size+4);
+    // Increase the size of the score table
+    int new_size = std::max(score_table_size*2, score_table_size+4);
     double *new_table = new double[new_size];
-    if (prob_table_size > 0)
+    if (score_table_size > 0)
     {
-      memcpy(new_table, log_prob_table, prob_table_size*sizeof(double));
-      delete log_prob_table;
+      memcpy(new_table, score_table, score_table_size*sizeof(double));
+      delete score_table;
     }
-    log_prob_table = new_table;
-    prob_table_size = new_size;
+    score_table = new_table;
+    score_table_size = new_size;
   }
   if (!frame_blocks.empty() && frame_blocks.back().start == frame+1)
   {
     // Add to previous block
     frame_blocks.back().start--;
-    log_prob_table[num_probs++] = prob;
+    score_table[num_scores++] = score;
   }
   else
   {
     // Create a new block
-    FrameBlock b(frame, frame, num_probs);
+    FrameBlock b(frame, frame, num_scores);
     frame_blocks.push_back(b);
-    log_prob_table[num_probs++] = prob;
+    score_table[num_scores++] = score;
   }
 }
 
 double
-HmmNetBaumWelch::FrameProbs::get_log_prob(int frame)
+HmmNetBaumWelch::FrameScores::get_score(int frame)
 {
   for (int i = 0; i < (int)frame_blocks.size() && frame <= frame_blocks[i].end;
        i++)
@@ -841,20 +1016,20 @@ HmmNetBaumWelch::FrameProbs::get_log_prob(int frame)
     if (frame >= frame_blocks[i].start && frame <= frame_blocks[i].end)
     {
       // Found the block
-      return log_prob_table[frame_blocks[i].buf_start +
-                            frame_blocks[i].end-frame];
+      return score_table[frame_blocks[i].buf_start +
+                         frame_blocks[i].end-frame];
     }
   }
-  // There is no probability for this frame
+  // There is no score for this frame
   return HmmNetBaumWelch::loglikelihoods.zero();
 }
 
 void
-HmmNetBaumWelch::FrameProbs::clear(void)
+HmmNetBaumWelch::FrameScores::clear(void)
 {
-  if (prob_table_size > 0)
-    delete log_prob_table;
-  prob_table_size = 0;
-  num_probs = 0;
+  if (score_table_size > 0)
+    delete score_table;
+  score_table_size = 0;
+  num_scores = 0;
   frame_blocks.clear();
 }
