@@ -61,6 +61,10 @@ open $fh, "> optional_silence.fst";
 print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 __ __\nT 0 1\n";
 close $fh;
 
+open $fh, "> end_symbol.fst";
+print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 ## ,\n";
+close $fh;
+
 my $scriptfile = $ID."_gen_den.sh";
 open $fh, "> $scriptfile" || die "Could not open $scriptfile";
 print $fh get_batch_script_pre_string($tempdir, $tempdir);

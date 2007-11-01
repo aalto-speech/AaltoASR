@@ -45,12 +45,16 @@ for my $label (keys %$hmms) {
 	for my $arc (@$arcs) {
 #	    $out = $label if ($arc->[0] == 1);
             my $in = $arc->[2];
-            $in = $eps if ($in == -1);
+            if ($in == -1) {
+              $in = $eps;
+            } else {
+              $in = $in."-$label.".($s-2);
+            }
 	    $fsm->add_arc($fsm_states[$s], $fsm_states[$arc->[0]], 
 			  $in, $out, 0); #log($arc->[1])
 	}
     }
-    $fsm->add_arc($fsm->initial, $fsm_states[0], "$eps", "$label", 0);
+    $fsm->add_arc($fsm->initial, $fsm_states[0], "#".$label, "$label", 0);
     $fsm->add_arc($fsm_states[1], $hmm_end, "$eps", "$eps", 0);
 }
 

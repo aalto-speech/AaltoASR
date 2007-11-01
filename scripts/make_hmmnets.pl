@@ -85,9 +85,13 @@ sub phn2fsm {
           my $out = "$eps";
           my $arcs = $hmm_states->[$s]->{'arcs'};
           for my $arc (@$arcs) {
-            my $in = $arc->[2];
-            $in = $eps if ($in == -1);
-            $out = $label if ($arc->[0] == 1);
+            my $in;
+            if ($arc->[2] < 0) {
+              $in = "#".$label;
+            } else {
+              $in = $arc->[2]."-".$label.".".($s-2);
+            }
+            $out = $eps; #$label if ($arc->[0] == 1);
             # NOTE: Transition probabilities are added on the fly
             $fsm->add_arc($fsm_states[$s], $fsm_states[$arc->[0]], 
                           $in, $out, 0); #log($arc->[1])
