@@ -114,6 +114,7 @@ HmmSet::add_mixture_pdf(Mixture *pdf)
 {
   int index = (int)m_emission_pdfs.size();
   m_emission_pdfs.push_back(pdf);
+  m_pdf_likelihoods.push_back(-1);
   pdf->set_pool(&m_pool);
   return index;
 }
@@ -738,15 +739,19 @@ HmmSet::estimate_transition_parameters()
 
 
 void
-HmmSet::estimate_parameters(void)
+HmmSet::estimate_parameters(bool pool, bool mixture)
 {
-  m_pool.estimate_parameters();
-  for (int s = 0; s < num_states(); s++) {
-    try {
-      m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
-    } catch (std::string errstr) {
-      std::cout << "Warning: emission pdf for state " << s
-                << ": " <<  errstr << std::endl;
+  if (pool)
+    m_pool.estimate_parameters();
+  
+  if (mixture) {
+    for (int s = 0; s < num_states(); s++) {
+      try {
+        m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
+      } catch (std::string errstr) {
+        std::cout << "Warning: emission pdf for state " << s
+                  << ": " <<  errstr << std::endl;
+      }
     }
   }
 }

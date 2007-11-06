@@ -154,6 +154,11 @@ public:
    */
   inline int num_emission_pdfs() const;
 
+  /**
+   * \return the number of base PDFs in the pool
+   */
+  inline int num_pool_pdfs() const;
+
   /** Gives a reference to a tied state
    * \param state index of the tied state
    * \return reference to the state
@@ -191,6 +196,11 @@ public:
    * \return the desired transition
    */
   inline HmmTransition &transition(int t);
+
+  /** Gives access to the pool of this HmmSet
+   * \return a pointer to the pool
+   */
+  PDFPool* get_pool() { return &m_pool; }
 
   /** Returns a pointer to a base PDF in the pool
    * \param index pool index
@@ -359,8 +369,10 @@ public:
   void stop_accumulating();
 
   /** Sets parameters according to the current accumulators.
+   * \param pool estimate pool parameters
+   * \param mixture estimate mixture parameters
    */
-  void estimate_parameters(void);
+  void estimate_parameters(bool pool=true, bool mixture=true);
 
   /** Estimates/updates the MLLT transform and Gaussian parameters
    * according to the current accumulators
@@ -528,6 +540,13 @@ int
 HmmSet::num_emission_pdfs() const
 {
   return m_emission_pdfs.size();
+}
+
+
+int
+HmmSet::num_pool_pdfs() const
+{
+  return m_pool.size();
 }
 
 

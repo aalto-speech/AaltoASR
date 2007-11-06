@@ -36,6 +36,7 @@ main(int argc, char *argv[])
       ('p', "ph=FILE", "arg", "", "Previous HMM definitions")
       ('c', "config=FILE", "arg", "", "feature configuration (required for MLLT)")
       ('L', "list=LISTNAME", "arg must", "", "file with one statistics file per line")
+      ('C', "coeffs=NAME", "arg", "", "Precomputed precision/subspace Gaussians")
       ('o', "out=BASENAME", "arg must", "", "base filename for output models")
       ('t', "transitions", "", "", "estimate also state transitions")
       ('i', "info=INT", "arg", "0", "info level")
@@ -66,7 +67,7 @@ main(int argc, char *argv[])
       throw std::string("Don't define both --ml and --mmi!");
     
     if (!config["mmi"].specified && !config["ml"].specified)
-      throw std::string("Define either --ml and --mmi!");
+      throw std::string("Define either --ml or --mmi!");
       
     // Load the previous models
     if (config["base"].specified)
@@ -143,19 +144,47 @@ main(int argc, char *argv[])
       bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
 
     model.set_hcl_optimization(&ls, &bfgs, config["hcl_line_cfg"].get_str(), config["hcl_bfgs_cfg"].get_str());
+
+    // Load precomputed coefficients
+    if (config["coeffs"].specified) {
+      std::ifstream coeffs_files(config["coeffs"].get_str().c_str());
+      std::string coeff_file_name;
+      while (coeffs_files >> coeff_file_name) {
+        std::ifstream coeff_file(coeff_file_name.c_str());
+        int g;
+        while (coeff_file >> g) {
+          PrecisionConstrainedGaussian *pc = dynamic_cast< PrecisionConstrainedGaussian* > (model.get_pool_pdf(g));
+          if (pc != NULL) {
+            pc->read(coeff_file);
+          }
+          
+          SubspaceConstrainedGaussian *sc = dynamic_cast< SubspaceConstrainedGaussian* > (model.get_pool_pdf(g));
+          if (sc != NULL) {
+            sc->read(coeff_file);
+          }
+        }
+      }
+
+      // Re-estimate only mixture parameters in this case
+      model.estimate_parameters(false, true);
+    }
+
+    // Normal training, FIXME: MLLT + precomputed coefficients?
+    else {
     
-    if (transtat)
-      model.estimate_transition_parameters();
-    if (config["mllt"].specified)
-      model.estimate_mllt(fea_gen, config["mllt"].get_str());
-    else
-      model.estimate_parameters();
+      if (transtat)
+        model.estimate_transition_parameters();
+      if (config["mllt"].specified)
+        model.estimate_mllt(fea_gen, config["mllt"].get_str());
+      else
+        model.estimate_parameters();
+    }
 
     // Delete Gaussians
     if (config["delete"].specified)
       model.delete_gaussians(config["delete"].get_double());
 
-    // Remove mixture componens
+    // Remove mixture components
     if (config["mremove"].specified)
       model.remove_mixture_components(config["mremove"].get_double());
     

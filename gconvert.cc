@@ -15,6 +15,7 @@ main(int argc, char *argv[])
       ('h', "help", "", "", "display help")
       ('g', "gk=FILE", "arg must", "", "previous distributions (.gk)")
       ('o', "out=FILE", "arg must", "", "converted file (.gk)")
+      ('C', "coeffs=NAME", "arg", "", "Precomputed precision/subspace coefficients")
       ('d', "to-diagonal", "", "", "convert Gaussians to diagonal")
       ('f', "to-full", "", "", "convert Gaussians to full covariances")
       ('p', "to-pcgmm", "", "", "convert Gaussians to have a subspace constraint on precisions")
@@ -141,11 +142,49 @@ main(int argc, char *argv[])
       new_pool.set_exponential_subspace(1, es);
     }
     
+
+    // Load possible precomputed Gaussians
+
+    // Set up bookkeeping for precomputed Gaussians
+    std::vector<bool> already_computed;
+    already_computed.resize(pool.size());
+    for (unsigned int i=0; i<already_computed.size(); i++)
+      already_computed[i] = false;
+
+    // Go through the files
+    if (config["coeffs"].specified) {
+      std::ifstream coeffs_files(config["coeffs"].get_str().c_str());
+      std::string coeff_file_name;
+      while (coeffs_files >> coeff_file_name) {
+        std::ifstream coeff_file(coeff_file_name.c_str());
+        int g;
+        while (coeff_file >> g) {
+
+          already_computed[g]=true;
+
+          if (config["to-pcgmm"].specified) {
+            PrecisionConstrainedGaussian *pc = new PrecisionConstrainedGaussian();
+            pc->read(coeff_file);
+            new_pool.set_pdf(g, pc);
+          }
+
+          else if (config["to-scgmm"].specified) {
+            SubspaceConstrainedGaussian *sc = new SubspaceConstrainedGaussian();
+            sc->read(coeff_file);
+            new_pool.set_pdf(g, sc);
+          }
+        }
+      }
+    }
+
     // Go through every Gaussian in the pool
     Matrix covariance;
     Vector mean;
     for (int i=0; i<pool.size(); i++) {
 
+      if (already_computed[i])
+        continue;
+      
       if (config["info"].get_int() > 0)
         std::cout << "Converting Gaussian: " << i << "/" << pool.size();
       
