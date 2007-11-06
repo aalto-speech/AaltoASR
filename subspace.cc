@@ -11,7 +11,7 @@ int
 main(int argc, char *argv[])
 {
   try {
-    config("usage: gconvert [OPTION...]\n")
+    config("usage: subspace [OPTION...]\n")
       ('h', "help", "", "", "display help")
       ('g', "gk=FILE", "arg must", "", "Gaussian distributions (.gk)")
       ('o', "out=FILE", "arg must", "", "output file for the subspace")
