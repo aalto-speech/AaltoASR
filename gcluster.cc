@@ -194,7 +194,7 @@ void save_clustering(const std::string &filename)
   
   std::ofstream out(filename.c_str());
   if (!out)
-    throw std::string("Could not open file %s\n", filename.c_str());
+    throw std::string("Could not open file ") + filename;
 
   out << num_valid_clusters << "\n";
   for (int i = 0; i < (int)gaussians.size(); i++)
@@ -204,7 +204,7 @@ void save_clustering(const std::string &filename)
     printf("Wrote %i clusters\n", num_valid_clusters);
   
   if (!out)
-    throw std::string("Error writing file: %s\n", filename.c_str());
+    throw std::string("Error writing file: ") + filename;
 
 }
 
