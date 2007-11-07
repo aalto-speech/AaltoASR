@@ -20,7 +20,7 @@ Hmm::resize(int states)
 
 HmmSet::HmmSet()
 {
-  m_mode=PDF::ML;
+  m_statistics_mode = 0;
 }
 
 
@@ -46,6 +46,7 @@ HmmSet::copy(const HmmSet &hmm_set)
   // Note! Copies just the pointers, not the objects!
   m_emission_pdfs = hmm_set.m_emission_pdfs;
   m_hmms = hmm_set.m_hmms;
+  m_statistics_mode = hmm_set.m_statistics_mode;
 }
 
 
@@ -59,6 +60,7 @@ HmmSet::reset()
 
   for (int t = 0; t < num_transitions(); t++)
     m_transitions[t].prob = 0;
+  m_statistics_mode = 0;
 }
 
 
@@ -454,7 +456,18 @@ HmmSet::precompute_likelihoods(const FeatureVec &f)
 
 
 void
-HmmSet::start_accumulating()
+HmmSet::start_accumulating(PDF::StatisticsMode mode)
+{
+  m_statistics_mode = mode;
+
+  init_transition_accumulators();
+  for (int i = 0; i < num_emission_pdfs(); i++)
+    m_emission_pdfs[i]->start_accumulating(mode);
+}
+
+
+void
+HmmSet::init_transition_accumulators()
 {
   m_transition_accum = m_transitions;
   m_accumulated.resize(m_transition_accum.size());
@@ -462,9 +475,6 @@ HmmSet::start_accumulating()
     m_transition_accum[i].prob=0;
     m_accumulated[i]=false;
   }
-
-  for (int i = 0; i < num_emission_pdfs(); i++)
-    m_emission_pdfs[i]->start_accumulating();
 }
 
 
@@ -489,8 +499,7 @@ HmmSet::accumulate_transition(int transition_index, double prior)
 void
 HmmSet::dump_statistics(const std::string base) const
 {
-  if (m_mode == PDF::ML)
-    dump_ph_statistics(base+".phs");
+  dump_ph_statistics(base+".phs");
   dump_mc_statistics(base+".mcs");
   dump_gk_statistics(base+".gks");
 }
@@ -533,21 +542,11 @@ HmmSet::dump_mc_statistics(const std::string filename) const
   }  
   
   mcs << num_emission_pdfs() << std::endl;
+  mcs << m_statistics_mode << std::endl;
 
   for (int i = 0; i < num_emission_pdfs(); i++) {
-    if (m_emission_pdfs[i]->accumulated(0)) {
-      mcs << i << " num ";
-      m_emission_pdfs[i]->dump_statistics(mcs, 0);
-      mcs << std::endl;
-    }
-
-    if (m_emission_pdfs[i]->estimation_mode() == PDF::MMI) {
-      if (m_emission_pdfs[i]->accumulated(1)) {
-	mcs << i << " den ";
-	m_emission_pdfs[i]->dump_statistics(mcs, 1);
-	mcs << std::endl;
-      }
-    }
+    mcs << i << std::endl;
+    m_emission_pdfs[i]->dump_statistics(mcs);
   }
   
   if (!mcs)
@@ -570,23 +569,11 @@ HmmSet::dump_gk_statistics(const std::string filename) const
   int di=m_pool.dim();
   gks.write((char*)&sz, sizeof(int));
   gks.write((char*)&di, sizeof(int));
+  gks.write((char*)&m_statistics_mode, sizeof(PDF::StatisticsMode));
 
-  for (int g=0; g<m_pool.size(); g++) {
-    if (m_pool.get_pdf(g)->accumulated(0)) {
-      int num=0;
-      gks.write((char*)&g, sizeof(int));
-      gks.write((char*)&num, sizeof(int));
-      m_pool.get_pdf(g)->dump_statistics(gks, 0);
-    }
-
-    if (m_pool.get_pdf(g)->estimation_mode() == PDF::MMI) {
-      if (m_pool.get_pdf(g)->accumulated(1)) {
-        int den=1;
-        gks.write((char*)&g, sizeof(int));
-        gks.write((char*)&den, sizeof(int));
-	m_pool.get_pdf(g)->dump_statistics(gks, 1);
-      }
-    }
+  for (int g=0; gks && g<m_pool.size(); g++) {
+    gks.write((char*)&g, sizeof(int));
+    m_pool.get_pdf(g)->dump_statistics(gks);
   }
   
   if (!gks)
@@ -598,8 +585,6 @@ HmmSet::dump_gk_statistics(const std::string filename) const
 void
 HmmSet::accumulate_from_dump(const std::string base)
 {
-  assert(m_transition_accum.size() > 0);
-
   accumulate_ph_from_dump(base+".phs");
   accumulate_mc_from_dump(base+".mcs");
   accumulate_gk_from_dump(base+".gks");
@@ -614,11 +599,14 @@ HmmSet::accumulate_ph_from_dump(const std::string filename)
     fprintf(stderr, "HmmSet::accumulate_ph_from_dump(): could not open %s\n", filename.c_str());
     return;
   }
+
+  if (m_transition_accum.size() == 0)
+    init_transition_accumulators();
   
   unsigned int num_transitions;
   phs >> num_transitions;
   if (m_transition_accum.size() != num_transitions)
-    throw std::string("HmmSet::accumulate_ph_from_dump: the number of transitions in: %s doesn't match the earlier accumulations\n", filename.c_str());
+    throw str::fmt(512, "HmmSet::accumulate_ph_from_dump: the number of transitions in: %s doesn't match the earlier accumulations\n", filename.c_str());
   
   int source, target, pos; double occ;
   for (unsigned int t=0; t<num_transitions; t++) {
@@ -660,8 +648,15 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
   if (n != num_emission_pdfs())
     throw str::fmt(128, "HmmSet::accumulate_mc_from_dump: the number of PDFs in: %s is wrong\n", filename.c_str());
 
-  while(mcs >> pdf)
-    m_emission_pdfs[pdf]->accumulate_from_dump(mcs);
+  PDF::StatisticsMode mode;
+  
+  mcs >> mode;
+  if (mode == 0 || (m_statistics_mode != 0 && mode != m_statistics_mode))
+    throw str::fmt(512, "HmmSet::accumulate_mc_from_dump: invalid statistics mode in %s\n", filename.c_str());
+  m_statistics_mode = mode;
+
+  while (mcs >> pdf)
+    m_emission_pdfs[pdf]->accumulate_from_dump(mcs, m_statistics_mode);
   
   mcs.close();
 }
@@ -677,21 +672,27 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
   }
 
   int num_pdfs, dim, pdf;
+  PDF::StatisticsMode mode;
   gks.read((char*)&num_pdfs, sizeof(int));
   gks.read((char*)&dim, sizeof(int));
   if (num_pdfs != m_pool.size())
-    throw std::string("HmmSet::accumulate_gk_from_dump: the number of mixture base distributions in: %s is wrong\n", filename.c_str());
+    throw str::fmt(512, "HmmSet::accumulate_gk_from_dump: the number of mixture base distributions in: %s is wrong\n", filename.c_str());
 
   if (dim != m_pool.dim())
-    throw std::string("HmmSet::accumulate_gk_from_dump: the dimensionality of mixture base distributions in: %s is wrong\n", filename.c_str());
+    throw str::fmt(512, "HmmSet::accumulate_gk_from_dump: the dimensionality of mixture base distributions in: %s is wrong\n", filename.c_str());
 
-  while(gks.good()) {
+  gks.read((char*)&mode, sizeof(PDF::StatisticsMode));
+  if (mode == 0 || (m_statistics_mode != 0 && mode != m_statistics_mode))
+    throw str::fmt(512, "HmmSet::accumulate_gk_from_dump: invalid statistics mode in %s\n", filename.c_str());
+  m_statistics_mode = mode;
+
+  while (gks.good()) {
     gks.read((char*)&pdf, sizeof(int));
     if (gks.eof())
       break;
     if (pdf < 0 || pdf >= num_pdfs)
       throw std::string("Invalid statistics dump (wrong pdf index)");
-    m_pool.get_pdf(pdf)->accumulate_from_dump(gks);
+    m_pool.get_pdf(pdf)->accumulate_from_dump(gks, m_statistics_mode);
   }
   gks.close();
 }
@@ -739,15 +740,15 @@ HmmSet::estimate_transition_parameters()
 
 
 void
-HmmSet::estimate_parameters(bool pool, bool mixture)
+HmmSet::estimate_parameters(PDF::EstimationMode mode, bool pool, bool mixture)
 {
   if (pool)
-    m_pool.estimate_parameters();
-  
-  if (mixture) {
+    m_pool.estimate_parameters(mode);
+
+  if (mixture) {  
     for (int s = 0; s < num_states(); s++) {
       try {
-        m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
+        m_emission_pdfs[state(s).emission_pdf]->estimate_parameters(mode);
       } catch (std::string errstr) {
         std::cout << "Warning: emission pdf for state " << s
                   << ": " <<  errstr << std::endl;
@@ -757,7 +758,7 @@ HmmSet::estimate_parameters(bool pool, bool mixture)
 }
 
 
-// FIXME: Move to PDFPool
+// FIXME: Move to PDFPool?
 void
 HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
 {
@@ -799,9 +800,9 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       (m_pool.get_pdf(g));
     if (gaussian == NULL)
       continue;
-    if (!gaussian->full_stats_accumulated())
+    if (!gaussian->full_stats_accumulated(PDF::ML_BUF))
       continue;
-    beta += gaussian->m_accums[0]->gamma();
+    beta += gaussian->m_accums[PDF::ML_BUF]->gamma();
   }
 
   // Iterate long enough
@@ -815,17 +816,20 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
         (m_pool.get_pdf(g));
       if (gaussian == NULL)
         continue;
-      if (!gaussian->full_stats_accumulated())
+      if (!gaussian->full_stats_accumulated(PDF::ML_BUF))
         continue;
 
-      gaussian->m_accums[0]->get_covariance_estimate(curr_sample_covariance);
+      gaussian->m_accums[PDF::ML_BUF]->get_covariance_estimate(
+        curr_sample_covariance);
       Blas_Mat_Mat_Mult(A, curr_sample_covariance, temp_m, 1.0, 0.0);
       Blas_Mat_Mat_Trans_Mult(temp_m, A, new_covariance, 1.0, 0.0);
       // Check that covariances are valid
       for (int i=0; i<dim(); i++)
         if (new_covariance(i,i) <= 0)
-          fprintf(stderr, "Warning: Variance in dimension %i is %g (gamma %g)\n",
-                  i, new_covariance(i,i), gaussian->m_accums[0]->gamma());
+          fprintf(stderr,
+                  "Warning: Variance in dimension %i is %g (gamma %g)\n",
+                  i, new_covariance(i, i),
+                  gaussian->m_accums[PDF::ML_BUF]->gamma());
       // Common tweaking
       for (int i=0; i<dim(); i++)
         if (new_covariance(i,i) < m_pool.get_minvar())
@@ -833,8 +837,9 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       for (int i=0; i<dim(); i++)
         for (int j=0; j<dim(); j++)
           if (i != j)
-            new_covariance(i,j) *= gaussian->m_accums[0]->feacount()
-              /(gaussian->m_accums[0]->feacount()+m_pool.get_covsmooth());
+            new_covariance(i,j) *= gaussian->m_accums[PDF::ML_BUF]->feacount()
+              /(gaussian->m_accums[PDF::ML_BUF]->feacount() +
+                m_pool.get_covsmooth());
       gaussian->set_covariance(new_covariance);
     }
     
@@ -848,14 +853,15 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
           (m_pool.get_pdf(g));
         if (gaussian == NULL)
           continue;
-        if (!gaussian->full_stats_accumulated())
+        if (!gaussian->full_stats_accumulated(PDF::ML_BUF))
           continue;
 
-        gaussian->m_accums[0]->get_covariance_estimate(curr_sample_covariance);
+        gaussian->m_accums[PDF::ML_BUF]->get_covariance_estimate(
+          curr_sample_covariance);
         gaussian->get_covariance(curr_covariance);
         Blas_Add_Mat_Mult(temp_m,
-                          gaussian->m_accums[0]->gamma()/curr_covariance(i,i),
-                          curr_sample_covariance);
+                          gaussian->m_accums[PDF::ML_BUF]->gamma()/
+                          curr_covariance(i,i), curr_sample_covariance);
       }
       // Invert
       LinearAlgebra::inverse(temp_m, G[i]);
@@ -905,25 +911,27 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
       (m_pool.get_pdf(g));
     if (gaussian == NULL)
       continue;
-    if (!gaussian->full_stats_accumulated())
+    if (!gaussian->full_stats_accumulated(PDF::ML_BUF))
       continue;
     
     // Transform mean
     LaVectorDouble old_mean(dim());
     LaVectorDouble new_mean(dim());
-    gaussian->m_accums[0]->get_mean_estimate(old_mean);
+    gaussian->m_accums[PDF::ML_BUF]->get_mean_estimate(old_mean);
     Blas_Mat_Vec_Mult(A, old_mean, new_mean, 1.0, 0.0);
     gaussian->set_mean(new_mean);
     
     // Re-estimate the covariances
-    gaussian->m_accums[0]->get_covariance_estimate(curr_sample_covariance);
+    gaussian->m_accums[PDF::ML_BUF]->get_covariance_estimate(
+      curr_sample_covariance);
     Blas_Mat_Mat_Mult(A, curr_sample_covariance, temp_m, 1.0, 0.0);
     Blas_Mat_Mat_Trans_Mult(temp_m, A, new_covariance, 1.0, 0.0);
     // Check that covariances are valid
     for (int i=0; i<dim(); i++)
       if (new_covariance(i,i) <= 0)
         fprintf(stderr, "Warning: Variance in dimension %i is %g (gamma %g)\n",
-                i, new_covariance(i,i), gaussian->m_accums[0]->gamma());
+                i, new_covariance(i,i),
+                gaussian->m_accums[PDF::ML_BUF]->gamma());
     // Common tweaking
     for (int i=0; i<dim(); i++)
       if (new_covariance(i,i) < m_pool.get_minvar())
@@ -931,8 +939,9 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
     for (int i=0; i<dim(); i++)
       for (int j=0; j<dim(); j++)
         if (i != j)
-          new_covariance(i,j) *= gaussian->m_accums[0]->feacount()
-            /(gaussian->m_accums[0]->feacount()+m_pool.get_covsmooth());
+          new_covariance(i,j) *= gaussian->m_accums[PDF::ML_BUF]->feacount()
+            /(gaussian->m_accums[PDF::ML_BUF]->feacount() +
+              m_pool.get_covsmooth());
     gaussian->set_covariance(new_covariance);
   }
   
@@ -951,43 +960,11 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
   for (int s = 0; s < num_states(); s++)
   {
     try {
-      m_emission_pdfs[state(s).emission_pdf]->estimate_parameters();
+      m_emission_pdfs[state(s).emission_pdf]->estimate_parameters(PDF::ML_EST);
     } catch (std::string errstr) {
       std::cout << "Warning: emission pdf for state " << s
                 << ": " <<  errstr << std::endl;
     }
-  }
-}
-
-
-void
-HmmSet::set_estimation_mode(PDF::EstimationMode mode)
-{
-  m_mode = mode;
-  
-  for (int i=0; i<m_pool.size(); i++)
-    m_pool.get_pdf(i)->set_estimation_mode(m_mode);
-  
-  for (int i=0; i<num_emission_pdfs(); i++)
-    m_emission_pdfs[i]->set_estimation_mode(m_mode);
-}
-  
-
-PDF::EstimationMode
-HmmSet::get_estimation_mode()
-{
-  return m_mode;
-}
-
-
-void
-HmmSet::set_full_stats(bool full_stats)
-{
-  for (int i=0; i<m_pool.size(); i++) {
-    Gaussian *g = dynamic_cast< Gaussian* >
-      (m_pool.get_pdf(i));
-    if (g != NULL)
-      g->set_full_stats(full_stats);
   }
 }
 
@@ -1136,9 +1113,10 @@ int HmmSet::remove_mixture_components(double min_weight)
         index_offset++;
       }
     
-    // Update the mixtures
+    // Update the mixtures (component numbers have changed!)
     for (int p = 0; p < num_emission_pdfs(); p++)
     {
+      assert( m_emission_pdfs[p]->size() > 0 );
       m_emission_pdfs[p]->update_components(index_map);
       assert( m_emission_pdfs[p]->size() > 0 );
     }

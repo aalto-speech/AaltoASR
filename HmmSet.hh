@@ -305,9 +305,12 @@ public:
   void precompute_likelihoods(const FeatureVec &f);
 
   /** Prepares the HmmSet for parameter training. 
-   * Should be called before \ref accumulate() or \ref accumulate_from_dump()
+   * Should be called before \ref accumulate()
    */
-  void start_accumulating();
+  void start_accumulating(PDF::StatisticsMode mode);
+
+  /** Initializes the accumulators for transitions */
+  void init_transition_accumulators(void);
 
   /** Accumulates emission pdf statistics with a new frame
    * \param f the feature in the current frame
@@ -369,10 +372,12 @@ public:
   void stop_accumulating();
 
   /** Sets parameters according to the current accumulators.
+   * \param mode estimation mode
    * \param pool estimate pool parameters
    * \param mixture estimate mixture parameters
    */
-  void estimate_parameters(bool pool=true, bool mixture=true);
+  void estimate_parameters(PDF::EstimationMode mode, bool pool=true,
+                           bool mixture=true);
 
   /** Estimates/updates the MLLT transform and Gaussian parameters
    * according to the current accumulators
@@ -384,21 +389,7 @@ public:
   /** Sets transition parameters according to the current accumulators.
    */
   void estimate_transition_parameters();
-  
-  /** Sets the current estimation mode for this model
-   * \param mode PDF::EstimationMode (ML/MMI)
-   */
-  void set_estimation_mode(PDF::EstimationMode mode);
-
-  /** Gets the current estimation mode for this model
-   */
-  PDF::EstimationMode get_estimation_mode();
-
-  /** Whether full statistics should be collected for all Gaussians
-   * \param full_stats full statistics or not
-   */
-  void set_full_stats(bool full_stats);
-  
+    
   /** Sets the parameters for Gaussian estimation
    * \param minvar    Minimum variance
    * \param covsmooth Smoothing value for off-diagonal covariance terms
@@ -406,7 +397,7 @@ public:
    * \param c2 the C2 constant
    * \param ismooth the I-smoothing constant
    */
-  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, ismooth); }
+  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double mmi_ismooth, double mpe_ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, mmi_ismooth, mpe_ismooth); }
 
   /** Set the HCL objects and settings for optimization
    * \param ls            HCL linesearch
@@ -518,7 +509,8 @@ private:
   std::vector<bool> m_accumulated;
 
   PDFPool m_pool;
-  PDF::EstimationMode m_mode;
+
+  PDF::StatisticsMode m_statistics_mode;
 };
 
 

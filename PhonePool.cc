@@ -27,8 +27,7 @@ PhonePool::ContextPhone::ContextPhone(const std::string &label,
 
   if (persistent)
   {
-    m_stats.set_estimation_mode(PDF::ML);
-    m_stats.start_accumulating();
+    m_stats.start_accumulating(PDF_ML_STATS);
 
     // Store contexts to the pool
     for (int i = 0; i < (int)m_left_contexts.size(); i++)
@@ -69,7 +68,7 @@ PhonePool::ContextPhone::rule_answer(const DecisionRule *rule,
 void
 PhonePool::ContextPhone::finish_statistics(void)
 {
-  m_stats.estimate_parameters();
+  m_stats.estimate_parameters(PDF::ML_EST);
   m_stats.stop_accumulating();
 }
 

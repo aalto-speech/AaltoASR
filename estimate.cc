@@ -27,6 +27,8 @@ int
 main(int argc, char *argv[])
 {
   double total_log_likelihood = 0;
+  PDF::EstimationMode mode;
+  
   try {
     config("usage: estimate [OPTION...]\n")
       ('h', "help", "", "", "display help")
@@ -43,18 +45,21 @@ main(int argc, char *argv[])
       ('\0', "mllt=MODULE", "arg", "", "update maximum likelihood linear transform")
       ('\0', "ml", "", "", "maximum likelihood estimation")
       ('\0', "mmi", "", "", "maximum mutual information estimation")
+      ('\0', "mpe", "", "", "minimum phone error estimation")
       ('\0', "minvar=FLOAT", "arg", "0.1", "minimum variance (default 0.1)")
       ('\0', "covsmooth", "arg", "0", "covariance smoothing (default 0.0)")
       ('\0', "C1=FLOAT", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
       ('\0', "C2=FLOAT", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
-      ('\0', "ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for discriminative training (default 0.0)")
+      ('\0', "mmi-ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for MMI")
+      ('\0', "mpe-ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for MPE")
+      ('\0', "mmi-prior", "", "", "Use MMI prior when I-smoothing MPE model")
       ('\0', "delete=FLOAT", "arg", "0.0", "delete Gaussians with occupancies below the threshold")
       ('\0', "mremove=FLOAT", "arg", "0.0", "remove mixture components below the weight threshold")
       ('\0', "split=FLOAT", "arg", "0.0", "split a Gaussian if the occupancy exceeds the threshold")
       ('\0', "maxg=INT", "arg", "0", "maximum number of Gaussians per state for splitting")
       ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihood)")
-      ('\0', "hcl_bfgs_cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
-      ('\0', "hcl_line_cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
+      ('\0', "hcl-bfgs-cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
+      ('\0', "hcl-line-cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
       ;
     config.default_parse(argc, argv);
 
@@ -62,13 +67,36 @@ main(int argc, char *argv[])
     info = config["info"].get_int();
     out_file = config["out"].get_str();
     maxg = config["maxg"].get_int();
+
+    int count = 0;
+    if (config["ml"].specified) {
+      count++;
+      mode = PDF::ML_EST;
+    }
+    if (config["mmi"].specified) {
+      count++;
+      mode = PDF::MMI_EST;
+    }
+    if (config["mpe"].specified) {
+      count++;
+      mode = PDF::MPE_EST;
+    }
+    if (count != 1)
+      throw std::string("Define exactly one of --ml, --mmi and --mpe!");
+
+    if (config["mmi-ismooth"].specified &&
+        (!config["mmi"].specified && !config["mmi-prior"].specified))
+      fprintf(stderr, "Warning: --mmi-ismooth ignored without --mmi or --mmi-prior\n");
+    if (config["mpe-ismooth"].specified && mode != PDF::MPE_EST)
+        fprintf(stderr, "Warning: --mpe-ismooth ignored without --mpe\n");
+    if (config["mmi-prior"].specified)
+    {
+      if (mode == PDF::MPE_EST)
+        mode = PDF::MPE_MMI_PRIOR_EST;
+      else
+        fprintf(stderr, "Warning: --mmi-prior ignored without --mpe\n");
+    }
     
-    if (config["mmi"].specified && config["ml"].specified)
-      throw std::string("Don't define both --ml and --mmi!");
-    
-    if (!config["mmi"].specified && !config["ml"].specified)
-      throw std::string("Define either --ml or --mmi!");
-      
     // Load the previous models
     if (config["base"].specified)
     {
@@ -85,12 +113,12 @@ main(int argc, char *argv[])
     {
       throw std::string("Must give either --base or all --gk, --mc and --ph");
     }
-    if (config["ml"].specified)
-      model.set_estimation_mode(PDF::ML);
-    else
-      model.set_estimation_mode(PDF::MMI);
+
     if (config["mllt"].specified)
-      model.set_full_stats(true);
+    {
+      if (!config["ml"].specified)
+        throw std::string("--mllt is only supported with --ml");
+    }
     
     if (config["config"].specified) {
       fea_gen.load_configuration(io::Stream(config["config"].get_str()));
@@ -99,8 +127,6 @@ main(int argc, char *argv[])
       throw std::string("Must specify configuration file with MLLT");      
     }
     
-    model.start_accumulating();
-
     // Open the list of statistics files
     std::ifstream filelist(config["list"].get_str().c_str());
     if (!filelist)
@@ -131,19 +157,20 @@ main(int argc, char *argv[])
                                   config["covsmooth"].get_double(),
                                   config["C1"].get_double(),
                                   config["C2"].get_double(),
-                                  config["ismooth"].get_double());
+                                  config["mmi-ismooth"].get_double(),
+                                  config["mpe-ismooth"].get_double());
 
     // Linesearch for subspace models
     HCL_LineSearch_MT_d ls;
-    if (config["hcl_line_cfg"].specified)
-      ls.Parameters().Merge(config["hcl_line_cfg"].get_str().c_str());
+    if (config["hcl-line-cfg"].specified)
+      ls.Parameters().Merge(config["hcl-line-cfg"].get_str().c_str());
 
     // lmBFGS for subspace models
     HCL_UMin_lbfgs_d bfgs(&ls);
-    if (config["hcl_bfgs_cfg"].specified)
-      bfgs.Parameters().Merge(config["hcl_bfgs_cfg"].get_str().c_str());
+    if (config["hcl-bfgs-cfg"].specified)
+      bfgs.Parameters().Merge(config["hcl-bfgs-cfg"].get_str().c_str());
 
-    model.set_hcl_optimization(&ls, &bfgs, config["hcl_line_cfg"].get_str(), config["hcl_bfgs_cfg"].get_str());
+    model.set_hcl_optimization(&ls, &bfgs, config["hcl-line-cfg"].get_str(), config["hcl-bfgs-cfg"].get_str());
 
     // Load precomputed coefficients
     if (config["coeffs"].specified) {
@@ -166,33 +193,33 @@ main(int argc, char *argv[])
       }
 
       // Re-estimate only mixture parameters in this case
-      model.estimate_parameters(false, true);
+      model.estimate_parameters(mode, false, true);
     }
 
     // Normal training, FIXME: MLLT + precomputed coefficients?
     else {
-    
+
       if (transtat)
         model.estimate_transition_parameters();
       if (config["mllt"].specified)
         model.estimate_mllt(fea_gen, config["mllt"].get_str());
       else
-        model.estimate_parameters();
+        model.estimate_parameters(mode);
+      
+      // Delete Gaussians
+      if (config["delete"].specified)
+        model.delete_gaussians(config["delete"].get_double());
+      
+      // Remove mixture components
+      if (config["mremove"].specified)
+        model.remove_mixture_components(config["mremove"].get_double());
+      
+      // Split Gaussians if desired
+      if (config["split"].specified)
+        model.split_gaussians(config["split"].get_double(), maxg);
+      
+      model.stop_accumulating();
     }
-
-    // Delete Gaussians
-    if (config["delete"].specified)
-      model.delete_gaussians(config["delete"].get_double());
-
-    // Remove mixture components
-    if (config["mremove"].specified)
-      model.remove_mixture_components(config["mremove"].get_double());
-    
-    // Split Gaussians if desired
-    if (config["split"].specified)
-      model.split_gaussians(config["split"].get_double(), maxg);
-
-    model.stop_accumulating();
     
     // Write final models
     model.write_all(out_file);

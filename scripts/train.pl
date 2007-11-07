@@ -31,11 +31,13 @@ my $init_cfg = $HMMDIR."/".$BASE_ID.".cfg"; # Used in tying and training
 # Batch settings
 my $NUM_BATCHES = 2; # Number of processes in parallel
 
-# Baum-Welch settings
-my $USE_BAUM_WELCH = 1; # If 0, the script must call align appropriately
+# Train/Baum-Welch settings
+my $USE_HMMNETS = 1; # If 0, the script must call align appropriately
 my $FORWARD_BEAM = 20;
 my $BACKWARD_BEAM = 200;
-my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/ln(10)))
+my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/lne(10)))
+my $STATS_MODE = "--ml";
+my $TRAIN_MODE = "--ml";
 
 # Alignment settings
 my $ALIGN_WINDOW = 4000;
@@ -52,6 +54,7 @@ my $TIE_MAX_LOSS = 3500;  # Maximum loglikelihood loss for merging states
 # Gaussian splitting options
 my $SPLIT_MIN_OCCUPANCY = 300; # Accumulated state probability
 my $SPLIT_MAX_GAUSSIANS = 100; # Per state
+my $GAUSS_REMOVE_THRESHOLD = 0.001; # Mixture component weight threshold
 
 # Minimum variance
 my $MINVAR = 0.1;
@@ -66,7 +69,7 @@ my $MLLT_MODULE_NAME = "transform";
 
 # Training iterations
 my $num_ml_train_iter = 20;
-my $num_mmi_train_iter = 4;
+my $num_dtrain_iter = 4;
 my $split_frequency = 2; # How many EM iterations between Gaussian splits
 my $split_stop_iter = 16; # Iteration after which no more splits are done
 
@@ -75,10 +78,10 @@ my $VTLN_MODULE = "vtln";
 my $MLLR_MODULE = "mllr";
 my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
 
-# MMI settings
-my $NUM_OPTIONS = "-H -V";
-my $DEN_OPTIONS = "-D -E";
-my $MMI_AC_SCALE = 0.067;
+# Discriminative training settings
+my $DISCRIMINATIVE_STATS_MODE = "--mmi -E";
+my $DISCRIMINATIVE_TRAIN_MODE = "--mmi";
+my $DISCRIMINATIVE_AC_SCALE = 0.067;
 
 
 # Misc settings
@@ -127,11 +130,14 @@ if ($NUM_GAUSS_CLUSTERS > 0) {
   cluster_gaussians($tempdir, $om);
 }
 
-# MMI
-#my $mmi_model;
-#$AC_SCALE=$MMI_AC_SCALE;    # for MMI 1/(LMSCALE/ln(10)))
-#$mmi_model=mmi_train($tempdir, 1, $num_mmi_train_iter, $ml_model, $ml_model.".cfg");
-#$om = $mmi_model;
+# Discriminative training
+#my $dmodel;
+#$AC_SCALE=$DISCRIMINATIVE_AC_SCALE;    # for MMI 1/(LMSCALE/ln(10)))
+#$STATS_MODE = $DISCRIMINATIVE_STATS_MODE;
+#$TRAIN_MODE = $DISCRIMINATIVE_TRAIN_MODE;
+#$USE_HMMNETS = 1;
+#$dmodel=discriminative_train($tempdir, 1, $num_dtrain_iter, $ml_model, $ml_model.".cfg");
+#$om = $dmodel;
 
 # Generate lnas for the final model
 generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
@@ -184,7 +190,7 @@ sub ml_train {
   my $dstring = "$mday.".($mon+1).".".(1900+$year);
   my $model_base = "$HMMDIR/${BASE_ID}_${dstring}";
 
-  my $stats_list_file = "stats.lst";
+  my $stats_list_file = "statsfiles.lst";
   my $batch_info;
 
   for (my $i = $iter_init; $i <= $iter_end ; $i ++) {
@@ -194,14 +200,14 @@ sub ml_train {
 
     $mllt_flag = 1 if ($mllt_start && $i >= $mllt_start);
 
-    collect_ml_stats($temp_dir, $im, $im_cfg, $stats_list_file,
+    collect_stats($temp_dir, $im, $im_cfg, $stats_list_file,
                   $mllt_flag);
 
     $split_flag = 0;
     $split_flag = 1 if ($split_frequency && $i < $split_stop_iter &&
                         (($i-1) % $split_frequency) == 0);
-    ml_estimate($temp_dir, $im, $im_cfg, $om, $stats_list_file, $MINVAR,
-                $mllt_flag, $split_flag);
+    estimate_model($temp_dir, $im, $im_cfg, $om, $stats_list_file, $MINVAR,
+                   $mllt_flag, $split_flag);
     
     # Check the models were really created
     if (!(-e $om.".ph")) {
@@ -216,7 +222,7 @@ sub ml_train {
 }
 
 
-sub mmi_train {
+sub discriminative_train {
   my $temp_dir = shift(@_);
   my $iter_init = shift(@_);
   my $iter_end = shift(@_);
@@ -228,7 +234,7 @@ sub mmi_train {
   my $dstring = "$mday.".($mon+1).".".(1900+$year);
   my $model_base = "$HMMDIR/${BASE_ID}_${dstring}";
 
-  my $stats_list_file = "stats.lst";
+  my $stats_list_file = "statsfiles.lst";
   my $batch_info;
 
   for (my $i = $iter_init; $i <= $iter_end ; $i ++) {
@@ -240,8 +246,9 @@ sub mmi_train {
     mkdir $curr_temp_dir;
     chdir $curr_temp_dir || die("Could not chdir to $curr_temp_dir");
 
-    collect_mmi_stats($curr_temp_dir, $im, $im_cfg, $stats_list_file);
-    mmi_estimate($curr_temp_dir, $im, $im_cfg, $om, $stats_list_file, $MINVAR);
+    collect_stats($curr_temp_dir, $im, $im_cfg, $stats_list_file, 0);
+    estimate_model($curr_temp_dir, $im, $im_cfg, $om, $stats_list_file,
+                   $MINVAR, 0, 0);
     
     # Check the models were really created
     if (!(-e $om.".ph")) {
@@ -256,7 +263,7 @@ sub mmi_train {
 }
 
 
-sub collect_ml_stats {
+sub collect_stats {
   my $temp_dir = shift(@_);
   my $model_base = shift(@_);
   my $cfg = shift(@_);
@@ -270,7 +277,7 @@ sub collect_ml_stats {
   my $bw_option = "";
   my $mllt_option = "";
   my $spkc_switch = "";
-  $bw_option = "-H" if ($USE_BAUM_WELCH);
+  $bw_option = "-H" if ($USE_HMMNETS);
   $spkc_switch = "-S $SPKC_FILE" if ($SPKC_FILE ne "");
 
   $mllt_option = "--mllt" if ($mllt_flag);
@@ -298,7 +305,7 @@ sub collect_ml_stats {
     print $list_fh $statsfile."\n";
   }
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $bw_option -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -t -i $VERBOSITY $mllt_option\n";
+  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $bw_option -o $statsfile $FILEFORMAT $STATS_MODE -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -t -i $VERBOSITY $mllt_option\n";
   print $fh "touch $keyfile\n";
   close($fh);
   push @{$batch_info->{"script"}}, $scriptfile;
@@ -307,84 +314,7 @@ sub collect_ml_stats {
 }
 
 
-
-sub collect_mmi_stats {
-  my $temp_dir = shift(@_);
-  my $model_base = shift(@_);
-  my $cfg = shift(@_);
-  my $stats_list_file = shift(@_);
-  my $batch_options;
-  my ($scriptfile, $statsfile, $keyfile);
-  my $fh;
-  my $batch_info = get_empty_batch_info();
-  my $list_fh;
-  my $spkc_switch = "";
-  $spkc_switch = "-S $SPKC_FILE" if ($SPKC_FILE ne "");
-
-  open $list_fh, "> $stats_list_file" || die "Could not open $stats_list_file";
-
-  # Numerator
-  $scriptfile = "genstats_numerator_${BASE_ID}.sh";
-  open $fh, "> $scriptfile" || die "Could not open $scriptfile";
-  $statsfile = "stats_numerator";
-  $keyfile = "stats_ready_numerator";
-  $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
-  if ($NUM_BATCHES > 1) {
-    for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
-      my $cur_keyfile = $keyfile."_$i";
-      my $cur_statsfile = $statsfile."_$i";
-      print $list_fh $cur_statsfile."\n";
-      unlink(glob($cur_statsfile.".*"));
-      push @{$batch_info->{"key"}}, $cur_keyfile;
-    }
-    $statsfile = $statsfile."_\$SGE_TASK_ID";
-    $keyfile = $keyfile."_\$SGE_TASK_ID";
-  } else {
-    unlink(glob($statsfile.".*"));
-    push @{$batch_info->{"key"}}, $keyfile;
-    print $list_fh $statsfile."\n";
-  }
-  print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $NUM_OPTIONS -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
-  print $fh "touch $keyfile\n";
-  close($fh);
-  push @{$batch_info->{"script"}}, $scriptfile;
-  submit_and_wait($batch_info);
-
-  # Denominator
-  $batch_info = get_empty_batch_info();
-  $scriptfile = "genstats_denominator_${BASE_ID}.sh";
-  open $fh, "> $scriptfile" || die "Could not open $scriptfile";
-  $statsfile = "stats_denominator";
-  $keyfile = "stats_ready_denominator";
-  $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
-  if ($NUM_BATCHES > 1) {
-      for (my $i = 1; $i <= $NUM_BATCHES; $i++) {
-	  my $cur_keyfile = $keyfile."_$i";
-	  my $cur_statsfile = $statsfile."_$i";
-	  print $list_fh $cur_statsfile."\n";
-	  unlink(glob($cur_statsfile.".*"));
-	  push @{$batch_info->{"key"}}, $cur_keyfile;
-      }
-      $statsfile = $statsfile."_\$SGE_TASK_ID";
-      $keyfile = $keyfile."_\$SGE_TASK_ID";
-  } else {
-      unlink(glob($statsfile.".*"));
-      push @{$batch_info->{"key"}}, $keyfile;
-      print $list_fh $statsfile."\n";
-  }
-  print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $DEN_OPTIONS -o $statsfile $FILEFORMAT -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -i $VERBOSITY\n";
-  print $fh "touch $keyfile\n";
-  close($fh);
-  push @{$batch_info->{"script"}}, $scriptfile;
-  close($list_fh);
-  submit_and_wait($batch_info);
-}
-
-
-
-sub ml_estimate {
+sub estimate_model {
   my $temp_dir = shift(@_);
   my $im = shift(@_);
   my $im_cfg = shift(@_);
@@ -396,22 +326,10 @@ sub ml_estimate {
   my $extra_options = "";
 
   $extra_options = "--mllt $MLLT_MODULE_NAME" if ($mllt_flag);
+  $extra_options = $extra_options." --mremove $GAUSS_REMOVE_THRESHOLD" if ($GAUSS_REMOVE_THRESHOLD > 0);
   $extra_options = $extra_options." --split $SPLIT_MIN_OCCUPANCY --maxg $SPLIT_MAX_GAUSSIANS" if ($split_flag);
 
-  my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -t -i $VERBOSITY --minvar $minvar --ml -s ${BASE_ID}_loglikelihoods $extra_options\n");
-  submit_and_wait($batch_info, 10); # Reduced batch check interval
-}
-
-
-sub mmi_estimate {
-  my $temp_dir = shift(@_);
-  my $im = shift(@_);
-  my $im_cfg = shift(@_);
-  my $om = shift(@_);
-  my $stats_list_file = shift(@_);
-  my $minvar = shift(@_);
-
-  my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -i $VERBOSITY --minvar $minvar --mmi -s ${BASE_ID}_conditionalloglikelihood\n");
+  my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -t -i $VERBOSITY --minvar $minvar $TRAIN_MODE -s ${BASE_ID}_loglikelihoods $extra_options\n");
   submit_and_wait($batch_info, 10); # Reduced batch check interval
 }
 

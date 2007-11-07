@@ -8,11 +8,18 @@
 #include "LinearAlgebra.hh"
 #include "Subspaces.hh"
 
+// Bitmasks for statistics mode. Note! PDF_ML_FULL_STATS implies PDF_ML_STATS
+#define PDF_ML_STATS      1
+#define PDF_ML_FULL_STATS 2
+#define PDF_MMI_STATS     4
+#define PDF_MPE_STATS     8
 
 class PDF {
 public:
 
-  enum EstimationMode { ML, MMI };
+  typedef int StatisticsMode; // Use bitflags above
+  enum EstimationMode { ML_EST=1, MMI_EST=2, MPE_EST=3, MPE_MMI_PRIOR_EST=4 };
+  enum AccumBuffer { ML_BUF=0, MMI_BUF=1, MPE_NUM_BUF=2, MPE_DEN_BUF=3 };
   
   // COMMON
 
@@ -23,7 +30,7 @@ public:
   // TRAINING
 
   /* Initializes the accumulator buffers */  
-  virtual void start_accumulating() = 0;
+  virtual void start_accumulating(StatisticsMode mode) = 0;
   /** Has accumulating been started
    * \returns true if start_accumulating has been called, false otherwise
    */
@@ -33,22 +40,15 @@ public:
 			  const FeatureVec &f, 
 			  int accum_pos = 0) = 0;
   /* Writes the currently accumulated statistics to a file */
-  virtual void dump_statistics(std::ostream &os,
-			       int accum_pos = 0) const = 0;
+  virtual void dump_statistics(std::ostream &os) const = 0;
   /* Accumulates from a file dump */
-  virtual void accumulate_from_dump(std::istream &is) = 0;
+  virtual void accumulate_from_dump(std::istream &is, StatisticsMode mode) = 0;
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating() = 0;
   /* Tells if this pdf has been accumulated */
   virtual bool accumulated(int accum_pos = 0) const = 0;
   /* Use the accumulated statistics to update the current model parameters. */
-  virtual void estimate_parameters(void) = 0;
-  /* Sets the training mode for this pdf */
-  void set_estimation_mode(EstimationMode mode) { m_mode = mode; }
-  /* Sets the training mode for this pdf */
-  EstimationMode estimation_mode() const { return m_mode; }
-  /* Returns the correct accumulator for these statistics */
-  int accumulator_position(std::string type);
+  virtual void estimate_parameters(EstimationMode mode) = 0;
   
   // LIKELIHOODS
   
@@ -67,7 +67,6 @@ public:
 
 protected:
   int m_dim;
-  EstimationMode m_mode;
 };
 
 
@@ -127,7 +126,7 @@ public:
   void precompute_likelihoods(const FeatureVec &f);
 
   /// Estimates parameters of the pdfs in the pool
-  void estimate_parameters(void);
+  void estimate_parameters(PDF::EstimationMode mode);
 
 
   /********************************************************************/
@@ -142,7 +141,8 @@ public:
    * \param ismooth   MMI I-smoothing constant
    */
   void set_gaussian_parameters(double minvar = 0, double covsmooth = 0,
-                               double c1 = 0, double c2 = 0, double ismooth = 0);
+                               double c1 = 0, double c2 = 0,
+                               double mmi_ismooth = 0, double mpe_ismooth = 0);
 
   /** Set the HCL objects and settings for optimization
    * \param ls            HCL linesearch
@@ -213,7 +213,8 @@ private:
   double m_covsmooth;
   double m_c1;
   double m_c2;
-  double m_ismooth;
+  double m_mmi_ismooth;
+  double m_mpe_ismooth;
 
   // Subspaces
   std::map<int, PrecisionSubspace*> m_precision_subspaces;
@@ -247,13 +248,17 @@ public:
   bool accumulated() const { return m_accumulated; }
   int feacount() const { return m_feacount; }
   double gamma() const { return m_gamma; }
+  void set_gamma(double g) { m_gamma = g; }
   void get_mean_estimate(Vector &mean_estimate) const;
   void get_accumulated_mean(Vector &mean) const;
+  void set_accumulated_mean(Vector &mean);
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const = 0;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const = 0;
+  virtual void set_accumulated_second_moment(Matrix &second_moment) = 0;
   virtual void accumulate(int feacount, double gamma, const FeatureVec &f) = 0;
   virtual void dump_statistics(std::ostream &os) const = 0;
   virtual void accumulate_from_dump(std::istream &is) = 0;
+  virtual bool full_stats_accumulated() const = 0;
 protected:
   int m_dim;
   bool m_accumulated;
@@ -277,9 +282,11 @@ public:
   }
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
+  virtual void set_accumulated_second_moment(Matrix &second_moment);
   virtual void accumulate(int feacount, double gamma, const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
+  virtual bool full_stats_accumulated() const { return accumulated(); }
 private:
   SymmetricMatrix m_second_moment;
 };
@@ -299,9 +306,11 @@ public:
   }
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
+  virtual void set_accumulated_second_moment(Matrix &second_moment);
   virtual void accumulate(int feacount, double gamma, const FeatureVec &f);
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
+  virtual bool full_stats_accumulated() const { return false; }
 private:
   Vector m_second_moment;
 };
@@ -321,25 +330,25 @@ public:
   // FROM PDF
 
   /* Initializes the accumulator buffers */  
-  virtual void start_accumulating() = 0;
+  virtual void start_accumulating(StatisticsMode mode) = 0;
   virtual bool is_accumulating() { return (m_accums.size()>0?true:false); }
   /* Accumulates the maximum likelihood statistics for the Gaussian
      weighed with a prior. */
   virtual void accumulate(double prior, const FeatureVec &f, 
 			  int accum_pos = 0) ;
   /* Writes the currently accumulated statistics to a stream */
-  virtual void dump_statistics(std::ostream &os,
-			       int accum_pos = 0) const;
+  virtual void dump_statistics(std::ostream &os) const;
   /* Accumulates from dump */
-  virtual void accumulate_from_dump(std::istream &is);
+  virtual void accumulate_from_dump(std::istream &is, StatisticsMode mode);
   /* Stops training and clears the accumulators */
   virtual void stop_accumulating();
   /* Tells if this Gaussian has been accumulated */
   virtual bool accumulated(int accum_pos = 0) const;
   /* Use the accumulated statistics to update the current model parameters. */
-  virtual void estimate_parameters(void) { estimate_parameters(0, 0, 1, 2, 0); }
-  virtual void estimate_parameters(double minvar, double covsmooth,
-                                   double c1, double c2, double ismooth);
+  virtual void estimate_parameters(EstimationMode mode) { estimate_parameters(mode, 0, 0, 1, 2, false); }
+  virtual void estimate_parameters(EstimationMode mode, double minvar,
+                                   double covsmooth, double c1, double c2,
+                                   bool ml_stats_target);
   
   // GAUSSIAN SPECIFIC
   
@@ -386,14 +395,20 @@ public:
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
   
-  /* Set the full statistics to be accumulated */
-  void set_full_stats(bool full_stats) { m_full_stats = full_stats; }
-  /* Tells if full statistics have been accumulated for this Gaussian */
-  bool full_stats_accumulated() const;
+  /** Tells if full statistics have been accumulated for this Gaussian
+   * \param accum_pos Accumulator position
+   */
+  bool full_stats_accumulated(int accum_pos);
+
+  /** Apply ismoothing to the statistics.
+   * \param source    Source buffer (the one being smoothed with)
+   * \param target    Target buffer (the one the source buffer is added to)
+   * \param smoothing Smoothing constant
+   */
+  void ismooth_statistics(int source, int target, double smoothing);
 
 protected:
   double m_constant;
-  bool m_full_stats;
   
   std::vector<GaussianAccumulator*> m_accums;
 
@@ -418,7 +433,7 @@ public:
   virtual void read(std::istream &is);
 
   // Gaussian-specific
-  virtual void start_accumulating();
+  virtual void start_accumulating(StatisticsMode mode);
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
@@ -437,12 +452,14 @@ public:
                               bool finish_statistics = true);
 
   /// Sets the constant after the precisions have been set
-  void set_constant(void); 
+  void set_constant(void);
 
 private:  
   Vector m_mean;
   Vector m_covariance;
   Vector m_precision;
+
+  bool m_full_stats;
 };
 
 
@@ -461,7 +478,7 @@ public:
   virtual void read(std::istream &is);
 
   // Gaussian-specific
-  virtual void start_accumulating();
+  virtual void start_accumulating(StatisticsMode mode);
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
@@ -500,7 +517,7 @@ public:
   virtual void read(std::istream &is);
 
   // Gaussian-specific
-  virtual void start_accumulating();
+  virtual void start_accumulating(StatisticsMode mode);
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
@@ -554,7 +571,7 @@ public:
   virtual void read(std::istream &is);
 
   // Gaussian-specific
-  virtual void start_accumulating();
+  virtual void start_accumulating(StatisticsMode mode);
   virtual void get_mean(Vector &mean) const;
   virtual void get_covariance(Matrix &covariance) const;
   virtual void set_mean(const Vector &mean);
@@ -644,17 +661,16 @@ public:
   void remove_component(int index);
   
   // From pdf
-  virtual void start_accumulating();
+  virtual void start_accumulating(StatisticsMode mode);
   virtual bool is_accumulating() { return (m_accums.size()>0?true:false); }
   virtual void accumulate(double prior,
 			  const FeatureVec &f,
 			  int accum_pos = 0);
-  virtual void dump_statistics(std::ostream &os,
-			       int accum_pos = 0) const;
-  virtual void accumulate_from_dump(std::istream &is);
+  virtual void dump_statistics(std::ostream &os) const;
+  virtual void accumulate_from_dump(std::istream &is, StatisticsMode mode);
   virtual void stop_accumulating();
   virtual bool accumulated(int accum_pos = 0) const;
-  virtual void estimate_parameters(void);
+  virtual void estimate_parameters(EstimationMode mode);
   virtual double compute_likelihood(const FeatureVec &f) const;
   virtual double compute_log_likelihood(const FeatureVec &f) const;
   virtual void write(std::ostream &os) const;
@@ -689,7 +705,7 @@ Mixture::MixtureAccumulator::MixtureAccumulator(int mixture_size) {
 struct PDFPool::Gaussian_occ_comp
 {
   Gaussian_occ_comp(std::vector<PDF*> &pool) : m_pool(pool) { }
-  bool operator()(int x, int y) { return dynamic_cast< Gaussian* > (m_pool[x]) ->m_accums[0]->gamma() > dynamic_cast< Gaussian* > (m_pool[y]) ->m_accums[0]->gamma(); }
+  bool operator()(int x, int y) { return dynamic_cast< Gaussian* > (m_pool[x]) ->m_accums[PDF::ML_BUF]->gamma() > dynamic_cast< Gaussian* > (m_pool[y]) ->m_accums[PDF::ML_BUF]->gamma(); }
 private:
   std::vector<PDF*> &m_pool;
 };

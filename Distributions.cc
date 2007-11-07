@@ -17,6 +17,13 @@ GaussianAccumulator::get_accumulated_mean(Vector &mean) const
 
 
 void
+GaussianAccumulator::set_accumulated_mean(Vector &mean)
+{
+  m_mean.copy(mean);
+}
+
+
+void
 GaussianAccumulator::get_mean_estimate(Vector &mean) const
 {
   mean.copy(m_mean);
@@ -79,6 +86,14 @@ void
 FullStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_moment) const
 {
   second_moment = LaGenMatDouble(m_second_moment);
+}
+
+void
+FullStatisticsAccumulator::set_accumulated_second_moment(Matrix &second_moment)
+{
+  for (int i = 0; i < dim(); i++)
+    for (int j = 0; j <= i; j++)
+      m_second_moment(i, j) = second_moment(i, j);
 }
 
 
@@ -179,6 +194,14 @@ DiagonalStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_mome
 
 
 void
+DiagonalStatisticsAccumulator::set_accumulated_second_moment(Matrix &second_moment)
+{
+  for (int i = 0; i < dim(); i++)
+    m_second_moment(i) = second_moment(i, i);
+}
+
+
+void
 DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureVec &f)
 {
   assert( feacount >= 0 );
@@ -190,17 +213,6 @@ DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const Feat
   Blas_Add_Mult(m_mean, gamma, *feature);
   for (int i=0; i<dim(); i++)
     m_second_moment(i) += gamma * (*feature)(i) * (*feature)(i);
-}
-
-
-int
-PDF::accumulator_position(std::string stats_type)
-{
-  if (stats_type == "num")
-    return 0;
-  else if (stats_type == "den")
-    return 1;
-  else return -1;
 }
 
 
@@ -217,25 +229,34 @@ Gaussian::accumulate(double gamma,
 
 
 void 
-Gaussian::dump_statistics(std::ostream &os,
-                          int accum_pos) const
+Gaussian::dump_statistics(std::ostream &os) const
 {
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);  
-
-  m_accums[accum_pos]->dump_statistics(os);
+  for (int i = 0; i < (int)m_accums.size(); i++)
+  {
+    if (m_accums[i]->accumulated()) {
+      os.write((char*)&i, sizeof(int));
+      m_accums[i]->dump_statistics(os);
+    }
+  }
+  int end = -1;
+  os.write((char*)&end, sizeof(int));
 }
-  
+
 void 
-Gaussian::accumulate_from_dump(std::istream &is)
+Gaussian::accumulate_from_dump(std::istream &is, StatisticsMode mode)
 {
   int accum_pos;  
   is.read((char*)&accum_pos, sizeof(int));
 
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
+  if (m_accums.size() == 0)
+    start_accumulating(mode);
 
-  m_accums[accum_pos]->accumulate_from_dump(is);
+  while (accum_pos >= 0) {
+    if (accum_pos >= (int)m_accums.size() || m_accums[accum_pos] == NULL)
+      throw str::fmt(128, "Gaussian::accumulate_from_dump:Invalid accumulator position %i", accum_pos);
+    m_accums[accum_pos]->accumulate_from_dump(is);
+    is.read((char*)&accum_pos, sizeof(int));
+  }
 }
 
 
@@ -262,47 +283,81 @@ Gaussian::accumulated(int accum_pos) const
 
 
 void
-Gaussian::estimate_parameters(double minvar, double covsmooth,
-                              double c1, double c2, double ismooth)
+Gaussian::ismooth_statistics(int source, int target, double smoothing)
 {
-  if (!accumulated(0))
-    throw std::string("Parameters could not be estimated, ML statistics not accumulated");
+  if (!accumulated(source) || !accumulated(target))
+  {
+    fprintf(stderr, "Warning: Could not perform I-smoothing due to missing statistics!\n");
+    return;
+  }
+  double smooth_factor = smoothing/m_accums[source]->gamma();
+
+  m_accums[target]->set_gamma(m_accums[target]->gamma()+smoothing);
+  
+  LaVectorDouble mu_source, mu_target;
+  m_accums[source]->get_accumulated_mean(mu_source);
+  m_accums[target]->get_accumulated_mean(mu_target);
+  Blas_Add_Mult(mu_target, smooth_factor, mu_source);
+  m_accums[target]->set_accumulated_mean(mu_target);
+
+  LaGenMatDouble sigma_source, sigma_target;
+  m_accums[source]->get_accumulated_second_moment(mu_source);
+  m_accums[target]->get_accumulated_second_moment(mu_target);
+  Blas_Add_Mat_Mult(sigma_target, smooth_factor, sigma_source);
+  m_accums[target]->set_accumulated_second_moment(mu_target);
+}
+
+
+void
+Gaussian::estimate_parameters(EstimationMode mode, double minvar,
+                              double covsmooth, double c1, double c2,
+                              bool ml_stats_target)
+{
+  if ((mode == ML_EST && !accumulated(ML_BUF)) ||
+      (mode == MMI_EST && (!accumulated(ML_BUF) || !accumulated(MMI_BUF))) ||
+      ((mode == MPE_EST || mode == MPE_MMI_PRIOR_EST) &&
+       (!accumulated(MPE_NUM_BUF) || !accumulated(MPE_DEN_BUF))))
+  {
+    fprintf(stderr, "Warning: Could not estimate Gaussian parameters due to missing statistics!\n");
+    return;
+  }
 
   Vector new_mean;
   Matrix new_covariance;
+  int feacount;
   
-  if (m_mode == ML) {
-    m_accums[0]->get_mean_estimate(new_mean);
-    m_accums[0]->get_covariance_estimate(new_covariance);
+  if (mode == ML_EST)
+  {
+    m_accums[ML_BUF]->get_mean_estimate(new_mean);
+    m_accums[ML_BUF]->get_covariance_estimate(new_covariance);
+    feacount = m_accums[ML_BUF]->feacount();
   }
-  else if (m_mode == MMI && !accumulated(1)) {
-    fprintf(stderr, "Warning: MMI statistics were not updated for this Gaussian, backing down to ML estimation\n");
-    m_accums[0]->get_mean_estimate(new_mean);
-    m_accums[0]->get_covariance_estimate(new_covariance);
-  }
-  else if (m_mode == MMI) {
+  else
+  {
+    int num_buf = ML_BUF, den_buf = MMI_BUF;
+    if (mode == MPE_EST || mode == MPE_MMI_PRIOR_EST)
+    {
+      num_buf = MPE_NUM_BUF;
+      den_buf = MPE_DEN_BUF;
+    }
     
     Vector old_mean;
     Matrix old_covariance;
     get_mean(old_mean);
     get_covariance(old_covariance);
-
-    double smooth_factor = 1 + ismooth/m_accums[0]->gamma();
     
     // c & mu~ & sigma~
-    double c = smooth_factor * m_accums[0]->gamma() - m_accums[1]->gamma();
+    double c = m_accums[num_buf]->gamma() - m_accums[den_buf]->gamma();
     LaVectorDouble mu_tilde;
     LaVectorDouble temp_denominator_mu;
-    m_accums[0]->get_accumulated_mean(mu_tilde);
-    Blas_Scale(smooth_factor, mu_tilde);
-    m_accums[1]->get_accumulated_mean(temp_denominator_mu);
+    m_accums[num_buf]->get_accumulated_mean(mu_tilde);
+    m_accums[den_buf]->get_accumulated_mean(temp_denominator_mu);
     Blas_Add_Mult(mu_tilde, -1, temp_denominator_mu);
 
     LaGenMatDouble sigma_tilde;
     LaGenMatDouble temp_denominator_sigma;
-    m_accums[0]->get_accumulated_second_moment(sigma_tilde);
-    Blas_Scale(smooth_factor, sigma_tilde);
-    m_accums[1]->get_accumulated_second_moment(temp_denominator_sigma);
+    m_accums[num_buf]->get_accumulated_second_moment(sigma_tilde);
+    m_accums[den_buf]->get_accumulated_second_moment(temp_denominator_sigma);
     Blas_Add_Mat_Mult(sigma_tilde, -1, temp_denominator_sigma);
     
     // a0
@@ -348,7 +403,7 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
       if (std::fabs(eigvals(i).i) < 0.000000001)
         d=std::max(d, eigvals(i).r);    
     assert(c2>1);
-    d=std::max(c1*m_accums[1]->gamma(), c2*d);
+    d=std::max(c1*m_accums[den_buf]->gamma(), c2*d);
     
     // COMPUTE NEW MEAN
     // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
@@ -365,17 +420,16 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
     Blas_Add_Mat_Mult(new_covariance, 1, sigma_tilde);
     Blas_Scale(1/(c+d), new_covariance);
     Blas_R1_Update(new_covariance, new_mean, new_mean, -1);
+
+    feacount = m_accums[num_buf]->feacount();
   }
-  else
-    assert( 0 );
 
   // Check that covariances are valid
-  if (m_accums[0]->feacount() > 1)
+  if (feacount > 1)
   {
     for (int i=0; i<dim(); i++)
       if (new_covariance(i,i) <= 0)
-        fprintf(stderr, "Warning: Variance in dimension %i is %g (gamma %g)\n",
-                i, new_covariance(i,i), m_accums[0]->gamma());
+        fprintf(stderr, "Warning: Variance in dimension %i is %g (%i features)\n", i, new_covariance(i,i), feacount);
   }
   
   // Common tweaking
@@ -383,16 +437,25 @@ Gaussian::estimate_parameters(double minvar, double covsmooth,
     if (new_covariance(i,i) < minvar)
       new_covariance(i,i) = minvar;
   
-  if (covsmooth != 0) {
+  if (covsmooth != 0)
+  {
     for (int i=0; i<dim(); i++)
       for (int j=0; j<dim(); j++)
         if (i != j)
-          new_covariance(i,j) *= m_accums[0]->feacount()/(m_accums[0]->feacount()+covsmooth);
+          new_covariance(i,j) *= feacount/(feacount+covsmooth);
   }
 
   // Set the parameters
-  set_mean(new_mean);
-  set_covariance(new_covariance);
+  if (ml_stats_target)
+  {
+    m_accums[ML_BUF]->set_accumulated_mean(new_mean);
+    m_accums[ML_BUF]->set_accumulated_second_moment(new_covariance);
+  }
+  else
+  {
+    set_mean(new_mean);
+    set_covariance(new_covariance);
+  }
 }
 
 
@@ -544,13 +607,12 @@ Gaussian::kullback_leibler(Gaussian &g) const
 
 
 bool
-Gaussian::full_stats_accumulated() const
+Gaussian::full_stats_accumulated(int accum_pos)
 {
-  if (!m_full_stats)
+  if ((int)m_accums.size() <= accum_pos || m_accums[accum_pos] == NULL)
     return false;
-  return accumulated();
+  return m_accums[accum_pos]->full_stats_accumulated();
 }
-
 
 void
 Gaussian::set_covariance(const Vector &covariance,
@@ -606,7 +668,6 @@ void
 DiagonalGaussian::reset(int dim)
 {
   m_dim=dim;
-  m_mode=ML;
   
   m_mean.resize(dim);
   m_covariance.resize(dim);
@@ -614,7 +675,6 @@ DiagonalGaussian::reset(int dim)
   m_mean=0; m_covariance=0; m_precision=0;
 
   m_constant=0;
-  m_full_stats=false;
 }
 
 
@@ -685,25 +745,27 @@ DiagonalGaussian::read(std::istream &is)
 
 
 void
-DiagonalGaussian::start_accumulating()
+DiagonalGaussian::start_accumulating(StatisticsMode mode)
 {
-  if (m_mode == ML) {
-    m_accums.resize(1);
-    if (m_full_stats)
-      m_accums[0] = new FullStatisticsAccumulator(dim());
-    else
-      m_accums[0] = new DiagonalStatisticsAccumulator(dim());
+  if (mode & PDF_ML_STATS && !(mode & PDF_ML_FULL_STATS)) {
+    m_accums.resize(ML_BUF+1, NULL);
+    m_accums[ML_BUF] = new DiagonalStatisticsAccumulator(dim());
   }
-  else if (m_mode == MMI) {
-    m_accums.resize(2);
-    if (m_full_stats) {
-      m_accums[0] = new FullStatisticsAccumulator(dim());
-      m_accums[1] = new FullStatisticsAccumulator(dim());
-    }
-    else {
-      m_accums[0] = new DiagonalStatisticsAccumulator(dim());
-      m_accums[1] = new DiagonalStatisticsAccumulator(dim());
-    }
+  else if (mode & PDF_ML_FULL_STATS) {
+    m_accums.resize(ML_BUF+1, NULL);
+    m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
+  }
+  
+  if (mode & PDF_MMI_STATS) {
+    m_accums.resize(MMI_BUF+1, NULL);
+    if (m_accums[ML_BUF] == NULL)
+      m_accums[ML_BUF] = new DiagonalStatisticsAccumulator(dim());
+    m_accums[MMI_BUF] = new DiagonalStatisticsAccumulator(dim());
+  }
+  if (mode & PDF_MPE_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
+    m_accums[MPE_NUM_BUF] = new DiagonalStatisticsAccumulator(dim());
+    m_accums[MPE_DEN_BUF] = new DiagonalStatisticsAccumulator(dim());
   }
 }
 
@@ -843,14 +905,12 @@ void
 FullCovarianceGaussian::reset(int dim)
 {
   m_dim=dim;
-  m_mode=ML;
   
   m_mean.resize(dim);
   m_precision.resize(dim,dim);
   m_mean=0; m_precision=0; m_covariance=0;
 
   m_constant=0;
-  m_full_stats=true;
   m_statistics_finished=false;
 }
 
@@ -932,16 +992,22 @@ FullCovarianceGaussian::read(std::istream &is)
 
 
 void
-FullCovarianceGaussian::start_accumulating()
+FullCovarianceGaussian::start_accumulating(StatisticsMode mode)
 {
-  if (m_mode == ML) {
-    m_accums.resize(1);
-    m_accums[0] = new FullStatisticsAccumulator(dim());
+  if (mode & (PDF_ML_STATS|PDF_ML_FULL_STATS)) {
+    m_accums.resize(ML_BUF+1, NULL);
+    m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
   }
-  else if (m_mode == MMI) {
-    m_accums.resize(2);
-    m_accums[0] = new FullStatisticsAccumulator(dim());
-    m_accums[1] = new FullStatisticsAccumulator(dim());
+  if (mode & PDF_MMI_STATS) {
+    m_accums.resize(MMI_BUF+1, NULL);
+    if (m_accums[ML_BUF] == NULL)
+      m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
+    m_accums[MMI_BUF] = new FullStatisticsAccumulator(dim());
+  }
+  if (mode & PDF_MPE_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
+    m_accums[MPE_NUM_BUF] = new FullStatisticsAccumulator(dim());
+    m_accums[MPE_DEN_BUF] = new FullStatisticsAccumulator(dim());
   }
 }
 
@@ -1038,7 +1104,6 @@ PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(const PrecisionConstr
   m_coeffs.copy(g.m_coeffs);
   m_ps = g.get_subspace();
   m_constant = g.m_constant;
-  m_full_stats = true;
 }
 
 
@@ -1051,14 +1116,12 @@ void
 PrecisionConstrainedGaussian::reset(int feature_dim)
 {
   m_dim=feature_dim;
-  m_mode=ML;
   
   m_transformed_mean.resize(feature_dim);
   m_transformed_mean=0;
   m_coeffs=0; m_coeffs(0)=1;
   
   m_constant=0;
-  m_full_stats=true;
 }
 
 
@@ -1125,16 +1188,22 @@ PrecisionConstrainedGaussian::read(std::istream &is)
 
 
 void
-PrecisionConstrainedGaussian::start_accumulating()
+PrecisionConstrainedGaussian::start_accumulating(StatisticsMode mode)
 {
-  if (m_mode == ML) {
-    m_accums.resize(1);
-    m_accums[0] = new FullStatisticsAccumulator(dim());
+  if (mode & (PDF_ML_STATS|PDF_ML_FULL_STATS)) {
+    m_accums.resize(ML_BUF+1, NULL);
+    m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
   }
-  else if (m_mode == MMI) {
-    m_accums.resize(2);
-    m_accums[0] = new FullStatisticsAccumulator(dim());
-    m_accums[1] = new FullStatisticsAccumulator(dim());
+  if (mode & PDF_MMI_STATS) {
+    m_accums.resize(MMI_BUF+1, NULL);
+    if (m_accums[ML_BUF] == NULL)
+      m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
+    m_accums[MMI_BUF] = new FullStatisticsAccumulator(dim());
+  }
+  if (mode & PDF_MPE_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
+    m_accums[MPE_NUM_BUF] = new FullStatisticsAccumulator(dim());
+    m_accums[MPE_DEN_BUF] = new FullStatisticsAccumulator(dim());
   }
 }
 
@@ -1240,13 +1309,11 @@ void
 SubspaceConstrainedGaussian::reset(int feature_dim)
 {
   m_dim=feature_dim;
-  m_mode=ML;
   
   m_coeffs=0;
   m_coeffs(0)=1;
   
   m_constant=0;
-  m_full_stats=true;
 }
 
 
@@ -1321,16 +1388,22 @@ SubspaceConstrainedGaussian::read(std::istream &is)
 
 
 void
-SubspaceConstrainedGaussian::start_accumulating()
+SubspaceConstrainedGaussian::start_accumulating(StatisticsMode mode)
 {
-  if (m_mode == ML) {
-    m_accums.resize(1);
-    m_accums[0] = new FullStatisticsAccumulator(dim());
+  if (mode & (PDF_ML_STATS|PDF_ML_FULL_STATS)) {
+    m_accums.resize(ML_BUF+1, NULL);
+    m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
   }
-  else if (m_mode == MMI) {
-    m_accums.resize(2);
-    m_accums[0] = new FullStatisticsAccumulator(dim());
-    m_accums[1] = new FullStatisticsAccumulator(dim());
+  if (mode & PDF_MMI_STATS) {
+    m_accums.resize(MMI_BUF+1, NULL);
+    if (m_accums[ML_BUF] == NULL)
+      m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
+    m_accums[MMI_BUF] = new FullStatisticsAccumulator(dim());
+  }
+  if (mode & PDF_MPE_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
+    m_accums[MPE_NUM_BUF] = new FullStatisticsAccumulator(dim());
+    m_accums[MPE_DEN_BUF] = new FullStatisticsAccumulator(dim());
   }
 }
 
@@ -1483,22 +1556,31 @@ Mixture::compute_log_likelihood(const FeatureVec &f) const
 
 
 void
-Mixture::start_accumulating()
+Mixture::start_accumulating(StatisticsMode mode)
 {
-  if (m_mode == ML) {
-    m_accums.resize(1);
-    m_accums[0] = new MixtureAccumulator(size());
+  if (mode & (PDF_ML_STATS|PDF_ML_FULL_STATS)) {
+    m_accums.resize(ML_BUF+1, NULL);
+    m_accums[ML_BUF] = new MixtureAccumulator(size());
   }
-  else if (m_mode == MMI) {
-    m_accums.resize(2);
-    m_accums[0] = new MixtureAccumulator(size());
-    m_accums[1] = new MixtureAccumulator(size());
+  if (mode & PDF_MMI_STATS) {
+    m_accums.resize(MMI_BUF+1, NULL);
+    if (m_accums[ML_BUF] == NULL)
+      m_accums[ML_BUF] = new MixtureAccumulator(size());
+    m_accums[MMI_BUF] = new MixtureAccumulator(size());
   }
-  
-  for (int i=0; i<size(); i++)
+  if (mode & PDF_MPE_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
+    m_accums[MPE_NUM_BUF] = new MixtureAccumulator(size());
+    m_accums[MPE_DEN_BUF] = new MixtureAccumulator(size());
+  }
+
+  if (mode != 0)
   {
-    if (!get_base_pdf(i)->is_accumulating())
-      get_base_pdf(i)->start_accumulating();
+    for (int i=0; i<size(); i++)
+    {
+      if (!get_base_pdf(i)->is_accumulating())
+        get_base_pdf(i)->start_accumulating(mode);
+    }
   }
 }
 
@@ -1537,43 +1619,52 @@ Mixture::accumulated(int accum_pos) const
 
 
 void 
-Mixture::dump_statistics(std::ostream &os,
-			 int accum_pos) const
+Mixture::dump_statistics(std::ostream &os) const
 {
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
+  for (int a = 0; a < (int)m_accums.size(); a++)
+  {
+    if (m_accums[a]->accumulated)
+    {
+      os << a << " " << size();
 
-  if (m_accums[accum_pos]->accumulated) {
-    os << size();
-    for (int i=0; i<size()-1; i++)
-      os << " " << m_pointers[i] << " " << m_accums[accum_pos]->gamma[i];
-    os << " " << m_pointers[size()-1] << " " << m_accums[accum_pos]->gamma[size()-1];
+      for (int i = 0; i < size(); i++)
+        os << " " << m_pointers[i] << " " << m_accums[a]->gamma[i];
+      os << std::endl;
+    }
   }
+  os << "-1" << std::endl;
 }
 
 
 void 
-Mixture::accumulate_from_dump(std::istream &is)
+Mixture::accumulate_from_dump(std::istream &is, StatisticsMode mode)
 {
-  std::string type;
-  is >> type;
-  int accum_pos = accumulator_position(type);
+  int accum_pos;
+  is >> accum_pos;
 
-  assert((int)m_accums.size() > accum_pos);
-  assert(m_accums[accum_pos] != NULL);
+  if (m_accums.size() == 0)
+    start_accumulating(mode);
 
-  int pointer, sz;
-  double acc;
-  is >> sz;
-  assert(sz==size());
+  while (accum_pos >= 0)
+  {
+    if (accum_pos >= (int)m_accums.size() || m_accums[accum_pos] == NULL)
+      throw str::fmt(128, "Mixture::accumulate_from_dump: Invalid accumulator position %i", accum_pos);
 
-  for (int i=0; i<size(); i++) {
-    is >> pointer >> acc;    
-    assert(m_pointers[i] == pointer);
-    m_accums[accum_pos]->gamma[i] += acc;
+    int pointer, sz;
+    double acc;
+    is >> sz;
+    assert(sz==size());
+
+    for (int i=0; i<size(); i++) {
+      is >> pointer >> acc;    
+      assert(m_pointers[i] == pointer);
+      m_accums[accum_pos]->gamma[i] += acc;
+    }
+
+    m_accums[accum_pos]->accumulated = true;
+    
+    is >> accum_pos;
   }
-
-  m_accums[accum_pos]->accumulated = true;
 }
 
 
@@ -1592,22 +1683,35 @@ Mixture::stop_accumulating()
 
 
 void
-Mixture::estimate_parameters(void)
+Mixture::estimate_parameters(EstimationMode mode)
 {
-  if (!accumulated(0))
-    throw std::string("Parameters could not be estimated, ML statistics not accumulated");
-
-  if (m_mode == ML || !accumulated(1)) {    
+  if ((mode == ML_EST && !accumulated(ML_BUF)) ||
+      (mode == MMI_EST && (!accumulated(ML_BUF) || !accumulated(MMI_BUF))) ||
+      ((mode == MPE_EST || mode == MPE_MMI_PRIOR_EST) &&
+       (!accumulated(MPE_NUM_BUF) || !accumulated(MPE_DEN_BUF))))
+  {
+    fprintf(stderr, "Warning: Could not estimate mixture parameters due to missing statistics!\n");
+    return;
+  }
+  
+  if (mode == ML_EST) {    
     double total_gamma = 0;
     for (int i=0; i<size(); i++)
-      total_gamma += m_accums[0]->gamma[i];    
+      total_gamma += m_accums[ML_BUF]->gamma[i];    
     for (int i=0; i<size(); i++)
-      m_weights[i] = m_accums[0]->gamma[i]/total_gamma;
+      m_weights[i] = m_accums[ML_BUF]->gamma[i]/total_gamma;
   }
+  else if (mode == MMI_EST)
+  {
+    // There are many alternatives for updating mixture coefficients
+    // This implementation follows Woodland & Povey, '02
 
-  // There are many alternatives for updating mixture coefficients
-  // This implementation follows Woodland & Povey, '02
-  else if (m_mode == MMI) {
+    int num_buf = ML_BUF, den_buf = MMI_BUF;
+    if (mode == MPE_EST || mode == MPE_MMI_PRIOR_EST)
+    {
+      num_buf = MPE_NUM_BUF;
+      den_buf = MPE_DEN_BUF;
+    }
 
     double currfval=0, oldfval=0, diff=1, norm;
 
@@ -1618,6 +1722,13 @@ Mixture::estimate_parameters(void)
       iter++;
       diff = 0;
       std::vector<double> previous_weights = m_weights;
+
+      if (size() == 1)
+      {
+        assert( m_weights.size() == 1 );
+        m_weights[0] = 1;
+        break;
+      }
 
       // Go through every mixture weight
       for (int i=0; i<size(); i++) {
@@ -1632,14 +1743,14 @@ Mixture::estimate_parameters(void)
             temp += previous_weights[j];
         for (int j=0; j<size(); j++)
           if (i != j)
-            a -= m_accums[1]->gamma[j] * previous_weights[j] / (old_weights[j] * temp);
-        a += m_accums[1]->gamma[i] / old_weights[i];
+            a -= m_accums[den_buf]->gamma[j] * previous_weights[j] / (old_weights[j] * temp);
+        a += m_accums[den_buf]->gamma[i] / old_weights[i];
         // b
         b = -a;
         for (int j=0; j<size(); j++)
-            b -= m_accums[0]->gamma[j];
+            b -= m_accums[num_buf]->gamma[j];
         // c
-        c = m_accums[0]->gamma[i];
+        c = m_accums[num_buf]->gamma[i];
         // Solve
         sol1 = (-b-sqrt(b*b-4*a*c)) / (2*a);
         sol2 = (-b+sqrt(b*b-4*a*c)) / (2*a);
@@ -1652,7 +1763,7 @@ Mixture::estimate_parameters(void)
           break;
         }
         
-        assert(sol1 > 0); assert(sol1 < 1);
+        assert(sol1 > 0); assert(sol1 <= 1.00001);
         m_weights[i] = sol1;
 
         // Renormalize weights
@@ -1667,7 +1778,8 @@ Mixture::estimate_parameters(void)
       oldfval = currfval;
       currfval = 0;
       for (int i=0; i<size(); i++)
-        currfval += m_accums[0]->gamma[i] * m_weights[i] - m_accums[1]->gamma[i] * m_weights[i] / old_weights[i];
+        currfval += m_accums[num_buf]->gamma[i] * m_weights[i] -
+          m_accums[den_buf]->gamma[i] * m_weights[i] / old_weights[i];
       diff = std::fabs(oldfval-currfval);
     }
   }  
@@ -1918,13 +2030,15 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
 
 void
 PDFPool::set_gaussian_parameters(double minvar, double covsmooth,
-                                 double c1, double c2, double ismooth)
+                                 double c1, double c2, double mmi_ismooth,
+                                 double mpe_ismooth)
 {
   m_minvar = minvar;
   m_covsmooth = covsmooth;
   m_c1 = c1;
   m_c2 = c2;
-  m_ismooth = ismooth;
+  m_mmi_ismooth = mmi_ismooth;
+  m_mpe_ismooth = mpe_ismooth;
 }
 
 
@@ -1947,7 +2061,7 @@ PDFPool::set_hcl_optimization(HCL_LineSearch_MT_d *ls,
 
 
 void
-PDFPool::estimate_parameters(void)
+PDFPool::estimate_parameters(PDF::EstimationMode mode)
 {
   for (int i=0; i<size(); i++)
   {
@@ -1961,9 +2075,24 @@ PDFPool::estimate_parameters(void)
 
     try {
       if (temp != NULL)
-        temp->estimate_parameters(m_minvar, m_covsmooth, m_c1, m_c2, m_ismooth);
+      {
+        if (mode == PDF::MPE_MMI_PRIOR_EST)
+        {
+          if (m_mmi_ismooth > 0)
+            temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
+          temp->estimate_parameters(PDF::MMI_EST, m_minvar, m_covsmooth,
+                                    m_c1, m_c2, true);
+          temp->ismooth_statistics(PDF::MPE_NUM_BUF,PDF::ML_BUF,m_mpe_ismooth);
+        }
+        else if (mode == PDF::MPE_EST && m_mpe_ismooth > 0)
+          temp->ismooth_statistics(PDF::MPE_NUM_BUF,PDF::ML_BUF,m_mpe_ismooth);
+        else if (mode == PDF::MMI_EST && m_mmi_ismooth > 0)
+          temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
+        temp->estimate_parameters(mode, m_minvar, m_covsmooth,
+                                  m_c1, m_c2, false);
+      }
       else
-        m_pool[i]->estimate_parameters();
+        m_pool[i]->estimate_parameters(mode);
     } catch (std::string errstr) {
       std::cout << "Warning: Gaussian number " << i
                 << ": " << errstr << std::endl;
@@ -1977,7 +2106,7 @@ PDFPool::read_gk(const std::string &filename)
 {
   std::ifstream in(filename.c_str());
   if (!in)
-    throw std::string("PDFPool::read_gk(): could not open %s\n", filename.c_str());
+    throw str::fmt(512, "PDFPool::read_gk(): could not open %s\n", filename.c_str());
   
   int pdfs = 0;
   int ssid;
@@ -2064,7 +2193,7 @@ PDFPool::read_gk(const std::string &filename)
   }
   
   if (!in)
-    throw std::string("PDFPool::read_gk(): error reading file: %s\n");
+    throw std::string("PDFPool::read_gk(): error reading file: ") + filename;
 }
 
 
@@ -2073,7 +2202,7 @@ PDFPool::write_gk(const std::string &filename) const
 {
   std::ofstream out(filename.c_str());
   if (!out)
-    throw std::string("PDFPool::write_gk(): could not open %s\n", filename.c_str());
+    throw std::string("PDFPool::write_gk(): could not open ") + filename;
   
   out << m_pool.size() << " " << m_dim << " variable\n";
 
@@ -2118,7 +2247,7 @@ PDFPool::write_gk(const std::string &filename) const
   }
 
   if (!out)
-    throw std::string("PDFPool::write_gk(): error writing file: %s\n", filename.c_str());
+    throw std::string("PDFPool::write_gk(): error writing file: ") + filename;
 }
 
 
@@ -2171,9 +2300,12 @@ PDFPool::split_gaussian(int index, int *new_index, double minocc, int minfeas)
   if (gaussian == NULL)
     return false;
 
-  if (gaussian->m_accums[0]->gamma() < minocc)
+  if (!gaussian->accumulated(PDF::ML_BUF))
+    throw std::string("PDFPool::split_gaussian: ML statistics are required");
+
+  if (gaussian->m_accums[PDF::ML_BUF]->gamma() < minocc)
     return false;
-  if (gaussian->m_accums[0]->feacount() < minfeas)
+  if (gaussian->m_accums[PDF::ML_BUF]->feacount() < minfeas)
     return false;
   
   Gaussian *new_gaussian = gaussian->copy_gaussian();
@@ -2187,8 +2319,8 @@ double
 PDFPool::get_gaussian_occupancy(int index) const
 {
   Gaussian *gaussian = dynamic_cast< Gaussian* > (m_pool[index]);
-  if (gaussian != NULL && gaussian->accumulated(0))
-    return gaussian->m_accums[0]->gamma();
+  if (gaussian != NULL && gaussian->accumulated(PDF::ML_BUF))
+    return gaussian->m_accums[PDF::ML_BUF]->gamma();
   return -1;
 }
 
@@ -2202,9 +2334,9 @@ PDFPool::get_occ_sorted_gaussians(std::vector<int> &sorted_gaussians,
     Gaussian *gaussian = dynamic_cast< Gaussian* > (m_pool[i]);
     if (gaussian != NULL)
     {
-      if (gaussian->accumulated(0))
+      if (gaussian->accumulated(PDF::ML_BUF))
       {
-        if (gaussian->m_accums[0]->gamma() >= minocc)
+        if (gaussian->m_accums[PDF::ML_BUF]->gamma() >= minocc)
           sorted_gaussians.push_back(i);
       }
     }
@@ -2223,7 +2355,7 @@ PDFPool::read_clustering(const std::string &filename)
 {
   std::ifstream in(filename.c_str());
   if (!in)
-    throw std::string("PDFPool::read_clustering(): could not open %s\n", filename.c_str());
+    throw std::string("PDFPool::read_clustering(): could not open ")+filename;
 
   in >> m_number_of_clusters;
   m_gaussian_to_cluster.resize(size());
@@ -2262,7 +2394,7 @@ PDFPool::read_clustering(const std::string &filename)
         weights.push_back(1.0);
       }
       else
-        throw std::string("PDFPool::read_clustering(): the distribution at index %i wasn't Gaussian\n", m_cluster_to_gaussians[i][j]);
+        throw str::fmt(128, "PDFPool::read_clustering(): the distribution at index %i wasn't Gaussian\n", m_cluster_to_gaussians[i][j]);
     }
 
     // Compute the center by merging

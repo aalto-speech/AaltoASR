@@ -20,6 +20,11 @@ bool transtat;
 float start_time, end_time;
 double total_log_likelihood=0;
 
+// Training modes
+bool ml = false;
+bool mmi = false;
+bool mpe = false;
+
 conf::Config config;
 Recipe recipe;
 HmmSet model;
@@ -27,8 +32,40 @@ FeatureGenerator fea_gen;
 SpeakerConfig speaker_config(fea_gen);
 
 
+bool initialize_hmmnet(HmmNetBaumWelch* lattice, float bw_beam, float fw_beam,
+                       float ac_scale, int hmmnet_mode,
+                       std::string &audio_path)
+{
+  lattice->set_pruning_thresholds(bw_beam, fw_beam);
+  if (config["ac-scale"].specified)
+    lattice->set_acoustic_scaling(ac_scale);
+  if (hmmnet_mode == 1)
+    lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
+  else if (hmmnet_mode == 2)
+    lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
+        
+  double orig_beam = lattice->get_backward_beam();
+  int counter = 1;
+  while (!lattice->init_utterance_segmentation())
+  {
+    if (counter >= 5)
+    {
+      fprintf(stderr, "Could not run Baum-Welch for file %s\n",
+              audio_path.c_str());
+      fprintf(stderr, "The HMM network may be incorrect or initial beam too low.\n");
+      return false;
+    }
+    fprintf(stderr,
+            "Warning: Backward phase failed, increasing beam to %.1f\n",
+            ++counter*orig_beam);
+    lattice->set_pruning_thresholds(counter*orig_beam, 0);
+  }
+  return true;
+}
+
+
 void
-train(HmmSet *model, Segmentator *segmentator)
+train(HmmSet *model, Segmentator *segmentator, bool numerator)
 {
   int frame;
 
@@ -45,15 +82,20 @@ train(HmmSet *model, Segmentator *segmentator)
     const std::vector<Segmentator::IndexProbPair> &pdfs
       = segmentator->pdf_probs();
     for (int i = 0; i < (int)pdfs.size(); i++) {
-      model->accumulate_distribution(feature, pdfs[i].index,
-                                     pdfs[i].prob, accum_pos);
+      if (numerator && (ml || mmi))
+        model->accumulate_distribution(feature, pdfs[i].index,
+                                       pdfs[i].prob, PDF::ML_BUF);
+      else if (mmi)
+        model->accumulate_distribution(feature, pdfs[i].index,
+                                       pdfs[i].prob, PDF::MMI_BUF);
       if (!segmentator->computes_total_log_likelihood())
-        total_log_likelihood += util::safe_log(
-          pdfs[i].prob*model->state_likelihood(pdfs[i].index, feature));
+        total_log_likelihood += (numerator?1:-1)*
+          util::safe_log(pdfs[i].prob*model->state_likelihood(pdfs[i].index,
+                                                              feature));
     }
     
     // Accumulate also transition probabilities if desired
-    if (transtat) {
+    if (numerator && transtat) { // No transition statistics for denumerator!
 
       const std::vector<Segmentator::IndexProbPair> &transitions
         = segmentator->transition_probs();
@@ -71,7 +113,8 @@ train(HmmSet *model, Segmentator *segmentator)
     }
   }
   if (segmentator->computes_total_log_likelihood())
-    total_log_likelihood += segmentator->get_total_log_likelihood();
+    total_log_likelihood +=
+      (numerator?1:-1)*segmentator->get_total_log_likelihood();
 }
 
 
@@ -79,6 +122,7 @@ int
 main(int argc, char *argv[])
 {
   Segmentator *segmentator;
+  int hmmnet_mode = 0;
   try {
     config("usage: stats [OPTION...]\n")
       ('h', "help", "", "", "display help")
@@ -90,7 +134,6 @@ main(int argc, char *argv[])
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for training")
       ('H', "hmmnet", "", "", "use HMM networks for training")
-      ('D', "den-hmmnet", "", "", "use denominator HMM networks for training")
       ('o', "out=BASENAME", "arg must", "", "base filename for output statistics")
       ('R', "raw-input", "", "", "raw audio input")
       ('t', "transitions", "", "", "collect also state transition statistics")
@@ -99,11 +142,14 @@ main(int argc, char *argv[])
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for HMM networks)")
       ('E', "extvit", "", "", "Use extended Viterbi over HMM networks")
       ('V', "vit", "", "", "Use Viterbi over HMM networks")
+      ('\0', "ml", "", "", "Collect statistics for ML")
+      ('\0', "mmi", "", "", "Collect statistics for MMI")
+      ('\0', "mpe", "", "", "Collect statistics for MPE")
+      ('\0', "mllt", "", "", "maximum likelihood linear transformation (for ML)")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
-      ('\0', "mllt", "", "", "maximum likelihood linear transformation")
       ;
     config.default_parse(argc, argv);
     
@@ -153,18 +199,44 @@ main(int argc, char *argv[])
                 config["batch"].get_int(), config["bindex"].get_int(),
                 true);
 
-    // Configure the model for accumulating
-    if (config["den-hmmnet"].specified) {
-      model.set_estimation_mode(PDF::MMI);
-      accum_pos=1;
+    PDF::StatisticsMode mode = 0;
+    
+    if (config["ml"].specified)
+    {
+      ml = true;
+      mode |= PDF_ML_STATS;
     }
-    else {
-      model.set_estimation_mode(PDF::ML);
-      accum_pos=0;
+    if (config["mmi"].specified)
+    {
+      mmi = true;
+      mode |= PDF_MMI_STATS;
     }
+    if (config["mpe"].specified)
+    {
+      mpe = true;
+      mode |= PDF_MPE_STATS;
+    }
+
+    if (mode == 0)
+      throw std::string("At least one mode (--ml, --mmi, --mpe) must be given!");
+
+    if (mode != 1 && !config["hmmnet"].specified)
+      throw std::string("Discriminative training requires --hmmnet");
+
+    if (config["vit"].specified)
+      hmmnet_mode = 1;
+    if (config["extvit"].specified)
+      hmmnet_mode = 2;
+    if (hmmnet_mode > 0 && !config["hmmnet"].specified)
+      throw std::string("--vit and --extvit require --hmmnet");
+    
     if (config["mllt"].specified)
-      model.set_full_stats(true);
-    model.start_accumulating();
+    {
+      if (mmi || mpe)
+        throw std::string("--mllt is only supported with --ml");
+      mode |= PDF_ML_FULL_STATS;
+    }
+    model.start_accumulating(mode);
 
     // Process each recipe line
     for (int f = 0; f < (int)recipe.infos.size(); f++)
@@ -190,38 +262,17 @@ main(int argc, char *argv[])
 
       bool skip = false;
 
-      if (config["hmmnet"].specified || config["den-hmmnet"].specified)
+      if (config["hmmnet"].specified)
       {
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-          &model, config["den-hmmnet"].specified, &fea_gen,
-          config["raw-input"].specified, NULL);
+          &model, false, &fea_gen, config["raw-input"].specified, NULL);
         lattice->set_collect_transition_probs(transtat);
-        lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
-        if (config["ac-scale"].specified)
-          lattice->set_acoustic_scaling(config["ac-scale"].get_float());
-        if (config["extvit"].specified)
-          lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
-        else if (config["vit"].specified)
-          lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
-        
-        double orig_beam = lattice->get_backward_beam();
-        int counter = 1;
-        while (!lattice->init_utterance_segmentation())
-        {
-          if (counter >= 5)
-          {
-            fprintf(stderr, "Could not run Baum-Welch for file %s\n",
-                    recipe.infos[f].audio_path.c_str());
-            fprintf(stderr, "The HMM network may be incorrect or initial beam too low.\n");
-            skip = true;
-            break;
-          }
-          fprintf(stderr,
-                  "Warning: Backward phase failed, increasing beam to %.1f\n",
-                  ++counter*orig_beam);
-          lattice->set_pruning_thresholds(counter*orig_beam, 0);
-        }
+        if (!initialize_hmmnet(lattice, config["bw-beam"].get_float(),
+                               config["fw-beam"].get_float(),
+                               config["ac-scale"].get_float(), hmmnet_mode,
+                               recipe.infos[f].audio_path))
+          skip = true;
         segmentator = lattice;
       }
       else
@@ -243,8 +294,32 @@ main(int argc, char *argv[])
 
       if (!skip)
       {
-        // Train
-        train(&model, segmentator);
+        // Train the numerator
+        train(&model, segmentator, true);
+
+        if (mmi || mpe)
+        {
+          // Clean up
+          delete segmentator;
+          fea_gen.close();
+          
+          // Open files and configure
+          HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
+            &model, true, &fea_gen, config["raw-input"].specified, NULL);
+          lattice->set_collect_transition_probs(transtat);
+          if (!initialize_hmmnet(lattice, config["bw-beam"].get_float(),
+                                 config["fw-beam"].get_float(),
+                                 config["ac-scale"].get_float(), hmmnet_mode,
+                                 recipe.infos[f].audio_path))
+            skip = true;
+          segmentator = lattice;
+
+          if (!skip)
+          {
+            // Train the denumerator
+            train(&model, segmentator, false);
+          }
+        }
       }
 	
       // Clean up
@@ -267,8 +342,8 @@ main(int argc, char *argv[])
     std::ofstream lls_file(lls_file_name.c_str());
     if (lls_file)
     {
-      if (accum_pos == 1) // Denominator
-        total_log_likelihood = -total_log_likelihood;
+//       if (accum_pos == 1) // Denominator
+//         total_log_likelihood = -total_log_likelihood;
       lls_file << total_log_likelihood << std::endl;
       lls_file.close();
     }
