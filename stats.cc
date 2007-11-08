@@ -32,6 +32,101 @@ FeatureGenerator fea_gen;
 SpeakerConfig speaker_config(fea_gen);
 
 
+class MPEEvaluator : public HmmNetBaumWelch::CustomDataQuery {
+private:
+  int m_first_frame;
+  int m_cur_frame;
+  std::vector< std::vector<HmmNetBaumWelch::ArcInfo>* > m_ref_segmentation;
+  
+public:
+  MPEEvaluator() { m_first_frame = -1; }
+
+  // CustomDataQuery interface
+  virtual ~MPEEvaluator() { }
+  virtual double custom_data_value(int frame, HmmNetBaumWelch::Arc &arc);
+
+  // Other public methods
+  void fetch_frame_info(HmmNetBaumWelch *seg);
+  void reset(void);
+
+private:
+  std::string extract_center_phone(const std::string &label);
+};
+
+
+std::string
+MPEEvaluator::extract_center_phone(const std::string &label)
+{
+  int pos1 = label.find_last_of('-');
+  int pos2 = label.find_first_of('+');
+  std::string temp = "";
+  if (pos1 >= 0 && pos2 >= 0)
+  {
+    if (pos2 > pos1+1)
+      temp = label.substr(pos1+1, pos2-pos1-1);
+  }
+  else if (pos1 >= 0)
+    temp = label.substr(pos1);
+  else if (pos2 >= 0)
+    temp = label.substr(0, pos2);
+  else
+    temp = label;
+  if ((int)temp.size() > 0)
+    return temp;
+  return label;
+}
+
+double
+MPEEvaluator::custom_data_value(int frame, HmmNetBaumWelch::Arc &arc)
+{
+  int internal_frame = frame - m_first_frame;
+  if (internal_frame < 0 || internal_frame >= (int)m_ref_segmentation.size())
+    return 0;
+  // Check the label against the correct one
+  if (arc.label[0] == '_') // Silence node
+    return 0;
+
+  std::string center = extract_center_phone(arc.label);
+  for (int i = 0; i < (int)m_ref_segmentation[internal_frame]->size(); i++)
+    if ((*m_ref_segmentation[internal_frame])[i].label == center)
+      return 1;
+  return 0;
+}
+
+void
+MPEEvaluator::reset(void)
+{
+  m_first_frame = -1;
+  // Clear the old reference segmentation
+  for (int i = 0; i < (int)m_ref_segmentation.size(); i++)
+    delete m_ref_segmentation[i];
+  m_ref_segmentation.clear();
+}
+
+void
+MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
+{
+  int seg_frame = seg->current_frame();
+  if (m_first_frame == -1)
+    m_first_frame = seg_frame;
+  else if (m_cur_frame+1 != seg_frame)
+    throw std::string("Non-continuous numerator segmentation");
+  m_cur_frame = seg_frame;
+
+  m_ref_segmentation.push_back(
+    new std::vector<HmmNetBaumWelch::ArcInfo> );
+  seg->fill_arc_info(*(m_ref_segmentation.back()));
+
+  // Process the labels to speed up the custom data query
+  for (int i = 0; i < (int)m_ref_segmentation.back()->size(); i++)
+    (*m_ref_segmentation.back())[i].label = extract_center_phone((*m_ref_segmentation.back())[i].label);
+        
+}
+
+
+MPEEvaluator mpe_evaluator;
+
+
 bool initialize_hmmnet(HmmNetBaumWelch* lattice, float bw_beam, float fw_beam,
                        float ac_scale, int hmmnet_mode,
                        std::string &audio_path)
@@ -69,6 +164,9 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
 {
   int frame;
 
+  if (mpe && numerator)
+    mpe_evaluator.reset();
+  
   while (segmentator->next_frame()) {
 
     // Fetch the current feature vector
@@ -81,17 +179,50 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
     // Accumulate all possible states distributions for this frame
     const std::vector<Segmentator::IndexProbPair> &pdfs
       = segmentator->pdf_probs();
-    for (int i = 0; i < (int)pdfs.size(); i++) {
-      if (numerator && (ml || mmi))
-        model->accumulate_distribution(feature, pdfs[i].index,
-                                       pdfs[i].prob, PDF::ML_BUF);
-      else if (mmi)
-        model->accumulate_distribution(feature, pdfs[i].index,
-                                       pdfs[i].prob, PDF::MMI_BUF);
-      if (!segmentator->computes_total_log_likelihood())
-        total_log_likelihood += (numerator?1:-1)*
-          util::safe_log(pdfs[i].prob*model->state_likelihood(pdfs[i].index,
-                                                              feature));
+    
+    if (mpe)
+    {
+      HmmNetBaumWelch *seg = dynamic_cast< HmmNetBaumWelch* >(segmentator);
+      if (seg == NULL)
+        throw std::string("MPE training requires the use of hmmnets!");
+      if (numerator)
+        mpe_evaluator.fetch_frame_info(seg);
+      else
+      {
+        std::vector<HmmNetBaumWelch::ArcInfo> arcs;
+        seg->fill_arc_info(arcs);
+        for (int i = 0; i < (int)arcs.size(); i++)
+        {
+          double gamma = arcs[i].custom_score - seg->get_total_custom_score();
+          if (gamma > 0)
+            model->accumulate_distribution(feature, arcs[i].pdf_index,
+                                           gamma, PDF::MPE_NUM_BUF);
+          else
+            model->accumulate_distribution(feature, arcs[i].pdf_index,
+                                           -gamma, PDF::MPE_DEN_BUF);
+        }
+      }
+    }
+    else
+    {
+      for (int i = 0; i < (int)pdfs.size(); i++)
+      {
+        if (numerator)
+        {
+          if (ml || mmi)
+            model->accumulate_distribution(feature, pdfs[i].index,
+                                           pdfs[i].prob, PDF::ML_BUF);
+        }
+        else if (mmi)
+        {
+          model->accumulate_distribution(feature, pdfs[i].index,
+                                         pdfs[i].prob, PDF::MMI_BUF);
+        }
+        if (!segmentator->computes_total_log_likelihood())
+          total_log_likelihood += (numerator?1:-1)*
+            util::safe_log(pdfs[i].prob*model->state_likelihood(pdfs[i].index,
+                                                                feature));
+      }
     }
     
     // Accumulate also transition probabilities if desired
@@ -100,7 +231,8 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
       const std::vector<Segmentator::IndexProbPair> &transitions
         = segmentator->transition_probs();
       
-      for (int i = 0; i < (int)transitions.size(); i++) {
+      for (int i = 0; i < (int)transitions.size(); i++)
+      {
         model->accumulate_transition(transitions[i].index,
                                      transitions[i].prob);
         if (!segmentator->computes_total_log_likelihood())
@@ -307,12 +439,18 @@ main(int argc, char *argv[])
           HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
             &model, true, &fea_gen, config["raw-input"].specified, NULL);
           lattice->set_collect_transition_probs(transtat);
+          if (mpe)
+            lattice->set_custom_data_callback(&mpe_evaluator);
+
           if (!initialize_hmmnet(lattice, config["bw-beam"].get_float(),
                                  config["fw-beam"].get_float(),
                                  config["ac-scale"].get_float(), hmmnet_mode,
                                  recipe.infos[f].audio_path))
             skip = true;
           segmentator = lattice;
+
+          if (mpe)
+            fprintf(stderr, "Total custom score %f\n", lattice->get_total_custom_score());
 
           if (!skip)
           {

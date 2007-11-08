@@ -625,6 +625,7 @@ HmmNetBaumWelch::fill_arc_info(std::vector<ArcInfo> &traversed_arcs)
     assert( m_active_arcs.size() == 1 );
     normalizing_score = m_active_arcs.back().score;
   }
+  traversed_arcs.reserve((int)m_active_arcs.size());
   for (int i = 0; i < (int)m_active_arcs.size(); i++)
   {
     HmmTransition &tr = m_model.transition(
@@ -947,6 +948,7 @@ HmmNetBaumWelch::compute_total_bw_scores(void)
   }
 
   m_sum_total_loglikelihood = ll_sum;
+  m_sum_total_custom_score = custom_sum;
 }
 
 
