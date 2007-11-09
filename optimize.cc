@@ -13,6 +13,8 @@ HmmSet model;
 int
 main(int argc, char *argv[])
 {
+  PDF::EstimationMode mode;
+  
   try {
     config("usage: optimize [OPTION...]\n")
       ('h', "help", "", "", "display help")
@@ -27,11 +29,14 @@ main(int argc, char *argv[])
       ('\0', "to-scgmm", "", "", "convert Gaussians to have an exponential subspace constraint")
       ('\0', "ml", "", "", "maximum likelihood estimation")
       ('\0', "mmi", "", "", "maximum mutual information estimation")
+      ('\0', "mpe", "", "", "minimum phone error estimation")
       ('\0', "minvar=FLOAT", "arg", "0.1", "minimum variance (default 0.1)")
       ('\0', "covsmooth", "arg", "0", "covariance smoothing (default 0.0)")
       ('\0', "C1=FLOAT", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
       ('\0', "C2=FLOAT", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
-      ('\0', "ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for discriminative training (default 0.0)")
+      ('\0', "mmi-ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for MMI")
+      ('\0', "mpe-ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for MPE")
+      ('\0', "mmi-prior", "", "", "Use MMI prior when I-smoothing MPE model")
       ('\0', "hcl_bfgs_cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
       ('\0', "hcl_line_cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
@@ -90,18 +95,35 @@ main(int argc, char *argv[])
       if (!config["base"].specified &&
           !(config["gk"].specified && config["mc"].specified && config["ph"].specified))
         throw std::string("Must give either --base or all --gk, --mc and --ph");
-      
-      if (config["mmi"].specified && config["ml"].specified)
-        throw std::string("Don't define both --ml and --mmi!");
-      
-      if (!config["mmi"].specified && !config["ml"].specified)
-        throw std::string("Define either --ml or --mmi!");
 
-      // ML or MMI?
-      if (config["ml"].specified)
-        model.set_estimation_mode(PDF::ML);
-      else
-        model.set_estimation_mode(PDF::MMI);
+      int count = 0;
+      if (config["ml"].specified) {
+        count++;
+        mode = PDF::ML_EST;
+      }
+      if (config["mmi"].specified) {
+        count++;
+        mode = PDF::MMI_EST;
+      }
+      if (config["mpe"].specified) {
+        count++;
+        mode = PDF::MPE_EST;
+      }
+      if (count != 1)
+        throw std::string("Define exactly one of --ml, --mmi and --mpe!");
+
+      if (config["mmi-ismooth"].specified &&
+          (!config["mmi"].specified && !config["mmi-prior"].specified))
+        fprintf(stderr, "Warning: --mmi-ismooth ignored without --mmi or --mmi-prior\n");
+      if (config["mpe-ismooth"].specified && mode != PDF::MPE_EST)
+        fprintf(stderr, "Warning: --mpe-ismooth ignored without --mpe\n");
+      if (config["mmi-prior"].specified)
+      {
+        if (mode == PDF::MPE_EST)
+          mode = PDF::MPE_MMI_PRIOR_EST;
+        else
+          fprintf(stderr, "Warning: --mmi-prior ignored without --mpe\n");
+      }
       
       // Open the list of statistics files
       std::ifstream filelist(config["list"].get_str().c_str());
@@ -110,16 +132,17 @@ main(int argc, char *argv[])
         fprintf(stderr, "Could not open %s\n", config["list"].get_str().c_str());
         exit(1);
       }
-      
+
       // Set parameters for Gaussian estimation
       model.set_gaussian_parameters(config["minvar"].get_double(),
                                     config["covsmooth"].get_double(),
                                     config["C1"].get_double(),
                                     config["C2"].get_double(),
-                                    config["ismooth"].get_double());
+                                    config["mmi-ismooth"].get_double(),
+                                    config["mpe-ismooth"].get_double());
 
       // Accumulate .gk statistics
-      model.start_accumulating();
+      model.start_accumulating(mode);
       while (filelist >> stat_file && stat_file != " ")
         model.accumulate_gk_from_dump(stat_file+".gks");
       
@@ -133,17 +156,19 @@ main(int argc, char *argv[])
         
         try {
           if (pc != NULL)
-            pc->estimate_parameters(config["minvar"].get_double(),
+            pc->estimate_parameters(mode,
+                                    config["minvar"].get_double(),
                                     config["covsmooth"].get_double(),
                                     config["C1"].get_double(),
                                     config["C2"].get_double(),
-                                    config["ismooth"].get_double());
+                                    false);
           else if (sc != NULL)
-            sc->estimate_parameters(config["minvar"].get_double(),
+            sc->estimate_parameters(mode,
+                                    config["minvar"].get_double(),
                                     config["covsmooth"].get_double(),
                                     config["C1"].get_double(),
                                     config["C2"].get_double(),
-                                    config["ismooth"].get_double());
+                                    false);
         } catch (std::string errstr) {
           std::cout << "Warning: Gaussian number " << g
                     << ": " << errstr << std::endl;
