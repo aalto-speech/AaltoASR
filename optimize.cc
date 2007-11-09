@@ -20,7 +20,7 @@ main(int argc, char *argv[])
       ('g', "gk=FILE", "arg", "", "Previous mixture base distributions")
       ('m', "mc=FILE", "arg", "", "Previous mixture coefficients for the states")
       ('p', "ph=FILE", "arg", "", "Previous HMM definitions")
-      ('o', "out=FILE", "arg must", "", "base output file for the coefficients (will be appended with _bindex)")
+      ('o', "out=FILE", "arg must", "", "output file for the coefficients")
       ('L', "list=LISTNAME", "arg", "", "file with one statistics file per line")
       ('\0', "subspace=FILE", "arg", "", "use an already initialized subspace")
       ('\0', "to-pcgmm", "", "", "convert Gaussians to have a subspace constraint on precisions")
@@ -67,7 +67,7 @@ main(int argc, char *argv[])
     model.set_hcl_optimization(&ls, &bfgs, config["hcl_line_cfg"].get_str(), config["hcl_bfgs_cfg"].get_str());
     
     // Open the file for writing out the subspace coefficients
-    std::string outfilename = config["out"].get_str() + "_" + str::fmt(256, "%d", config["bindex"].get_int());
+    std::string outfilename = config["out"].get_str();
     std::ofstream outfile(outfilename.c_str());
     if (!outfile)
     {
