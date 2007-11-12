@@ -195,8 +195,8 @@ main(int argc, char *argv[])
       if (!config["subspace"].specified)
         throw std::string("Please specify --subspace if you want to convert an old model");
 
-      PrecisionSubspace *ps;
-      ExponentialSubspace *es;
+      PrecisionSubspace *ps = NULL;
+      ExponentialSubspace *es = NULL;
       
       if (config["to-pcgmm"].specified) {
         ps = new PrecisionSubspace();
@@ -226,7 +226,7 @@ main(int argc, char *argv[])
         if (source_gaussian == NULL)
           continue;
 
-        Gaussian *target_gaussian;
+        Gaussian *target_gaussian = NULL;
         if (config["to-pcgmm"].specified)
           target_gaussian = new PrecisionConstrainedGaussian(ps);
         else if (config["to-scgmm"].specified)
