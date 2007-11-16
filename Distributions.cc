@@ -1623,7 +1623,7 @@ Mixture::dump_statistics(std::ostream &os) const
 {
   for (int a = 0; a < (int)m_accums.size(); a++)
   {
-    if (m_accums[a]->accumulated)
+    if (m_accums[a] != NULL && m_accums[a]->accumulated)
     {
       os << a << " " << size();
 
