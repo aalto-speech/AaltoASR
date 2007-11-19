@@ -203,15 +203,14 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
         }
       }
     }
-    else
+    if (ml || mmi)
     {
       for (int i = 0; i < (int)pdfs.size(); i++)
       {
         if (numerator)
         {
-          if (ml || mmi)
-            model->accumulate_distribution(feature, pdfs[i].index,
-                                           pdfs[i].prob, PDF::ML_BUF);
+          model->accumulate_distribution(feature, pdfs[i].index,
+                                         pdfs[i].prob, PDF::ML_BUF);
         }
         else if (mmi)
         {

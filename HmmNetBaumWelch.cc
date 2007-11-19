@@ -957,6 +957,7 @@ HmmNetBaumWelch::clear_bw_scores(void)
 {
   for (int i = 0; i < (int)m_arcs.size(); i++) {
     m_arcs[i].bw_scores.clear();
+    m_arcs[i].bw_custom_data.clear();
   }
 }
 
