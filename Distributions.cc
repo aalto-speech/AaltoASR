@@ -233,7 +233,7 @@ Gaussian::dump_statistics(std::ostream &os) const
 {
   for (int i = 0; i < (int)m_accums.size(); i++)
   {
-    if (m_accums[i]->accumulated()) {
+    if (m_accums[i] != NULL && m_accums[i]->accumulated()) {
       os.write((char*)&i, sizeof(int));
       m_accums[i]->dump_statistics(os);
     }
