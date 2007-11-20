@@ -27,6 +27,7 @@ int
 main(int argc, char *argv[])
 {
   double total_log_likelihood = 0;
+  double total_mpe_score = 0;
   PDF::EstimationMode mode;
   
   try {
@@ -147,8 +148,13 @@ main(int argc, char *argv[])
       {
         double temp;
         lls_file >> temp;
-        lls_file.close();
         total_log_likelihood += temp;
+        if (mode == PDF::MPE_EST || mode == PDF::MPE_MMI_PRIOR_EST)
+        {
+          lls_file >> temp;
+          total_mpe_score += temp;
+        }
+        lls_file.close();
       }
     }
 
@@ -235,7 +241,11 @@ main(int argc, char *argv[])
         fprintf(stderr, "Could not open summary file: %s\n",
                 summary_file_name.c_str());
       else
+      {
         summary_file << total_log_likelihood << std::endl;
+        if (mode == PDF::MPE_EST || mode == PDF::MPE_MMI_PRIOR_EST)
+          summary_file << "  " << total_mpe_score << std::endl;
+      }
       summary_file.close();
     }
   }

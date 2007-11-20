@@ -18,7 +18,8 @@ int info;
 int accum_pos;
 bool transtat;
 float start_time, end_time;
-double total_log_likelihood=0;
+double total_log_likelihood = 0;
+double total_mpe_score = 0;
 
 // Training modes
 bool ml = false;
@@ -39,18 +40,34 @@ private:
   std::vector< std::vector<HmmNetBaumWelch::ArcInfo>* > m_ref_segmentation;
   
 public:
-  MPEEvaluator() { m_first_frame = -1; }
+  typedef enum { MPEM_MONOPHONE_LABEL, // Correct monophone label
+                 MPEM_MONOPHONE_STATE, // Correct monophone label+state index
+                 MPEM_CONTEXT_LABEL, // Correct context phone label
+                 MPEM_STATE, // Correct state
+                 MPEM_CONTEXT_PHONE_STATE, // A state of the correct CP
+                 MPEM_HYP_CONTEXT_PHONE_STATE, // A correct state in hypothesis CP
+  } MPEMode;
+  
+  MPEEvaluator() { m_first_frame = -1; m_mode = MPEM_MONOPHONE_LABEL; m_model = NULL; }
 
   // CustomDataQuery interface
   virtual ~MPEEvaluator() { }
   virtual double custom_data_value(int frame, HmmNetBaumWelch::Arc &arc);
 
   // Other public methods
+  void set_mode(MPEMode mode) { m_mode = mode; }
+  void set_model(HmmSet *model) { m_model = model; }
   void fetch_frame_info(HmmNetBaumWelch *seg);
   void reset(void);
 
 private:
   std::string extract_center_phone(const std::string &label);
+  std::string extract_context_phone(const std::string &label);
+  int extract_state(const std::string &label);
+
+private:
+  MPEMode m_mode;
+  HmmSet *m_model;
 };
 
 
@@ -66,7 +83,7 @@ MPEEvaluator::extract_center_phone(const std::string &label)
       temp = label.substr(pos1+1, pos2-pos1-1);
   }
   else if (pos1 >= 0)
-    temp = label.substr(pos1);
+    temp = label.substr(pos1+1);
   else if (pos2 >= 0)
     temp = label.substr(0, pos2);
   else
@@ -74,6 +91,29 @@ MPEEvaluator::extract_center_phone(const std::string &label)
   if ((int)temp.size() > 0)
     return temp;
   return label;
+}
+
+std::string
+MPEEvaluator::extract_context_phone(const std::string &label)
+{
+  int pos = label.find_last_of('.'); // Remove the state number
+  if (pos > 0)
+    return label.substr(0, pos);
+  return label;
+}
+
+
+int
+MPEEvaluator::extract_state(const std::string &label)
+{
+  int pos = label.find_last_of('.'); // Find the state number
+  if (pos >= 0)
+  {
+    std::string temp;
+    temp = label.substr(pos+1);
+    return atoi(temp.c_str());
+  }
+  return -1;
 }
 
 double
@@ -86,10 +126,53 @@ MPEEvaluator::custom_data_value(int frame, HmmNetBaumWelch::Arc &arc)
   if (arc.label[0] == '_') // Silence node
     return 0;
 
-  std::string center = extract_center_phone(arc.label);
+  std::string label;
+  int state = -1;
+  if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_MONOPHONE_STATE)
+    label = extract_center_phone(arc.label);
+  else if (m_mode == MPEM_CONTEXT_LABEL ||
+           m_mode == MPEM_HYP_CONTEXT_PHONE_STATE)
+    label = extract_context_phone(arc.label);
+  else if (m_mode == MPEM_STATE || m_mode == MPEM_CONTEXT_PHONE_STATE)
+  {
+    HmmTransition &tr = model.transition(arc.transition_id);
+    state = model.emission_pdf_index(tr.source_index);
+  }
+  if (m_mode == MPEM_MONOPHONE_STATE)
+    state = extract_state(arc.label);
   for (int i = 0; i < (int)m_ref_segmentation[internal_frame]->size(); i++)
-    if ((*m_ref_segmentation[internal_frame])[i].label == center)
-      return 1;
+  {
+    if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_CONTEXT_LABEL)
+    {
+      if ((*m_ref_segmentation[internal_frame])[i].label == label)
+        return 1;
+    }
+    else if (m_mode == MPEM_MONOPHONE_STATE)
+    {
+      if ((*m_ref_segmentation[internal_frame])[i].label == label &&
+          (*m_ref_segmentation[internal_frame])[i].pdf_index == state)
+        return 1;
+    }
+    else if (m_mode == MPEM_STATE)
+    {
+      if ((*m_ref_segmentation[internal_frame])[i].pdf_index == state)
+        return 1;
+    }
+    else if (m_mode == MPEM_CONTEXT_PHONE_STATE)
+    {
+      Hmm &hmm = m_model->hmm((*m_ref_segmentation[internal_frame])[i].label);
+      for (int s = 0; s < hmm.num_states(); s++)
+        if (hmm.state(s) == state)
+          return 1;
+    }
+    else if (m_mode == MPEM_HYP_CONTEXT_PHONE_STATE)
+    {
+      Hmm &hmm = m_model->hmm(label);
+      for (int s = 0; s < hmm.num_states(); s++)
+        if ((*m_ref_segmentation[internal_frame])[i].pdf_index==hmm.state(s))
+          return 1;
+    }
+  }
   return 0;
 }
 
@@ -119,8 +202,16 @@ MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
 
   // Process the labels to speed up the custom data query
   for (int i = 0; i < (int)m_ref_segmentation.back()->size(); i++)
-    (*m_ref_segmentation.back())[i].label = extract_center_phone((*m_ref_segmentation.back())[i].label);
-        
+  {
+    std::string &label = (*m_ref_segmentation.back())[i].label;
+    if (m_mode == MPEM_MONOPHONE_STATE)
+      (*m_ref_segmentation.back())[i].pdf_index = extract_state(label);
+    if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_MONOPHONE_STATE)
+      label = extract_center_phone(label);
+    else if (m_mode == MPEM_CONTEXT_LABEL ||
+             m_mode == MPEM_CONTEXT_PHONE_STATE)
+      label = extract_context_phone(label);
+  }
 }
 
 
@@ -277,6 +368,7 @@ main(int argc, char *argv[])
       ('\0', "mmi", "", "", "Collect statistics for MMI")
       ('\0', "mpe", "", "", "Collect statistics for MPE")
       ('\0', "mllt", "", "", "maximum likelihood linear transformation (for ML)")
+      ('\0', "mpemode=MODE", "arg", "", "mono/mono-state/state/cp/cp-state/hyp-cp-state")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
@@ -346,12 +438,13 @@ main(int argc, char *argv[])
     {
       mpe = true;
       mode |= PDF_MPE_STATS;
+      mpe_evaluator.set_model(&model);
     }
 
     if (mode == 0)
       throw std::string("At least one mode (--ml, --mmi, --mpe) must be given!");
 
-    if (mode != 1 && !config["hmmnet"].specified)
+    if (mode != PDF_ML_STATS && !config["hmmnet"].specified)
       throw std::string("Discriminative training requires --hmmnet");
 
     if (config["vit"].specified)
@@ -360,6 +453,30 @@ main(int argc, char *argv[])
       hmmnet_mode = 2;
     if (hmmnet_mode > 0 && !config["hmmnet"].specified)
       throw std::string("--vit and --extvit require --hmmnet");
+
+    if (config["mpemode"].specified)
+    {
+      if (!(mode&PDF_MPE_STATS))
+        fprintf(stderr, "--mpemode ignored without --mpe\n");
+      else
+      {
+        std::string mpe_mode = config["mpemode"].get_str();
+        if (mpe_mode == "mono")
+          mpe_evaluator.set_mode(MPEEvaluator::MPEM_MONOPHONE_LABEL);
+        else if (mpe_mode == "mono-state")
+          mpe_evaluator.set_mode(MPEEvaluator::MPEM_MONOPHONE_STATE);
+        else if (mpe_mode == "state")
+          mpe_evaluator.set_mode(MPEEvaluator::MPEM_STATE);
+        else if (mpe_mode == "cp")
+          mpe_evaluator.set_mode(MPEEvaluator::MPEM_CONTEXT_LABEL);
+        else if (mpe_mode == "cp-state")
+          mpe_evaluator.set_mode(MPEEvaluator::MPEM_CONTEXT_PHONE_STATE);
+        else if (mpe_mode == "hyp-cp-state")
+          mpe_evaluator.set_mode(MPEEvaluator::MPEM_HYP_CONTEXT_PHONE_STATE);
+        else
+          throw std::string("Invalid MPE mode ") + mpe_mode;
+      }
+    }
     
     if (config["mllt"].specified)
     {
@@ -449,7 +566,10 @@ main(int argc, char *argv[])
           segmentator = lattice;
 
           if (mpe)
+          {
             fprintf(stderr, "Total custom score %f\n", lattice->get_total_custom_score());
+            total_mpe_score += lattice->get_total_custom_score();
+          }
 
           if (!skip)
           {
@@ -482,6 +602,8 @@ main(int argc, char *argv[])
 //       if (accum_pos == 1) // Denominator
 //         total_log_likelihood = -total_log_likelihood;
       lls_file << total_log_likelihood << std::endl;
+      if (mpe)
+        lls_file << total_mpe_score << std::endl;
       lls_file.close();
     }
   }
