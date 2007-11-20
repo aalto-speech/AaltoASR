@@ -337,7 +337,7 @@ PhonePool::center_phone(const std::string &label)
   }
   else if (pos1 >= 0)
   {
-    temp = label.substr(pos1);
+    temp = label.substr(pos1+1);
   }
   else if (pos2 >= 0)
   {
