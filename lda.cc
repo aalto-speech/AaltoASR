@@ -248,9 +248,10 @@ main(int argc, char *argv[])
         total_states++;
       }
     // Don't collect statistics for silence states
-    for (unsigned int i=0; i<silence_states.size(); i++)
-      if (state_accumulators[silence_states[i]] != NULL)
-          delete state_accumulators[silence_states[i]];
+    for (unsigned int i=0; i<silence_states.size(); i++) {
+      delete state_accumulators[silence_states[i]];
+      state_accumulators[silence_states[i]] = NULL;
+    }
     
     // PASS 2
     
