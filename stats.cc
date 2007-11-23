@@ -122,9 +122,14 @@ MPEEvaluator::custom_data_value(int frame, HmmNetBaumWelch::Arc &arc)
   int internal_frame = frame - m_first_frame;
   if (internal_frame < 0 || internal_frame >= (int)m_ref_segmentation.size())
     return 0;
-  // Check the label against the correct one
-  if (arc.label[0] == '_') // Silence node
+
+  // Ignore silence nodes
+  if (arc.label.find('-') == std::string::npos &&
+      arc.label.find('+') == std::string::npos &&
+      arc.label[0] == '_') // Silence node
     return 0;
+  
+  // Check the label against the correct one
 
   std::string label;
   int state = -1;
@@ -140,6 +145,7 @@ MPEEvaluator::custom_data_value(int frame, HmmNetBaumWelch::Arc &arc)
   }
   if (m_mode == MPEM_MONOPHONE_STATE)
     state = extract_state(arc.label);
+  
   for (int i = 0; i < (int)m_ref_segmentation[internal_frame]->size(); i++)
   {
     if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_CONTEXT_LABEL)
@@ -173,6 +179,7 @@ MPEEvaluator::custom_data_value(int frame, HmmNetBaumWelch::Arc &arc)
           return 1;
     }
   }
+  
   return 0;
 }
 
@@ -199,7 +206,7 @@ MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
   m_ref_segmentation.push_back(
     new std::vector<HmmNetBaumWelch::ArcInfo> );
   seg->fill_arc_info(*(m_ref_segmentation.back()));
-
+  
   // Process the labels to speed up the custom data query
   for (int i = 0; i < (int)m_ref_segmentation.back()->size(); i++)
   {
@@ -229,7 +236,7 @@ bool initialize_hmmnet(HmmNetBaumWelch* lattice, float bw_beam, float fw_beam,
     lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
   else if (hmmnet_mode == 2)
     lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
-        
+
   double orig_beam = lattice->get_backward_beam();
   int counter = 1;
   while (!lattice->init_utterance_segmentation())
