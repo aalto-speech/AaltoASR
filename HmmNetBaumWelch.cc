@@ -730,7 +730,8 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
   double arc_custom_score;
   double viterbi_best_ll = loglikelihoods.zero();
   double viterbi_best_new_score = loglikelihoods.zero();
-  double viterbi_best_custom_score = 0;
+  double viterbi_best_arc_custom_score = 0;
+  double viterbi_best_total_custom_score = 0;
   int viterbi_best_arc_id = -1;
   
   for (int a = 0; a < (int)m_nodes[node_id].out_arcs.size(); a++)
@@ -817,7 +818,11 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
           viterbi_best_ll = total_arc_loglikelihood;
           viterbi_best_new_score = new_score;
           viterbi_best_arc_id = arc_id;
-          viterbi_best_custom_score = arc_custom_score;
+          viterbi_best_arc_custom_score = arc_custom_score;
+          viterbi_best_total_custom_score = cur_custom_score;
+          if (m_custom_data_callback != NULL)
+            viterbi_best_total_custom_score +=
+              m_arcs[arc_id].bw_custom_data.get_score(m_current_frame);
         }
       }
     }
@@ -839,7 +844,7 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
       // of paths (branching occurs only in epsilon arcs!).
       m_active_arcs.push_back(TraversedArc(viterbi_best_arc_id,
                                            viterbi_best_ll,
-                                           viterbi_best_custom_score));
+                                           viterbi_best_total_custom_score));
     }
 
     if (m_mode == MODE_VITERBI ||
@@ -849,7 +854,7 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
       m_active_node_table[target_buffer].push_back(next_node_id);
       m_nodes[next_node_id].log_prob[target_buffer] = viterbi_best_new_score;
       m_nodes[next_node_id].custom_score[target_buffer] =
-        viterbi_best_custom_score;
+        viterbi_best_arc_custom_score;
     }
     else
     {
@@ -862,7 +867,7 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
       {
         update_node_custom_score(next_node_id, target_buffer,
                                  prev_log_prob, viterbi_best_new_score,
-                                 viterbi_best_custom_score);
+                                 viterbi_best_arc_custom_score);
       }
     }
   }

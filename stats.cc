@@ -291,7 +291,8 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
         seg->fill_arc_info(arcs);
         for (int i = 0; i < (int)arcs.size(); i++)
         {
-          double gamma = arcs[i].custom_score - seg->get_total_custom_score();
+          double gamma =
+            (arcs[i].custom_score-seg->get_total_custom_score())*arcs[i].prob;
           if (gamma > 0)
             model->accumulate_distribution(feature, arcs[i].pdf_index,
                                            gamma, PDF::MPE_NUM_BUF);
@@ -496,7 +497,6 @@ main(int argc, char *argv[])
     // Process each recipe line
     for (int f = 0; f < (int)recipe.infos.size(); f++)
     {
-
       // Print file name, start and end times to stderr
       if (info > 0)
       {
@@ -574,7 +574,8 @@ main(int argc, char *argv[])
 
           if (mpe)
           {
-            fprintf(stderr, "Total custom score %f\n", lattice->get_total_custom_score());
+            if (info > 0)
+              fprintf(stderr, "Total custom score %f\n", lattice->get_total_custom_score());
             total_mpe_score += lattice->get_total_custom_score();
           }
 
