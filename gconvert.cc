@@ -163,13 +163,13 @@ main(int argc, char *argv[])
           already_computed[g]=true;
 
           if (config["to-pcgmm"].specified) {
-            PrecisionConstrainedGaussian *pc = new PrecisionConstrainedGaussian();
+            PrecisionConstrainedGaussian *pc = new PrecisionConstrainedGaussian(ps);
             pc->read(coeff_file);
             new_pool.set_pdf(g, pc);
           }
 
           else if (config["to-scgmm"].specified) {
-            SubspaceConstrainedGaussian *sc = new SubspaceConstrainedGaussian();
+            SubspaceConstrainedGaussian *sc = new SubspaceConstrainedGaussian(es);
             sc->read(coeff_file);
             new_pool.set_pdf(g, sc);
           }
