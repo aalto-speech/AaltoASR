@@ -89,6 +89,9 @@ my $DUR_SKIP_MODELS = 6; # Models without duration model (silences/noises)
 my $FILEFORMAT = "-R"; # Empty for wav files, -R for raw
 my $VERBOSITY = 1;
 
+# NOTE: if you plan to recompile executables at the same time as running them, 
+# it is a good idea to copy the old binaries to a different directory
+my $COPY_BINARY_TO_WORK = 0;
 
 ######################################################################
 # Training script begins
@@ -98,6 +101,10 @@ my $VERBOSITY = 1;
 my $tempdir = $workdir."/".$BASE_ID;
 mkdir $tempdir;
 chdir $tempdir || die("Could not chdir to $tempdir");
+
+if ($COPY_BINARY_TO_WORK > 0) {
+    copy_binary_to_work($BINDIR, $tempdir."/bin");
+}
 
 # Generate initial model by context phone tying using existing alignments
 context_phone_tying($tempdir, $init_model, $init_cfg);
@@ -143,6 +150,20 @@ if ($NUM_GAUSS_CLUSTERS > 0) {
 generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
 
 
+
+sub copy_binary_to_work {
+    my $orig_bin_dir = shift(@_);
+    my $new_bin_dir = shift(@_);
+
+    mkdir $new_bin_dir;
+    system("cp ${orig_bin_dir}/estimate ${new_bin_dir}/estimate");
+    system("cp ${orig_bin_dir}/align ${new_bin_dir}/align");
+    system("cp ${orig_bin_dir}/tie ${new_bin_dir}/tie");
+    system("cp ${orig_bin_dir}/stats ${new_bin_dir}/stats");
+    system("cp ${orig_bin_dir}/vtln ${new_bin_dir}/vtln");
+    system("cp ${orig_bin_dir}/dur_est ${new_bin_dir}/dur_est");
+    $BINDIR = $new_bin_dir;
+}
 
 
 sub context_phone_tying {
