@@ -248,9 +248,13 @@ main(int argc, char *argv[])
         total_states++;
       }
     // Don't collect statistics for silence states
-    for (unsigned int i=0; i<silence_states.size(); i++) {
-      delete state_accumulators[silence_states[i]];
-      state_accumulators[silence_states[i]] = NULL;
+    if (config["no-silence"].specified) {
+      if (info>0)
+        std::cout << "Discarding " << silence_states.size() << " silence states" << std::endl;
+      for (unsigned int i=0; i<silence_states.size(); i++) {
+        delete state_accumulators[silence_states[i]];
+        state_accumulators[silence_states[i]] = NULL;
+      }
     }
     
     // PASS 2
@@ -346,12 +350,12 @@ main(int argc, char *argv[])
         const std::vector<Segmentator::IndexProbPair> &pdfs
           = segmentator->pdf_probs();
         for (int i = 0; i < (int)pdfs.size(); i++) {
-          if (state_accumulators[pdfs[i].index] != NULL)
+          if (state_accumulators[pdfs[i].index] != NULL) {
             state_accumulators[pdfs[i].index]->accumulate(1, pdfs[i].prob, feature);
+            whole_data_accumulator.accumulate(1, pdfs[i].prob, feature);
+          }
         }
-        
-        // Collect statistics for the whole data
-        whole_data_accumulator.accumulate(1, 1, feature);
+
       }
       
       // Clean up
@@ -385,7 +389,7 @@ main(int argc, char *argv[])
         Blas_Add_Mat_Mult(W, std::min(state_accumulators[i]->gamma(), max_gamma), tcov);
       }
     }
-    
+
     // Inverse of W
     Matrix W_inverse(W);
     LaVectorLongInt pivots(source_dim,1);
@@ -395,39 +399,50 @@ main(int argc, char *argv[])
     // Eigendecomposition for inverse(W) * B
     Matrix WinvB(source_dim, source_dim);
     Blas_Mat_Mat_Mult(W_inverse, B, WinvB, 1.0, 0.0);
-    Vector eigenvalues(source_dim);
-    LaEigSolveSymmetricVecIP(WinvB, eigenvalues);
+    Matrix eigenvectors(source_dim, source_dim);
+    Vector eigenvalues_real(source_dim);
+    Vector eigenvalues_imag(source_dim);
+    LaEigSolve(WinvB, eigenvalues_real, eigenvalues_imag, eigenvectors);
     Matrix pca = Matrix::zeros(source_dim, target_dim);
-    for (int i=0; i<source_dim-1; i++)
-      assert(eigenvalues(i)<eigenvalues(i+1));
-    // All row values, only the last columns
+    for (int i=0; i<target_dim-1; i++) {
+      assert(std::fabs(eigenvalues_real(i+1))<=std::fabs(eigenvalues_real(i)));
+      if (eigenvalues_real(i) < 0)
+        std::cout << "Warning: a negative eigenvector was selected\n";
+    }
+    // All row values, only the first columns
     for (int i=0; i<source_dim; i++)
       for (int j=0; j<target_dim; j++)
-        pca(i,j) = WinvB(i,j+source_dim-target_dim);
-    
+        pca(i,j) = eigenvectors(i,j);
+
     Matrix fea_cov = Matrix::zeros(target_dim, target_dim);
     Matrix fea_cov_temp = Matrix::zeros(target_dim, source_dim);
     Blas_Mat_Trans_Mat_Mult(pca, data_cov, fea_cov_temp, 1.0, 0.0);
     Blas_Mat_Mat_Mult(fea_cov_temp, pca, fea_cov, 1.0, 0.0);
 
-    Vector fea_cov_eigvals(target_dim);
-    LaEigSolveSymmetricVecIP(fea_cov, fea_cov_eigvals);
+    Vector fea_cov_eigvals_real(target_dim);
+    Vector fea_cov_eigvals_imag(target_dim);
+    Matrix fea_cov_eigvecs(target_dim, target_dim);
+    LaEigSolve(fea_cov, fea_cov_eigvals_real, fea_cov_eigvals_imag, fea_cov_eigvecs);
     for (int i=0; i<target_dim; i++)
-      fea_cov_eigvals(i) = 1/sqrt(fea_cov_eigvals(i));
-    Matrix fea_cov_eigval_matrix = Matrix::from_diag(fea_cov_eigvals);
+      fea_cov_eigvals_real(i) = 1/sqrt(fea_cov_eigvals_real(i));
+    Matrix fea_cov_eigval_matrix = Matrix::from_diag(fea_cov_eigvals_real);
 
     // Get the final LDA matrix
     Matrix lda_matrix = Matrix::zeros(target_dim, source_dim);
     Matrix lda_temp_matrix = Matrix::zeros(target_dim, target_dim);
-    Blas_Mat_Mat_Trans_Mult(fea_cov_eigval_matrix, fea_cov, lda_temp_matrix, 1.0, 0.0);
+    Blas_Mat_Mat_Trans_Mult(fea_cov_eigval_matrix, fea_cov_eigvecs, lda_temp_matrix, 1.0, 0.0);
     Blas_Mat_Mat_Trans_Mult(lda_temp_matrix, pca, lda_matrix, 1.0, 0.0);
 
     // Set the transformation to FeatureGenerator
     std::vector<float> tr;
+    int pos=0;
     tr.resize(target_dim*source_dim);
     for (int i=0; i<target_dim; i++)
       for (int j=0; j<source_dim; j++)
-        tr[i*source_dim + j] = lda_matrix(i,j);
+      {
+        tr[pos] = lda_matrix(i,j);
+        pos++;
+      }
     lda_module->set_transformation_matrix(tr);
     
     // Write out
