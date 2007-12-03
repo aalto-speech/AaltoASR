@@ -162,6 +162,7 @@ sub copy_binary_to_work {
     system("cp ${orig_bin_dir}/stats ${new_bin_dir}/stats");
     system("cp ${orig_bin_dir}/vtln ${new_bin_dir}/vtln");
     system("cp ${orig_bin_dir}/dur_est ${new_bin_dir}/dur_est");
+    system("cp ${orig_bin_dir}/gconvert ${new_bin_dir}/gconvert");
     $BINDIR = $new_bin_dir;
 }
 
