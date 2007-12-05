@@ -24,7 +24,7 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est gconvert mllr subspace logl gcluster
+PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est gconvert mllr subspace logl gcluster lda optimize
 
 PROGS_SRCS = $(PROGS:=.cc)
 
@@ -34,7 +34,7 @@ CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	Recipe.cc conf.cc io.cc str.cc endian.cc Distributions.cc \
 	LinearAlgebra.cc Subspaces.cc HmmNetBaumWelch.cc \
 	Lattice.cc Viterbi.cc PhonePool.cc \
-	MllrTrainer.cc \
+	MllrTrainer.cc Ziggurat.cc mtw.cc \
 
 CLASS_OBJS = $(CLASS_SRCS:.cc=.o)
 
@@ -58,6 +58,7 @@ lib: $(CLASS_OBJS)
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 $(PROGS) : %: %.o $(CLASS_OBJS)
+	rm -f $@
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< -o $@ \
 		$(CLASS_OBJS) $(LIBS)
 
