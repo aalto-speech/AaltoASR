@@ -426,7 +426,7 @@ HmmSet::pdf_likelihood(const int p, const FeatureVec &feature)
   if (m_pdf_likelihoods[p] > 0)
     return m_pdf_likelihoods[p];
 
-  m_pdf_likelihoods[p] = m_emission_pdfs[p]->compute_likelihood(feature);
+  m_pdf_likelihoods[p] = m_emission_pdfs[p]->compute_likelihood(*feature.get_vector());
   if (m_pdf_likelihoods[p] < MIN_STATE_PROB)
     m_pdf_likelihoods[p] = MIN_STATE_PROB;
   m_valid_pdf_likelihoods.push_back(p);
@@ -442,12 +442,12 @@ HmmSet::precompute_likelihoods(const FeatureVec &f)
   reset_cache();
   
   // Precompute base distribution likelihoods
-  m_pool.precompute_likelihoods(f);
+  m_pool.precompute_likelihoods(*f.get_vector());
 
   m_valid_pdf_likelihoods.clear();
   // Precompute state likelihoods
   for (int i = 0; i < num_emission_pdfs(); i++) {
-    m_pdf_likelihoods[i] = m_emission_pdfs[i]->compute_likelihood(f);
+    m_pdf_likelihoods[i] = m_emission_pdfs[i]->compute_likelihood(*f.get_vector());
     if (m_pdf_likelihoods[i] < MIN_STATE_PROB)
       m_pdf_likelihoods[i] = MIN_STATE_PROB;
     m_valid_pdf_likelihoods.push_back(i);
@@ -481,7 +481,7 @@ HmmSet::init_transition_accumulators()
 void
 HmmSet::accumulate_distribution(const FeatureVec &f, int pdf, double gamma, int pos)
 {
-  m_emission_pdfs[pdf]->accumulate(gamma, f, pos);
+  m_emission_pdfs[pdf]->accumulate(gamma, *f.get_vector(), pos);
 }
 
 

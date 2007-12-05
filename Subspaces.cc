@@ -455,13 +455,13 @@ PrecisionSubspace::dotproduct(const Vector &lambda) const
 
 
 void
-PrecisionSubspace::precompute(const FeatureVec &f)
+PrecisionSubspace::precompute(const Vector &f)
 {
   if (!m_computed) {
     LaVectorDouble y(m_feature_dim);
     for (int i=0; i<m_subspace_dim; i++) {
-      Blas_Mat_Vec_Mult(m_mspace.at(i), *f.get_vector(), y);
-      m_quadratic_features(i)=-0.5*Blas_Dot_Prod(*f.get_vector(),y);
+      Blas_Mat_Vec_Mult(m_mspace.at(i), f, y);
+      m_quadratic_features(i)=-0.5*Blas_Dot_Prod(f,y);
     }
     m_computed=true;
   }
@@ -742,17 +742,17 @@ ExponentialSubspace::optimize_coefficients(const Vector &sample_mean,
 
 
 void
-ExponentialSubspace::precompute(const FeatureVec &f)
+ExponentialSubspace::precompute(const Vector &f)
 {
   if (!m_computed) {
     LaVectorDouble feature_exp=LaVectorDouble(m_feature_dim+(m_feature_dim*m_feature_dim+1)/2);
     
     // Combine to get the exponential feature vector
     for (unsigned int i=0; i<feature_dim(); i++)
-      feature_exp(i)=(*f.get_vector())(i);
+      feature_exp(i)=f(i);
     LaGenMatDouble xxt=LaGenMatDouble::zeros(feature_dim(), feature_dim());
     LaVectorDouble xxt_vector=LaVectorDouble(exponential_dim()-feature_dim());
-    Blas_R1_Update(xxt, *f.get_vector(), *f.get_vector(), -0.5);
+    Blas_R1_Update(xxt, f, f, -0.5);
     LinearAlgebra::map_m2v(xxt, xxt_vector);
     for (unsigned int i=feature_dim(); i<exponential_dim(); i++)
       feature_exp(i)=xxt_vector(i-feature_dim());

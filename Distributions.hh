@@ -7,6 +7,8 @@
 #include "FeatureModules.hh"
 #include "LinearAlgebra.hh"
 #include "Subspaces.hh"
+#include "Ziggurat.hh"
+#include "mtw.hh"
 
 // Bitmasks for statistics mode. Note! PDF_ML_FULL_STATS implies PDF_ML_STATS
 #define PDF_ML_STATS      1
@@ -37,7 +39,7 @@ public:
   virtual bool is_accumulating() = 0;
   /* Accumulates the statistics for this pdf */
   virtual void accumulate(double prior,
-			  const FeatureVec &f, 
+			  const Vector &f, 
 			  int accum_pos = 0) = 0;
   /* Writes the currently accumulated statistics to a file */
   virtual void dump_statistics(std::ostream &os) const = 0;
@@ -53,10 +55,15 @@ public:
   // LIKELIHOODS
   
   /* The likelihood of the current feature given this model */
-  virtual double compute_likelihood(const FeatureVec &f) const = 0;
+  virtual double compute_likelihood(const Vector &f) const = 0;
   /* The log likelihood of the current feature given this model */
-  virtual double compute_log_likelihood(const FeatureVec &f) const = 0;
+  virtual double compute_log_likelihood(const Vector &f) const = 0;
 
+  // SAMPLING
+
+  /* Draw a random sample from this distribution */
+  virtual void draw_sample(Vector &sample) = 0;
+  
   // IO
 
   /* Write the parameters of this distribution to the stream os */
@@ -68,7 +75,6 @@ public:
 protected:
   int m_dim;
 };
-
 
 
 class PDFPool {
@@ -109,7 +115,7 @@ public:
   void read_gk(const std::string &filename);
   /// Write the distributions to a .gk -file
   void write_gk(const std::string &filename) const;
-  
+ 
   /// Reset the cache
   void reset_cache();
 
@@ -118,12 +124,12 @@ public:
    * \param index the pdf index
    * \return the likelihood of the given feature for some pdf
    */
-  double compute_likelihood(const FeatureVec &f, int index);
+  double compute_likelihood(const Vector &f, int index);
 
   /** Computes likelihoods for all distributions to the cache
    * \param f the feature vector
    */
-  void precompute_likelihoods(const FeatureVec &f);
+  void precompute_likelihoods(const Vector &f);
 
   /// Estimates parameters of the pdfs in the pool
   void estimate_parameters(PDF::EstimationMode mode);
@@ -255,7 +261,7 @@ public:
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const = 0;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const = 0;
   virtual void set_accumulated_second_moment(Matrix &second_moment) = 0;
-  virtual void accumulate(int feacount, double gamma, const FeatureVec &f) = 0;
+  virtual void accumulate(int feacount, double gamma, const Vector &f) = 0;
   virtual void dump_statistics(std::ostream &os) const = 0;
   virtual void accumulate_from_dump(std::istream &is) = 0;
   virtual bool full_stats_accumulated() const = 0;
@@ -283,7 +289,7 @@ public:
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
   virtual void set_accumulated_second_moment(Matrix &second_moment);
-  virtual void accumulate(int feacount, double gamma, const FeatureVec &f);
+  virtual void accumulate(int feacount, double gamma, const Vector &f);
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual bool full_stats_accumulated() const { return accumulated(); }
@@ -307,7 +313,7 @@ public:
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
   virtual void set_accumulated_second_moment(Matrix &second_moment);
-  virtual void accumulate(int feacount, double gamma, const FeatureVec &f);
+  virtual void accumulate(int feacount, double gamma, const Vector &f);
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual bool full_stats_accumulated() const { return false; }
@@ -334,7 +340,7 @@ public:
   virtual bool is_accumulating() { return (m_accums.size()>0?true:false); }
   /* Accumulates the maximum likelihood statistics for the Gaussian
      weighed with a prior. */
-  virtual void accumulate(double prior, const FeatureVec &f, 
+  virtual void accumulate(double prior, const Vector &f, 
 			  int accum_pos = 0) ;
   /* Writes the currently accumulated statistics to a stream */
   virtual void dump_statistics(std::ostream &os) const;
@@ -394,7 +400,9 @@ public:
                      bool finish_statistics = true);
   /* Compute the Kullback-Leibler divergence KL(current||g) */
   virtual double kullback_leibler(Gaussian &g) const;
-  
+  /* Draw a random sample from this Gaussian */
+  virtual void draw_sample(Vector &sample);
+
   /** Tells if full statistics have been accumulated for this Gaussian
    * \param accum_pos Accumulator position
    */
@@ -415,6 +423,8 @@ protected:
   friend class HmmSet;
   friend class PDFPool;
   friend struct PDFPool::Gaussian_occ_comp;
+
+  static Ziggurat ziggurat;
 };
 
 
@@ -427,8 +437,8 @@ public:
   virtual void reset(int dim);
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f) const;
-  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual double compute_likelihood(const Vector &f) const;
+  virtual double compute_log_likelihood(const Vector &f) const;
   virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
 
@@ -472,8 +482,8 @@ public:
   virtual void reset(int dim);
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f) const;
-  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual double compute_likelihood(const Vector &f) const;
+  virtual double compute_log_likelihood(const Vector &f) const;
   virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
 
@@ -511,8 +521,8 @@ public:
   virtual void reset(int dim);
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f) const;
-  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual double compute_likelihood(const Vector &f) const;
+  virtual double compute_log_likelihood(const Vector &f) const;
   virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
 
@@ -565,8 +575,8 @@ public:
   virtual void reset(int feature_dim);
 
   // From pdf
-  virtual double compute_likelihood(const FeatureVec &f) const;
-  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual double compute_likelihood(const Vector &f) const;
+  virtual double compute_log_likelihood(const Vector &f) const;
   virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
 
@@ -659,22 +669,31 @@ public:
    * \param index Component index
    */
   void remove_component(int index);
+
+  /** Computes the Kullback-Leibler divergence between this and another mixture
+   * using Monte Carlo simulation
+   * \param g the other mixture
+   * \param samples number of samples to use in the mc-simulation
+   */
+  double kullback_leibler(Mixture &g, int samples=100000);
+
   
   // From pdf
   virtual void start_accumulating(StatisticsMode mode);
   virtual bool is_accumulating() { return (m_accums.size()>0?true:false); }
   virtual void accumulate(double prior,
-			  const FeatureVec &f,
+			  const Vector &f,
 			  int accum_pos = 0);
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is, StatisticsMode mode);
   virtual void stop_accumulating();
   virtual bool accumulated(int accum_pos = 0) const;
   virtual void estimate_parameters(EstimationMode mode);
-  virtual double compute_likelihood(const FeatureVec &f) const;
-  virtual double compute_log_likelihood(const FeatureVec &f) const;
+  virtual double compute_likelihood(const Vector &f) const;
+  virtual double compute_log_likelihood(const Vector &f) const;
   virtual void write(std::ostream &os) const;
   virtual void read(std::istream &is);
+  virtual void draw_sample(Vector &sample);
 
 private:
 
@@ -709,8 +728,6 @@ struct PDFPool::Gaussian_occ_comp
 private:
   std::vector<PDF*> &m_pool;
 };
-
-
 
 
 #endif /* DISTRIBUTIONS_HH */

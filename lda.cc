@@ -351,8 +351,8 @@ main(int argc, char *argv[])
           = segmentator->pdf_probs();
         for (int i = 0; i < (int)pdfs.size(); i++) {
           if (state_accumulators[pdfs[i].index] != NULL) {
-            state_accumulators[pdfs[i].index]->accumulate(1, pdfs[i].prob, feature);
-            whole_data_accumulator.accumulate(1, pdfs[i].prob, feature);
+            state_accumulators[pdfs[i].index]->accumulate(1, pdfs[i].prob, *feature.get_vector());
+            whole_data_accumulator.accumulate(1, pdfs[i].prob, *feature.get_vector());
           }
         }
 

@@ -330,7 +330,7 @@ private:
 void
 PhonePool::ContextPhone::add_feature(double prior, const FeatureVec &f)
 {
-  m_stats.accumulate(prior, f);
+  m_stats.accumulate(prior, *f.get_vector());
   m_occupancy += prior;
 }
 

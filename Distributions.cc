@@ -9,6 +9,9 @@
 #include "blas3pp.h"
 
 
+Ziggurat Gaussian::ziggurat = Ziggurat();
+
+
 void
 GaussianAccumulator::get_accumulated_mean(Vector &mean) const
 {
@@ -109,14 +112,13 @@ FullStatisticsAccumulator::get_covariance_estimate(Matrix &covariance_estimate) 
 
 
 void
-FullStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureVec &f)
+FullStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &f)
 {
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
-  const Vector *feature = f.get_vector();
-  Blas_Add_Mult(m_mean, gamma, *feature);
-  Blas_R1_Update(m_second_moment, *feature, gamma, 1.0, true);
+  Blas_Add_Mult(m_mean, gamma, f);
+  Blas_R1_Update(m_second_moment, f, gamma, 1.0, true);
 }
 
 
@@ -202,23 +204,22 @@ DiagonalStatisticsAccumulator::set_accumulated_second_moment(Matrix &second_mome
 
 
 void
-DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const FeatureVec &f)
+DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &f)
 {
   assert( feacount >= 0 );
   assert( gamma >= 0 );
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
-  const Vector *feature = f.get_vector();
-  Blas_Add_Mult(m_mean, gamma, *feature);
+  Blas_Add_Mult(m_mean, gamma, f);
   for (int i=0; i<dim(); i++)
-    m_second_moment(i) += gamma * (*feature)(i) * (*feature)(i);
+    m_second_moment(i) += gamma * f(i) * f(i);
 }
 
 
 void
 Gaussian::accumulate(double gamma,
-                     const FeatureVec &f,
+                     const Vector &f,
                      int accum_pos)
 {
   assert((int)m_accums.size() > accum_pos);
@@ -606,6 +607,19 @@ Gaussian::kullback_leibler(Gaussian &g) const
 }
 
 
+void
+Gaussian::draw_sample(Vector &sample)
+{
+  get_mean(sample);
+  Matrix cov; get_covariance(cov);
+  Matrix chol; LinearAlgebra::cholesky_factor(cov, chol);
+  Vector ziggies(dim());
+  for (int i=0; i<dim(); i++)
+    ziggies(i) = ziggurat.rnor();
+  Blas_Mat_Vec_Mult(chol, ziggies, sample, 1.0, 1.0);
+}
+
+
 bool
 Gaussian::full_stats_accumulated(int accum_pos)
 {
@@ -679,18 +693,18 @@ DiagonalGaussian::reset(int dim)
 
 
 double
-DiagonalGaussian::compute_likelihood(const FeatureVec &f) const
+DiagonalGaussian::compute_likelihood(const Vector &f) const
 {
   return exp(compute_log_likelihood(f));
 }
 
 
 double
-DiagonalGaussian::compute_log_likelihood(const FeatureVec &f) const
+DiagonalGaussian::compute_log_likelihood(const Vector &f) const
 {
   double ll=0;
 
-  Vector diff(*(f.get_vector()));
+  Vector diff(f);
 
   Blas_Add_Mult(diff, -1, m_mean);
   for (int i=0; i<dim(); i++)
@@ -916,19 +930,19 @@ FullCovarianceGaussian::reset(int dim)
 
 
 double
-FullCovarianceGaussian::compute_likelihood(const FeatureVec &f) const
+FullCovarianceGaussian::compute_likelihood(const Vector &f) const
 {
   return exp(compute_log_likelihood(f));
 }
 
 
 double
-FullCovarianceGaussian::compute_log_likelihood(const FeatureVec &f) const
+FullCovarianceGaussian::compute_log_likelihood(const Vector &f) const
 {
   double ll;
 
-  Vector diff(*(f.get_vector()));
-  Vector t(f.dim());
+  Vector diff(f);
+  Vector t(f.size());
 
   Blas_Add_Mult(diff, -1, m_mean);
   Blas_Mat_Vec_Mult(m_precision, diff, t, 1, 0);
@@ -1126,20 +1140,20 @@ PrecisionConstrainedGaussian::reset(int feature_dim)
 
 
 double
-PrecisionConstrainedGaussian::compute_likelihood(const FeatureVec &f) const
+PrecisionConstrainedGaussian::compute_likelihood(const Vector &f) const
 {
   return exp(compute_log_likelihood(f));
 }
 
 
 double
-PrecisionConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
+PrecisionConstrainedGaussian::compute_log_likelihood(const Vector &f) const
 {
   if (!m_ps->computed())
     m_ps->precompute(f);
   
   double result=m_constant
-    +Blas_Dot_Prod(m_transformed_mean, *f.get_vector())
+    +Blas_Dot_Prod(m_transformed_mean, f);
     +m_ps->dotproduct(m_coeffs);
   return result;
 }
@@ -1318,14 +1332,14 @@ SubspaceConstrainedGaussian::reset(int feature_dim)
 
 
 double
-SubspaceConstrainedGaussian::compute_likelihood(const FeatureVec &f) const
+SubspaceConstrainedGaussian::compute_likelihood(const Vector &f) const
 {
   return exp(compute_log_likelihood(f));
 }
 
 
 double
-SubspaceConstrainedGaussian::compute_log_likelihood(const FeatureVec &f) const
+SubspaceConstrainedGaussian::compute_log_likelihood(const Vector &f) const
 {
   if (!m_es->computed())
     m_es->precompute(f);
@@ -1534,7 +1548,7 @@ Mixture::normalize_weights()
 
 
 double
-Mixture::compute_likelihood(const FeatureVec &f) const
+Mixture::compute_likelihood(const Vector &f) const
 {
   double l = 0;
   for (unsigned int i=0; i< m_pointers.size(); i++) {
@@ -1545,7 +1559,7 @@ Mixture::compute_likelihood(const FeatureVec &f) const
 
 
 double
-Mixture::compute_log_likelihood(const FeatureVec &f) const
+Mixture::compute_log_likelihood(const Vector &f) const
 {
   double ll = 0;
   for (unsigned int i=0; i< m_pointers.size(); i++) {
@@ -1587,7 +1601,7 @@ Mixture::start_accumulating(StatisticsMode mode)
 
 void
 Mixture::accumulate(double gamma,
-		    const FeatureVec &f,
+		    const Vector &f,
 		    int accum_pos)
 {
   double total_likelihood, this_likelihood;
@@ -1853,6 +1867,35 @@ Mixture::remove_component(int index)
 }
 
 
+double
+Mixture::kullback_leibler(Mixture &g, int samples)
+{
+  double kl=0;
+  Vector sample;
+  for (int i=0; i<samples; i++) {
+    draw_sample(sample);
+    m_pool->reset_cache();
+    kl += util::safe_log(compute_likelihood(sample)/g.compute_likelihood(sample));
+  }
+  return kl/samples;
+}
+
+
+void
+Mixture::draw_sample(Vector &sample)
+{
+  double randval = mtw::rnd.f();
+  double cumsum = 0;
+  for (unsigned int i=0; i<m_weights.size(); i++) {
+    cumsum += m_weights[i];
+    if (randval <= cumsum) {
+      m_pool->get_pdf(m_pointers[i])->draw_sample(sample);
+      return;
+    }    
+  }
+}
+
+
 PDFPool::PDFPool() {
   reset();
 }
@@ -1896,8 +1939,10 @@ PDFPool::get_pdf(int index) const
 void
 PDFPool::set_pdf(int pdfindex, PDF *pdf)
 {
-  if ((unsigned int)pdfindex >= m_pool.size())
+  if ((unsigned int)pdfindex >= m_pool.size()) {
     m_pool.resize(pdfindex+1);
+    m_likelihoods.resize(m_pool.size());
+  }
   m_pool[pdfindex]=pdf;
 }
 
@@ -1940,7 +1985,7 @@ PDFPool::reset_cache()
 
 
 double
-PDFPool::compute_likelihood(const FeatureVec &f, int index)
+PDFPool::compute_likelihood(const Vector &f, int index)
 {
   if (m_likelihoods[index] > 0)
     return m_likelihoods[index];
@@ -1951,7 +1996,7 @@ PDFPool::compute_likelihood(const FeatureVec &f, int index)
 
 
 void
-PDFPool::precompute_likelihoods(const FeatureVec &f)
+PDFPool::precompute_likelihoods(const Vector &f)
 {
   reset_cache();
 
@@ -1967,10 +2012,9 @@ PDFPool::precompute_likelihoods(const FeatureVec &f)
   if (!use_clustering()) {
     Vector exponential_feature_vector((int)(dim()*(dim()+3)/2));
     for (int i=0; i<dim(); i++)
-      exponential_feature_vector(i) = f[i];
+      exponential_feature_vector(i) = f(i);
     Matrix tmat(dim(), dim()); tmat=0;
-    const Vector *feature = f.get_vector();
-    Blas_R1_Update(tmat, *feature, *feature, 1.0);
+    Blas_R1_Update(tmat, f, f, 1.0);
     Vector tvec;
     LinearAlgebra::map_m2v(tmat, tvec);
     for (int i=0; i<tvec.size(); i++)

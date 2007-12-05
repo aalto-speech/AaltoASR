@@ -99,7 +99,7 @@ public:
   /** Copy the contents of another HmmSet
    * \param hmm_set the reference HmmSet
    */
-    void copy(const HmmSet &hmm_set);
+  void copy(const HmmSet &hmm_set);
   
   /**
    * \return the dimensionality of the feature vectors for this HmmSet

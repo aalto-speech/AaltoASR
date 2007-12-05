@@ -55,7 +55,7 @@ void MllrTrainer::find_probs(double prior, HmmState *state,
     if (gaussian == NULL)
       throw std::string("Warning: MLLR not supported for non-Gaussian models");
     
-    probs[g] = prior*gaussian->compute_likelihood(feature);
+    probs[g] = prior*gaussian->compute_likelihood(*feature.get_vector());
     prob_sum += probs[g];
   }
   

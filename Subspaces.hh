@@ -44,7 +44,7 @@ public:
   int subspace_dim() const;
   int feature_dim() const;
   double dotproduct(const Vector &lambda) const;
-  void precompute(const FeatureVec &f);
+  void precompute(const Vector &f);
   void reset_cache() { m_computed = false; }
   bool computed() { return m_computed; }
   void optimize_coefficients(const Matrix &sample_cov,
@@ -189,7 +189,7 @@ public:
   int feature_dim() const;
   int exponential_dim() const;
   double dotproduct(const Vector &lambda) const;
-  void precompute(const FeatureVec &f);
+  void precompute(const Vector &f);
   void reset_cache() { m_computed = false; }
   bool computed() { return m_computed; }
   void optimize_coefficients(const Vector &sample_mean,
