@@ -28,7 +28,9 @@ namespace LinearAlgebra {
   void matrix_power(const Matrix &A,
                     Matrix &B,
                     double power);
-  
+
+  // Computes the lower triangular Cholesky matrix
+  //!< A assumed symmetric positive definite
   void cholesky_factor(const Matrix &A,
                        Matrix &B);
   
