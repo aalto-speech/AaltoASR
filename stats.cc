@@ -20,11 +20,13 @@ bool transtat;
 float start_time, end_time;
 double total_log_likelihood = 0;
 double total_mpe_score = 0;
+int num_frames = 0;
 
 // Training modes
 bool ml = false;
 bool mmi = false;
 bool mpe = false;
+bool mpe_grad = false;
 
 conf::Config config;
 Recipe recipe;
@@ -262,7 +264,7 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
 {
   int frame;
 
-  if (mpe && numerator)
+  if ((mpe || mpe_grad) && numerator)
     mpe_evaluator.reset();
   
   while (segmentator->next_frame()) {
@@ -273,12 +275,15 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
 
     if (fea_gen.eof())
       break; // EOF in FeatureGenerator
+
+    if (numerator)
+      num_frames++;
     
     // Accumulate all possible states distributions for this frame
     const std::vector<Segmentator::IndexProbPair> &pdfs
       = segmentator->pdf_probs();
     
-    if (mpe)
+    if (mpe || mpe_grad)
     {
       HmmNetBaumWelch *seg = dynamic_cast< HmmNetBaumWelch* >(segmentator);
       if (seg == NULL)
@@ -293,7 +298,7 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
         {
           double gamma =
             (arcs[i].custom_score-seg->get_total_custom_score())*arcs[i].prob;
-          if (gamma > 0)
+          if (gamma > 0 || mpe_grad)
             model->accumulate_distribution(feature, arcs[i].pdf_index,
                                            gamma, PDF::MPE_NUM_BUF);
           else
@@ -375,6 +380,7 @@ main(int argc, char *argv[])
       ('\0', "ml", "", "", "Collect statistics for ML")
       ('\0', "mmi", "", "", "Collect statistics for MMI")
       ('\0', "mpe", "", "", "Collect statistics for MPE")
+      ('\0', "mpegrad", "", "", "Collect statistics for gradient based MPE")
       ('\0', "mllt", "", "", "maximum likelihood linear transformation (for ML)")
       ('\0', "mpemode=MODE", "arg", "", "mono/mono-state/state/cp/cp-state/hyp-cp-state")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
@@ -444,13 +450,21 @@ main(int argc, char *argv[])
     }
     if (config["mpe"].specified)
     {
+      if (config["mpegrad"].specified)
+        throw std::string("Define only either --mpe or --mpegrad");
       mpe = true;
-      mode |= PDF_MPE_STATS;
+      mode |= PDF_MPE_NUM_STATS|PDF_MPE_DEN_STATS;
+      mpe_evaluator.set_model(&model);
+    }
+    else if (config["mpegrad"].specified)
+    {
+      mpe_grad = true;
+      mode |= PDF_MPE_NUM_STATS;
       mpe_evaluator.set_model(&model);
     }
 
     if (mode == 0)
-      throw std::string("At least one mode (--ml, --mmi, --mpe) must be given!");
+      throw std::string("At least one mode (--ml, --mmi, --mpe, --mpegrad) must be given!");
 
     if (mode != PDF_ML_STATS && !config["hmmnet"].specified)
       throw std::string("Discriminative training requires --hmmnet");
@@ -464,8 +478,8 @@ main(int argc, char *argv[])
 
     if (config["mpemode"].specified)
     {
-      if (!(mode&PDF_MPE_STATS))
-        fprintf(stderr, "--mpemode ignored without --mpe\n");
+      if (!mpe && !mpe_grad)
+        fprintf(stderr, "--mpemode ignored without --mpe or --mpegrad\n");
       else
       {
         std::string mpe_mode = config["mpemode"].get_str();
@@ -488,7 +502,7 @@ main(int argc, char *argv[])
     
     if (config["mllt"].specified)
     {
-      if (mmi || mpe)
+      if (mmi || mpe || mpe_grad)
         throw std::string("--mllt is only supported with --ml");
       mode |= PDF_ML_FULL_STATS;
     }
@@ -552,7 +566,7 @@ main(int argc, char *argv[])
         // Train the numerator
         train(&model, segmentator, true);
 
-        if (mmi || mpe)
+        if (mmi || mpe || mpe_grad)
         {
           // Clean up
           delete segmentator;
@@ -562,7 +576,7 @@ main(int argc, char *argv[])
           HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
             &model, true, &fea_gen, config["raw-input"].specified, NULL);
           lattice->set_collect_transition_probs(transtat);
-          if (mpe)
+          if (mpe || mpe_grad)
             lattice->set_custom_data_callback(&mpe_evaluator);
 
           if (!initialize_hmmnet(lattice, config["bw-beam"].get_float(),
@@ -572,7 +586,7 @@ main(int argc, char *argv[])
             skip = true;
           segmentator = lattice;
 
-          if (mpe)
+          if (mpe || mpe_grad)
           {
             if (info > 0)
               fprintf(stderr, "Total custom score %f\n", lattice->get_total_custom_score());
@@ -610,8 +624,9 @@ main(int argc, char *argv[])
 //       if (accum_pos == 1) // Denominator
 //         total_log_likelihood = -total_log_likelihood;
       lls_file << total_log_likelihood << std::endl;
-      if (mpe)
+      if (mpe || mpe_grad)
         lls_file << total_mpe_score << std::endl;
+      lls_file << num_frames << std::endl;
       lls_file.close();
     }
   }
