@@ -688,7 +688,15 @@ public:
    * \param g the other mixture
    * \param samples number of samples to use in the mc-simulation
    */
-  double kullback_leibler(Mixture &g, int samples=100000);
+  double kullback_leibler(Mixture &g, int samples=10000);
+
+  /** Computes the Kullback-Leibler divergence between this and another mixture
+   * using sampling with the (f+g)/2 as sampling distribution
+   * \param g the other mixture
+   * \param samples number of samples to use in the computation
+   */
+  double bhattacharyya(Mixture &g, int samples=10000);
+  
   
   // From pdf
   virtual void start_accumulating(StatisticsMode mode);
