@@ -66,7 +66,7 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
   if (is.fail())
     fprintf(stderr, "Error while reading statistics dump\n");
 
-  if (feacount < 0 || gamma < 0)
+  if (feacount < 0)
     throw std::string("Invalid statistics dump\n");
   
   m_feacount += feacount;
@@ -89,6 +89,14 @@ void
 FullStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_moment) const
 {
   second_moment = LaGenMatDouble(m_second_moment);
+}
+
+// Diagonal covariance version of get_accumulated_second_moment
+void
+FullStatisticsAccumulator::get_accumulated_second_moment(Vector &second_moment) const
+{
+  for (int i = 0; i < dim(); i++)
+    second_moment(i) = m_second_moment(i,i);
 }
 
 void
@@ -153,7 +161,7 @@ DiagonalStatisticsAccumulator::accumulate_from_dump(std::istream &is)
   if (is.fail())
     fprintf(stderr, "Error while reading statistics dump\n");
   
-  if (feacount < 0 || gamma < 0)
+  if (feacount < 0)
     throw std::string("Invalid statistics dump\n");
   
   m_feacount += feacount;
@@ -194,6 +202,13 @@ DiagonalStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_mome
     second_moment(i,i) = m_second_moment(i);
 }
 
+// Diagonal covariance version of get_accumulated_second_moment
+void
+DiagonalStatisticsAccumulator::get_accumulated_second_moment(Vector &second_moment) const
+{
+  second_moment = m_second_moment;
+}
+
 
 void
 DiagonalStatisticsAccumulator::set_accumulated_second_moment(Matrix &second_moment)
@@ -207,7 +222,7 @@ void
 DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &f)
 {
   assert( feacount >= 0 );
-  assert( gamma >= 0 );
+  //assert( gamma >= 0 );
   m_feacount += feacount;
   m_gamma += gamma;
   m_accumulated = true;
@@ -302,10 +317,10 @@ Gaussian::ismooth_statistics(int source, int target, double smoothing)
   m_accums[target]->set_accumulated_mean(mu_target);
 
   LaGenMatDouble sigma_source, sigma_target;
-  m_accums[source]->get_accumulated_second_moment(mu_source);
-  m_accums[target]->get_accumulated_second_moment(mu_target);
+  m_accums[source]->get_accumulated_second_moment(sigma_source);
+  m_accums[target]->get_accumulated_second_moment(sigma_target);
   Blas_Add_Mat_Mult(sigma_target, smooth_factor, sigma_source);
-  m_accums[target]->set_accumulated_second_moment(mu_target);
+  m_accums[target]->set_accumulated_second_moment(sigma_target);
 }
 
 
@@ -449,7 +464,10 @@ Gaussian::estimate_parameters(EstimationMode mode, double minvar,
   // Set the parameters
   if (ml_stats_target)
   {
+    double gamma = m_accums[ML_BUF]->gamma();
+    Blas_Scale(gamma, new_mean);
     m_accums[ML_BUF]->set_accumulated_mean(new_mean);
+    Blas_Scale(gamma, new_covariance);
     m_accums[ML_BUF]->set_accumulated_second_moment(new_covariance);
   }
   else
@@ -776,9 +794,12 @@ DiagonalGaussian::start_accumulating(StatisticsMode mode)
       m_accums[ML_BUF] = new DiagonalStatisticsAccumulator(dim());
     m_accums[MMI_BUF] = new DiagonalStatisticsAccumulator(dim());
   }
-  if (mode & PDF_MPE_STATS) {
-    m_accums.resize(MPE_DEN_BUF+1, NULL);
+  if (mode & PDF_MPE_NUM_STATS) {
+    m_accums.resize(MPE_NUM_BUF+1, NULL);
     m_accums[MPE_NUM_BUF] = new DiagonalStatisticsAccumulator(dim());
+  }
+  if (mode & PDF_MPE_DEN_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
     m_accums[MPE_DEN_BUF] = new DiagonalStatisticsAccumulator(dim());
   }
 }
@@ -1018,9 +1039,12 @@ FullCovarianceGaussian::start_accumulating(StatisticsMode mode)
       m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
     m_accums[MMI_BUF] = new FullStatisticsAccumulator(dim());
   }
-  if (mode & PDF_MPE_STATS) {
-    m_accums.resize(MPE_DEN_BUF+1, NULL);
+  if (mode & PDF_MPE_NUM_STATS) {
+    m_accums.resize(MPE_NUM_BUF+1, NULL);
     m_accums[MPE_NUM_BUF] = new FullStatisticsAccumulator(dim());
+  }
+  if (mode & PDF_MPE_DEN_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
     m_accums[MPE_DEN_BUF] = new FullStatisticsAccumulator(dim());
   }
 }
@@ -1214,9 +1238,12 @@ PrecisionConstrainedGaussian::start_accumulating(StatisticsMode mode)
       m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
     m_accums[MMI_BUF] = new FullStatisticsAccumulator(dim());
   }
-  if (mode & PDF_MPE_STATS) {
-    m_accums.resize(MPE_DEN_BUF+1, NULL);
+  if (mode & PDF_MPE_NUM_STATS) {
+    m_accums.resize(MPE_NUM_BUF+1, NULL);
     m_accums[MPE_NUM_BUF] = new FullStatisticsAccumulator(dim());
+  }
+  if (mode & PDF_MPE_DEN_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
     m_accums[MPE_DEN_BUF] = new FullStatisticsAccumulator(dim());
   }
 }
@@ -1414,9 +1441,12 @@ SubspaceConstrainedGaussian::start_accumulating(StatisticsMode mode)
       m_accums[ML_BUF] = new FullStatisticsAccumulator(dim());
     m_accums[MMI_BUF] = new FullStatisticsAccumulator(dim());
   }
-  if (mode & PDF_MPE_STATS) {
-    m_accums.resize(MPE_DEN_BUF+1, NULL);
+  if (mode & PDF_MPE_NUM_STATS) {
+    m_accums.resize(MPE_NUM_BUF+1, NULL);
     m_accums[MPE_NUM_BUF] = new FullStatisticsAccumulator(dim());
+  }
+  if (mode & PDF_MPE_DEN_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
     m_accums[MPE_DEN_BUF] = new FullStatisticsAccumulator(dim());
   }
 }
@@ -1582,9 +1612,12 @@ Mixture::start_accumulating(StatisticsMode mode)
       m_accums[ML_BUF] = new MixtureAccumulator(size());
     m_accums[MMI_BUF] = new MixtureAccumulator(size());
   }
-  if (mode & PDF_MPE_STATS) {
-    m_accums.resize(MPE_DEN_BUF+1, NULL);
+  if (mode & PDF_MPE_NUM_STATS) {
+    m_accums.resize(MPE_NUM_BUF+1, NULL);
     m_accums[MPE_NUM_BUF] = new MixtureAccumulator(size());
+  }
+  if (mode & PDF_MPE_DEN_STATS) {
+    m_accums.resize(MPE_DEN_BUF+1, NULL);
     m_accums[MPE_DEN_BUF] = new MixtureAccumulator(size());
   }
 
@@ -2126,10 +2159,10 @@ PDFPool::estimate_parameters(PDF::EstimationMode mode)
             temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
           temp->estimate_parameters(PDF::MMI_EST, m_minvar, m_covsmooth,
                                     m_c1, m_c2, true);
-          temp->ismooth_statistics(PDF::MPE_NUM_BUF,PDF::ML_BUF,m_mpe_ismooth);
+          temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF,m_mpe_ismooth);
         }
         else if (mode == PDF::MPE_EST && m_mpe_ismooth > 0)
-          temp->ismooth_statistics(PDF::MPE_NUM_BUF,PDF::ML_BUF,m_mpe_ismooth);
+          temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF,m_mpe_ismooth);
         else if (mode == PDF::MMI_EST && m_mmi_ismooth > 0)
           temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
         temp->estimate_parameters(mode, m_minvar, m_covsmooth,

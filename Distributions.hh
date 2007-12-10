@@ -14,7 +14,8 @@
 #define PDF_ML_STATS      1
 #define PDF_ML_FULL_STATS 2
 #define PDF_MMI_STATS     4
-#define PDF_MPE_STATS     8
+#define PDF_MPE_NUM_STATS 8
+#define PDF_MPE_DEN_STATS 16
 
 class PDF {
 public:
@@ -260,6 +261,7 @@ public:
   void set_accumulated_mean(Vector &mean);
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const = 0;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const = 0;
+  virtual void get_accumulated_second_moment(Vector &second_moment) const = 0;
   virtual void set_accumulated_second_moment(Matrix &second_moment) = 0;
   virtual void accumulate(int feacount, double gamma, const Vector &f) = 0;
   virtual void dump_statistics(std::ostream &os) const = 0;
@@ -288,6 +290,7 @@ public:
   }
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
+  virtual void get_accumulated_second_moment(Vector &second_moment) const;
   virtual void set_accumulated_second_moment(Matrix &second_moment);
   virtual void accumulate(int feacount, double gamma, const Vector &f);
   virtual void dump_statistics(std::ostream &os) const;
@@ -312,6 +315,7 @@ public:
   }
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
+  virtual void get_accumulated_second_moment(Vector &second_moment) const;
   virtual void set_accumulated_second_moment(Matrix &second_moment);
   virtual void accumulate(int feacount, double gamma, const Vector &f);
   virtual void dump_statistics(std::ostream &os) const;
@@ -414,6 +418,12 @@ public:
    * \param smoothing Smoothing constant
    */
   void ismooth_statistics(int source, int target, double smoothing);
+
+  // Accessing the accumulator
+  double get_accumulated_gamma(int accum) const { return m_accums[accum]->gamma(); }
+  void get_accumulated_mean(int accum, Vector &mean) const { m_accums[accum]->get_accumulated_mean(mean); }
+  void get_accumulated_second_moment(int accum, Vector &s) { m_accums[accum]->get_accumulated_second_moment(s); }
+
 
 protected:
   double m_constant;
@@ -670,13 +680,15 @@ public:
    */
   void remove_component(int index);
 
+  // For accessing the accumulator
+  double get_accumulated_gamma(int accum, int index) { return m_accums[accum]->gamma[index]; }
+
   /** Computes the Kullback-Leibler divergence between this and another mixture
    * using Monte Carlo simulation
    * \param g the other mixture
    * \param samples number of samples to use in the mc-simulation
    */
   double kullback_leibler(Mixture &g, int samples=100000);
-
   
   // From pdf
   virtual void start_accumulating(StatisticsMode mode);
