@@ -1914,6 +1914,26 @@ Mixture::kullback_leibler(Mixture &g, int samples)
 }
 
 
+double
+Mixture::bhattacharyya(Mixture &g, int samples)
+{
+  double bh=0;
+  double f_val, g_val;
+  Vector sample;
+  for (int i=0; i<samples; i++) {
+    if (mtw::rnd.f() <0.5)
+      draw_sample(sample);
+    else
+      g.draw_sample(sample);
+    m_pool->reset_cache();
+    f_val = compute_likelihood(sample);
+    g_val = g.compute_likelihood(sample);
+    bh += sqrt(f_val*g_val) / (0.5*(f_val+g_val));
+  }
+  return bh/samples;
+}
+
+
 void
 Mixture::draw_sample(Vector &sample)
 {
