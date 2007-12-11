@@ -34,7 +34,7 @@ CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	Recipe.cc conf.cc io.cc str.cc endian.cc Distributions.cc \
 	LinearAlgebra.cc Subspaces.cc HmmNetBaumWelch.cc \
 	Lattice.cc Viterbi.cc PhonePool.cc \
-	MllrTrainer.cc Ziggurat.cc mtw.cc \
+	MllrTrainer.cc ziggurat.cc mtw.cc \
 
 CLASS_OBJS = $(CLASS_SRCS:.cc=.o)
 

@@ -9,9 +9,6 @@
 #include "blas3pp.h"
 
 
-Ziggurat Gaussian::ziggurat = Ziggurat();
-
-
 void
 GaussianAccumulator::get_accumulated_mean(Vector &mean) const
 {
@@ -633,7 +630,7 @@ Gaussian::draw_sample(Vector &sample)
   Matrix chol; LinearAlgebra::cholesky_factor(cov, chol);
   Vector ziggies(dim());
   for (int i=0; i<dim(); i++)
-    ziggies(i) = ziggurat.rnor();
+    ziggies(i) = ziggurat::rnd.rnor();
   Blas_Mat_Vec_Mult(chol, ziggies, sample, 1.0, 1.0);
 }
 

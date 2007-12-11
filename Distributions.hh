@@ -7,7 +7,7 @@
 #include "FeatureModules.hh"
 #include "LinearAlgebra.hh"
 #include "Subspaces.hh"
-#include "Ziggurat.hh"
+#include "ziggurat.hh"
 #include "mtw.hh"
 
 // Bitmasks for statistics mode. Note! PDF_ML_FULL_STATS implies PDF_ML_STATS
@@ -433,8 +433,6 @@ protected:
   friend class HmmSet;
   friend class PDFPool;
   friend struct PDFPool::Gaussian_occ_comp;
-
-  static Ziggurat ziggurat;
 };
 
 
