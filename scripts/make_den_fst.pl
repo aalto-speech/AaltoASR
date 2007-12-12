@@ -98,6 +98,9 @@ sub load_recipe {
 sub make_transcript_word_fsts {
   my $list_file = "filelist.tmp";
   my $l;
+  my $orig_dir;
+
+  chomp($orig_dir = `pwd`);
 
   chdir($TEMPDIR) || die "Could not change to directory $TEMPDIR";
 
@@ -131,7 +134,7 @@ sub make_transcript_word_fsts {
 
   system("rm -rf $temp_out_dir\n"); # Remove temporary files
 
-  chdir("..");
+  chdir($orig_dir) || die "Could not change to directory $orig_dir";
 }
 
 
@@ -142,10 +145,13 @@ sub make_denominator_hmmnets {
 
   for $l (@BATCH_FILES) {
     print "Generating denominator hmmnet for file ".$l->[2]."\n";
-    for ($c = 0; $c < 4; $c++) {
-      $r = system("$LATTICE_RESCORE -l $LMMODEL -i ".$l->[2]." -o - | $SRI_LATTICE_TOOL -posterior-prune $LATTICE_THRESHOLD -read-htk -in-lattice - -write-htk -out-lattice - -htk-lmscale $LMSCALE -htk-acscale 1 -posterior-scale $LMSCALE | $HTK2FST - | fst_concatenate optional_silence.fst - - | fst_concatenate - optional_silence.fst - | fst_concatenate - sentence_end.fst - | fst_union ${TEMPDIR}/".$l->[1]." - - | fst_optimize -A - - | fst_compose -t L.fst - - | fst_optimize -A - - | fst_compose -t C.fst - - | fst_project i e - - | fst_optimize -A - - | fst_compose -t H.fst - - | $RMB | fst_concatenate - end_symbol.fst - | fst_optimize -A - ".$l->[3]);
-      last if ($r == 0);
+    for ($c = 0; $c < 8; $c++) {
+      $r = system("fst_project e e ${TEMPDIR}/".$l->[1]." - | fst_optimize -A - - | ${SCRIPTDIR}/negate_fst_weights.pl > ${TEMPDIR}/temp_weight.fst");
+      if ($r == 0) {
+        $r = system("$LATTICE_RESCORE -l $LMMODEL -i ".$l->[2]." -o - | $SRI_LATTICE_TOOL -posterior-prune $LATTICE_THRESHOLD -read-htk -in-lattice - -write-htk -out-lattice - -htk-lmscale $LMSCALE -htk-acscale 1 -posterior-scale $LMSCALE | $HTK2FST - | fst_concatenate optional_silence.fst - - | fst_concatenate - optional_silence.fst - | fst_concatenate - sentence_end.fst - | fst_union ${TEMPDIR}/".$l->[1]." - - | fst_optimize -A - - | fst_compose -t L.fst - - | fst_optimize -A - - | fst_compose -t C.fst - - | fst_project i e - - | fst_optimize -A - - | fst_compose -t H.fst - - | $RMB | fst_concatenate - end_symbol.fst - | fst_concatenate ${TEMPDIR}/temp_weight.fst - - | fst_optimize -A - ".$l->[3]);
+        last if ($r == 0);
+      }
     }
-    die "Could not process file ".$l->[2]."\n" if ($c >= 10);
+    die "Could not process file ".$l->[2]."\n" if ($c >= 8);
   }
 }
