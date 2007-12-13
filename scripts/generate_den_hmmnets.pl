@@ -3,6 +3,8 @@
 # Run this script at itl-cl1, as it uses GridEngine for scheduling
 # the parallel processes.
 
+# Numerator hmmnets must be available when creating the denumerator hmmnets!
+
 use locale;
 use strict;
 

@@ -87,8 +87,10 @@ sub load_recipe {
       my $wgfile = $TEMPDIR."/".$1.".wg";
       $line =~ /den\-hmmnet=(\S*)/;
       my $denfile = $1;
+      $line =~ /hmmnet=(\S*)/;
+      my $hmmnetfile = $1;
 
-      push(@BATCH_FILES, [$trfile, $trhmmnet, $wgfile, $denfile]);
+      push(@BATCH_FILES, [$trfile, $trhmmnet, $wgfile, $denfile, $hmmnetfile]);
     }
     $cur_line++;
   }
@@ -126,7 +128,7 @@ sub make_transcript_word_fsts {
     my $c;
     for ($c = 0; $c < 4; $c++) {
       my $r;
-      $r = system("$HTK2FST ${temp_out_dir}/".$l->[1]." | fst_nbest -t -1000 -n 1 -p - ".$l->[1]);
+      $r = system("$HTK2FST ${temp_out_dir}/".$l->[1]." | fst_nbest -t -1000 -n 1 -p - - | fst_project e e - - | ${SCRIPTDIR}/negate_fst_weights.pl | fst_optimize -A - ".$l->[1]);
       last if ($r == 0);
     }
     die "Could not process file ".$l->[1]."\n" if ($c >= 4);
@@ -146,11 +148,8 @@ sub make_denominator_hmmnets {
   for $l (@BATCH_FILES) {
     print "Generating denominator hmmnet for file ".$l->[2]."\n";
     for ($c = 0; $c < 8; $c++) {
-      $r = system("fst_project e e ${TEMPDIR}/".$l->[1]." - | fst_optimize -A - - | ${SCRIPTDIR}/negate_fst_weights.pl > ${TEMPDIR}/temp_weight.fst");
-      if ($r == 0) {
-        $r = system("$LATTICE_RESCORE -l $LMMODEL -i ".$l->[2]." -o - | $SRI_LATTICE_TOOL -posterior-prune $LATTICE_THRESHOLD -read-htk -in-lattice - -write-htk -out-lattice - -htk-lmscale $LMSCALE -htk-acscale 1 -posterior-scale $LMSCALE | $HTK2FST - | fst_concatenate optional_silence.fst - - | fst_concatenate - optional_silence.fst - | fst_concatenate - sentence_end.fst - | fst_union ${TEMPDIR}/".$l->[1]." - - | fst_optimize -A - - | fst_compose -t L.fst - - | fst_optimize -A - - | fst_compose -t C.fst - - | fst_project i e - - | fst_optimize -A - - | fst_compose -t H.fst - - | $RMB | fst_concatenate - end_symbol.fst - | fst_concatenate ${TEMPDIR}/temp_weight.fst - - | fst_optimize -A - ".$l->[3]);
-        last if ($r == 0);
-      }
+      $r = system("$LATTICE_RESCORE -l $LMMODEL -i ".$l->[2]." -o - | $SRI_LATTICE_TOOL -posterior-prune $LATTICE_THRESHOLD -read-htk -in-lattice - -write-htk -out-lattice - -htk-lmscale $LMSCALE -htk-acscale 1 -posterior-scale $LMSCALE | $HTK2FST - | fst_concatenate optional_silence.fst - - | fst_concatenate - optional_silence.fst - | fst_concatenate - sentence_end.fst - | fst_optimize -A - - | fst_compose -t L.fst - - | fst_optimize -A - - | fst_compose -t C.fst - - | fst_project i e - - | fst_optimize -A - - | fst_compose -t H.fst - - | $RMB | fst_concatenate ${TEMPDIR}/".$l->[1]." - - | fst_optimize -A - - | fst_union ".$l->[4]." - - | fst_concatenate - end_symbol.fst - | fst_optimize -A - ".$l->[3]);
+      last if ($r == 0);
     }
     die "Could not process file ".$l->[2]."\n" if ($c >= 8);
   }
