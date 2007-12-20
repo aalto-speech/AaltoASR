@@ -20,6 +20,7 @@ bool transtat;
 float start_time, end_time;
 double total_log_likelihood = 0;
 double total_mpe_score = 0;
+double total_mpe_num_score = 0;
 int num_frames = 0;
 
 // Training modes
@@ -62,6 +63,9 @@ public:
   void fetch_frame_info(HmmNetBaumWelch *seg);
   void reset(void);
 
+  int non_silence_frames(void) { return m_non_silence_frames; }
+  int frames(void) { return (int)m_ref_segmentation.size(); }
+
 private:
   std::string extract_center_phone(const std::string &label);
   std::string extract_context_phone(const std::string &label);
@@ -70,6 +74,7 @@ private:
 private:
   MPEMode m_mode;
   HmmSet *m_model;
+  int m_non_silence_frames;
 };
 
 
@@ -193,6 +198,7 @@ MPEEvaluator::reset(void)
   for (int i = 0; i < (int)m_ref_segmentation.size(); i++)
     delete m_ref_segmentation[i];
   m_ref_segmentation.clear();
+  m_non_silence_frames = 0;
 }
 
 void
@@ -208,11 +214,17 @@ MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
   m_ref_segmentation.push_back(
     new std::vector<HmmNetBaumWelch::ArcInfo> );
   seg->fill_arc_info(*(m_ref_segmentation.back()));
+
+  bool silence = false;
   
   // Process the labels to speed up the custom data query
   for (int i = 0; i < (int)m_ref_segmentation.back()->size(); i++)
   {
     std::string &label = (*m_ref_segmentation.back())[i].label;
+    if (label.find('-') == std::string::npos &&
+        label.find('+') == std::string::npos &&
+        label[0] == '_') // Silence node
+      silence = true;
     if (m_mode == MPEM_MONOPHONE_STATE)
       (*m_ref_segmentation.back())[i].pdf_index = extract_state(label);
     if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_MONOPHONE_STATE)
@@ -221,6 +233,8 @@ MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
              m_mode == MPEM_CONTEXT_PHONE_STATE)
       label = extract_context_phone(label);
   }
+  if (!silence)
+    m_non_silence_frames++;
 }
 
 
@@ -259,13 +273,18 @@ bool initialize_hmmnet(HmmNetBaumWelch* lattice, float bw_beam, float fw_beam,
 }
 
 
+double file_mmi = 0;
+
 void
 train(HmmSet *model, Segmentator *segmentator, bool numerator)
 {
   int frame;
 
   if ((mpe || mpe_grad) && numerator)
+  {
     mpe_evaluator.reset();
+    file_mmi = 0;
+  }
   
   while (segmentator->next_frame()) {
 
@@ -294,13 +313,16 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
       {
         std::vector<HmmNetBaumWelch::ArcInfo> arcs;
         seg->fill_arc_info(arcs);
+        std::set<int> mixtures;
         for (int i = 0; i < (int)arcs.size(); i++)
         {
           double gamma =
             (arcs[i].custom_score-seg->get_total_custom_score())*arcs[i].prob;
           if (gamma > 0 || mpe_grad)
+          {
             model->accumulate_distribution(feature, arcs[i].pdf_index,
                                            gamma, PDF::MPE_NUM_BUF);
+          }
           else
             model->accumulate_distribution(feature, arcs[i].pdf_index,
                                            -gamma, PDF::MPE_DEN_BUF);
@@ -348,8 +370,18 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
     }
   }
   if (segmentator->computes_total_log_likelihood())
+  {
     total_log_likelihood +=
       (numerator?1:-1)*segmentator->get_total_log_likelihood();
+    file_mmi += (numerator?1:-1)*segmentator->get_total_log_likelihood();
+  }
+
+//   if (mpe && !numerator)
+//   {
+//     HmmNetBaumWelch *seg = dynamic_cast< HmmNetBaumWelch* >(segmentator);
+//     fprintf(stderr, "MPE %g %g %i %g\n",
+//             (double)mpe_evaluator.non_silence_frames()/(double)mpe_evaluator.frames(), seg->get_total_custom_score()/(double)mpe_evaluator.frames(), mpe_evaluator.frames(), file_mmi);
+//   }
 }
 
 
@@ -577,7 +609,10 @@ main(int argc, char *argv[])
             &model, true, &fea_gen, config["raw-input"].specified, NULL);
           lattice->set_collect_transition_probs(transtat);
           if (mpe || mpe_grad)
+          {
+            total_mpe_num_score += mpe_evaluator.non_silence_frames();
             lattice->set_custom_data_callback(&mpe_evaluator);
+          }
 
           if (!initialize_hmmnet(lattice, config["bw-beam"].get_float(),
                                  config["fw-beam"].get_float(),
@@ -625,7 +660,10 @@ main(int argc, char *argv[])
 //         total_log_likelihood = -total_log_likelihood;
       lls_file << total_log_likelihood << std::endl;
       if (mpe || mpe_grad)
+      {
         lls_file << total_mpe_score << std::endl;
+        lls_file << total_mpe_num_score << std::endl;
+      }
       lls_file << num_frames << std::endl;
       lls_file.close();
     }
