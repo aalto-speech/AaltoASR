@@ -38,7 +38,7 @@ my $TRANSCRIPT2FSM = "$SCRIPTDIR/transcript2fsm.pl";
 
 
 load_recipe($RECIPE, $BATCH_INDEX, $NUM_BATCHES);
-make_transcript_word_fsts();
+make_transcript_lmscore_fsts();
 make_denominator_hmmnets();
 
 # Remove the temporary transcript files
@@ -97,7 +97,7 @@ sub load_recipe {
 }
 
 
-sub make_transcript_word_fsts {
+sub make_transcript_lmscore_fsts {
   my $list_file = "filelist.tmp";
   my $l;
   my $orig_dir;
@@ -134,7 +134,7 @@ sub make_transcript_word_fsts {
     die "Could not process file ".$l->[1]."\n" if ($c >= 4);
   }
 
-  system("rm -rf $temp_out_dir\n"); # Remove temporary files
+  system("rm -rf $temp_out_dir"); # Remove temporary files
 
   chdir($orig_dir) || die "Could not change to directory $orig_dir";
 }
