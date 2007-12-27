@@ -163,6 +163,13 @@ sub copy_binary_to_work {
     system("cp ${orig_bin_dir}/vtln ${new_bin_dir}/vtln");
     system("cp ${orig_bin_dir}/dur_est ${new_bin_dir}/dur_est");
     system("cp ${orig_bin_dir}/gconvert ${new_bin_dir}/gconvert");
+    system("cp ${orig_bin_dir}/gcluster ${new_bin_dir}/gcluster");
+    system("cp ${orig_bin_dir}/subspace ${new_bin_dir}/subspace");
+    system("cp ${orig_bin_dir}/segfea ${new_bin_dir}/segfea");
+    system("cp ${orig_bin_dir}/phone_probs ${new_bin_dir}/phone_probs");
+    system("cp ${orig_bin_dir}/optmodel ${new_bin_dir}/optmodel");
+    system("cp ${orig_bin_dir}/optimize ${new_bin_dir}/optimize");
+    system("cp ${orig_bin_dir}/mllr ${new_bin_dir}/mllr");
     $BINDIR = $new_bin_dir;
 }
 
