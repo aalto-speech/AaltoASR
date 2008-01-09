@@ -18,7 +18,9 @@ int info;
 int accum_pos;
 bool transtat;
 float start_time, end_time;
-double total_log_likelihood = 0;
+double total_num_log_likelihood = 0;
+double total_den_log_likelihood = 0;
+double total_mmi_score = 0;
 double total_mpe_score = 0;
 double total_mpe_num_score = 0;
 int num_frames = 0;
@@ -273,8 +275,6 @@ bool initialize_hmmnet(HmmNetBaumWelch* lattice, float bw_beam, float fw_beam,
 }
 
 
-double file_mmi = 0;
-
 void
 train(HmmSet *model, Segmentator *segmentator, bool numerator)
 {
@@ -283,7 +283,6 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
   if ((mpe || mpe_grad) && numerator)
   {
     mpe_evaluator.reset();
-    file_mmi = 0;
   }
   
   while (segmentator->next_frame()) {
@@ -344,9 +343,14 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
                                          pdfs[i].prob, PDF::MMI_BUF);
         }
         if (!segmentator->computes_total_log_likelihood())
-          total_log_likelihood += (numerator?1:-1)*
-            util::safe_log(pdfs[i].prob*model->state_likelihood(pdfs[i].index,
-                                                                feature));
+        {
+          if (numerator)
+            total_num_log_likelihood += util::safe_log(
+              pdfs[i].prob*model->state_likelihood(pdfs[i].index, feature));
+          else
+            total_den_log_likelihood += util::safe_log(
+              pdfs[i].prob*model->state_likelihood(pdfs[i].index, feature));
+        }
       }
     }
     
@@ -363,25 +367,18 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
         if (!segmentator->computes_total_log_likelihood())
         {
           HmmTransition &t = model->transition(transitions[i].index);
-          total_log_likelihood +=
-            util::safe_log(transitions[i].prob*t.prob);
+          total_num_log_likelihood+=util::safe_log(transitions[i].prob*t.prob);
         }
       }
     }
   }
   if (segmentator->computes_total_log_likelihood())
   {
-    total_log_likelihood +=
-      (numerator?1:-1)*segmentator->get_total_log_likelihood();
-    file_mmi += (numerator?1:-1)*segmentator->get_total_log_likelihood();
+    if (numerator)
+      total_num_log_likelihood += segmentator->get_total_log_likelihood();
+    else
+      total_den_log_likelihood += segmentator->get_total_log_likelihood();
   }
-
-//   if (mpe && !numerator)
-//   {
-//     HmmNetBaumWelch *seg = dynamic_cast< HmmNetBaumWelch* >(segmentator);
-//     fprintf(stderr, "MPE %g %g %i %g\n",
-//             (double)mpe_evaluator.non_silence_frames()/(double)mpe_evaluator.frames(), seg->get_total_custom_score()/(double)mpe_evaluator.frames(), mpe_evaluator.frames(), file_mmi);
-//   }
 }
 
 
@@ -645,7 +642,7 @@ main(int argc, char *argv[])
     {
       fprintf(stderr, "Finished collecting statistics (%i/%i)\n",
 	      config["bindex"].get_int(), config["batch"].get_int());
-      fprintf(stderr, "Total log likelihood: %f\n", total_log_likelihood);
+      fprintf(stderr, "Total log likelihood: %f\n", total_num_log_likelihood);
     }
     
     // Write statistics to file dump and clean up
@@ -656,15 +653,18 @@ main(int argc, char *argv[])
     std::ofstream lls_file(lls_file_name.c_str());
     if (lls_file)
     {
-//       if (accum_pos == 1) // Denominator
-//         total_log_likelihood = -total_log_likelihood;
-      lls_file << total_log_likelihood << std::endl;
+      lls_file << "Numerator loglikelihood: " << total_num_log_likelihood << std::endl;
+      if (mmi || mpe || mpe_grad)
+      {
+        lls_file << "Denominator loglikelihood: " << total_den_log_likelihood << std::endl;
+        lls_file << "MMI score: " << (total_num_log_likelihood - total_den_log_likelihood) << std::endl;
+      }
       if (mpe || mpe_grad)
       {
-        lls_file << total_mpe_score << std::endl;
-        lls_file << total_mpe_num_score << std::endl;
+        lls_file << "MPFE score: " << total_mpe_score << std::endl;
+        lls_file << "MPFE numerator score: " << total_mpe_num_score << std::endl;
       }
-      lls_file << num_frames << std::endl;
+      lls_file << "Number of frames: " << num_frames << std::endl;
       lls_file.close();
     }
   }

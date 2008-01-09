@@ -1,6 +1,7 @@
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <stdlib.h>
 
 #include "io.hh"
 #include "str.hh"
@@ -181,9 +182,9 @@ void extract_gradient(void)
 int
 main(int argc, char *argv[])
 {
-  double total_log_likelihood = 0;
-  double total_mpe_score = 0;
-  double total_mpe_num_score = 0;
+  double total_mpe_score;
+  std::map< std::string, double > sum_statistics;
+  std::string base_file_name;
   
   try {
     config("usage: optmodel [OPTION...]\n")
@@ -199,7 +200,7 @@ main(int argc, char *argv[])
       ('\0', "minvar=FLOAT", "arg", "0.09", "minimum variance (default 0.09)")
       ('A', "ac-scale=FLOAT", "arg", "1", "acoustic scaling used in stats")
       ('\0', "bfgsu=INT", "arg", "4", "Number of BFGS updates (default 4)")
-      ('s', "savesum=FILE", "arg", "", "save summary information (loglikelihood)")
+      ('s', "savesum=FILE", "arg", "", "save summary information")
       ('i', "info=INT", "arg", "0", "info level")
       ;
     config.default_parse(argc, argv);
@@ -213,6 +214,7 @@ main(int argc, char *argv[])
     if (config["base"].specified)
     {
       model.read_all(config["base"].get_str());
+      base_file_name = config["base"].get_str();
     }
     else if (config["gk"].specified && config["mc"].specified &&
              config["ph"].specified)
@@ -220,6 +222,7 @@ main(int argc, char *argv[])
       model.read_gk(config["gk"].get_str());
       model.read_mc(config["mc"].get_str());
       model.read_ph(config["ph"].get_str());
+      base_file_name = config["gk"].get_str();
     }
     else
     {
@@ -242,20 +245,31 @@ main(int argc, char *argv[])
       model.accumulate_mc_from_dump(statistics_file+".mcs");
       std::string lls_file_name = statistics_file+".lls";
       std::ifstream lls_file(lls_file_name.c_str());
-      if (lls_file)
+      while (lls_file.good())
       {
-        double temp;
-        int itemp;
-        lls_file >> temp;
-        total_log_likelihood += temp;
-        lls_file >> temp;
-        total_mpe_score += temp;
-        lls_file >> temp;
-        total_mpe_num_score += temp;
-        lls_file >> itemp;
-        num_frames += itemp;
-        lls_file.close();
+        char buf[256];
+        std::string temp;
+        std::vector<std::string> fields;
+        lls_file.getline(buf, 256);
+        temp.assign(buf);
+        str::split(&temp, ":", false, &fields, 2);
+        if (fields.size() == 2)
+        {
+          double value = strtod(fields[1].c_str(), NULL);
+          if (sum_statistics.find(fields[0]) == sum_statistics.end())
+            sum_statistics[fields[0]] = value;
+          else
+            sum_statistics[fields[0]] = sum_statistics[fields[0]] + value;
+        }
       }
+      lls_file.close();
+      if (sum_statistics.find("MPFE score") == sum_statistics.end())
+        throw std::string("MPFE score not available");
+      if (sum_statistics.find("Number of frames") == sum_statistics.end())
+        throw std::string("Number of frames not available");
+      
+      total_mpe_score = sum_statistics["MPFE score"];
+      num_frames = (int)sum_statistics["Number of frames"];
     }
 
     state_file = config["osf"].get_str();
@@ -306,10 +320,13 @@ main(int argc, char *argv[])
                 summary_file_name.c_str());
       else
       {
-        summary_file << total_log_likelihood << std::endl;
-        summary_file << "  " << total_mpe_score << std::endl;
-        summary_file << "  " << total_mpe_num_score << std::endl;
-        summary_file << "  " << num_frames << std::endl;
+        summary_file << base_file_name << std::endl;
+        for (std::map<std::string, double>::const_iterator it =
+               sum_statistics.begin(); it != sum_statistics.end(); it++)
+        {
+          summary_file << "  " << (*it).first << ": " << (*it).second <<
+            std::endl;
+        }
       }
       summary_file.close();
     }
