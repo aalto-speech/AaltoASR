@@ -805,7 +805,7 @@ PhonePool::iterate_context_phones(ContextPhoneCallback &c,
 {  
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
-    if ((*it).second->label()[0] != '_')
+    if ((*it).second->label()[0] != '_' && max_context_index > 0)
     {
       // Iterate through all context phones (with this center phone)
       if (max_context_index > 0)
