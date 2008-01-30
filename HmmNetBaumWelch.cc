@@ -398,6 +398,9 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
       // All tokens were pruned, backward beam should be increased
       return false;
     }
+
+    // Update the maximum probability used for pruning
+    prev_max_log_prob = max_log_prob;
     
     // Iterate through active nodes and propagate the epsilon transitions.
     // The new active nodes are appended to the end of m_active_node_table.
@@ -417,9 +420,6 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
           target_buffer, true, fea_vec);
       }
     }
-
-    // Use previous maximum probability for pruning
-    prev_max_log_prob = max_log_prob;    
   }
 
   // Clear the active nodes
@@ -667,11 +667,11 @@ HmmNetBaumWelch::backward_propagate_node_arcs(int node_id, double cur_score,
     if (new_score > loglikelihoods.zero())
     {
       // Fill in the backward probability for the arc
-      m_arcs[arc_id].bw_scores.safe_set_score(m_current_frame, new_score);
+      m_arcs[arc_id].bw_scores.set_new_score(m_current_frame, new_score);
       if (m_custom_data_callback != NULL)
       {
-        m_arcs[arc_id].bw_custom_data.safe_set_score(m_current_frame,
-                                                     arc_custom_score);
+        m_arcs[arc_id].bw_custom_data.set_new_score(m_current_frame,
+                                                    arc_custom_score);
       }
 
       // Propagate the probability of the arc to the next node
@@ -964,14 +964,6 @@ HmmNetBaumWelch::clear_bw_scores(void)
     m_arcs[i].bw_scores.clear();
     m_arcs[i].bw_custom_data.clear();
   }
-}
-
-
-void
-HmmNetBaumWelch::FrameScores::safe_set_score(int frame, double score)
-{
-  assert( frame_blocks.empty() || frame_blocks.back().start > frame );
-  set_new_score(frame, score);
 }
 
 
