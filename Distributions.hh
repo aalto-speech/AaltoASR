@@ -331,7 +331,8 @@ private:
 class Gaussian : public PDF {
 public:
 
-  Gaussian() { };
+  Gaussian() { chol = NULL; };
+  virtual ~Gaussian() { if (chol != NULL) delete chol; }
   // ABSTRACT FUNCTIONS, SHOULD BE OVERWRITTEN IN THE GAUSSIAN IMPLEMENTATIONS
   
   /* Resets the Gaussian to have dimensionality dim and all values zeroed */
@@ -412,6 +413,11 @@ public:
    */
   bool full_stats_accumulated(int accum_pos);
 
+  /**
+   * \return true if Gaussian parameters are computed and valid
+   */
+  bool valid_parameters(void) const { return m_valid_parameters; }
+
   /** Apply ismoothing to the statistics.
    * \param source    Source buffer (the one being smoothed with)
    * \param target    Target buffer (the one the source buffer is added to)
@@ -427,8 +433,11 @@ public:
 
 protected:
   double m_constant;
+  bool m_valid_parameters;
   
   std::vector<GaussianAccumulator*> m_accums;
+
+  Matrix *chol;
 
   friend class HmmSet;
   friend class PDFPool;
@@ -515,7 +524,6 @@ private:
   Matrix m_precision;
   Vector m_exponential_parameters;
   double m_exponential_normalizer;
-  bool m_statistics_finished;
 };
 
 

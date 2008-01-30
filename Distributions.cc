@@ -92,6 +92,7 @@ FullStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_moment) 
 void
 FullStatisticsAccumulator::get_accumulated_second_moment(Vector &second_moment) const
 {
+  second_moment.resize(dim());
   for (int i = 0; i < dim(); i++)
     second_moment(i) = m_second_moment(i,i);
 }
@@ -558,21 +559,31 @@ Gaussian::merge(const std::vector<double> &weights,
 
   Vector new_mean(m_dim);
   Matrix new_covariance = Matrix::zeros(m_dim, m_dim);
-  Matrix eye = Matrix::eye(m_dim, m_dim);
+  //Matrix eye = Matrix::eye(m_dim, m_dim);
   double weight_sum = 0;
   new_mean = 0;
+  double even_weight = 1.0/(double)weights.size();
+  bool use_even_weight = false;
+
+  for (int i = 0; i < (int)weights.size(); i++)
+    weight_sum += weights[i];
+  if (weight_sum < 1e-15)
+  {
+    use_even_weight = true;
+    weight_sum = 1;
+  }
   
   for (int i = 0; i < (int)weights.size(); i++)
   {
     Matrix cur_covariance;
     Vector cur_mean;
+    double cur_weight = (use_even_weight?even_weight:weights[i]);
     gaussians[i]->get_covariance(cur_covariance);
     gaussians[i]->get_mean(cur_mean);
     Blas_R1_Update(cur_covariance, cur_mean, cur_mean);
-    Blas_Mat_Mat_Mult(cur_covariance, eye, new_covariance, weights[i], 1.0);
-    //Blas_Add_Mat_Mult(new_covariance, weights[i], cur_covariance);
-    Blas_Add_Mult(new_mean, weights[i], cur_mean);
-    weight_sum += weights[i];
+    //Blas_Mat_Mat_Mult(cur_covariance, eye, new_covariance, cur_weight, 1.0);
+    Blas_Add_Mat_Mult(new_covariance, cur_weight, cur_covariance);
+    Blas_Add_Mult(new_mean, cur_weight, cur_mean);
   }
   Blas_Scale(1.0/weight_sum, new_mean);
   Blas_Scale(1.0/weight_sum, new_covariance);
@@ -626,12 +637,16 @@ void
 Gaussian::draw_sample(Vector &sample)
 {
   get_mean(sample);
-  Matrix cov; get_covariance(cov);
-  Matrix chol; LinearAlgebra::cholesky_factor(cov, chol);
+  if (chol == NULL)
+  {
+    Matrix cov; get_covariance(cov);
+    chol = new Matrix(dim(), dim());
+    LinearAlgebra::cholesky_factor(cov, *chol);
+  }
   Vector ziggies(dim());
   for (int i=0; i<dim(); i++)
     ziggies(i) = ziggurat::rnd.rnor();
-  Blas_Mat_Vec_Mult(chol, ziggies, sample, 1.0, 1.0);
+  Blas_Mat_Vec_Mult(*chol, ziggies, sample, 1.0, 1.0);
 }
 
 
@@ -652,6 +667,11 @@ Gaussian::set_covariance(const Vector &covariance,
   for (int i=0; i<covariance.size(); i++)
     cov(i,i)=covariance(i);
   set_covariance(cov, finish_statistics);
+  if (chol != NULL)
+  {
+    delete chol;
+    chol = NULL;
+  }
 }
 
 
@@ -675,15 +695,10 @@ DiagonalGaussian::DiagonalGaussian(const DiagonalGaussian &g)
 {
   reset(g.dim());
   g.get_mean(m_mean);
-  g.get_covariance(m_covariance);
-  for (int i=0; i<dim(); i++)
-  {
-    if (m_covariance(i) > 0)
-      m_precision(i)=1/m_covariance(i);
-    else
-      m_covariance(i) = 0;
-  }
-  set_constant();
+  m_covariance.copy(g.m_covariance);
+  m_precision.copy(g.m_precision);
+  m_constant = g.m_constant;
+  m_valid_parameters = g.m_valid_parameters;
 }
 
 
@@ -704,6 +719,7 @@ DiagonalGaussian::reset(int dim)
   m_mean=0; m_covariance=0; m_precision=0;
 
   m_constant=0;
+  m_valid_parameters = false;
 }
 
 
@@ -719,11 +735,19 @@ DiagonalGaussian::compute_log_likelihood(const Vector &f) const
 {
   double ll=0;
 
-  Vector diff(f);
-
-  Blas_Add_Mult(diff, -1, m_mean);
+// Seems to be faster without BLAS, old implementation commented out
+  
+//   Vector diff(f);
+//   Blas_Add_Mult(diff, -1, m_mean);
+//   for (int i=0; i<dim(); i++)
+//     ll += diff(i)*diff(i)*m_precision(i);
+  
   for (int i=0; i<dim(); i++)
-    ll += diff(i)*diff(i)*m_precision(i);
+  {
+    double d=f(i)-m_mean(i);
+    ll += d*d*m_precision(i);
+  }
+  
   ll *= -0.5;
   ll += m_constant;
 
@@ -834,6 +858,7 @@ DiagonalGaussian::set_covariance(const Matrix &covariance,
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
 
+  m_valid_parameters = false;
   for (int i=0; i<dim(); i++) {
     assert(covariance(i,i)>0);
     m_covariance(i) = covariance(i,i);
@@ -844,6 +869,11 @@ DiagonalGaussian::set_covariance(const Matrix &covariance,
   }
   if (finish_statistics)
     set_constant();
+  if (chol != NULL)
+  {
+    delete chol;
+    chol = NULL;
+  }
 }
 
 
@@ -861,6 +891,7 @@ DiagonalGaussian::set_covariance(const Vector &covariance,
   assert(covariance.size()==dim());
   m_covariance.copy(covariance);
 
+  m_valid_parameters = false;
   for (int i=0; i<dim(); i++) {
     m_covariance(i) = covariance(i);
     if (finish_statistics && m_covariance(i) > 0)
@@ -870,6 +901,11 @@ DiagonalGaussian::set_covariance(const Vector &covariance,
   }
   if (finish_statistics)
     set_constant();
+  if (chol != NULL)
+  {
+    delete chol;
+    chol = NULL;
+  }
 }
 
 
@@ -880,7 +916,14 @@ DiagonalGaussian::set_constant(void)
   for (int i=0; i<dim(); i++)
     m_constant *= m_precision(i);
   if (m_constant > 0)
+  {
     m_constant = log(sqrt(m_constant));
+    m_valid_parameters = true;
+  }
+  else
+  {
+    m_valid_parameters = false;
+  }
 }
 
 
@@ -923,7 +966,7 @@ FullCovarianceGaussian::FullCovarianceGaussian(const FullCovarianceGaussian &g)
   m_exponential_parameters.copy(g.m_exponential_parameters);
   m_constant = g.m_constant;
   m_exponential_normalizer = g.m_exponential_normalizer;
-  m_statistics_finished = g.m_statistics_finished;
+  m_valid_parameters = g.m_valid_parameters;
 }
 
 
@@ -943,7 +986,7 @@ FullCovarianceGaussian::reset(int dim)
   m_mean=0; m_precision=0; m_covariance=0;
 
   m_constant=0;
-  m_statistics_finished=false;
+  m_valid_parameters=false;
 }
 
 
@@ -1057,11 +1100,6 @@ FullCovarianceGaussian::get_mean(Vector &mean) const
 void
 FullCovarianceGaussian::get_covariance(Matrix &covariance) const
 {
-  if (m_statistics_finished) {
-    covariance.resize(m_precision.rows(), m_precision.cols());
-    LinearAlgebra::inverse(m_precision, covariance);
-  }
-  else
     covariance.copy(m_covariance);
 }
 
@@ -1103,19 +1141,24 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance,
   assert(covariance.rows()==dim());
   assert(covariance.cols()==dim());
 
+  m_covariance.copy(covariance); // Maintain the original covariance
   if (finish_statistics && LinearAlgebra::is_spd(covariance))
   {
     LinearAlgebra::inverse(covariance, m_precision);
     m_constant = log(sqrt(LinearAlgebra::spd_determinant(m_precision)));
     recompute_exponential_parameters();
-    m_statistics_finished = true;
+    m_valid_parameters = true;
   }
   else
   {
-    m_covariance.copy(covariance);
     m_precision = 0;
     m_constant = 0;
-    m_statistics_finished=false;
+    m_valid_parameters=false;
+  }
+  if (chol != NULL)
+  {
+    delete chol;
+    chol = NULL;
   }
 }
 
@@ -1139,6 +1182,7 @@ PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(const PrecisionConstr
   m_coeffs.copy(g.m_coeffs);
   m_ps = g.get_subspace();
   m_constant = g.m_constant;
+  m_valid_parameters = g.m_valid_parameters;
 }
 
 
@@ -1157,6 +1201,7 @@ PrecisionConstrainedGaussian::reset(int feature_dim)
   m_coeffs=0; m_coeffs(0)=1;
   
   m_constant=0;
+  m_valid_parameters = false;
 }
 
 
@@ -1297,6 +1342,12 @@ PrecisionConstrainedGaussian::set_covariance(const Matrix &covariance,
 
   // Recompute the constant
   recompute_constant();
+
+  if (chol != NULL)
+  {
+    delete chol;
+    chol = NULL;
+  }
 }
 
 
@@ -1315,6 +1366,7 @@ PrecisionConstrainedGaussian::recompute_constant()
   
   Blas_Mat_Vec_Mult(t, m_transformed_mean, mean);
   m_constant += -0.5 * Blas_Dot_Prod(m_transformed_mean, mean);
+  m_valid_parameters = true;
 }
 
 
@@ -1335,6 +1387,7 @@ SubspaceConstrainedGaussian::SubspaceConstrainedGaussian(const SubspaceConstrain
 {
   g.get_subspace_coeffs(m_coeffs);
   m_es = g.get_subspace();
+  m_valid_parameters = g.m_valid_parameters;
 }
 
 
@@ -1352,6 +1405,7 @@ SubspaceConstrainedGaussian::reset(int feature_dim)
   m_coeffs(0)=1;
   
   m_constant=0;
+  m_valid_parameters = false;
 }
 
 
@@ -1422,6 +1476,7 @@ SubspaceConstrainedGaussian::read(std::istream &is)
   Blas_Mat_Vec_Mult(covariance, psi, t);
   m_constant -= Blas_Dot_Prod(psi, t);
   m_constant -= m_es->feature_dim() * log(2*3.1416);
+  m_valid_parameters = true;
 }
 
 
@@ -1482,6 +1537,13 @@ void
 SubspaceConstrainedGaussian::set_parameters(const Vector &mean, const Matrix &covariance)
 {
   m_es->optimize_coefficients(mean, covariance, m_coeffs);
+  m_valid_parameters = true;
+
+  if (chol != NULL)
+  {
+    delete chol;
+    chol = NULL;
+  }
 }
 
 
