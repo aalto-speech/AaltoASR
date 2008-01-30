@@ -31,6 +31,8 @@ bool mmi = false;
 bool mpe = false;
 bool mpe_grad = false;
 
+bool binary_mpfe = false;
+
 conf::Config config;
 Recipe recipe;
 HmmSet model;
@@ -66,6 +68,7 @@ public:
   void reset(void);
 
   int non_silence_frames(void) { return m_non_silence_frames; }
+  double non_silence_occupancy(void) { return m_non_silence_occupancy; }
   int frames(void) { return (int)m_ref_segmentation.size(); }
 
 private:
@@ -77,6 +80,7 @@ private:
   MPEMode m_mode;
   HmmSet *m_model;
   int m_non_silence_frames;
+  double m_non_silence_occupancy;
 };
 
 
@@ -154,42 +158,53 @@ MPEEvaluator::custom_data_value(int frame, HmmNetBaumWelch::Arc &arc)
   }
   if (m_mode == MPEM_MONOPHONE_STATE)
     state = extract_state(arc.label);
+
+  double correct_prob = 0;
   
   for (int i = 0; i < (int)m_ref_segmentation[internal_frame]->size(); i++)
   {
     if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_CONTEXT_LABEL)
     {
       if ((*m_ref_segmentation[internal_frame])[i].label == label)
-        return 1;
+        correct_prob = std::max(correct_prob,
+                                (*m_ref_segmentation[internal_frame])[i].prob);
     }
     else if (m_mode == MPEM_MONOPHONE_STATE)
     {
       if ((*m_ref_segmentation[internal_frame])[i].label == label &&
           (*m_ref_segmentation[internal_frame])[i].pdf_index == state)
-        return 1;
+        correct_prob = std::max(correct_prob,
+                                (*m_ref_segmentation[internal_frame])[i].prob);
     }
     else if (m_mode == MPEM_STATE)
     {
       if ((*m_ref_segmentation[internal_frame])[i].pdf_index == state)
-        return 1;
+        correct_prob = std::max(correct_prob,
+                                (*m_ref_segmentation[internal_frame])[i].prob);
     }
     else if (m_mode == MPEM_CONTEXT_PHONE_STATE)
     {
       Hmm &hmm = m_model->hmm((*m_ref_segmentation[internal_frame])[i].label);
       for (int s = 0; s < hmm.num_states(); s++)
         if (hmm.state(s) == state)
-          return 1;
+        {
+          correct_prob=std::max(correct_prob,
+                                (*m_ref_segmentation[internal_frame])[i].prob);
+        }
     }
     else if (m_mode == MPEM_HYP_CONTEXT_PHONE_STATE)
     {
       Hmm &hmm = m_model->hmm(label);
       for (int s = 0; s < hmm.num_states(); s++)
         if ((*m_ref_segmentation[internal_frame])[i].pdf_index==hmm.state(s))
-          return 1;
+        {
+          correct_prob=std::max(correct_prob,
+                                (*m_ref_segmentation[internal_frame])[i].prob);
+        }
     }
   }
   
-  return 0;
+  return (binary_mpfe ? (correct_prob > 0 ? 1 : 0) : correct_prob);
 }
 
 void
@@ -201,6 +216,7 @@ MPEEvaluator::reset(void)
     delete m_ref_segmentation[i];
   m_ref_segmentation.clear();
   m_non_silence_frames = 0;
+  m_non_silence_occupancy = 0;
 }
 
 void
@@ -218,6 +234,7 @@ MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
   seg->fill_arc_info(*(m_ref_segmentation.back()));
 
   bool silence = false;
+  double silence_prob = 0;
   
   // Process the labels to speed up the custom data query
   for (int i = 0; i < (int)m_ref_segmentation.back()->size(); i++)
@@ -226,7 +243,10 @@ MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
     if (label.find('-') == std::string::npos &&
         label.find('+') == std::string::npos &&
         label[0] == '_') // Silence node
+    {
       silence = true;
+      silence_prob += (*m_ref_segmentation.back())[i].prob;
+    }
     if (m_mode == MPEM_MONOPHONE_STATE)
       (*m_ref_segmentation.back())[i].pdf_index = extract_state(label);
     if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_MONOPHONE_STATE)
@@ -237,6 +257,7 @@ MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
   }
   if (!silence)
     m_non_silence_frames++;
+  m_non_silence_occupancy += 1-silence_prob;
 }
 
 
@@ -410,6 +431,7 @@ main(int argc, char *argv[])
       ('\0', "mmi", "", "", "Collect statistics for MMI")
       ('\0', "mpe", "", "", "Collect statistics for MPE")
       ('\0', "mpegrad", "", "", "Collect statistics for gradient based MPE")
+      ('\0', "binmpfe", "", "", "Binary 0/1 MPFE score function")
       ('\0', "mllt", "", "", "maximum likelihood linear transformation (for ML)")
       ('\0', "mpemode=MODE", "arg", "", "mono/mono-state/state/cp/cp-state/hyp-cp-state")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
@@ -528,6 +550,9 @@ main(int argc, char *argv[])
           throw std::string("Invalid MPE mode ") + mpe_mode;
       }
     }
+
+    if (config["binmpfe"].specified)
+      binary_mpfe = true;
     
     if (config["mllt"].specified)
     {
@@ -607,7 +632,7 @@ main(int argc, char *argv[])
           lattice->set_collect_transition_probs(transtat);
           if (mpe || mpe_grad)
           {
-            total_mpe_num_score += mpe_evaluator.non_silence_frames();
+            total_mpe_num_score += mpe_evaluator.non_silence_occupancy();
             lattice->set_custom_data_callback(&mpe_evaluator);
           }
 
@@ -642,7 +667,8 @@ main(int argc, char *argv[])
     {
       fprintf(stderr, "Finished collecting statistics (%i/%i)\n",
 	      config["bindex"].get_int(), config["batch"].get_int());
-      fprintf(stderr, "Total log likelihood: %f\n", total_num_log_likelihood);
+      fprintf(stderr, "Total num log likelihood: %.15f\n", total_num_log_likelihood);
+      fprintf(stderr, "Total den log likelihood: %.15f\n", total_den_log_likelihood);
     }
     
     // Write statistics to file dump and clean up
