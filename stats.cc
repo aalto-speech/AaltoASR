@@ -667,8 +667,7 @@ main(int argc, char *argv[])
     {
       fprintf(stderr, "Finished collecting statistics (%i/%i)\n",
 	      config["bindex"].get_int(), config["batch"].get_int());
-      fprintf(stderr, "Total num log likelihood: %.15f\n", total_num_log_likelihood);
-      fprintf(stderr, "Total den log likelihood: %.15f\n", total_den_log_likelihood);
+      fprintf(stderr, "Total num log likelihood: %g\n", total_num_log_likelihood);
     }
     
     // Write statistics to file dump and clean up
