@@ -80,10 +80,9 @@ main(int argc, char *argv[])
       HmmState &second_model_state = second_model.state(i);
       Mixture *second_model_mixture = second_model.get_emission_pdf(second_model_state.emission_pdf);
 
-      if (config["kl"].specified) {
-        kl = first_model_mixture->kullback_leibler(*second_model_mixture, 10000);
+      kl = first_model_mixture->kullback_leibler(*second_model_mixture, 10000);
+      if (config["kl"].specified)
         std::cout << "kl-divergence, state " << i << ": "  << kl << std::endl;
-      }
       if (config["skl"].specified) {
         kl += second_model_mixture->kullback_leibler(*first_model_mixture, 10000);
         std::cout << "symmetric kl-divergence, state " << i << ": "  << kl << std::endl;
