@@ -485,19 +485,16 @@ Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
   Vector mean2; get_mean(mean2);
   Matrix cov; get_covariance(cov);
 
-  Matrix eigvecs(cov);
-  Vector eigvals(dim());
-  LaEigSolveSymmetricVecIP(eigvecs, eigvals);
-  for (int i=0; i<dim(); i++) {
-    double t=0;
-    // FIXME!? IS THIS CORRECT??
-    for (int j=0; j<dim(); j++)
-      t +=  sqrt(eigvals(j)) * eigvecs(i,j);
-    t = perturbation * t;
-    mean1(i) -= t;
-    mean2(i) += t;
-  }
+  Matrix cholesky;
+  Vector perturbations(dim());
   
+  LinearAlgebra::cholesky_factor(cov, cholesky);
+  for (int i=0; i<dim(); i++)
+    perturbations(i)=perturbation;
+
+  Blas_Mat_Vec_Mult(cholesky, perturbations, mean1, -1.0, 1.0);
+  Blas_Mat_Vec_Mult(cholesky, perturbations, mean2,  1.0, 1.0);
+
   g1.set_mean(mean1);
   g2.set_mean(mean2);
   g1.set_covariance(cov);
@@ -766,6 +763,15 @@ double
 DiagonalGaussian::compute_log_likelihood_exponential(const Vector &exponential_feature) const
 {
   throw std::string("compute_log_likelihood_exponential not implemented for DiagonalGaussian\n");
+}
+
+
+void
+DiagonalGaussian::draw_sample(Vector &sample)
+{
+  get_mean(sample);
+  for (int i=0; i<dim(); i++)
+    sample(i) += sqrt(m_covariance(i)) * ziggurat::rnd.rnor();
 }
 
 
@@ -1967,6 +1973,7 @@ Mixture::kullback_leibler(Mixture &g, int samples)
   for (int i=0; i<samples; i++) {
     draw_sample(sample);
     m_pool->reset_cache();
+    g.get_pool()->reset_cache();
     kl += util::safe_log(compute_likelihood(sample)/g.compute_likelihood(sample));
   }
   return kl/samples;
