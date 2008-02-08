@@ -471,6 +471,9 @@ public:
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
 
+  // Draw a random sample from this DiagonalGaussian
+  virtual void draw_sample(Vector &sample);
+  
   // Diagonal-specific
   /// Get the diagonal of the covariance matrix
   virtual void get_covariance(Vector &covariance) const;
@@ -642,6 +645,7 @@ public:
   int size() const { return m_pointers.size(); };
   void reset();
   void set_pool(PDFPool *pool);
+  PDFPool* get_pool() { return m_pool; }
   /** Set the mixture components, clear existing mixture */
   void set_components(const std::vector<int> &pointers,
 		      const std::vector<double> &weights);
