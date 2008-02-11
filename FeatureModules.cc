@@ -497,13 +497,12 @@ PreModule::eof(int frame)
 }
 int PreModule::last_frame(void)
 {
-  // FIXME: NOT TESTED!!!
   long cur_pos = ftell(m_fp);
   int last_frame;
   
   if (fseek(m_fp, 0, SEEK_END) < 0)
     throw std::string("PreModule: Could not seek the file.");
-  last_frame = (ftell(m_fp)-m_file_offset)/(m_dim*sizeof(float));
+  last_frame = (ftell(m_fp)-m_file_offset)/(m_dim*sizeof(float)) - 1;
   fseek(m_fp, cur_pos, SEEK_SET);
   return last_frame;
 }
