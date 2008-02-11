@@ -284,7 +284,7 @@ public:
 
   /** Clears the PDF likelihood cache */
   void reset_cache();
-
+  
   /** Compute a state likelihood, use cache
    * \param s the state index
    * \param f the feature

@@ -263,11 +263,14 @@ HmmNetBaumWelch::check_network_structure(void)
     if (eps_out_transitions > 1 && self_transition)
       throw std::string("HmmNetBaumWelch: A node may not have a self transition if it has multiple (epsilon) out transitions");
 
-    if (non_eps_out_transitions == 0 && eps_out_transitions > 0)
-      m_nodes[i].epsilon_out = true;
+    if (eps_out_transitions > 0)
+    {
+      assert( non_eps_out_transitions == 0 ); // This is checked above
+      m_nodes[i].num_epsilon_out = eps_out_transitions;
+    }
   }
 
-  if (!m_nodes[m_initial_node_id].epsilon_out)
+  if (m_nodes[m_initial_node_id].num_epsilon_out == 0)
     throw std::string("HmmNetBaumWelch: Initial node must have only epsilon out arcs!");
   if (m_nodes[m_initial_node_id].in_arcs.size() > 0)
     throw std::string("HmmNetBaumWelch: Initial node may not have in arcs!");
@@ -328,8 +331,8 @@ bool
 HmmNetBaumWelch::fill_backward_probabilities(void)
 {
   int target_buffer = 0;
-  double max_log_prob;
-  double prev_max_log_prob = loglikelihoods.one();
+  double best_log_prob;
+  //double prev_max_log_prob = loglikelihoods.one();
   
   clear_bw_scores();
   if (m_last_frame > 0)
@@ -352,7 +355,7 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
       m_active_node_table[target_buffer][i],
       m_nodes[m_active_node_table[target_buffer][i]].log_prob[target_buffer],
       m_nodes[m_active_node_table[target_buffer][i]].custom_score[target_buffer],
-      target_buffer, true, empty_fea_vec);
+      target_buffer, true, empty_fea_vec, loglikelihoods.zero());
   }
 
   while (m_current_frame > m_first_frame)
@@ -361,7 +364,7 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     int source_buffer = target_buffer;
     target_buffer ^= 1;
 
-    max_log_prob = loglikelihoods.zero();
+    best_log_prob = loglikelihoods.zero();
 
     m_model.reset_cache();
 
@@ -373,17 +376,17 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
         m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer];
 
       // Propagate the node only if its loglikelihood is within the beam
-      if (loglikelihoods.divide(cur_node_score, prev_max_log_prob) >
-          -m_backward_beam)
-      {
-        double temp = backward_propagate_node_arcs(
-          m_active_node_table[source_buffer][i], cur_node_score,
-          m_nodes[m_active_node_table[source_buffer][i]].custom_score[source_buffer],
-          target_buffer, false, fea_vec);
+//       if (loglikelihoods.divide(cur_node_score, prev_max_log_prob) >
+//           -m_backward_beam)
+//       {
+      double temp = backward_propagate_node_arcs(
+        m_active_node_table[source_buffer][i], cur_node_score,
+        m_nodes[m_active_node_table[source_buffer][i]].custom_score[source_buffer],
+        target_buffer, false, fea_vec, best_log_prob);
         
-        if (temp > max_log_prob)
-          max_log_prob = temp;
-      }
+      if (temp > best_log_prob)
+        best_log_prob = temp;
+//      }
 
       // Reset the probability
       m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer] =
@@ -393,33 +396,60 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     // Clear the old active nodes
     m_active_node_table[source_buffer].clear();
 
-    if (m_active_node_table[target_buffer].empty())
-    {
-      // All tokens were pruned, backward beam should be increased
-      return false;
-    }
+//     if (m_active_node_table[target_buffer].empty())
+//     {
+//       // All tokens were pruned, backward beam should be increased
+//       return false;
+//     }
 
-    // Update the maximum probability used for pruning
-    prev_max_log_prob = max_log_prob;
+//     // Update the maximum probability used for pruning
+//     prev_max_log_prob = max_log_prob;
+
+    assert( !m_active_node_table[target_buffer].empty() );
     
     // Iterate through active nodes and propagate the epsilon transitions.
     // The new active nodes are appended to the end of m_active_node_table.
     // The previous probabilities are taken from the target buffer. Also
     // fills the backward probabilities of epsilon arcs.
+    // Identifies the best active node which will be moved to the first
+    // position.
+    double temp_max_log_prob = loglikelihoods.zero();
+    int best_log_prob_node_index = -1;
     for (int i = 0; i < (int)m_active_node_table[target_buffer].size(); i++)
     {
       double cur_node_score =
         m_nodes[m_active_node_table[target_buffer][i]].log_prob[target_buffer];
       // Propagate the node only if its loglikelihood is within the beam
-      if (loglikelihoods.divide(cur_node_score, prev_max_log_prob) >
+      if (loglikelihoods.divide(cur_node_score, best_log_prob) >
           -m_backward_beam)
       {
+        // No pruning during these propagations!
         backward_propagate_node_arcs(
           m_active_node_table[target_buffer][i], cur_node_score,
           m_nodes[m_active_node_table[target_buffer][i]].custom_score[target_buffer],
-          target_buffer, true, fea_vec);
+          target_buffer, true, fea_vec, loglikelihoods.zero());
+      }
+      if (cur_node_score > temp_max_log_prob &&
+          (int)m_nodes[m_active_node_table[target_buffer][i]].out_arcs.size() >
+          m_nodes[m_active_node_table[target_buffer][i]].num_epsilon_out)
+      {
+        // "The best node" is required to have non-epsilon arcs
+        temp_max_log_prob = cur_node_score;
+        best_log_prob_node_index = i;
       }
     }
+
+    // Move the best node to the beginning of the active node table to
+    // enhance pruning
+    if (best_log_prob_node_index != -1)
+    {
+      int temp_active_node = m_active_node_table[target_buffer][0];
+      m_active_node_table[target_buffer][0] =
+        m_active_node_table[target_buffer][best_log_prob_node_index];
+      m_active_node_table[target_buffer][best_log_prob_node_index] =
+        temp_active_node;
+    }
+
   }
 
   // Clear the active nodes
@@ -644,7 +674,8 @@ double
 HmmNetBaumWelch::backward_propagate_node_arcs(int node_id, double cur_score,
                                               double cur_custom_score,
                                               int target_buffer, bool epsilons,
-                                              FeatureVec &fea_vec)
+                                              FeatureVec &fea_vec,
+                                              double ref_log_prob)
 {
   double cur_max_log_prob = loglikelihoods.zero();
   double arc_score;
@@ -658,13 +689,14 @@ HmmNetBaumWelch::backward_propagate_node_arcs(int node_id, double cur_score,
     if ((!epsilons && m_arcs[arc_id].epsilon()) ||
         (epsilons && !m_arcs[arc_id].epsilon()))
       continue;
-
+    
     fill_arc_scores(arc_id, fea_vec, cur_custom_score, &arc_score,
                     &arc_custom_score);
 
     new_score = loglikelihoods.times(cur_score, arc_score);
 
-    if (new_score > loglikelihoods.zero())
+    if (new_score > loglikelihoods.zero() &&
+        loglikelihoods.divide(new_score, ref_log_prob) > -m_backward_beam)
     {
       // Fill in the backward probability for the arc
       m_arcs[arc_id].bw_scores.set_new_score(m_current_frame, new_score);
@@ -686,8 +718,9 @@ HmmNetBaumWelch::backward_propagate_node_arcs(int node_id, double cur_score,
       else
       {
         // Node had a probability already
-        if (m_mode == MODE_BAUM_WELCH || (m_mode == MODE_EXTENDED_VITERBI &&
-                                          m_nodes[next_node_id].epsilon_out))
+        if (m_mode == MODE_BAUM_WELCH ||
+            (m_mode == MODE_EXTENDED_VITERBI &&
+             m_nodes[next_node_id].num_epsilon_out > 0))
         {
           // Add the new probability to the previous one
           double prev_log_prob = m_nodes[next_node_id].log_prob[target_buffer];
@@ -699,8 +732,9 @@ HmmNetBaumWelch::backward_propagate_node_arcs(int node_id, double cur_score,
                                      prev_log_prob,new_score,arc_custom_score);
           }
         }
-        else  // m_mode == MODE_VITERBI || (m_mode == MODE_EXTENDED_VITERBI &&
-              //                            !m_nodes[next_node_id].epsilon_out)
+        else  // m_mode == MODE_VITERBI ||
+              // (m_mode == MODE_EXTENDED_VITERBI &&
+              //  m_nodes[next_node_id].num_epsilon_out == 0)
         {
           // Update the probability if it is smaller than the new one
           if (m_nodes[next_node_id].log_prob[target_buffer] < new_score)
@@ -742,6 +776,22 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
         (epsilons && !m_arcs[arc_id].epsilon()))
       continue;
 
+    double backward_loglikelihood =
+      m_arcs[arc_id].bw_scores.get_score(m_current_frame);
+    double total_arc_loglikelihood =
+      loglikelihoods.times(cur_score, backward_loglikelihood);
+    
+    if (m_mode == MODE_BAUM_WELCH || m_mode == MODE_EXTENDED_VITERBI)
+    {
+      // If the total likelihood (forward+backward) of the path
+      // is worse than the forward beam compared to the sum of
+      // likelihoods of all paths, discard this path.
+      // NOTE: This handles also the case when backward score is zero
+      if (total_arc_loglikelihood <
+          m_sum_total_loglikelihood - m_forward_beam)
+        continue;
+    }
+
     fill_arc_scores(arc_id, fea_vec, cur_custom_score, &arc_score,
                     &arc_custom_score);
 
@@ -751,20 +801,7 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
     {
       if (!epsilons && m_mode == MODE_BAUM_WELCH)
       {
-        double backward_loglikelihood =
-          m_arcs[arc_id].bw_scores.get_score(m_current_frame);
-        double total_arc_loglikelihood =
-          loglikelihoods.times(cur_score, backward_loglikelihood);
         double total_custom_score = cur_custom_score;
-        
-        // If the total likelihood (forward+backward) of the path
-        // is worse than the forward beam compared to the sum of
-        // likelihoods of all paths, discard this path.
-        // NOTE: This handles also the case when backward score is zero
-        if (total_arc_loglikelihood <
-            m_sum_total_loglikelihood - m_forward_beam)
-          continue;
-
         if (m_custom_data_callback != NULL)
         {
           total_custom_score +=
@@ -776,7 +813,8 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
       }
 
       if (m_mode == MODE_BAUM_WELCH ||
-          (m_mode == MODE_EXTENDED_VITERBI && m_nodes[node_id].epsilon_out))
+          (m_mode == MODE_EXTENDED_VITERBI &&
+           m_nodes[node_id].num_epsilon_out > 0))
       {
         // Propagate the probability of the arc to the next node
         if (m_nodes[next_node_id].log_prob[target_buffer] <=
@@ -802,17 +840,8 @@ HmmNetBaumWelch::forward_propagate_node_arcs(int node_id, double cur_score,
         }
       }
       else // m_mode == MODE_VITERBI || (m_mode == MODE_EXTENDED_VITERBI &&
-           //                            !m_nodes[node_id].epsilon_out)
-      {
-        double backward_loglikelihood =
-          m_arcs[arc_id].bw_scores.get_score(m_current_frame);
-        double total_arc_loglikelihood =
-          loglikelihoods.times(cur_score, backward_loglikelihood);
-
-        if (m_mode == MODE_EXTENDED_VITERBI &&
-            total_arc_loglikelihood < m_sum_total_loglikelihood-m_forward_beam)
-          continue;
-        
+           //                            m_nodes[node_id].num_epsilon_out == 0)
+      {        
         if (total_arc_loglikelihood > viterbi_best_ll)
         {
           viterbi_best_ll = total_arc_loglikelihood;
@@ -924,7 +953,7 @@ HmmNetBaumWelch::compute_total_bw_scores(void)
   int node_id = m_initial_node_id;
   int frame = m_first_frame;
 
-  assert( m_nodes[node_id].epsilon_out );
+  assert( m_nodes[node_id].num_epsilon_out > 0 );
   
   for (int i = 0; i < (int)m_nodes[node_id].out_arcs.size(); i++)
   {

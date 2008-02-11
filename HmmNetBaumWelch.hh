@@ -82,14 +82,15 @@ public:
   
   /** Network node */
   struct Node {
-    Node(int id_) : id(id_) { log_prob[0] = loglikelihoods.zero(); log_prob[1] = loglikelihoods.zero(); epsilon_out = false; }
+    Node(int id_) : id(id_) { log_prob[0] = loglikelihoods.zero(); log_prob[1] = loglikelihoods.zero(); num_epsilon_out = 0; }
     int id;
     std::vector<int> in_arcs; //!< Indices of the arcs leading to this node
     std::vector<int> out_arcs; //!< Indices of the arcs leaving this node
 
-    /// If true, all out transitions (not counting the self transition) are
-    /// epsilon transitions. Otherwise there are no epsilon out transitions.
-    bool epsilon_out;
+    // If nonzero, all out transitions (not counting the self transition) are
+    // epsilon transitions and this is their count. Otherwise there are no
+    // epsilon out transitions.
+    int num_epsilon_out;
     
     double log_prob[2]; //!< Log sum of the likelihoods, two buffers
 
@@ -183,7 +184,7 @@ private:
   double backward_propagate_node_arcs(int node_id, double cur_score,
                                       double cur_custom_score,
                                       int target_buffer, bool epsilons,
-                                      FeatureVec &fea_vec);
+                                      FeatureVec &fea_vec,double ref_log_prob);
   void forward_propagate_node_arcs(int node_id, double cur_score,
                                    double cur_custom_score,
                                    int target_buffer, bool epsilons,
