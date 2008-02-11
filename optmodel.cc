@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream>
 #include <stdlib.h>
+#include <algorithm>
 
 #include "io.hh"
 #include "str.hh"
@@ -23,7 +24,7 @@ double min_var;
 double ac_scale;
 int num_frames = 0;
 
-typedef enum {MODE_MMI, MODE_MPE} OptMode;
+typedef enum {MODE_ML, MODE_MMI, MODE_MPE} OptMode;
 
 OptMode mode;
 
@@ -125,6 +126,7 @@ void extract_gradient(void)
   PDFPool *pool = model.get_pool();
   Vector params;
   Vector gradient;
+  std::vector<double> temp;
 
   optimizer.get_parameters(params);
   gradient.resize(optimizer.get_num_parameters());
@@ -135,28 +137,49 @@ void extract_gradient(void)
     Mixture *m = model.get_emission_pdf(i);
     // Compute the normalization
     double norm = 0;
+    temp.resize(m->size());
     for (int j = 0; j < m->size(); j++)
       norm += exp(params(pindex+j));
+    // Compute the derivatives wrt the original mixture weights
     for (int j = 0; j < m->size(); j++)
     {
-      double ep = exp(params(pindex));
       if (mode == MODE_MPE)
       {
-        gradient(pindex) =
-          -(ac_scale*m->get_accumulated_gamma(PDF::MPE_NUM_BUF, j) /
-            ((double)num_frames * m->get_mixture_coefficient(j)) *
-            ((ep - m->get_mixture_coefficient(j)*ep) / norm));
+        temp[j] = -(ac_scale/(double)num_frames) *
+          (m->get_accumulated_gamma(PDF::MPE_NUM_BUF, j) /
+           m->get_mixture_coefficient(j));
       }
       else if (mode == MODE_MMI)
       {
-        gradient(pindex) = -(ac_scale/(double)num_frames) * (
+        temp[j] = -(ac_scale/(double)num_frames) * (
           (m->get_accumulated_gamma(PDF::ML_BUF, j) /
            m->get_mixture_coefficient(j)) -
           (m->get_accumulated_gamma(PDF::MMI_BUF, j) /
-           m->get_mixture_coefficient(j))) *
-          ((ep - m->get_mixture_coefficient(j)*ep) / norm);
+           m->get_mixture_coefficient(j)));
       }
-      pindex++;
+      else if (mode == MODE_ML)
+      {
+        temp[j] = -(ac_scale/(double)num_frames) * 
+          (m->get_accumulated_gamma(PDF::ML_BUF, j) /
+           m->get_mixture_coefficient(j));
+      }
+    }
+    // Combine to form derivatives wrt the transformed parameters
+    for (int j = 0; j < m->size(); j++)
+    {
+      double val = 0;
+      double ep = exp(params(pindex));
+      for (int k = 0; k < m->size(); k++)
+      {
+        if (k == j)
+          val += temp[k]*((ep - m->get_mixture_coefficient(k)*ep) / norm);
+        else
+        {
+          val += temp[k]*(-m->get_mixture_coefficient(k)*ep/norm);
+        }
+      }
+      
+      gradient(pindex++) = val;
     }
   }
   
@@ -188,6 +211,12 @@ void extract_gradient(void)
       ngamma = pdf->get_accumulated_gamma(PDF::ML_BUF);
       gamma = pdf->get_accumulated_gamma(PDF::MMI_BUF);
     }
+    else if (mode == MODE_ML)
+    {
+      pdf->get_accumulated_mean(PDF::ML_BUF, nm1);
+      pdf->get_accumulated_second_moment(PDF::ML_BUF, nm2);
+      ngamma = pdf->get_accumulated_gamma(PDF::ML_BUF);
+    }
     for (int j = 0; j < pool->dim(); j++)
     {
       if (mode == MODE_MPE)
@@ -200,6 +229,11 @@ void extract_gradient(void)
         gradient(pindex) = -(ac_scale/(double)num_frames) * (
           (nm1(j)-mean(j)*ngamma)/diag_cov(j) -
           (m1(j)-mean(j)*gamma)/diag_cov(j));
+      }
+      else if (mode == MODE_ML)
+      {
+        gradient(pindex) = -(ac_scale/(double)num_frames) *
+          (nm1(j)-mean(j)*ngamma)/diag_cov(j);
       }
       pindex++;
     }
@@ -217,6 +251,12 @@ void extract_gradient(void)
         gradient(pindex) = -(ac_scale/(double)num_frames) * (
           (nm2(j)-2*nm1(j)*mean(j)+ngamma*mean(j)*mean(j)-ngamma*c)/(2*c*c) -
           (m2(j)-2*m1(j)*mean(j)+gamma*mean(j)*mean(j)-gamma*c)/(2*c*c)) * ep;
+      }
+      else if (mode == MODE_ML)
+      {
+        gradient(pindex) = -(ac_scale/(double)num_frames) * (
+          (nm2(j)-2*nm1(j)*mean(j)+ngamma*mean(j)*mean(j)-ngamma*c)/(2*c*c))
+          * ep;
       }
       pindex++;
     }
@@ -244,6 +284,7 @@ main(int argc, char *argv[])
       ('L', "list=LISTNAME", "arg must", "", "file with one statistics file per line")
       ('F', "osf=FILE", "arg must", "", "Optimization state file")
       ('o', "out=BASENAME", "arg must", "", "base filename for output models")
+      ('\0', "ml", "", "", "ML optimization")
       ('\0', "mmi", "", "", "MMI optimization")
       ('\0', "mpe", "", "", "MPE optimization")
       ('l', "initscale=SCALE", "arg", "", "Initialize with inverse Hessian scale")
@@ -260,9 +301,11 @@ main(int argc, char *argv[])
 
     optimizer.set_verbosity(info);
 
-    if (!(config["mmi"].specified^config["mpe"].specified))
-      throw std::string("Must give either --mmi or --mpe");
-    if (config["mmi"].specified)
+    if (!(config["mmi"].specified^config["mpe"].specified^config["ml"].specified))
+      throw std::string("Must give one of --ml, --mmi or --mpe");
+    if (config["ml"].specified)
+      mode = MODE_ML;
+    else if (config["mmi"].specified)
       mode = MODE_MMI;
     else if (config["mpe"].specified)
       mode = MODE_MPE;
@@ -330,6 +373,9 @@ main(int argc, char *argv[])
     if (mode == MODE_MMI &&
         sum_statistics.find("MMI score") == sum_statistics.end())
       throw std::string("MMI score not available");
+    if (mode == MODE_ML &&
+        sum_statistics.find("Numerator loglikelihood") == sum_statistics.end())
+      throw std::string("Numerator loglikelihood not available");
     if (sum_statistics.find("Number of frames") == sum_statistics.end())
       throw std::string("Number of frames not available");
     
@@ -337,6 +383,8 @@ main(int argc, char *argv[])
       score = sum_statistics["MPFE score"];
     else if (mode == MODE_MMI)
       score = sum_statistics["MMI score"];
+    else if (mode == MODE_ML)
+      score = sum_statistics["Numerator loglikelihood"];
     num_frames = (int)sum_statistics["Number of frames"];
 
     state_file = config["osf"].get_str();
@@ -367,6 +415,11 @@ main(int argc, char *argv[])
     else if (mode == MODE_MMI)
     {
       // Negative MMI score, normalized with number of frames
+      optimizer.set_function_value(-score / (double)num_frames);
+    }
+    else if (mode == MODE_ML)
+    {
+      // Negative loglikelihood, normalized with number of frames
       optimizer.set_function_value(-score / (double)num_frames);
     }
 

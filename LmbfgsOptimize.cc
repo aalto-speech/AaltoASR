@@ -466,7 +466,7 @@ LmbfgsOptimize::update_bfgs(void)
   {
     delete m_bfgs_updates_x[0];
     delete m_bfgs_updates_grad[0];
-    for (int i = 0; i< m_max_bfgs_updates; i++)
+    for (int i = 0; i < m_max_bfgs_updates-1; i++)
     {
       m_bfgs_rho[i] = m_bfgs_rho[i+1];
       m_bfgs_updates_x[i] = m_bfgs_updates_x[i+1];
