@@ -37,6 +37,8 @@ collect_phone_stats(PhnReader *phn_reader, PhonePool *pool)
       throw std::string("Context phone tying requires phn files with state numbers!");
     PhonePool::ContextPhoneContainer phone = pool->get_context_phone(
       phn.label[0], phn.state);
+    fprintf(stderr, "%s.%i: %i - %i\n", phn.label[0].c_str(), phn.state,
+            phn.start, phn.end);
     for (f = phn.start; f < phn.end; f++)
     {
       FeatureVec feature = fea_gen.generate(f);
@@ -122,7 +124,8 @@ main(int argc, char *argv[])
       ('R', "raw-input", "", "", "raw audio input")
       ('\0', "count=INT", "arg", "100", "minimum feature count for state clusters")
       ('\0', "sgain=FLOAT", "arg", "0", "minimum loglikelihood gain in cluster splitting")
-      ('\0', "mloss=FLOAT", "arg", "0", "maximum loglikelihood loss in cluster merging")
+      ('\0', "mloss=FLOAT", "arg", "0", "cluster merging with maximum loglikelihood loss")
+      ('\0', "kmeans=FLOAT", "arg", "0.001", "kmeans clustering of resulting Gaussians")
       ('\0', "context=INT", "arg", "1", "maximum number of contexts (default 1=triphones)")
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
@@ -141,6 +144,9 @@ main(int argc, char *argv[])
 
     if (!(config["out"].specified^config["basebind"].specified))
       throw std::string("Specify either --out or --basebind for output");
+
+    if (config["mloss"].specified && config["kmeans"].specified)
+      throw std::string("Define only either --mloss or --kmeans");
     
     phone_pool.set_clustering_parameters(config["count"].get_int(),
                                          config["sgain"].get_float(),
@@ -257,16 +263,7 @@ main(int argc, char *argv[])
                                        config["raw-input"].specified,
                                        &phn_reader);
         phn_reader.set_collect_transition_probs(false);
-        if (!phn_reader.init_utterance_segmentation())
-        {
-          fprintf(stderr, "Could not initialize the utterance for PhnReader.");
-          fprintf(stderr,"Current file was: %s\n",
-                  recipe.infos[f].audio_path.c_str());
-        }
-        else
-        {
-          collect_phone_stats(&phn_reader, &phone_pool);
-        }
+        collect_phone_stats(&phn_reader, &phone_pool);
         phn_reader.close();
       }
 
@@ -277,6 +274,9 @@ main(int argc, char *argv[])
     phone_pool.decision_tree_cluster_context_phones(max_contexts);
     if (config["mloss"].specified)
       phone_pool.merge_context_phones();
+
+    if (config["kmeans"].specified)
+      phone_pool.soft_kmeans_clustering(config["kmeans"].get_float(), true);
 
     if (config["out"].specified)
       phone_pool.save_model(config["out"].get_str(), max_contexts);
