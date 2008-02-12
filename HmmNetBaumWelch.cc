@@ -372,38 +372,26 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     // Fill the backward probabilities for the arcs.
     for (int i = 0; i < (int)m_active_node_table[source_buffer].size(); i++)
     {
-      double cur_node_score =
-        m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer];
-
-      // Propagate the node only if its loglikelihood is within the beam
-//       if (loglikelihoods.divide(cur_node_score, prev_max_log_prob) >
-//           -m_backward_beam)
-//       {
-      double temp = backward_propagate_node_arcs(
-        m_active_node_table[source_buffer][i], cur_node_score,
-        m_nodes[m_active_node_table[source_buffer][i]].custom_score[source_buffer],
-        target_buffer, false, fea_vec, best_log_prob);
+      if (m_active_node_table[source_buffer][i] != -1)
+      {
+        double cur_node_score =
+          m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer];
+        double temp = backward_propagate_node_arcs(
+          m_active_node_table[source_buffer][i], cur_node_score,
+          m_nodes[m_active_node_table[source_buffer][i]].custom_score[source_buffer],
+          target_buffer, false, fea_vec, best_log_prob);
         
-      if (temp > best_log_prob)
-        best_log_prob = temp;
-//      }
+        if (temp > best_log_prob)
+          best_log_prob = temp;
 
-      // Reset the probability
-      m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer] =
-        loglikelihoods.zero();
+        // Reset the probability
+        m_nodes[m_active_node_table[source_buffer][i]].log_prob[source_buffer]=
+          loglikelihoods.zero();
+      }
     }
 
     // Clear the old active nodes
     m_active_node_table[source_buffer].clear();
-
-//     if (m_active_node_table[target_buffer].empty())
-//     {
-//       // All tokens were pruned, backward beam should be increased
-//       return false;
-//     }
-
-//     // Update the maximum probability used for pruning
-//     prev_max_log_prob = max_log_prob;
 
     assert( !m_active_node_table[target_buffer].empty() );
     
@@ -428,14 +416,23 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
           m_active_node_table[target_buffer][i], cur_node_score,
           m_nodes[m_active_node_table[target_buffer][i]].custom_score[target_buffer],
           target_buffer, true, fea_vec, loglikelihoods.zero());
+
+        if (cur_node_score > temp_max_log_prob &&
+            (int)m_nodes[m_active_node_table[target_buffer][i]].out_arcs.size() >
+            m_nodes[m_active_node_table[target_buffer][i]].num_epsilon_out)
+        {
+          // "The best node" is required to have non-epsilon arcs
+          temp_max_log_prob = cur_node_score;
+          best_log_prob_node_index = i;
+        }
       }
-      if (cur_node_score > temp_max_log_prob &&
-          (int)m_nodes[m_active_node_table[target_buffer][i]].out_arcs.size() >
-          m_nodes[m_active_node_table[target_buffer][i]].num_epsilon_out)
+      else
       {
-        // "The best node" is required to have non-epsilon arcs
-        temp_max_log_prob = cur_node_score;
-        best_log_prob_node_index = i;
+        // Reset the probability
+        m_nodes[m_active_node_table[target_buffer][i]].log_prob[target_buffer]=
+          loglikelihoods.zero();
+        // Do not propagate in the next frame
+        m_active_node_table[target_buffer][i] = -1;
       }
     }
 
@@ -454,8 +451,11 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
 
   // Clear the active nodes
   for (int i = 0; i < (int)m_active_node_table[target_buffer].size(); i++)
-    m_nodes[m_active_node_table[target_buffer][i]].log_prob[target_buffer] =
-      loglikelihoods.zero();
+  {
+    if (m_active_node_table[target_buffer][i] != -1)
+      m_nodes[m_active_node_table[target_buffer][i]].log_prob[target_buffer] =
+        loglikelihoods.zero();
+  }
   m_active_node_table[target_buffer].clear();
   
   // Reset the current frame for the forward phase
