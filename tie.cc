@@ -123,7 +123,6 @@ main(int argc, char *argv[])
       ('\0', "count=INT", "arg", "100", "minimum feature count for state clusters")
       ('\0', "sgain=FLOAT", "arg", "0", "minimum loglikelihood gain in cluster splitting")
       ('\0', "mloss=FLOAT", "arg", "0", "cluster merging with maximum loglikelihood loss")
-      ('\0', "kmeans=FLOAT", "arg", "0.001", "kmeans clustering of resulting Gaussians")
       ('\0', "context=INT", "arg", "1", "maximum number of contexts (default 1=triphones)")
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
@@ -272,9 +271,6 @@ main(int argc, char *argv[])
     phone_pool.decision_tree_cluster_context_phones(max_contexts);
     if (config["mloss"].specified)
       phone_pool.merge_context_phones();
-
-    if (config["kmeans"].specified)
-      phone_pool.soft_kmeans_clustering(config["kmeans"].get_float(), true);
 
     if (config["out"].specified)
       phone_pool.save_model(config["out"].get_str(), max_contexts);
