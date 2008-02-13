@@ -142,9 +142,6 @@ main(int argc, char *argv[])
     if (!(config["out"].specified^config["basebind"].specified))
       throw std::string("Specify either --out or --basebind for output");
 
-    if (config["mloss"].specified && config["kmeans"].specified)
-      throw std::string("Define only either --mloss or --kmeans");
-    
     phone_pool.set_clustering_parameters(config["count"].get_int(),
                                          config["sgain"].get_float(),
                                          config["mloss"].get_float());
