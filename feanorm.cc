@@ -20,6 +20,8 @@ main(int argc, char *argv[])
 {
   NormalizationModule *norm_mod = NULL;
   FeatureModule *norm_mod_src = NULL;
+  LinTransformModule *pca_mod = NULL;
+  FeatureModule *pca_mod_src = NULL;
   std::vector<double> block_mean_acc, global_mean_acc;
   std::vector<double> block_var_acc, global_var_acc;
   std::vector<double> block_cov_acc, global_cov_acc;
@@ -27,6 +29,7 @@ main(int argc, char *argv[])
   std::vector<float> mean, scale;
   bool raw_flag;
   bool cov_flag;
+  bool pca_flag;
   int info;
   int block_size;
   int cur_block_size;
@@ -41,8 +44,10 @@ main(int argc, char *argv[])
       ('w', "write-config=FILE", "arg", "", "write feature configuration")
       ('R', "raw-input", "", "", "raw audio input")
       ('M', "module=NAME", "arg", "", "normalization module name")
+      ('P', "pca=NAME", "arg", "", "pca module name")
+      ('u', "unit-determinant", "", "", "unit determinant for pca transform, by default unit variance for data")
       ('b', "block=INT", "arg", "1000", "block size (for reducing round-off errors)")
-      ('P', "print", "", "", "print mean and variance to stdout")
+      ('p', "print", "", "", "print mean and variance to stdout")
       ('\0', "cov", "", "", "estimate and print covariance matrix")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('i', "info=INT", "arg", "0", "info level")
@@ -72,9 +77,22 @@ main(int argc, char *argv[])
       fprintf(stderr, "Warning: No --module given, configuration will be written unaltered\n");
     }
 
+    if (config["pca"].specified)
+    {
+      pca_mod = dynamic_cast< LinTransformModule* >
+        (gen.module(config["pca"].get_str()));
+      if (pca_mod == NULL)
+        throw std::string("Module ") + config["pca"].get_str() +
+          std::string(" is not a linear transformation module");
+      std::vector<FeatureModule*> sources = pca_mod->sources();
+      assert( sources.front()->dim() == dim );
+      pca_mod_src = sources.front();
+    }
+    
     block_size = config["block"].get_int();
 
     cov_flag = config["cov"].specified;
+    pca_flag = config["pca"].specified;
 
     if (config["speakers"].specified)
       m_speaker_config.read_speaker_file(
@@ -87,7 +105,7 @@ main(int argc, char *argv[])
     global_var_acc.resize(dim, 0);
     global_acc_count = 0;
 
-    if (cov_flag)
+    if (cov_flag || pca_flag)
     {
       block_cov_acc.resize(dim*dim);
       global_cov_acc.resize(dim*dim, 0);
@@ -122,7 +140,7 @@ main(int argc, char *argv[])
         block_mean_acc[d] = 0;
         block_var_acc[d] = 0;
       }
-      if (cov_flag)
+      if (cov_flag || pca_flag)
       {
         for (int d = 0; d < dim*dim; d++)
           block_cov_acc[d] = 0;
@@ -148,7 +166,7 @@ main(int argc, char *argv[])
               global_mean_acc[d] += block_mean_acc[d]/(double)block_size;
               global_var_acc[d] += block_var_acc[d]/(double)block_size;
             }
-            if (cov_flag)
+            if (cov_flag || pca_flag)
             {
               for (int d = 0; d < dim*dim; d++)
                 global_cov_acc[d] += block_cov_acc[d]/(double)block_size;
@@ -165,7 +183,7 @@ main(int argc, char *argv[])
           block_mean_acc[d] += vec[d];
           block_var_acc[d] += vec[d]*vec[d];
         }
-        if (cov_flag)
+        if (cov_flag || pca_flag)
         {
           for (int d1 = 0; d1 < dim; d1++)
             for (int d2 = 0; d2 < dim; d2++)
@@ -180,7 +198,7 @@ main(int argc, char *argv[])
             global_mean_acc[d] += block_mean_acc[d]/(double)block_size;
             global_var_acc[d] += block_var_acc[d]/(double)block_size;
           }
-          if (cov_flag)
+          if (cov_flag || pca_flag)
           {
             for (int d = 0; d < dim*dim; d++)
               global_cov_acc[d] += block_cov_acc[d]/(double)block_size;
@@ -192,7 +210,7 @@ main(int argc, char *argv[])
             block_mean_acc[d] = 0;
             block_var_acc[d] = 0;
           }
-          if (cov_flag)
+          if (cov_flag || pca_flag)
           {
             for (int d = 0; d < dim*dim; d++)
               block_cov_acc[d] = 0;
@@ -214,6 +232,52 @@ main(int argc, char *argv[])
     {
       scale[d] = 1/sqrtf(global_var_acc[d] / global_acc_count -
                          global_mean_acc[d]*global_mean_acc[d]);
+    }
+
+    Matrix tr_matrix(dim, dim);
+    if (pca_flag) {
+      Matrix eigvecs(dim, dim);
+      Vector eigvals(dim);
+      for (int d1 = 0; d1 < dim; d1++)
+        for (int d2 = 0; d2 < dim; d2++)
+          eigvecs(d1, d2) = global_cov_acc[d1*dim+d2] / global_acc_count -
+            global_mean_acc[d1]*global_mean_acc[d2];
+      LaEigSolveSymmetricVecIP(eigvecs, eigvals);
+      tr_matrix.copy(eigvecs);
+      LaVectorLongInt pivots(dim,1);
+      LUFactorizeIP(tr_matrix, pivots);
+      LaLUInverseIP(tr_matrix, pivots);
+      
+      // Normalize pca to have unit determinant, mainly for seeding mllt
+      if (config["unit-determinant"].specified) {
+
+        // Remove the effect of variance scaling first
+        for (int i=0; i<dim; i++)
+          for (int j=0; j<dim; j++)
+            tr_matrix(i,j) /= scale[j];
+
+        // Scale after that
+        Matrix temp_m(tr_matrix);
+        LUFactorizeIP(temp_m, pivots);
+        double det=1;
+        for (int i=0; i<dim; i++)
+          det *= temp_m(i,i);
+        det = std::fabs(det);
+        double sc = pow(det, 1/(double)dim);
+        Blas_Scale(1/sc, tr_matrix);
+      }
+
+      // Normal case, normalize the data to have unit variance
+      else {
+        for (int i=0; i<dim; i++)
+          for (int j=0; j<dim; j++)
+            tr_matrix(i,j) /= sqrt(eigvals(i));
+        
+        // Remove the effect of variance scaling
+        for (int i=0; i<dim; i++)
+          for (int j=0; j<dim; j++)
+            tr_matrix(i,j) /= scale[j];
+      }
     }
     
     if (config["print"].specified)
@@ -244,6 +308,16 @@ main(int argc, char *argv[])
       
     if (norm_mod != NULL)
       norm_mod->set_normalization(mean, scale);
+
+    if (pca_mod != NULL) {
+      std::vector<float> tr;
+      tr.resize(dim*dim);
+      for (int i=0; i<dim; i++)
+        for (int j=0; j<dim; j++)
+          tr[i*dim + j] = tr_matrix(i, j);
+      pca_mod->set_transformation_matrix(tr);
+    }
+    
     if (config["write-config"].specified)
       gen.write_configuration(io::Stream(config["write-config"].get_str(),
                                          "w"));
