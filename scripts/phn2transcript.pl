@@ -31,4 +31,4 @@ while (<>)
   }
 }
 
-print "\n";
+print "$cur_word\n";
