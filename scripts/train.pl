@@ -65,6 +65,7 @@ my $GAUSS_EVAL_RATIO = 0.1;
 
 # MLLT options
 my $mllt_start_iter = 14; # At which iteration MLLT estimation should begin
+my $mllt_frequency = 1; # How many EM iterations between MLLT estimation
 my $MLLT_MODULE_NAME = "transform";
 
 # Training iterations
@@ -118,7 +119,7 @@ generate_hmmnet_files($tempdir, $init_model);
 # ML/EM training
 my $ml_model;
 $ml_model=ml_train($tempdir, 1, $num_ml_train_iter, $init_model, $init_cfg,
-                   $mllt_start_iter, $split_frequency, $split_stop_iter);
+                   $mllt_start_iter, $mllt_frequency, $split_frequency, $split_stop_iter);
 my $om = $ml_model;
 
 # Estimate duration model
@@ -209,6 +210,7 @@ sub ml_train {
   my $im_cfg = shift(@_);
 
   my $mllt_start = shift(@_);
+  my $mllt_frequency = shift(@_);
   my $mllt_flag = 0;
 
   my $split_frequency = shift(@_);
@@ -227,8 +229,10 @@ sub ml_train {
     print "Iteration ".$i."\n" if ($VERBOSITY > 0);
     my $om = $model_base."_".$i;
 
-    $mllt_flag = 1 if ($mllt_start && $i >= $mllt_start);
-
+    $mllt_flag = 0;
+    $mllt_flag = 1 if ($mllt_start && $i >= $mllt_start &&
+		       (($i-$mllt_start) % $mllt_frequency) == 0);
+    
     collect_stats($temp_dir, $im, $im_cfg, $stats_list_file,
                   $mllt_flag);
 
