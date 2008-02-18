@@ -24,10 +24,9 @@ double min_var;
 double ac_scale;
 int num_frames = 0;
 
-typedef enum {MODE_ML, MODE_MMI, MODE_MPE} OptMode;
-
-OptMode mode;
-
+double ml_weight = 0;
+double mmi_weight = 0;
+double mpe_weight = 0;
 
 
 // Gets Gaussian parameters, transforms them to optimization form and sets
@@ -143,23 +142,24 @@ void extract_gradient(void)
     // Compute the derivatives wrt the original mixture weights
     for (int j = 0; j < m->size(); j++)
     {
-      if (mode == MODE_MPE)
+      temp[j] = 0;
+      if (mpe_weight != 0)
       {
-        temp[j] = -(ac_scale/(double)num_frames) *
+        temp[j] += -mpe_weight*(ac_scale/(double)num_frames) *
           (m->get_accumulated_gamma(PDF::MPE_NUM_BUF, j) /
            m->get_mixture_coefficient(j));
       }
-      else if (mode == MODE_MMI)
+      if (mmi_weight != 0)
       {
-        temp[j] = -(ac_scale/(double)num_frames) * (
+        temp[j] += -mmi_weight*(ac_scale/(double)num_frames) * (
           (m->get_accumulated_gamma(PDF::ML_BUF, j) /
            m->get_mixture_coefficient(j)) -
           (m->get_accumulated_gamma(PDF::MMI_BUF, j) /
            m->get_mixture_coefficient(j)));
       }
-      else if (mode == MODE_ML)
+      if (ml_weight != 0)
       {
-        temp[j] = -(ac_scale/(double)num_frames) * 
+        temp[j] += -ml_weight*(ac_scale/(double)num_frames) * 
           (m->get_accumulated_gamma(PDF::ML_BUF, j) /
            m->get_mixture_coefficient(j));
       }
@@ -189,51 +189,50 @@ void extract_gradient(void)
     Gaussian *pdf = dynamic_cast< Gaussian* >(pool->get_pdf(i));
     if (pdf == NULL)
       throw std::string("Only Gaussian PDFs are supported!");
-    Vector m1, nm1;
-    Vector m2, nm2;
+    Vector mpe_m1, mmi_m1, ml_m1;
+    Vector mpe_m2, mmi_m2, ml_m2;
     Vector mean;
     Vector diag_cov;
-    double gamma = 0, ngamma = 0;
+    double mpe_gamma = 0, mmi_gamma = 0, ml_gamma = 0;
     pdf->get_mean(mean);
     pdf->get_covariance(diag_cov);
-    if (mode == MODE_MPE)
+    if (mpe_weight != 0)
     {
-      pdf->get_accumulated_mean(PDF::MPE_NUM_BUF, m1);
-      pdf->get_accumulated_second_moment(PDF::MPE_NUM_BUF, m2);
-      gamma = pdf->get_accumulated_gamma(PDF::MPE_NUM_BUF);
+      pdf->get_accumulated_mean(PDF::MPE_NUM_BUF, mpe_m1);
+      pdf->get_accumulated_second_moment(PDF::MPE_NUM_BUF, mpe_m2);
+      mpe_gamma = pdf->get_accumulated_gamma(PDF::MPE_NUM_BUF);
     }
-    else if (mode == MODE_MMI)
+    if (mmi_weight != 0 || ml_weight != 0)
     {
-      pdf->get_accumulated_mean(PDF::ML_BUF, nm1);
-      pdf->get_accumulated_mean(PDF::MMI_BUF, m1);
-      pdf->get_accumulated_second_moment(PDF::ML_BUF, nm2);
-      pdf->get_accumulated_second_moment(PDF::MMI_BUF, m2);
-      ngamma = pdf->get_accumulated_gamma(PDF::ML_BUF);
-      gamma = pdf->get_accumulated_gamma(PDF::MMI_BUF);
+      pdf->get_accumulated_mean(PDF::ML_BUF, ml_m1);
+      pdf->get_accumulated_second_moment(PDF::ML_BUF, ml_m2);
+      ml_gamma = pdf->get_accumulated_gamma(PDF::ML_BUF);
     }
-    else if (mode == MODE_ML)
+    if (mmi_weight != 0)
     {
-      pdf->get_accumulated_mean(PDF::ML_BUF, nm1);
-      pdf->get_accumulated_second_moment(PDF::ML_BUF, nm2);
-      ngamma = pdf->get_accumulated_gamma(PDF::ML_BUF);
+      pdf->get_accumulated_mean(PDF::MMI_BUF, mmi_m1);
+      pdf->get_accumulated_second_moment(PDF::MMI_BUF, mmi_m2);
+      mmi_gamma = pdf->get_accumulated_gamma(PDF::MMI_BUF);
     }
     for (int j = 0; j < pool->dim(); j++)
     {
-      if (mode == MODE_MPE)
+      gradient(pindex) = 0;
+      if (mpe_weight != 0)
       {
-        gradient(pindex) =
-          -(ac_scale*(m1(j)-mean(j)*gamma) / (diag_cov(j)*(double)num_frames));
+        gradient(pindex) +=
+          -mpe_weight*(ac_scale*(mpe_m1(j)-mean(j)*mpe_gamma) /
+            (diag_cov(j)*(double)num_frames));
       }
-      else if (mode == MODE_MMI)
+      if (mmi_weight != 0)
       {
-        gradient(pindex) = -(ac_scale/(double)num_frames) * (
-          (nm1(j)-mean(j)*ngamma)/diag_cov(j) -
-          (m1(j)-mean(j)*gamma)/diag_cov(j));
+        gradient(pindex) += -mmi_weight*(ac_scale/(double)num_frames) * (
+          (ml_m1(j)-mean(j)*ml_gamma)/diag_cov(j) -
+          (mmi_m1(j)-mean(j)*mmi_gamma)/diag_cov(j));
       }
-      else if (mode == MODE_ML)
+      if (ml_weight != 0)
       {
-        gradient(pindex) = -(ac_scale/(double)num_frames) *
-          (nm1(j)-mean(j)*ngamma)/diag_cov(j);
+        gradient(pindex) += -ml_weight*(ac_scale/(double)num_frames) *
+          (ml_m1(j)-mean(j)*ml_gamma)/diag_cov(j);
       }
       pindex++;
     }
@@ -241,22 +240,26 @@ void extract_gradient(void)
     {
       double ep = exp(params(pindex));
       double c = ep + min_var;
-      if (mode == MODE_MPE)
+      gradient(pindex) = 0;
+      if (mpe_weight != 0)
       {
-        gradient(pindex) = -(ac_scale/(double)num_frames) * (
-          (m2(j)-2*m1(j)*mean(j)+gamma*mean(j)*mean(j)-gamma*c)/(2*c*c)) * ep;
+        gradient(pindex) += -mpe_weight*(ac_scale/(double)num_frames) * (
+          (mpe_m2(j)-2*mpe_m1(j)*mean(j)+mpe_gamma*mean(j)*mean(j)-mpe_gamma*c)
+           / (2*c*c)) * ep;
       }
-      else if (mode == MODE_MMI)
+      if (mmi_weight != 0)
       {
-        gradient(pindex) = -(ac_scale/(double)num_frames) * (
-          (nm2(j)-2*nm1(j)*mean(j)+ngamma*mean(j)*mean(j)-ngamma*c)/(2*c*c) -
-          (m2(j)-2*m1(j)*mean(j)+gamma*mean(j)*mean(j)-gamma*c)/(2*c*c)) * ep;
+        gradient(pindex) += -mmi_weight*(ac_scale/(double)num_frames) * (
+          (ml_m2(j)-2*ml_m1(j)*mean(j)+ml_gamma*mean(j)*mean(j)-ml_gamma*c)
+          / (2*c*c) -
+          (mmi_m2(j)-2*mmi_m1(j)*mean(j)+mmi_gamma*mean(j)*mean(j)-mmi_gamma*c)
+          / (2*c*c)) * ep;
       }
-      else if (mode == MODE_ML)
+      if (ml_weight != 0)
       {
-        gradient(pindex) = -(ac_scale/(double)num_frames) * (
-          (nm2(j)-2*nm1(j)*mean(j)+ngamma*mean(j)*mean(j)-ngamma*c)/(2*c*c))
-          * ep;
+        gradient(pindex) += -ml_weight*(ac_scale/(double)num_frames) * (
+          (ml_m2(j)-2*ml_m1(j)*mean(j)+ml_gamma*mean(j)*mean(j)-ml_gamma*c)/
+          (2*c*c)) * ep;
       }
       pindex++;
     }
@@ -273,6 +276,7 @@ main(int argc, char *argv[])
   double score = 0;
   std::map< std::string, double > sum_statistics;
   std::string base_file_name;
+  PDF::StatisticsMode statistics_mode = 0;
   
   try {
     config("usage: optmodel [OPTION...]\n")
@@ -284,9 +288,9 @@ main(int argc, char *argv[])
       ('L', "list=LISTNAME", "arg must", "", "file with one statistics file per line")
       ('F', "osf=FILE", "arg must", "", "Optimization state file")
       ('o', "out=BASENAME", "arg must", "", "base filename for output models")
-      ('\0', "ml", "", "", "ML optimization")
-      ('\0', "mmi", "", "", "MMI optimization")
-      ('\0', "mpe", "", "", "MPE optimization")
+      ('\0', "ml=FLOAT", "arg", "0", "ML optimization weight")
+      ('\0', "mmi=FLOAT", "arg", "0", "MMI optimization weight")
+      ('\0', "mpe=FLOAT", "arg", "0", "MPE optimization weight")
       ('l', "initscale=SCALE", "arg", "", "Initialize with inverse Hessian scale")
       ('\0', "minvar=FLOAT", "arg", "0.09", "minimum variance (default 0.09)")
       ('A', "ac-scale=FLOAT", "arg", "1", "acoustic scaling used in stats")
@@ -301,16 +305,23 @@ main(int argc, char *argv[])
 
     optimizer.set_verbosity(info);
 
-    if (!(config["mmi"].specified^config["mpe"].specified^config["ml"].specified))
-      throw std::string("Must give one of --ml, --mmi or --mpe");
+    if (!(config["mmi"].specified || config["mpe"].specified || config["ml"].specified))
+      throw std::string("Must give at least one of --ml, --mmi or --mpe");
     if (config["ml"].specified)
-      mode = MODE_ML;
-    else if (config["mmi"].specified)
-      mode = MODE_MMI;
-    else if (config["mpe"].specified)
-      mode = MODE_MPE;
-    else
-      throw std::string("Invalid optimization mode");
+    {
+      ml_weight = config["ml"].get_float();
+      statistics_mode |= PDF_ML_STATS;
+    }
+    if (config["mmi"].specified)
+    {
+      mmi_weight = config["mmi"].get_float();
+      statistics_mode |= (PDF_ML_STATS | PDF_MMI_STATS);
+    }
+    if (config["mpe"].specified)
+    {
+      mpe_weight = config["mpe"].get_float();
+      statistics_mode |= (PDF_MPE_NUM_STATS);
+    }
 
     // Load the previous models
     if (config["base"].specified)
@@ -340,8 +351,9 @@ main(int argc, char *argv[])
     }
 
     optimizer.set_max_bfgs_updates(config["bfgsu"].get_int());
-
+    
     // Accumulate statistics
+    model.start_accumulating(statistics_mode);
     while (filelist >> statistics_file && statistics_file != " ") {
       model.accumulate_gk_from_dump(statistics_file+".gks");
       model.accumulate_mc_from_dump(statistics_file+".mcs");
@@ -367,25 +379,36 @@ main(int argc, char *argv[])
       lls_file.close();
     }
 
-    if (mode == MODE_MPE &&
+    if (mpe_weight != 0 &&
         sum_statistics.find("MPFE score") == sum_statistics.end())
       throw std::string("MPFE score not available");
-    if (mode == MODE_MMI &&
+    if (mmi_weight != 0 &&
         sum_statistics.find("MMI score") == sum_statistics.end())
       throw std::string("MMI score not available");
-    if (mode == MODE_ML &&
+    if (ml_weight != 0 &&
         sum_statistics.find("Numerator loglikelihood") == sum_statistics.end())
       throw std::string("Numerator loglikelihood not available");
     if (sum_statistics.find("Number of frames") == sum_statistics.end())
       throw std::string("Number of frames not available");
-    
-    if (mode == MODE_MPE)
-      score = sum_statistics["MPFE score"];
-    else if (mode == MODE_MMI)
-      score = sum_statistics["MMI score"];
-    else if (mode == MODE_ML)
-      score = sum_statistics["Numerator loglikelihood"];
+
+    score = 0;
     num_frames = (int)sum_statistics["Number of frames"];
+    if (mpe_weight != 0)
+    {
+      // Change the value from phone accuracy to phone error in order to
+      // turn the optimization problem into minimization
+      score += mpe_weight*(1-sum_statistics["MPFE score"]/(double)num_frames);
+    }
+    if (mmi_weight != 0)
+    {
+      // Negative MMI score, normalized with number of frames
+      score += -mmi_weight*sum_statistics["MMI score"]/(double)num_frames;
+    }
+    if (ml_weight != 0)
+    {
+      // Negative loglikelihood, normalized with number of frames
+      score += -ml_weight*sum_statistics["Numerator loglikelihood"]/(double)num_frames;
+    }
 
     state_file = config["osf"].get_str();
     min_var = config["minvar"].get_float();
@@ -405,24 +428,8 @@ main(int argc, char *argv[])
         exit(1);
       }
     }
-    
-    if (mode == MODE_MPE)
-    {
-      // Change the value from phone accuracy to phone error in order to
-      // turn the optimization problem into minimization
-      optimizer.set_function_value(1 - (score / (double)num_frames));
-    }
-    else if (mode == MODE_MMI)
-    {
-      // Negative MMI score, normalized with number of frames
-      optimizer.set_function_value(-score / (double)num_frames);
-    }
-    else if (mode == MODE_ML)
-    {
-      // Negative loglikelihood, normalized with number of frames
-      optimizer.set_function_value(-score / (double)num_frames);
-    }
 
+    optimizer.set_function_value(score);
     extract_gradient();
 
     // Perform the optimization step

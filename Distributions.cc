@@ -259,7 +259,7 @@ Gaussian::dump_statistics(std::ostream &os) const
 void 
 Gaussian::accumulate_from_dump(std::istream &is, StatisticsMode mode)
 {
-  int accum_pos;  
+  int accum_pos;
   is.read((char*)&accum_pos, sizeof(int));
 
   if (m_accums.size() == 0)

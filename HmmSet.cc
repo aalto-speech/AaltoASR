@@ -651,9 +651,10 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
   PDF::StatisticsMode mode;
   
   mcs >> mode;
-  if (mode == 0 || (m_statistics_mode != 0 && mode != m_statistics_mode))
-    throw str::fmt(512, "HmmSet::accumulate_mc_from_dump: invalid statistics mode in %s\n", filename.c_str());
-  m_statistics_mode = mode;
+//   if (mode == 0 || (m_statistics_mode != 0 && mode != m_statistics_mode))
+//     throw str::fmt(512, "HmmSet::accumulate_mc_from_dump: invalid statistics mode in %s\n", filename.c_str());
+  if (m_statistics_mode == 0)
+    m_statistics_mode = mode;
 
   while (mcs >> pdf)
     m_emission_pdfs[pdf]->accumulate_from_dump(mcs, m_statistics_mode);
@@ -682,9 +683,10 @@ HmmSet::accumulate_gk_from_dump(const std::string filename)
     throw str::fmt(512, "HmmSet::accumulate_gk_from_dump: the dimensionality of mixture base distributions in: %s is wrong\n", filename.c_str());
 
   gks.read((char*)&mode, sizeof(PDF::StatisticsMode));
-  if (mode == 0 || (m_statistics_mode != 0 && mode != m_statistics_mode))
-    throw str::fmt(512, "HmmSet::accumulate_gk_from_dump: invalid statistics mode in %s\n", filename.c_str());
-  m_statistics_mode = mode;
+//   if (mode == 0 || (m_statistics_mode != 0 && mode != m_statistics_mode))
+//     throw str::fmt(512, "HmmSet::accumulate_gk_from_dump: invalid statistics mode in %s\n", filename.c_str());
+  if (m_statistics_mode == 0)
+    m_statistics_mode = mode;
 
   while (gks.good()) {
     gks.read((char*)&pdf, sizeof(int));

@@ -4,7 +4,6 @@
 #include "ModuleConfig.hh"
 #include "str.hh"
 #include "FeatureGenerator.hh"
-#include "PhaseFeatures.hh"
 
 
 FeatureGenerator::FeatureGenerator(void) :
@@ -141,8 +140,6 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new VtlnModule();
     else if (type == SRNormModule::type_str())
       module = new SRNormModule();
-    else if (type == MODGDFModule::type_str())
-      module = new MODGDFModule(this);
     else
       throw std::string("Unknown module type '") + type + std::string("'");
     module->set_name(name);
