@@ -60,7 +60,11 @@ print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 </s> </s>\n";
 close $fh;
 
 open $fh, "> optional_silence.fst";
-print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 __ __\nT 0 1\n";
+if ($USE_MORPHS) {
+  print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 __ <w>\nT 0 1\n";
+} else {
+  print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 __ __\nT 0 1\n";
+}
 close $fh;
 
 open $fh, "> end_symbol.fst";
