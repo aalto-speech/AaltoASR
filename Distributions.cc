@@ -1813,7 +1813,7 @@ Mixture::estimate_parameters(EstimationMode mode)
     for (int i=0; i<size(); i++)
       m_weights[i] = m_accums[ML_BUF]->gamma[i]/total_gamma;
   }
-  else if (mode == MMI_EST)
+  else if (mode == MMI_EST || mode == MPE_EST || mode == MPE_MMI_PRIOR_EST)
   {
     // There are many alternatives for updating mixture coefficients
     // This implementation follows Woodland & Povey, '02
