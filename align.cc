@@ -87,6 +87,7 @@ viterbi_align(Viterbi &viterbi, int start_frame, int end_frame,
     viterbi.set_last_window(last_window);
     viterbi.set_last_frame(window_end_frame - window_start_frame);
     viterbi.fill();
+
     if (fea_gen.eof())
     {
       // Viterbi encountered eof and stopped
@@ -247,56 +248,93 @@ main(int argc, char *argv[])
       set_speakers = true;
     }
 
+    // These are for handling beam problems
+    double orig_beam = config["beam"].get_float();
+    int orig_sbeam = config["sbeam"].get_int();
+    double curr_beam = orig_beam;
+    int curr_sbeam = orig_sbeam;
+    bool ok = true;
+    
     for (int f = 0; f < (int)recipe.infos.size(); f++)
     {
+
+      if (curr_beam != orig_beam) {
+        std::cerr << "Restoring original beam " << orig_beam
+                  << " and original state beam " << orig_sbeam << std::endl;
+        curr_beam = orig_beam;
+        curr_sbeam = orig_sbeam;
+        viterbi.set_prob_beam(orig_beam);
+        viterbi.set_state_beam(orig_sbeam);
+        viterbi.resize(win_size, win_size, orig_sbeam / 4);
+      }
+
+    retry:
+      try {
+
+        if (info > 0)
+        {
+          fprintf(stderr, "Processing file: %s", 
+                  recipe.infos[f].audio_path.c_str());
+          if (recipe.infos[f].start_time || recipe.infos[f].end_time) 
+            fprintf(stderr," (%.2f-%.2f)",recipe.infos[f].start_time,
+                    recipe.infos[f].end_time);
+          fprintf(stderr,"\n");
+        }
+        
+        // Open the audio and phn files from the given list.
+        recipe.infos[f].init_phn_files(NULL, false, false, false, &fea_gen,
+                                       config["raw-input"].specified,
+                                       &phn_reader);
+        
+        phn_out_file.open(recipe.infos[f].alignment_path.c_str(), "w");
+        
+        ll = viterbi_align(viterbi, phn_reader.first_frame(),
+                           (int)(recipe.infos[f].end_time*fea_gen.frame_rate()),
+                           phn_out_file, recipe.infos[f].speaker_id,
+                           recipe.infos[f].utterance_id);
+        
+        phn_out_file.close();
+        fea_gen.close();
+        phn_reader.close();
+        
+        if (info > 1)
+        {
+          fprintf(stderr, "File log likelihood: %f\n", ll);
+        }
+        // Buffered sum for better resolution
+        prec_buff += ll;
+        if (fabsl(prec_buff) > 100000)
+        {
+          sum_data_likelihood += prec_buff;
+          prec_buff=0;
+        }
+
+      } catch (std::string err) {
+        curr_beam *= 2;
+        curr_sbeam *= 2;
+        std::cerr << "Too low beams, doubling to beam " << curr_beam
+                  << " and state beam " << curr_sbeam << std::endl; 
+        viterbi.set_prob_beam(curr_beam);
+        viterbi.set_state_beam(curr_sbeam);
+        viterbi.resize(win_size, win_size, curr_sbeam / 4);
+        ok = false;
+        if (curr_beam < 100000)
+          goto retry;
+        else
+          std::cerr << "Have to stop trying, beam already 100 000" << std::endl;
+      }
+      
+      sum_data_likelihood += prec_buff;
       if (info > 0)
       {
-        fprintf(stderr, "Processing file: %s", 
-                recipe.infos[f].audio_path.c_str());
-        if (recipe.infos[f].start_time || recipe.infos[f].end_time) 
-          fprintf(stderr," (%.2f-%.2f)",recipe.infos[f].start_time,
-                  recipe.infos[f].end_time);
-        fprintf(stderr,"\n");
-      }
+        fprintf(stderr, "Total data log likelihood: %f\n", sum_data_likelihood);
+      }  
+    } // Process the next file      
 
-      // Open the audio and phn files from the given list.
-      recipe.infos[f].init_phn_files(NULL, false, false, false, &fea_gen,
-                                     config["raw-input"].specified,
-                                     &phn_reader);
-    
-      phn_out_file.open(recipe.infos[f].alignment_path.c_str(), "w");
-
-      ll = viterbi_align(viterbi, phn_reader.first_frame(),
-                         (int)(recipe.infos[f].end_time*fea_gen.frame_rate()),
-                         phn_out_file, recipe.infos[f].speaker_id,
-                         recipe.infos[f].utterance_id);
-      
-      phn_out_file.close();
-      fea_gen.close();
-      phn_reader.close();
-
-      if (info > 1)
-      {
-        fprintf(stderr, "File log likelihood: %f\n", ll);
-      }
-      // Buffered sum for better resolution
-      prec_buff += ll;
-      if (fabsl(prec_buff) > 100000)
-      {
-        sum_data_likelihood += prec_buff;
-        prec_buff=0;
-      }
-    } // Process the next file
-
-    sum_data_likelihood += prec_buff;
-    if (info > 0)
-    {
-      fprintf(stderr, "Total data log likelihood: %f\n", sum_data_likelihood);
-    }
+    ok = true;
   }
   catch (HmmSet::UnknownHmm &e) {
-    fprintf(stderr, 
-	    "Unknown HMM in transcription\n");
+    fprintf(stderr, "Unknown HMM in transcription\n");
     abort();
   }
   catch (std::exception &e) {

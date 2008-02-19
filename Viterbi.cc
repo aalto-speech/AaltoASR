@@ -301,10 +301,10 @@ Viterbi::compute_best_path()
   if (m_force_end && m_last_window) {
     position = m_last_position - 1;
     if (position < (int)m_transcription.size() - 1)
-      std::cerr << "WARNING: Viterbi::compute_best_path: transcription end out of window" << std::endl;
+      throw std::string("WARNING: Viterbi::compute_best_path: transcription end out of window\n");
     
     else if (!m_lattice.range(frame).has(position))
-      std::cerr << "WARNING: Viterbi::compute_best_path: transcription end out of range" << std::endl;
+      throw std::string("WARNING: Viterbi::compute_best_path: transcription end out of range\n");
   }
   else
     position = m_best_position;
