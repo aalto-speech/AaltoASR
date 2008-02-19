@@ -128,6 +128,17 @@ FullStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &
 }
 
 
+void
+FullStatisticsAccumulator::reset()
+{
+  m_feacount=0;
+  m_mean=0;
+  m_second_moment=0;
+  m_gamma=0;
+  m_accumulated=false;
+}
+
+
 void 
 DiagonalStatisticsAccumulator::dump_statistics(std::ostream &os) const
 {
@@ -231,6 +242,17 @@ DiagonalStatisticsAccumulator::accumulate(int feacount, double gamma, const Vect
 
 
 void
+DiagonalStatisticsAccumulator::reset()
+{
+  m_feacount=0;
+  m_mean=0;
+  m_second_moment=0;
+  m_gamma=0;
+  m_accumulated=false;
+}
+
+
+void
 Gaussian::accumulate(double gamma,
                      const Vector &f,
                      int accum_pos)
@@ -259,7 +281,7 @@ Gaussian::dump_statistics(std::ostream &os) const
 void 
 Gaussian::accumulate_from_dump(std::istream &is, StatisticsMode mode)
 {
-  int accum_pos;
+  int accum_pos;  
   is.read((char*)&accum_pos, sizeof(int));
 
   if (m_accums.size() == 0)
@@ -763,6 +785,37 @@ double
 DiagonalGaussian::compute_log_likelihood_exponential(const Vector &exponential_feature) const
 {
   throw std::string("compute_log_likelihood_exponential not implemented for DiagonalGaussian\n");
+}
+
+
+double
+DiagonalGaussian::kullback_leibler(Gaussian &g) const
+{
+  assert(dim()==g.dim());
+
+  // Values for the other Gaussian
+  LaVectorDouble other_mean; g.get_mean(other_mean);
+  LaVectorDouble other_covariance; g.get_covariance(other_covariance);
+
+  double det=1;
+  for (int i=0; i<dim(); i++)
+    det *= m_covariance(i);
+
+  double other_det=1;
+  for (int i=0; i<dim(); i++)
+    other_det *= other_covariance(i);
+
+  Vector diff(other_mean);
+  Blas_Add_Mult(diff, -1.0, m_mean);
+  
+  // kl
+  double value = log(other_det/det);
+  for (int i=0; i<dim(); i++)
+    value += (m_covariance(i)+diff(i))/other_covariance(i);
+  value -= dim();
+  value *= 0.5;
+
+  return value;
 }
 
 

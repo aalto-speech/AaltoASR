@@ -267,6 +267,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const = 0;
   virtual void accumulate_from_dump(std::istream &is) = 0;
   virtual bool full_stats_accumulated() const = 0;
+  virtual void reset() = 0;
 protected:
   int m_dim;
   bool m_accumulated;
@@ -281,12 +282,8 @@ public:
   FullStatisticsAccumulator(int dim) { 
     m_mean.resize(dim);
     m_second_moment.resize(dim,dim);
-    m_feacount=0;
-    m_mean=0;
-    m_second_moment=0;
-    m_gamma=0;
     m_dim=dim;
-    m_accumulated=false;
+    reset();
   }
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
@@ -296,6 +293,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual bool full_stats_accumulated() const { return accumulated(); }
+  virtual void reset();
 private:
   SymmetricMatrix m_second_moment;
 };
@@ -306,12 +304,8 @@ public:
   DiagonalStatisticsAccumulator(int dim) {
     m_mean.resize(dim);
     m_second_moment.resize(dim);
-    m_feacount=0;
-    m_mean=0;
-    m_second_moment=0;
-    m_gamma=0;
     m_dim=dim;
-    m_accumulated=false;
+    reset();
   }
   virtual void get_covariance_estimate(Matrix &covariance_estimate) const;
   virtual void get_accumulated_second_moment(Matrix &second_moment) const;
@@ -321,6 +315,7 @@ public:
   virtual void dump_statistics(std::ostream &os) const;
   virtual void accumulate_from_dump(std::istream &is);
   virtual bool full_stats_accumulated() const { return false; }
+  virtual void reset();
 private:
   Vector m_second_moment;
 };
@@ -471,8 +466,9 @@ public:
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
 
-  // Draw a random sample from this DiagonalGaussian
+  // Faster implementations for DiagonalGaussian
   virtual void draw_sample(Vector &sample);
+  virtual double kullback_leibler(Gaussian &g) const;
   
   // Diagonal-specific
   /// Get the diagonal of the covariance matrix
