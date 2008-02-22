@@ -33,8 +33,8 @@ my $NUM_BATCHES = 2; # Number of processes in parallel
 
 # Train/Baum-Welch settings
 my $USE_HMMNETS = 1; # If 0, the script must call align appropriately
-my $FORWARD_BEAM = 20;
-my $BACKWARD_BEAM = 200;
+my $FORWARD_BEAM = 15;
+my $BACKWARD_BEAM = 150;
 my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/lne(10)))
 my $STATS_MODE = "--ml";
 my $TRAIN_MODE = "--ml";
@@ -82,7 +82,9 @@ my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
 # Discriminative training settings
 my $DISCRIMINATIVE_STATS_MODE = "--mmi -E";
 my $DISCRIMINATIVE_TRAIN_MODE = "--mmi";
-my $DISCRIMINATIVE_AC_SCALE = 0.067;
+my $DISCRIMINATIVE_AC_SCALE = 0.075;
+my $DISCRIMINATIVE_FORWARD_BEAM = 15;
+my $DISCRIMINATIVE_BACKWARD_BEAM = 40; # Affected by the acoustic scaling 
 
 
 # Misc settings
@@ -141,6 +143,8 @@ if ($NUM_GAUSS_CLUSTERS > 0) {
 # Discriminative training
 #my $dmodel;
 #$AC_SCALE=$DISCRIMINATIVE_AC_SCALE;    # for MMI 1/(LMSCALE/ln(10)))
+#$FORWARD_BEAM=$DISCRIMINATIVE_FORWARD_BEAM;
+#$BACKWARD_BEAM=$DISCRIMINATIVE_BACKWARD_BEAM;
 #$STATS_MODE = $DISCRIMINATIVE_STATS_MODE;
 #$TRAIN_MODE = $DISCRIMINATIVE_TRAIN_MODE;
 #$USE_HMMNETS = 1;
