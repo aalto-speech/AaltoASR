@@ -90,14 +90,6 @@ main(int argc, char *argv[])
     }
   }
   
-  // Handle errors
-  catch (HmmSet::UnknownHmm &e) {
-    fprintf(stderr, 
-	    "Unknown HMM in transcription, "
-	    "writing incompletely taught models\n");
-    abort();
-  }
-
   catch (std::exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());
     abort();
