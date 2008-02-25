@@ -29,6 +29,7 @@ my $num_virtual_batches = $NUM_BATCHES*$NUM_BLOCKS;
 
 for (my $i = 1; $i <= $NUM_BLOCKS; $i++) {
   my $cur_batch = ($BATCH_ID-1)*$NUM_BLOCKS + $i;
+  my $wg_generated = 0;
 
   # Load recipe to check if the files already exist (NOTE! only checks
   # the first and the last files in the batch!)
@@ -45,10 +46,12 @@ for (my $i = 1; $i <= $NUM_BLOCKS; $i++) {
     
     # Remove LNA files
     system("rm -f $tempdir/*.lna");
+
+    $wg_generated = 1;
   }
 
   # Check if denominator hmmnets have been generated already
-  if (!(-e $wgs->[0][1] && -e $wgs->[1][1])) {
+  if ($wg_generated || !(-e $wgs->[0][1] && -e $wgs->[1][1])) {
     # Generate hmmnets
     system("$SCRIPTDIR/make_den_fst.pl $USE_MORPHS $VOCABULARY $LMMODEL $RECIPE $tempdir $SCRIPTDIR $num_virtual_batches $cur_batch $LATTICE_THRESHOLD $LMSCALE") && die "hmmnet generation failed\n";
   }
