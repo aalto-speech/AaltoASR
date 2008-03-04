@@ -222,7 +222,8 @@ PhnReader::next_frame(void)
 
             if ((next_state >= cur_hmm.num_states() &&
                  m_cur_phn.state == 0) ||
-                (next_state == m_cur_phn.state))
+                (m_model->transition(tr_index[i]).target_offset != 0 &&
+                 next_state == m_cur_phn.state))
             {
               transition_index = tr_index[i];
               break;
