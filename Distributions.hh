@@ -42,6 +42,7 @@ public:
   virtual void accumulate(double prior,
 			  const Vector &f, 
 			  int accum_pos = 0) = 0;
+  virtual void accumulate_aux_gamma(double gamma, int accum_pos = 0) = 0;
   /* Writes the currently accumulated statistics to a file */
   virtual void dump_statistics(std::ostream &os) const = 0;
   /* Accumulates from a file dump */
@@ -126,6 +127,9 @@ public:
    * \return the likelihood of the given feature for some pdf
    */
   double compute_likelihood(const Vector &f, int index);
+
+
+  double compute_clustered_likelihood(const Vector &f, int index);
 
   /** Computes likelihoods for all distributions to the cache
    * \param f the feature vector
@@ -235,6 +239,7 @@ private:
   int m_number_of_clusters;
   int m_evaluate_min_clusters;
   int m_evaluate_min_gaussians;
+
   typedef std::pair<int,double> ClusterLikelihoodPair;
   struct cl_compare
   {
@@ -255,7 +260,9 @@ public:
   bool accumulated() const { return m_accumulated; }
   int feacount() const { return m_feacount; }
   double gamma() const { return m_gamma; }
+  double aux_gamma() const { return m_aux_gamma; }
   void set_gamma(double g) { m_gamma = g; }
+  void set_aux_gamma(double g) { m_aux_gamma = g; }
   void get_mean_estimate(Vector &mean_estimate) const;
   void get_accumulated_mean(Vector &mean) const;
   void set_accumulated_mean(Vector &mean);
@@ -264,6 +271,7 @@ public:
   virtual void get_accumulated_second_moment(Vector &second_moment) const = 0;
   virtual void set_accumulated_second_moment(Matrix &second_moment) = 0;
   virtual void accumulate(int feacount, double gamma, const Vector &f) = 0;
+  virtual void accumulate_aux_gamma(double gamma) { m_aux_gamma += gamma; }
   virtual void dump_statistics(std::ostream &os) const = 0;
   virtual void accumulate_from_dump(std::istream &is) = 0;
   virtual bool full_stats_accumulated() const = 0;
@@ -273,6 +281,7 @@ protected:
   bool m_accumulated;
   int m_feacount;
   double m_gamma;
+  double m_aux_gamma;
   Vector m_mean;
 };
 
@@ -342,6 +351,7 @@ public:
      weighed with a prior. */
   virtual void accumulate(double prior, const Vector &f, 
 			  int accum_pos = 0) ;
+  virtual void accumulate_aux_gamma(double gamma, int accum_pos = 0);
   /* Writes the currently accumulated statistics to a stream */
   virtual void dump_statistics(std::ostream &os) const;
   /* Accumulates from dump */
@@ -355,7 +365,7 @@ public:
   virtual void estimate_parameters(EstimationMode mode, double minvar,
                                    double covsmooth, double c1, double c2,
                                    bool ml_stats_target);
-  
+
   // GAUSSIAN SPECIFIC
   
   /* Returns the mean vector for this Gaussian */
@@ -424,6 +434,12 @@ public:
   double get_accumulated_gamma(int accum) const { return m_accums[accum]->gamma(); }
   void get_accumulated_mean(int accum, Vector &mean) const { m_accums[accum]->get_accumulated_mean(mean); }
   void get_accumulated_second_moment(int accum, Vector &s) { m_accums[accum]->get_accumulated_second_moment(s); }
+
+  double get_accumulated_aux_gamma(int accum) { return m_accums[accum]->aux_gamma(); }
+
+
+  // Special function to manipulate accumulators for ML smoothing
+  void copy_gamma_to_aux_gamma(int source, int target);
 
 
 protected:
@@ -702,7 +718,14 @@ public:
    * \param samples number of samples to use in the computation
    */
   double bhattacharyya(Mixture &g, int samples=10000);
-  
+
+
+  virtual void accumulate_aux_gamma(double gamma, int accum_pos = 0);
+  double get_accumulated_mixture_ll(int accum) { return m_accums[accum]->mixture_ll; }
+  double get_accumulated_aux_gamma(int accum) { return m_accums[accum]->aux_gamma; }
+
+  // Special function to manipulate accumulators for ML smoothing
+  void copy_aux_gamma(int source, int target);
   
   // From pdf
   virtual void start_accumulating(StatisticsMode mode);
@@ -727,6 +750,9 @@ private:
   public:
     inline MixtureAccumulator(int mixture_size);
     std::vector<double> gamma;
+    double aux_gamma;
+    double mixture_ll;
+    
     bool accumulated;
   };
 
@@ -742,6 +768,8 @@ Mixture::MixtureAccumulator::MixtureAccumulator(int mixture_size) {
   gamma.resize(mixture_size); 
   for (int i=0; i<mixture_size; i++)
     gamma[i]=0.0;
+  aux_gamma = 0;
+  mixture_ll = 0;
   accumulated = false;
 }
 

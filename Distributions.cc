@@ -38,6 +38,7 @@ FullStatisticsAccumulator::dump_statistics(std::ostream &os) const
   if (accumulated()) {
     os.write((char*)&m_feacount, sizeof(int));
     os.write((char*)&m_gamma, sizeof(double));
+    os.write((char*)&m_aux_gamma, sizeof(double));
     for (int i=0; i<dim(); i++) {
       t=m_mean(i);
       os.write((char*)&t, sizeof(float));
@@ -56,10 +57,12 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 {
   int feacount;
   double gamma;
+  double aux_gamma;
   float t;
 
   is.read((char*)&feacount, sizeof(int));
   is.read((char*)&gamma, sizeof(double));
+  is.read((char*)&aux_gamma, sizeof(double));
   if (is.fail())
     fprintf(stderr, "Error while reading statistics dump\n");
 
@@ -68,6 +71,7 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
   
   m_feacount += feacount;
   m_gamma += gamma;
+  m_aux_gamma += aux_gamma;
   m_accumulated = true;
   
   for (int i=0; i<dim(); i++) {
@@ -135,6 +139,7 @@ FullStatisticsAccumulator::reset()
   m_mean=0;
   m_second_moment=0;
   m_gamma=0;
+  m_aux_gamma = 0;
   m_accumulated=false;
 }
 
@@ -146,6 +151,7 @@ DiagonalStatisticsAccumulator::dump_statistics(std::ostream &os) const
   if (accumulated()) {
     os.write((char*)&m_feacount, sizeof(int));
     os.write((char*)&m_gamma, sizeof(double));
+    os.write((char*)&m_aux_gamma, sizeof(double));
     for (int i=0; i<dim(); i++) {
       t=m_mean(i);
       os.write((char*)&t, sizeof(float));
@@ -163,10 +169,12 @@ DiagonalStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 {
   int feacount;
   double gamma;
+  double aux_gamma;
   float t;
   
   is.read((char*)&feacount, sizeof(int));
   is.read((char*)&gamma, sizeof(double));
+  is.read((char*)&aux_gamma, sizeof(double));
   if (is.fail())
     fprintf(stderr, "Error while reading statistics dump\n");
   
@@ -175,6 +183,7 @@ DiagonalStatisticsAccumulator::accumulate_from_dump(std::istream &is)
   
   m_feacount += feacount;
   m_gamma += gamma;
+  m_aux_gamma += aux_gamma;
   m_accumulated = true;
   
   for (int i=0; i<dim(); i++) {
@@ -248,6 +257,7 @@ DiagonalStatisticsAccumulator::reset()
   m_mean=0;
   m_second_moment=0;
   m_gamma=0;
+  m_aux_gamma = 0;
   m_accumulated=false;
 }
 
@@ -261,6 +271,24 @@ Gaussian::accumulate(double gamma,
   assert(m_accums[accum_pos] != NULL);
   
   m_accums[accum_pos]->accumulate(1, gamma, f);
+}
+
+
+void
+Gaussian::accumulate_aux_gamma(double gamma, int accum_pos)
+{
+  assert((int)m_accums.size() > accum_pos);
+  assert(m_accums[accum_pos] != NULL);
+  m_accums[accum_pos]->accumulate_aux_gamma(gamma);
+}
+
+
+void
+Gaussian::copy_gamma_to_aux_gamma(int source, int target)
+{
+  if ((int)m_accums.size() > std::max(source, target) &&
+      m_accums[source] != NULL && m_accums[target] != NULL)
+    m_accums[target]->set_aux_gamma(m_accums[source]->gamma());
 }
 
 
@@ -1755,20 +1783,43 @@ Mixture::accumulate(double gamma,
 		    const Vector &f,
 		    int accum_pos)
 {
-  double total_likelihood, this_likelihood;
+  double total_likelihood, this_likelihood, weighted_likelihood;
+  double this_gamma;
 
   // Compute the total likelihood for this mixture
   total_likelihood = compute_likelihood(f);
+
+  m_accums[accum_pos]->mixture_ll += gamma*util::safe_log(total_likelihood);
   
   // Accumulate all basis distributions with some gamma
   if (total_likelihood > 0) {
     for (int i=0; i<size(); i++) {
-      this_likelihood = gamma * m_weights[i] * m_pool->compute_likelihood(f, m_pointers[i]);
-      m_accums[accum_pos]->gamma[i] += this_likelihood / total_likelihood;
-      get_base_pdf(i)->accumulate(this_likelihood / total_likelihood, f, accum_pos);
+      this_likelihood = m_pool->compute_likelihood(f, m_pointers[i]);
+      weighted_likelihood = gamma * m_weights[i] * this_likelihood;
+      this_gamma = weighted_likelihood / total_likelihood;
+      m_accums[accum_pos]->gamma[i] += this_gamma;
+      get_base_pdf(i)->accumulate(this_gamma, f, accum_pos);
+      get_base_pdf(i)->accumulate_aux_gamma(
+        this_gamma*util::safe_log(this_likelihood), accum_pos);
     }
     m_accums[accum_pos]->accumulated = true;
   }
+}
+
+
+void
+Mixture::accumulate_aux_gamma(double gamma, int accum_pos)
+{
+  m_accums[accum_pos]->aux_gamma += gamma;
+}
+
+
+void
+Mixture::copy_aux_gamma(int source, int target)
+{
+  if ((int)m_accums.size() > std::max(source, target) &&
+      m_accums[source] != NULL && m_accums[target] != NULL)
+    m_accums[target]->aux_gamma = m_accums[source]->aux_gamma;
 }
 
 
@@ -1786,6 +1837,7 @@ Mixture::accumulated(int accum_pos) const
 void 
 Mixture::dump_statistics(std::ostream &os) const
 {
+  os.precision(10);
   for (int a = 0; a < (int)m_accums.size(); a++)
   {
     if (m_accums[a] != NULL && m_accums[a]->accumulated)
@@ -1794,6 +1846,7 @@ Mixture::dump_statistics(std::ostream &os) const
 
       for (int i = 0; i < size(); i++)
         os << " " << m_pointers[i] << " " << m_accums[a]->gamma[i];
+      os << " " << m_accums[a]->aux_gamma << " " << m_accums[a]->mixture_ll;
       os << std::endl;
     }
   }
@@ -1825,6 +1878,11 @@ Mixture::accumulate_from_dump(std::istream &is, StatisticsMode mode)
       assert(m_pointers[i] == pointer);
       m_accums[accum_pos]->gamma[i] += acc;
     }
+
+    double aux, ll;
+    is >> aux >> ll;
+    m_accums[accum_pos]->aux_gamma += aux;
+    m_accums[accum_pos]->mixture_ll += ll;
 
     m_accums[accum_pos]->accumulated = true;
     
@@ -2098,6 +2156,9 @@ PDFPool::reset()
   m_pool.clear();
   m_likelihoods.clear();
   m_valid_likelihoods.clear();
+  m_use_clustering = 0;
+  m_evaluate_min_clusters = 1;
+  m_evaluate_min_gaussians = 1;
 }
 
 

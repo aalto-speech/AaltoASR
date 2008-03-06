@@ -318,8 +318,12 @@ public:
    * \param gamma probability for this emission
    * \param pos 1 = update denominator stats, 0 = update numerator stats, default = false
    */
-  void accumulate_distribution(const FeatureVec &f, int state, double gamma, int pos = 0);
+  void accumulate_distribution(const FeatureVec &f, int pdf, double gamma, int pos = 0);
 
+  void accumulate_aux_gamma(int pdf, double gamma, int pos = 0) { m_emission_pdfs[pdf]->accumulate_aux_gamma(gamma, pos); }
+
+  void prepare_smoothing_gamma(int source, int target);
+  
   /** Accumulates state transition statistics
    * \param state the source state index
    * \param transition relative state index for this transition
@@ -436,14 +440,18 @@ public:
   int split_gaussians(double minocc, int maxg);
 
 
-  /** Splits every Gaussian in the pool with some constrains
+  /** Reads a clustering file
    * \param filename       File with the clustering information
+   */
+  void read_clustering(const std::string &filename);
+  
+  /** Defines minimum number of clusters and gaussians to be evaluated.
+   * These are used in \ref precompute_likelihoods()
    * \param min_clusters   The number of best clusters to evaluate per frame as a percentage [0,1]
    * \param min_gaussians  The minimum number of Gaussians to evaluate per frame as a percentage [0,1]
   */ 
-  void set_clustering(const std::string &filename,
-                      double min_clusters=1.0,
-                      double min_gaussians=0.0);
+  void set_clustering_min_evals(double min_clusters=1.0,
+                                double min_gaussians=0.0);
 
   
 private:
@@ -500,7 +508,7 @@ private:
   
   /// List of the PDFs with valid likelihoods in the cache
   std::vector<int> m_valid_pdf_likelihoods;
-  
+
   std::vector<Hmm> m_hmms;
 
   // For accumulating transition probabilities

@@ -137,7 +137,7 @@ HmmSet::read_mc(const std::string &filename)
   in >> pdfs;
 
   m_emission_pdfs.resize(pdfs);
-  m_pdf_likelihoods.resize(pdfs);
+  m_pdf_likelihoods.resize(pdfs, -1);
   m_valid_pdf_likelihoods.clear();
   
   for (int i = 0; i < pdfs; i++) {
@@ -579,6 +579,20 @@ HmmSet::dump_gk_statistics(const std::string filename) const
   if (!gks)
     throw WriteError();  
   gks.close();
+}
+
+
+void
+HmmSet::prepare_smoothing_gamma(int source, int target)
+{
+  for (int i = 0; i < num_emission_pdfs(); i++)
+    m_emission_pdfs[i]->copy_aux_gamma(source, target);
+  for (int i = 0; i < m_pool.size(); i++)
+  {
+    Gaussian *pdf = dynamic_cast< Gaussian* >(m_pool.get_pdf(i));
+    if (pdf != NULL)
+      pdf->copy_gamma_to_aux_gamma(source, target);
+  }
 }
 
 
@@ -1181,11 +1195,15 @@ HmmSet::split_gaussians(double minocc, int maxg)
 
 
 void
-HmmSet::set_clustering(const std::string &filename,
-                       double min_clusters,
-                       double min_gaussians)
+HmmSet::read_clustering(const std::string &filename)
 {
   m_pool.read_clustering(filename);
+}
+
+void
+HmmSet::set_clustering_min_evals(double min_clusters,
+                                 double min_gaussians)
+{
   m_pool.set_evaluate_min_clusters(int(min_clusters*m_pool.number_of_clusters()));
   m_pool.set_evaluate_min_gaussians(int(min_gaussians*m_pool.size()));
   m_pool.set_use_clustering(true);

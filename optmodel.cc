@@ -28,6 +28,9 @@ double ml_weight = 0;
 double mmi_weight = 0;
 double mpe_weight = 0;
 
+double msmooth_tau = 0;
+double gsmooth_tau = 0;
+
 
 // Gets Gaussian parameters, transforms them to optimization form and sets
 // the parameters in the optimizer object
@@ -126,9 +129,12 @@ void extract_gradient(void)
   Vector params;
   Vector gradient;
   std::vector<double> temp;
+  std::vector<double> gauss_mixture_aux_gamma;
 
   optimizer.get_parameters(params);
   gradient.resize(optimizer.get_num_parameters());
+
+  gauss_mixture_aux_gamma.resize(pool->size(), 0);
   
   // Mixture components
   for (int i = 0; i < model.num_emission_pdfs(); i++)
@@ -163,7 +169,18 @@ void extract_gradient(void)
           (m->get_accumulated_gamma(PDF::ML_BUF, j) /
            m->get_mixture_coefficient(j));
       }
+      if (msmooth_tau != 0)
+      {
+        temp[j] += -ac_scale*msmooth_tau/
+          ((m->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF)+1)*
+           (double)num_frames)*
+          (m->get_accumulated_gamma(PDF::ML_BUF, j) /
+           m->get_mixture_coefficient(j));
+        gauss_mixture_aux_gamma[m->get_base_pdf_index(j)] +=
+          msmooth_tau/(m->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF)+1);
+      }
     }
+    
     // Combine to form derivatives wrt the transformed parameters
     for (int j = 0; j < m->size(); j++)
     {
@@ -194,6 +211,7 @@ void extract_gradient(void)
     Vector mean;
     Vector diag_cov;
     double mpe_gamma = 0, mmi_gamma = 0, ml_gamma = 0;
+    double gsmooth_gamma = 0;
     pdf->get_mean(mean);
     pdf->get_covariance(diag_cov);
     if (mpe_weight != 0)
@@ -202,7 +220,7 @@ void extract_gradient(void)
       pdf->get_accumulated_second_moment(PDF::MPE_NUM_BUF, mpe_m2);
       mpe_gamma = pdf->get_accumulated_gamma(PDF::MPE_NUM_BUF);
     }
-    if (mmi_weight != 0 || ml_weight != 0)
+    if (mmi_weight != 0 || ml_weight != 0 || msmooth_tau!=0 || gsmooth_tau!=0)
     {
       pdf->get_accumulated_mean(PDF::ML_BUF, ml_m1);
       pdf->get_accumulated_second_moment(PDF::ML_BUF, ml_m2);
@@ -213,6 +231,10 @@ void extract_gradient(void)
       pdf->get_accumulated_mean(PDF::MMI_BUF, mmi_m1);
       pdf->get_accumulated_second_moment(PDF::MMI_BUF, mmi_m2);
       mmi_gamma = pdf->get_accumulated_gamma(PDF::MMI_BUF);
+    }
+    if (gsmooth_tau!=0)
+    {
+      gsmooth_gamma = pdf->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF);
     }
     for (int j = 0; j < pool->dim(); j++)
     {
@@ -234,6 +256,20 @@ void extract_gradient(void)
         gradient(pindex) += -ml_weight*(ac_scale/(double)num_frames) *
           (ml_m1(j)-mean(j)*ml_gamma)/diag_cov(j);
       }
+      if (msmooth_tau != 0)
+      {
+        gradient(pindex) += -ac_scale*gauss_mixture_aux_gamma[i]/
+          (double)num_frames*
+          (ml_m1(j)-mean(j)*ml_gamma)/diag_cov(j);
+      }
+      if (gsmooth_tau != 0)
+      {
+        gradient(pindex) += -ac_scale*gsmooth_tau/
+          (gsmooth_gamma+1)/
+          (double)num_frames*
+          (ml_m1(j)-mean(j)*ml_gamma)/diag_cov(j);
+      }
+      
       pindex++;
     }
     for (int j = 0; j < pool->dim(); j++)
@@ -261,12 +297,65 @@ void extract_gradient(void)
           (ml_m2(j)-2*ml_m1(j)*mean(j)+ml_gamma*mean(j)*mean(j)-ml_gamma*c)/
           (2*c*c)) * ep;
       }
+      if (msmooth_tau != 0)
+      {
+        gradient(pindex) += -ac_scale*gauss_mixture_aux_gamma[i]/
+          (double)num_frames*
+          ((ml_m2(j)-2*ml_m1(j)*mean(j)+ml_gamma*mean(j)*mean(j)-ml_gamma*c)/
+           (2*c*c)) * ep;
+      }
+      if (gsmooth_tau != 0)
+      {
+        gradient(pindex) += -ac_scale*gsmooth_tau/
+          (gsmooth_gamma+1)/
+          (double)num_frames*
+          ((ml_m2(j)-2*ml_m1(j)*mean(j)+ml_gamma*mean(j)*mean(j)-ml_gamma*c)/
+           (2*c*c)) * ep;
+      }
+      
       pindex++;
     }
   }
   assert( pindex == optimizer.get_num_parameters() );
 
   optimizer.set_gradient(gradient);
+}
+
+
+double get_msmooth_score(void)
+{
+  double mscore = 0;
+  // Mixture components
+  for (int i = 0; i < model.num_emission_pdfs(); i++)
+  {
+    Mixture *m = model.get_emission_pdf(i);
+    mscore += ac_scale*msmooth_tau/
+      (m->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF)+1) *
+      m->get_accumulated_mixture_ll(PDF::ML_BUF);
+    fprintf(stderr, "%.15g %.15g ", msmooth_tau/(m->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF)+1), m->get_accumulated_mixture_ll(PDF::ML_BUF));
+  }
+  fprintf(stderr, "\nMixture loglikelihood score: %g\n", mscore);
+  return mscore / (double)num_frames;
+}
+
+double get_gsmooth_score(void)
+{
+  PDFPool *pool = model.get_pool();
+  double gscore = 0;
+  // Mixture components
+  for (int i = 0; i < pool->size(); i++)
+  {
+    Gaussian *pdf = dynamic_cast< Gaussian* >(pool->get_pdf(i));
+    if (pdf == NULL)
+      throw std::string("Only Gaussian PDFs are supported!");
+
+    gscore += ac_scale*gsmooth_tau/
+      (pdf->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF)+1)*
+      pdf->get_accumulated_aux_gamma(PDF::ML_BUF);
+    fprintf(stderr, "%.15g %.15g ", gsmooth_tau/(pdf->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF)+1), pdf->get_accumulated_aux_gamma(PDF::ML_BUF));
+  }
+  fprintf(stderr, "\nGaussian loglikelihood score: %g\n", gscore);
+  return gscore / (double)num_frames;
 }
 
 
@@ -291,6 +380,8 @@ main(int argc, char *argv[])
       ('\0', "ml=FLOAT", "arg", "0", "ML optimization weight")
       ('\0', "mmi=FLOAT", "arg", "0", "MMI optimization weight")
       ('\0', "mpe=FLOAT", "arg", "0", "MPE optimization weight")
+      ('\0', "msmooth=FLOAT", "arg", "0", "MPE mixture ML smoothing")
+      ('\0', "gsmooth=FLOAT", "arg", "0", "MPE Gaussian ML smoothing")
       ('l', "initscale=SCALE", "arg", "", "Initialize with inverse Hessian scale")
       ('\0', "minvar=FLOAT", "arg", "0.09", "minimum variance (default 0.09)")
       ('A', "ac-scale=FLOAT", "arg", "1", "acoustic scaling used in stats")
@@ -323,6 +414,21 @@ main(int argc, char *argv[])
       statistics_mode |= (PDF_MPE_NUM_STATS);
     }
 
+    if (config["msmooth"].specified)
+    {
+      if (!config["mpe"].specified)
+        throw std::string("--msmooth requires --mpe");
+      msmooth_tau = config["msmooth"].get_float();
+      statistics_mode |= PDF_ML_STATS;
+    }
+    if (config["gsmooth"].specified)
+    {
+      if (!config["mpe"].specified)
+        throw std::string("--gsmooth requires --mpe");
+      gsmooth_tau = config["gsmooth"].get_float();
+      statistics_mode |= PDF_ML_STATS;
+    }
+
     // Load the previous models
     if (config["base"].specified)
     {
@@ -351,6 +457,10 @@ main(int argc, char *argv[])
     }
 
     optimizer.set_max_bfgs_updates(config["bfgsu"].get_int());
+    
+    state_file = config["osf"].get_str();
+    min_var = config["minvar"].get_float();
+    ac_scale = config["ac-scale"].get_float();
     
     // Accumulate statistics
     model.start_accumulating(statistics_mode);
@@ -410,9 +520,10 @@ main(int argc, char *argv[])
       score += -ml_weight*sum_statistics["Numerator loglikelihood"]/(double)num_frames;
     }
 
-    state_file = config["osf"].get_str();
-    min_var = config["minvar"].get_float();
-    ac_scale = config["ac-scale"].get_float();
+    if (msmooth_tau != 0)
+      score -= get_msmooth_score();
+    if (gsmooth_tau != 0)
+      score -= get_gsmooth_score();
     
     if (config["initscale"].specified)
     {
