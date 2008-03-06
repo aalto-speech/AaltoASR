@@ -15,7 +15,6 @@
 
 int win_size;
 int info;
-bool raw_flag;
 float overlap;
 bool no_force_end;
 bool set_speakers;
@@ -184,7 +183,6 @@ main(int argc, char *argv[])
       ('p', "ph=FILE", "arg", "", "HMM definitions")
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
-      ('R', "raw-input", "", "", "raw audio input")
       ('\0', "swins=INT", "arg", "1000", "window size (default: 1000)")
       ('\0', "beam=FLOAT", "arg", "100.0", "log prob beam (default 100.0)")
       ('\0', "sbeam=INT", "arg", "100", "state beam (default 100)")
@@ -199,7 +197,6 @@ main(int argc, char *argv[])
     config.default_parse(argc, argv);
     
     info = config["info"].get_int();
-    raw_flag = config["raw-input"].specified;
     fea_gen.load_configuration(io::Stream(config["config"].get_str()));
 
     if (config["base"].specified)
@@ -283,7 +280,6 @@ main(int argc, char *argv[])
         
         // Open the audio and phn files from the given list.
         recipe.infos[f].init_phn_files(NULL, false, false, false, &fea_gen,
-                                       config["raw-input"].specified,
                                        &phn_reader);
         
         phn_out_file.open(recipe.infos[f].alignment_path.c_str(), "w");

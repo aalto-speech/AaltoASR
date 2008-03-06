@@ -38,7 +38,6 @@ main(int argc, char *argv[])
       ('h', "help", "", "", "display help")
       ('c', "config=FILE", "arg must", "", "read feature configuration")
       ('w', "write-config=FILE", "arg", "", "write feature configuration")
-      ('R', "raw-input", "", "", "raw audio input")
       ('\0', "raw-output", "", "", "raw float output")
       ('H', "header", "", "", "write a header (feature dim, 32 bits) in raw output")
       ('s', "start-frame=INT", "arg", "", "audio start frame")
@@ -59,7 +58,7 @@ main(int argc, char *argv[])
 
     gen.load_configuration(io::Stream(config["config"].get_str()));
     io::Stream audio_stream(config.arguments[0]);
-    gen.open(audio_stream, config["raw-input"].specified, true);
+    gen.open(audio_stream, true);
 
     if (config["speakers"].specified)
     {

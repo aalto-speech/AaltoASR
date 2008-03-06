@@ -196,8 +196,7 @@ main(int argc, char *argv[])
        
       recipe.infos[f].init_phn_files(NULL, false, false,
                                      config["ophn"].specified,
-                                     NULL, false,
-                                     &phn_reader);
+                                     NULL, &phn_reader);
       phn_reader.set_collect_transition_probs(false);
       if (!phn_reader.init_utterance_segmentation())
       {

@@ -181,7 +181,6 @@ main(int argc, char *argv[])
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for VTLN")
-      ('R', "raw-input", "", "", "raw audio input")
       ('v', "vtln=MODULE", "arg must", "", "VTLN module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('o', "out=FILE", "arg", "", "output speaker configuration file")
@@ -271,7 +270,7 @@ main(int argc, char *argv[])
       // Open the audio and phn files from the given list.
       phn_reader = recipe.infos[f].init_phn_files(
         &model, config["rsamp"].specified, config["snl"].specified,
-        config["ophn"].specified, &fea_gen, config["raw-input"].specified,
+        config["ophn"].specified, &fea_gen,
         NULL);
       if (recipe.infos[f].speaker_id.size() == 0)
         throw std::string("Speaker ID is missing");

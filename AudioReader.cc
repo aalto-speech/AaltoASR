@@ -71,42 +71,44 @@ AudioReader::resize(int start, int end)
 }
 
 void
-AudioReader::open(const char *filename)
+AudioReader::open(const char *filename, int sample_rate)
 {
   close();
   reset();
 
   m_sndfile = sf_open(filename, SFM_READ, &sf_info);
   if (m_sndfile == NULL)
-    throw std::string("AudioReader::open(): could not open file:") +
-      std::string(filename);
+  {
+    // Try opening in RAW mode
+    sf_info.format = SF_FORMAT_RAW | SF_FORMAT_PCM_16 | SF_ENDIAN_LITTLE;
+    sf_info.samplerate = sample_rate;
+    sf_info.channels = 1;
+    m_sndfile = sf_open(filename, SFM_READ, &sf_info);
+    if (m_sndfile == NULL)
+      throw std::string("AudioReader::open(): could not open file:") +
+        std::string(filename);
+  }
   check_audio_parameters();
 }
 
 void
-AudioReader::open(FILE *file, bool shall_close_file)
+AudioReader::open(FILE *file, int sample_rate, bool shall_close_file)
 {
   close();
   reset();
 
   m_sndfile = sf_open_fd(fileno(file), SFM_READ, &sf_info, shall_close_file);
   if (m_sndfile == NULL)
-    throw std::string("AudioReader::open(): sf_open_fd() failed");
-  check_audio_parameters();
-}
-
-void
-AudioReader::open_raw(FILE *file, int sample_rate, bool shall_close_file)
-{
-  close();
-  reset();
-
-  sf_info.format = SF_FORMAT_RAW | SF_FORMAT_PCM_16 | SF_ENDIAN_LITTLE;
-  sf_info.samplerate = sample_rate;
-  sf_info.channels = 1;
-  m_sndfile = sf_open_fd(fileno(file), SFM_READ, &sf_info, shall_close_file);
-  if (m_sndfile == NULL)
-    throw std::string("AudioReader::open(): sf_open_fd() failed");
+  {
+    rewind(file); // FIXME: How about non-seekable streams?
+    // Try opening in RAW mode
+    sf_info.format = SF_FORMAT_RAW | SF_FORMAT_PCM_16 | SF_ENDIAN_LITTLE;
+    sf_info.samplerate = sample_rate;
+    sf_info.channels = 1;
+    m_sndfile = sf_open_fd(fileno(file), SFM_READ, &sf_info, shall_close_file);
+    if (m_sndfile == NULL)
+      throw std::string("AudioReader::open(): sf_open_fd() failed");
+  }
   check_audio_parameters();
 }
 

@@ -52,7 +52,6 @@ public:
      *                             transcript phns.
      * \param fea_gen              Pointer to \ref FeatureGenerator.
      *                             May be NULL.
-     * \param raw_audio            true if audio files are of raw format.
      * \param phn_reader           The existing \ref PhnReader. If NULL,
      *                             creates a new instance.
      * \return The \ref PhnReader initialized, either created or given.
@@ -60,21 +59,20 @@ public:
     PhnReader* init_phn_files(HmmSet *model, bool relative_sample_nums,
                               bool state_num_labels, bool out_phn,
                               FeatureGenerator *fea_gen,
-                              bool raw_audio, PhnReader *phn_reader);
+                              PhnReader *phn_reader);
     /** Open the relevant files for \ref HmmNetBaumWelch and
      * \ref FeatureGenerator.
      * \param model           Pointer to the \ref HmmSet. Required if
      *                        hnbw is == NULL.
      * \param den_hmmnet      Use denominator HMM network
      * \param fea_gen         Pointer to \ref FeatureGenerator.
-     * \param raw_audio       true if audio files are of raw format.
      * \param hnbw            The existing \ref HmmNetBaumWelch. If NULL,
      *                        creates a new instance.
      * \return The \ref HmmNetBaumWelch initialized, either created or given.
      */
     HmmNetBaumWelch* init_hmmnet_files(HmmSet *model, bool den_hmmnet,
                                        FeatureGenerator *fea_gen,
-                                       bool raw_audio, HmmNetBaumWelch *hnbw);
+                                       HmmNetBaumWelch *hnbw);
 
     Info();
   };

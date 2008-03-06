@@ -27,7 +27,6 @@ main(int argc, char *argv[])
   std::vector<double> block_cov_acc, global_cov_acc;
   double global_acc_count;
   std::vector<float> mean, scale;
-  bool raw_flag;
   bool cov_flag;
   bool pca_flag;
   int info;
@@ -42,7 +41,6 @@ main(int argc, char *argv[])
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('c', "config=FILE", "arg must", "", "read feature configuration")
       ('w', "write-config=FILE", "arg", "", "write feature configuration")
-      ('R', "raw-input", "", "", "raw audio input")
       ('M', "module=NAME", "arg", "", "normalization module name")
       ('P', "pca=NAME", "arg", "", "pca module name")
       ('u', "unit-determinant", "", "", "unit determinant for pca transform, by default unit variance for data")
@@ -55,7 +53,6 @@ main(int argc, char *argv[])
     config.default_parse(argc, argv);
 
     info = config["info"].get_int();
-    raw_flag = config["raw-input"].specified;
     gen.load_configuration(io::Stream(config["config"].get_str()));
 
     dim = gen.dim();
@@ -125,7 +122,7 @@ main(int argc, char *argv[])
         fprintf(stderr, "Processing file: %s\n",
 	      recipe.infos[recipe_index].audio_path.c_str());
       }
-      gen.open(recipe.infos[recipe_index].audio_path, raw_flag);
+      gen.open(recipe.infos[recipe_index].audio_path);
 
       if (config["speakers"].specified)
       {

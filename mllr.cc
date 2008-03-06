@@ -116,7 +116,6 @@ main(int argc, char *argv[])
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for adaptation")
       ('H', "hmmnet", "", "", "use HMM networks for training")
-      ('R', "raw-input", "", "", "raw audio input")
       ('M', "mllr=MODULE", "arg must", "", "MLLR module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('o', "out=FILE", "arg", "", "output speaker configuration file")
@@ -195,7 +194,7 @@ main(int argc, char *argv[])
       {
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-          &model, false, &fea_gen, config["raw-input"].specified, NULL);
+          &model, false, &fea_gen, NULL);
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(),
                                         config["fw-beam"].get_float());
 
@@ -230,7 +229,7 @@ main(int argc, char *argv[])
                                          config["rsamp"].specified,
                                          config["snl"].specified,
                                          config["ophn"].specified, &fea_gen,
-                                         config["raw-input"].specified, NULL);
+                                         NULL);
         
         set_speaker(recipe.infos[f].speaker_id);
         if (recipe.infos[f].utterance_id.size() > 0)

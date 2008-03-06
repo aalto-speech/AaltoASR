@@ -30,27 +30,19 @@ public:
    */
   ~AudioReader();
 
-  /** Open a named file. */
-  void open(const char *filename);
+  /** Open a named file.
+   * \param file = the file to read the audio stream from
+   * \param sample_rate = sample rate (needed if the file is RAW)
+   */
+  void open(const char *filename, int sample_rate);
 
   /** Initialize reading from a file handle. 
    *
    * \param file = the file to read the audio stream from
+   * \param sample_rate = sample rate (needed if the file is RAW)
    * \param shall_close_file = will the class take care of closing the file?
    */
-  void open(FILE *file, bool shall_close_file = false);
-
-  /** Initialize reading a raw file stream from a file descriptor.
-   *
-   * \param file = the file to read the audio stream from
-   * \param sample_rate = sample rate
-   * \param shall_close_file = will the class take care of closing the file?
-   *
-   * The default parameters for the stream are: (1 channels, 16 bits,
-   * 2's complement, little endian), but they can be set before calling
-   * this function.
-   */
-  void open_raw(FILE *file, int sample_rate, bool shall_close_file = false);
+  void open(FILE *file, int sample_rate, bool shall_close_file = false);
 
   /** Close the file, but only if \ref m_shall_close_file is \c true. */
   void close();

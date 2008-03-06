@@ -22,7 +22,7 @@ FeatureGenerator::~FeatureGenerator()
 }
 
 void
-FeatureGenerator::open(const std::string &filename, bool raw_audio)
+FeatureGenerator::open(const std::string &filename)
 {
   if (m_file != NULL)
     close();
@@ -32,21 +32,16 @@ FeatureGenerator::open(const std::string &filename, bool raw_audio)
     throw std::string("could not open file ") + filename + ": " +
       strerror(errno);
 
-  open(file, raw_audio, false);
+  open(file, false);
 }
 
 void
-FeatureGenerator::open(FILE *file, bool raw_audio, bool dont_fclose)
+FeatureGenerator::open(FILE *file, bool dont_fclose)
 {
   if (m_file != NULL)
     close();
   m_file = file;
   m_dont_fclose = dont_fclose;
-
-  if (raw_audio)
-    m_audio_format = AF_RAW;
-  else
-    m_audio_format = AF_AUTO;
 
   for (int i = 0; i < (int)m_modules.size(); i++)
     m_modules[i]->reset();

@@ -42,7 +42,6 @@ void write_int(FILE *fp, unsigned int i)
 int
 main(int argc, char *argv[])
 {
-  bool raw_flag;
   int lnabytes;
   int info;
   std::string out_dir = "";
@@ -64,7 +63,6 @@ main(int argc, char *argv[])
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('o', "output-dir=DIR", "arg", "", "output directory (default: use filenames from recipe)")
-      ('R', "raw-input", "", "", "raw audio input")
       ('\0', "lnabytes=INT", "arg", "2", "number of bytes for probabilities, 2 (default) or 4")
       ('a', "afname", "", "", "use audio file name")
       ('n', "no-overwrite", "", "", "prevent overwriting existing files")
@@ -79,7 +77,6 @@ main(int argc, char *argv[])
     config.default_parse(argc, argv);
 
     info = config["info"].get_int();
-    raw_flag = config["raw-input"].specified;
     gen.load_configuration(io::Stream(config["config"].get_str()));
 
     lnabytes = config["lnabytes"].get_int();
@@ -108,9 +105,11 @@ main(int argc, char *argv[])
     }
 
     if (config["clusters"].specified)
-      model.set_clustering(config["clusters"].get_str(),
-                           config["eval-minc"].get_double(),
-                           config["eval-ming"].get_double());
+    {
+      model.read_clustering(config["clusters"].get_str());
+      model.set_clustering_min_evals(config["eval-minc"].get_double(),
+                                     config["eval-ming"].get_double());
+    }
     
     if (model.dim() != gen.dim())
     {
@@ -199,7 +198,7 @@ main(int argc, char *argv[])
         end_frame = INT_MAX;
 
       // Open files
-      gen.open(recipe.infos[recipe_index].audio_path, raw_flag);
+      gen.open(recipe.infos[recipe_index].audio_path);
       ofp.open(out_file, "w");
 
       // Write header

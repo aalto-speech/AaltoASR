@@ -119,7 +119,6 @@ main(int argc, char *argv[])
       ('u', "rule=FILE", "arg must", "", "rule set for triphone state tying")
       ('o', "out=FILE", "arg", "", "write output to HMM model with base name FILE")
       ('B', "basebind=FILE", "arg", "", "write output to basebind FILE")
-      ('R', "raw-input", "", "", "raw audio input")
       ('\0', "count=INT", "arg", "100", "minimum feature count for state clusters")
       ('\0', "sgain=FLOAT", "arg", "0", "minimum loglikelihood gain in cluster splitting")
       ('\0', "mloss=FLOAT", "arg", "0", "cluster merging with maximum loglikelihood loss")
@@ -210,7 +209,7 @@ main(int argc, char *argv[])
       {
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-          &model, false, mfea_gen, config["raw-input"].specified, NULL);
+          &model, false, mfea_gen, NULL);
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(),
                                         config["fw-beam"].get_float());
         if (config["ac-scale"].specified)
@@ -221,8 +220,7 @@ main(int argc, char *argv[])
         if (mfea_gen != &fea_gen)
         {
           // Open the file for the actual feature generator
-          fea_gen.open(recipe.infos[f].audio_path,
-                       config["raw-input"].specified);
+          fea_gen.open(recipe.infos[f].audio_path);
         }
         
         double orig_beam = lattice->get_backward_beam();
@@ -254,7 +252,6 @@ main(int argc, char *argv[])
         PhnReader phn_reader(NULL);
         recipe.infos[f].init_phn_files(NULL, false, false,
                                        config["ophn"].specified, &fea_gen,
-                                       config["raw-input"].specified,
                                        &phn_reader);
         phn_reader.set_collect_transition_probs(false);
         collect_phone_stats(&phn_reader, &phone_pool);

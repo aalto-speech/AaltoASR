@@ -95,7 +95,6 @@ main(int argc, char *argv[])
       ('O', "ophn", "", "", "use output phns for training")
       ('H', "hmmnet", "", "", "use HMM networks for training")
       ('D', "den-hmmnet", "", "", "use denominator HMM networks for training")
-      ('R', "raw-input", "", "", "raw audio input")
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for HMM networks)")
@@ -166,8 +165,7 @@ main(int argc, char *argv[])
       {
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-          &model, config["den-hmmnet"].specified, &fea_gen,
-          config["raw-input"].specified, NULL);
+          &model, config["den-hmmnet"].specified, &fea_gen, NULL);
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
@@ -200,7 +198,7 @@ main(int argc, char *argv[])
         PhnReader* phnreader = 
           recipe.infos[f].init_phn_files(&model, false, false,
                                          config["ophn"].specified, &fea_gen,
-                                         config["raw-input"].specified, NULL);
+                                         NULL);
         phnreader->set_collect_transition_probs(transtat);
         segmentator = phnreader;
         if (!segmentator->init_utterance_segmentation())

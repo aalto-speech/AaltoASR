@@ -333,7 +333,6 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
       {
         std::vector<HmmNetBaumWelch::ArcInfo> arcs;
         seg->fill_arc_info(arcs);
-        std::set<int> mixtures;
         for (int i = 0; i < (int)arcs.size(); i++)
         {
           double gamma =
@@ -342,6 +341,9 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
           {
             model->accumulate_distribution(feature, arcs[i].pdf_index,
                                            gamma, PDF::MPE_NUM_BUF);
+            if (mpe_grad && gamma > 0)
+              model->accumulate_aux_gamma(arcs[i].pdf_index, gamma,
+                                          PDF::MPE_NUM_BUF);
           }
           else
             model->accumulate_distribution(feature, arcs[i].pdf_index,
@@ -357,6 +359,8 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
         {
           model->accumulate_distribution(feature, pdfs[i].index,
                                          pdfs[i].prob, PDF::ML_BUF);
+          model->accumulate_aux_gamma(pdfs[i].index, pdfs[i].prob,
+                                      PDF::ML_BUF);
         }
         else if (mmi)
         {
@@ -420,7 +424,6 @@ main(int argc, char *argv[])
       ('O', "ophn", "", "", "use output phns for training")
       ('H', "hmmnet", "", "", "use HMM networks for training")
       ('o', "out=BASENAME", "arg must", "", "base filename for output statistics")
-      ('R', "raw-input", "", "", "raw audio input")
       ('t', "transitions", "", "", "collect also state transition statistics")
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
@@ -589,7 +592,7 @@ main(int argc, char *argv[])
       {
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-          &model, false, &fea_gen, config["raw-input"].specified, NULL);
+          &model, false, &fea_gen, NULL);
         lattice->set_collect_transition_probs(transtat);
         if (!initialize_hmmnet(lattice, config["bw-beam"].get_float(),
                                config["fw-beam"].get_float(),
@@ -603,7 +606,7 @@ main(int argc, char *argv[])
         PhnReader* phnreader = 
           recipe.infos[f].init_phn_files(&model, false, false,
                                          config["ophn"].specified, &fea_gen,
-                                         config["raw-input"].specified, NULL);
+                                         NULL);
         phnreader->set_collect_transition_probs(transtat);
         segmentator = phnreader;
         if (!segmentator->init_utterance_segmentation())
@@ -628,7 +631,7 @@ main(int argc, char *argv[])
           
           // Open files and configure
           HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-            &model, true, &fea_gen, config["raw-input"].specified, NULL);
+            &model, true, &fea_gen, NULL);
           lattice->set_collect_transition_probs(transtat);
           if (mpe || mpe_grad)
           {
@@ -669,6 +672,11 @@ main(int argc, char *argv[])
 	      config["bindex"].get_int(), config["batch"].get_int());
       fprintf(stderr, "Total num log likelihood: %g\n", total_num_log_likelihood);
     }
+
+    // Hack to have proper gamma values for g-smoothing in case some data
+    // is collected only for ML
+    if ((mpe || mpe_grad) && ml)
+      model.prepare_smoothing_gamma(PDF::ML_BUF, PDF::MPE_NUM_BUF);
     
     // Write statistics to file dump and clean up
     model.dump_statistics(out_file);

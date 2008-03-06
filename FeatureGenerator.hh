@@ -13,28 +13,23 @@
  */
 class FeatureGenerator {
 public:
-  /** Format of the audio file. */
-  typedef enum {AF_RAW, AF_AUTO} AudioFormat;
-
   FeatureGenerator();
   ~FeatureGenerator();
 
   /** Open an audio file closing the possible previously opened file.
    *
    * \param filename = The name of the audio file.  
-   * \param raw_audio = If true, the file assumed to contain raw audio
    * samples.  Otherwise, automatic file format is used.
    */
-  void open(const std::string &filename, bool raw_audio);
+  void open(const std::string &filename);
 
   /** Open an audio file closing the possible previously opened file.
    *
    * \param file = The file pointer of the audio file.  
-   * \param raw_audio = If true, the file assumed to contain raw audio
    * samples.  Otherwise, automatic file format is used.
    * \param dont_fclose = If true, the file is not closed by FeatureGenerator
    */
-  void open(FILE *file, bool raw_audio, bool dont_fclose);
+  void open(FILE *file, bool dont_fclose);
 
   /** Close the previously opened file. */
   void close();
@@ -77,9 +72,6 @@ public:
   /** Return the dimension of the feature fector. */
   inline int dim(void);
 
-  /** Return the format of the audio file. */
-  AudioFormat audio_format() { return m_audio_format; }
-
   /** Print the module structure in DOT format. */
   void print_dot_graph(FILE *file);
       
@@ -105,9 +97,6 @@ private:
   /** The last module in the module chain, which generates the final
    * features. */
   FeatureModule *m_last_module;
-
-  /** The format of the audio file. */
-  AudioFormat m_audio_format;
 
   /** The audio file. */
   FILE *m_file;

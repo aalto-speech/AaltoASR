@@ -216,7 +216,7 @@ compute_features_segfea(const std::string &in_fname,
                         const std::string &phn_fname, 
 		        int start_frame, int end_frame,
 			std::map<std::string, PhonemeInfo> &pho_info,
-			bool state_segmentation, bool raw,
+			bool state_segmentation,
                         std::vector<long int> &occurrences,
                         int info, FeatureGenerator &gen)
 {
@@ -230,7 +230,7 @@ compute_features_segfea(const std::string &in_fname,
   int state_index;
   int offset;
 
-  gen.open(in_fname, raw);
+  gen.open(in_fname);
   
   if ((fp = fopen(phn_fname.c_str(),"r")) == NULL)
   {
@@ -373,7 +373,6 @@ main(int argc, char *argv[])
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for training")
       ('o', "out=FILE", "arg must", "", "base filename for features")
-      ('R', "raw-input", "", "", "raw audio input")
       ('\0', "occ=FILE", "arg", "", "save state occurrence information to file")
       ('z', "zip", "", "", "zip the feature files")
       ('s', "stateseg", "", "", "the segmentation is based on states")
@@ -435,7 +434,6 @@ main(int argc, char *argv[])
                               phn_path,
                               start_frame, end_frame,
                               pho_info, config["stateseg"].specified,
-                              config["raw-input"].specified,
                               occurrences, info, gen);
     }
 

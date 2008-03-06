@@ -232,18 +232,8 @@ FFTModule::~FFTModule()
 void
 FFTModule::set_file(FILE *fp)
 {
-  if (m_fea_gen->audio_format() == FeatureGenerator::AF_RAW)
-  {
-    m_reader.open_raw(fp, m_sample_rate);
-  }
-  else if (m_fea_gen->audio_format() == FeatureGenerator::AF_AUTO)
-  {
-    m_reader.open(fp);
-  }
-  else
-  {
-    throw std::string("Trying to open an unknown file");
-  }
+  m_reader.open(fp, m_sample_rate);
+
   // Check that sample rate matches that given in configuration
   if (m_reader.sample_rate() != m_sample_rate)
   {

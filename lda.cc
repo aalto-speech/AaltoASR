@@ -55,7 +55,6 @@ main(int argc, char *argv[])
       ('H', "hmmnet", "", "", "use HMM networks for training")
       ('d', "dim", "arg", "39", "dimensionality of the projected features (default 39)")
       ('M', "module=NAME", "arg", "", "linear transform module name")
-      ('R', "raw-input", "", "", "raw audio input")
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for HMM networks)")
@@ -170,8 +169,7 @@ main(int argc, char *argv[])
       {
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-          &model, config["den-hmmnet"].specified, &fea_gen,
-          config["raw-input"].specified, NULL);
+          &model, config["den-hmmnet"].specified, &fea_gen, NULL);
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
@@ -204,7 +202,7 @@ main(int argc, char *argv[])
         PhnReader* phnreader = 
           recipe.infos[f].init_phn_files(&model, false, false,
                                          config["ophn"].specified, &fea_gen,
-                                         config["raw-input"].specified, NULL);
+                                         NULL);
         segmentator = phnreader;
         if (!segmentator->init_utterance_segmentation())
         {
@@ -289,8 +287,7 @@ main(int argc, char *argv[])
       {
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-          &model, config["den-hmmnet"].specified, &fea_gen,
-          config["raw-input"].specified, NULL);
+          &model, config["den-hmmnet"].specified, &fea_gen, NULL);
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
@@ -323,7 +320,7 @@ main(int argc, char *argv[])
         PhnReader* phnreader = 
           recipe.infos[f].init_phn_files(&model, false, false,
                                          config["ophn"].specified, &fea_gen,
-                                         config["raw-input"].specified, NULL);
+                                         NULL);
         segmentator = phnreader;
         if (!segmentator->init_utterance_segmentation())
         {

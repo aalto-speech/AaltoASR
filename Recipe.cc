@@ -134,14 +134,14 @@ PhnReader*
 Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
                              bool state_num_labels, bool out_phn,
                              FeatureGenerator *fea_gen,
-                             bool raw_audio, PhnReader *phn_reader)
+                             PhnReader *phn_reader)
 {
   float frame_rate = 125; // Default value
 
   if (fea_gen != NULL)
   {
     // Open the audio file
-    fea_gen->open(audio_path, raw_audio);
+    fea_gen->open(audio_path);
   }
 
   // Initialize the PhnReader
@@ -178,10 +178,10 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
 HmmNetBaumWelch*
 Recipe::Info::init_hmmnet_files(HmmSet *model, bool den_hmmnet,
                                 FeatureGenerator *fea_gen,
-                                bool raw_audio, HmmNetBaumWelch *hnbw)
+                                HmmNetBaumWelch *hnbw)
 {
   // Open the audio file
-  fea_gen->open(audio_path, raw_audio);
+  fea_gen->open(audio_path);
 
   // Initialize the HmmNetBaumWelch
   if (hnbw == NULL)
