@@ -89,7 +89,6 @@ my $DISCRIMINATIVE_BACKWARD_BEAM = 40; # Affected by the acoustic scaling
 
 # Misc settings
 my $DUR_SKIP_MODELS = 6; # Models without duration model (silences/noises)
-my $FILEFORMAT = "-R"; # Empty for wav files, -R for raw
 my $VERBOSITY = 1;
 
 # NOTE: if you plan to recompile executables at the same time as running them, 
@@ -186,7 +185,7 @@ sub context_phone_tying {
   my $phn_flag = "";
   $phn_flag = "-O" if ($TIE_USE_OUT_PHN);
 
-  my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/tie -c $im_cfg -o $out_model -r $RECIPE $phn_flag $FILEFORMAT -u $TIE_RULES --count $TIE_MIN_COUNT --sgain $TIE_MIN_GAIN --mloss $TIE_MAX_LOSS -i $VERBOSITY\n");
+  my $batch_info = make_single_batch($temp_dir, $BASE_ID, "$BINDIR/tie -c $im_cfg -o $out_model -r $RECIPE $phn_flag -u $TIE_RULES --count $TIE_MIN_COUNT --sgain $TIE_MIN_GAIN --mloss $TIE_MAX_LOSS -i $VERBOSITY\n");
   submit_and_wait($batch_info);
 
   if (!(-e $out_model.".ph")) {
@@ -342,7 +341,7 @@ sub collect_stats {
     print $list_fh $statsfile."\n";
   }
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $bw_option -o $statsfile $FILEFORMAT $STATS_MODE -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -t -i $VERBOSITY $mllt_option\n";
+  print $fh "$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $bw_option -o $statsfile $STATS_MODE -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE $spkc_switch $batch_options -t -i $VERBOSITY $mllt_option\n";
   print $fh "touch $keyfile\n";
   close($fh);
   push @{$batch_info->{"script"}}, $scriptfile;
@@ -399,7 +398,7 @@ sub align {
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/align -b $model -c $model.cfg -r $recipe --swins $ALIGN_WINDOW --beam $ALIGN_BEAM --sbeam $ALIGN_SBEAM $FILEFORMAT $spkc_switch $batch_options -i $VERBOSITY\n";
+  print $fh "$BINDIR/align -b $model -c $model.cfg -r $recipe --swins $ALIGN_WINDOW --beam $ALIGN_BEAM --sbeam $ALIGN_SBEAM $spkc_switch $batch_options -i $VERBOSITY\n";
   print $fh "touch $touch_keyfile\n";
   close($fh);
 
@@ -431,7 +430,7 @@ sub estimate_mllr {
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/mllr -b $model -c $model.cfg -r $recipe -H -F $FORWARD_BEAM -W $BACKWARD_BEAM $FILEFORMAT -M $MLLR_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY\n";
+  print $fh "$BINDIR/mllr -b $model -c $model.cfg -r $recipe -H -F $FORWARD_BEAM -W $BACKWARD_BEAM -M $MLLR_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY\n";
   print $fh "touch $touch_keyfile\n";
   close($fh);
 
@@ -466,7 +465,7 @@ sub estimate_vtln {
   $batch_options = get_aku_batch_options($NUM_BATCHES, $batch_info);
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/vtln -b $model -c $model.cfg -r $recipe -O $FILEFORMAT -v $VTLN_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY\n";
+  print $fh "$BINDIR/vtln -b $model -c $model.cfg -r $recipe -O -v $VTLN_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY\n";
   print $fh "touch $touch_keyfile\n";
   close($fh);
 
@@ -525,7 +524,7 @@ sub generate_lnas {
     
   open $fh, "> $scriptfile" || die "Could not open $scriptfile";
   print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh "$BINDIR/phone_probs -b $model -c $model.cfg -r $recipe -o $out_dir $FILEFORMAT $spkc_switch $batch_options -i $VERBOSITY $cluster_options\n";
+  print $fh "$BINDIR/phone_probs -b $model -c $model.cfg -r $recipe -o $out_dir $spkc_switch $batch_options -i $VERBOSITY $cluster_options\n";
   print $fh "touch $touch_keyfile\n";
   close($fh);
 
