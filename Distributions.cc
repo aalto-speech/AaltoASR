@@ -513,9 +513,10 @@ Gaussian::estimate_parameters(EstimationMode mode, double minvar,
   if (ml_stats_target)
   {
     double gamma = m_accums[ML_BUF]->gamma();
+    Blas_R1_Update(new_covariance, new_mean, new_mean, 1);
     Blas_Scale(gamma, new_mean);
-    m_accums[ML_BUF]->set_accumulated_mean(new_mean);
     Blas_Scale(gamma, new_covariance);
+    m_accums[ML_BUF]->set_accumulated_mean(new_mean);
     m_accums[ML_BUF]->set_accumulated_second_moment(new_covariance);
   }
   else
