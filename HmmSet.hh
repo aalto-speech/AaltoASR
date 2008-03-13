@@ -22,7 +22,6 @@ public:
   HmmState(int pdf_index) : emission_pdf(pdf_index) { };
 
   /** Get the transitions for this state
-   * \param state the number of state for which transitions are wanted
    * \return a vector of transitions
    */
   inline std::vector<int> &transitions() { return m_transitions; }
