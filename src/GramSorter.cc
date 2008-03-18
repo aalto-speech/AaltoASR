@@ -29,20 +29,20 @@ GramSorter::reset(int order, int grams)
   fprintf(stderr, "done\n");
 }
 
-static void
-pg(const GramSorter::Gram *gram)
-{
-  for (int i = 0; i < gram->size(); i++)
-    printf("%d ", (*gram)[i]);
-  printf("\n");
-}
+// static void
+// pg(const GramSorter::Gram *gram)
+// {
+//   for (int i = 0; i < gram->size(); i++)
+//     printf("%d ", (*gram)[i]);
+//   printf("\n");
+// }
 
 void 
 GramSorter::add_gram(const Gram &gram, float log_prob, float back_off)
 {
   // Check the length of the gram
   if (gram.size() != m_order) {
-    fprintf(stderr, "GramSorter: got %d-gram while expecting %d-grams\n",
+    fprintf(stderr, "GramSorter: got %zd-gram while expecting %d-grams\n",
 	    gram.size(), m_order);
     exit(1);
   }

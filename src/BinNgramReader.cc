@@ -9,7 +9,7 @@ BinNgramReader::write(FILE *file, Ngram *ng, bool reflip)
   fprintf (file, "%d\n", ng->num_words());
   for (int i=0; i<ng->num_words(); i++)
     fprintf(file, "%s\n", ng->word(i).c_str());
-  fprintf(file, "%d %d\n", ng->order(), ng->m_nodes.size());
+  fprintf(file, "%d %zd\n", ng->order(), ng->m_nodes.size());
 
   // Write little endian binary
   if (Endian::big) 

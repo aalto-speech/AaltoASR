@@ -267,9 +267,9 @@ TPLexPrefixTree::LMHistory::LMHistory(int word_id, int lm_id,
 
 TPLexPrefixTree::WordHistory::WordHistory(int word_id, int end_frame, 
 					  WordHistory *previous)
-  : word_id(word_id), end_frame(end_frame), printed(false), 
+  : word_id(word_id), end_frame(end_frame), 
     lm_log_prob(0), am_log_prob(0), cum_lm_log_prob(0), cum_am_log_prob(0),
-    previous(previous), reference_count(0)
+    printed(false), previous(previous), reference_count(0)
 {
   if (previous) {
     hist::link(previous);

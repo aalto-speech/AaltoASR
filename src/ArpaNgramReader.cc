@@ -454,7 +454,7 @@ ArpaNgramReader::debug_sanity_check()
   }
 
   if (n != m_ngram.m_nodes.size()) {
-    fprintf(stderr, "size mismatch: %d vs %d\n", n, m_ngram.m_nodes.size());
+    fprintf(stderr, "size mismatch: %d vs %zd\n", n, m_ngram.m_nodes.size());
     exit(1);
   }
 }

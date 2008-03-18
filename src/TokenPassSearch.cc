@@ -792,7 +792,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 //   debug_print_token_lm_history(0, token);
 
   int new_dur;
-  int depth;
+  int depth = token->depth;
   float new_cur_am_log_prob;
   float new_cur_lm_log_prob;
   float new_real_am_log_prob = token->am_log_prob + 
@@ -800,7 +800,6 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
   float new_real_lm_log_prob = token->lm_log_prob;
   float total_token_log_prob;
   int new_word_count = token->word_count;
-  int i;
   int new_lm_hist_code = token->lm_hist_code;
   TPLexPrefixTree::LMHistory *new_lm_history = token->lm_history;
   TPLexPrefixTree::WordHistory *new_word_history = token->word_history;
@@ -1004,7 +1003,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     }
 
 #ifdef PRUNING_MEASUREMENT
-    for (i = 0; i < 6; i++)
+    for (int i = 0; i < 6; i++)
       temp_token.meas[i] = token->meas[i];
 #endif
 
@@ -1222,7 +1221,7 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     }
 
 #ifdef PRUNING_MEASUREMENT
-    for (i = 0; i < 6; i++)
+    for (int i = 0; i < 6; i++)
       new_token->meas[i] = token->meas[i];
 #endif
 
@@ -1246,7 +1245,6 @@ TokenPassSearch::find_similar_lm_history(TPLexPrefixTree::LMHistory *wh,
                                            TPLexPrefixTree::Token *token_list)
 {
   TPLexPrefixTree::Token *cur_token = token_list;
-  int i, j;
   while (cur_token != NULL)
   {
     if (lm_hist_code == cur_token->lm_hist_code)
@@ -1332,7 +1330,7 @@ TokenPassSearch::prune_tokens(void)
   float we_beam_limit = m_best_we_log_prob - m_current_we_beam;
 
   if (m_verbose > 1)
-    printf("%d new tokens\n",
+    printf("%zd new tokens\n",
            m_new_token_list->size() + m_word_end_token_list->size());
 
   // At first, remove inactive tokens.
@@ -1437,7 +1435,7 @@ TokenPassSearch::prune_tokens(void)
     m_active_token_list = m_new_token_list;
     m_new_token_list = temp;
     if (m_verbose > 1)
-      printf("%d tokens after beam pruning\n", m_active_token_list->size());
+      printf("%zd tokens after beam pruning\n", m_active_token_list->size());
     num_active_tokens = m_active_token_list->size();
     if (num_active_tokens > m_max_num_tokens)
     {
@@ -1459,7 +1457,8 @@ TokenPassSearch::prune_tokens(void)
         }
       }
       if (m_verbose > 1)
-        printf("%d tokens after histogram pruning\n", m_active_token_list->size() - deleted);
+        printf("%zd tokens after histogram pruning\n", 
+               m_active_token_list->size() - deleted);
 
       // Pass the new beam limit to next token propagation
       m_current_glob_beam = std::min((m_best_log_prob-new_min_log_prob),
@@ -1511,7 +1510,7 @@ TokenPassSearch::prune_tokens(void)
     m_active_token_list = m_new_token_list;
     m_new_token_list = temp;
     if (m_verbose > 1)
-      printf("%d tokens after beam pruning\n", m_active_token_list->size());
+      printf("%zd tokens after beam pruning\n", m_active_token_list->size());
     if (m_current_glob_beam < m_global_beam)
     {
       // Determine new beam
@@ -1602,7 +1601,6 @@ TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::LMHistory *lm_hist)
   {
     // Create history
     m_history_lm.clear();
-    int last_word = lm_hist->word_id;
     TPLexPrefixTree::LMHistory *word = lm_hist;
     for (int i = 0; i < m_ngram->order(); i++) {
       if (word->word_id == -1)
@@ -1681,7 +1679,6 @@ TokenPassSearch::get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,
 
   return score;
 }
-
 
 // Note! Doesn't work if the sentence end is the first one in the word history
 float
@@ -1777,7 +1774,8 @@ TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 {
   int i;
   int index;
-  LMLookaheadScoreList *score_list, *old_score_list;
+  LMLookaheadScoreList *score_list = NULL;
+  LMLookaheadScoreList *old_score_list = NULL;
   float score;
 
   index = w1*m_lexicon.words() + w2;
@@ -1878,7 +1876,7 @@ TokenPassSearch::save_token_statistics(int count)
   int i, j;
   char fname[30];
   FILE *fp;
-  int x, y;
+  int x;
   int val;
   
   for (i = 0; i < MAX_TREE_DEPTH; i++)
@@ -2276,7 +2274,8 @@ TokenPassSearch::debug_print_best_lm_history()
   std::vector<int> word_hist;
   TPLexPrefixTree::LMHistory *cur_word;
   float max_log_prob = -1e20;
-  int i, best_token;
+  int i;
+  int best_token = -1;
 
   // Find the best token
   for (i = 0; i < m_active_token_list->size(); i++)
@@ -2290,6 +2289,7 @@ TokenPassSearch::debug_print_best_lm_history()
       }
     }
   }
+  assert(best_token >= 0);
   // Determine the word sequence
   cur_word = (*m_active_token_list)[best_token]->lm_history;
   while (cur_word != NULL)

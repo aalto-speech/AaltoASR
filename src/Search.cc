@@ -262,14 +262,14 @@ Search::add_ngram(TreeGram *ngram, float weight)
 
     // Warn about words not in lm.
     if (m_ngrams.back().lex2lm[i] == 0 && i != 0) {
-      fprintf(stderr, "%s not in LM %d\n", m_vocabulary.word(i).c_str(), 
+      fprintf(stderr, "%s not in LM %zd\n", m_vocabulary.word(i).c_str(), 
 	      m_ngrams.size());
       count++;
     }
   }
 
   if (count > 0)
-    fprintf(stderr, "there were %d out-of-LM words in total in LM %d\n", 
+    fprintf(stderr, "there were %d out-of-LM words in total in LM %zd\n", 
 	    count, m_ngrams.size());
 }
 

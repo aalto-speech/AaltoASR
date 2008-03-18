@@ -96,7 +96,8 @@ NowayLexiconReader::read(FILE *file)
 
     // Read phones and insert them to lexicon
     Lexicon::Node *node = m_lexicon.root();
-    Lexicon::Node *prev_node; // Used for duplicating identical word ends
+    // Used for duplicating identical word ends
+    Lexicon::Node *prev_node = NULL; 
     bool insert_rest = false;
 
     while (1) {

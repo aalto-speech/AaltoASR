@@ -422,7 +422,8 @@ TPLexPrefixTree::post_process_lex_branch(Node *node,
                                          std::vector<int> *lm_la_list)
 {
   int out_trans_count;
-  Node *original_node = node, *real_next;
+  Node *original_node = node;
+  Node *real_next = NULL;
   std::vector<Node*> prev_nodes;
   int i;
 
@@ -627,7 +628,6 @@ void
 TPLexPrefixTree::set_sentence_boundary(int sentence_start_id, 
 				       int sentence_end_id)
 {
-  TPLexPrefixTree::Node *sentence_start_node;
   TPLexPrefixTree::Node *sentence_end_node;
   Arc arc;
 
