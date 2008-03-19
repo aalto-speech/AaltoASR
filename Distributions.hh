@@ -390,7 +390,7 @@ public:
   virtual Gaussian* copy_gaussian(void) = 0;
   /// The likelihood of the current feature given this model using exponential feature vector
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const = 0;
-    /// The log likelihood of the current feature given this model using exponential feature vector
+  /// The log likelihood of the current feature given this model using exponential feature vector
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const = 0;
   
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
@@ -430,6 +430,8 @@ public:
    */
   void ismooth_statistics(int source, int target, double smoothing);
 
+  double covariance_determinant() { return m_covariance_determinant; }
+  
   // Accessing the accumulator
   double get_accumulated_gamma(int accum) const { return m_accums[accum]->gamma(); }
   void get_accumulated_mean(int accum, Vector &mean) const { m_accums[accum]->get_accumulated_mean(mean); }
@@ -444,6 +446,7 @@ public:
 
 protected:
   double m_constant;
+  double m_covariance_determinant;
   bool m_valid_parameters;
   
   std::vector<GaussianAccumulator*> m_accums;
@@ -705,8 +708,15 @@ public:
   // For accessing the accumulator
   double get_accumulated_gamma(int accum, int index) { return m_accums[accum]->gamma[index]; }
 
+  /** Computes the Cross-entropy between this and another mixture
+   * using Monte Carlo simulation and sampling from the current distribution
+   * \param g the other mixture
+   * \param samples number of samples to use in the computation
+   */
+  double cross_entropy(Mixture &g, int samples=10000);
+  
   /** Computes the Kullback-Leibler divergence between this and another mixture
-   * using Monte Carlo simulation
+   * using Monte Carlo simulation and sampling from the current distribution
    * \param g the other mixture
    * \param samples number of samples to use in the mc-simulation
    */
@@ -718,7 +728,6 @@ public:
    * \param samples number of samples to use in the computation
    */
   double bhattacharyya(Mixture &g, int samples=10000);
-
 
   virtual void accumulate_aux_gamma(double gamma, int accum_pos = 0);
   double get_accumulated_mixture_ll(int accum) { return m_accums[accum]->mixture_ll; }

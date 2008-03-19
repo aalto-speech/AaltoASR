@@ -605,6 +605,9 @@ Gaussian::merge(const std::vector<double> &weights,
 {
   assert( weights.size() == gaussians.size() );
 
+  if (weights.size() < 2)
+    return;
+  
   Vector new_mean(m_dim);
   Matrix new_covariance = Matrix::zeros(m_dim, m_dim);
   //Matrix eye = Matrix::eye(m_dim, m_dim);
@@ -705,6 +708,7 @@ Gaussian::full_stats_accumulated(int accum_pos)
     return false;
   return m_accums[accum_pos]->full_stats_accumulated();
 }
+
 
 void
 Gaussian::set_covariance(const Vector &covariance,
@@ -947,11 +951,15 @@ DiagonalGaussian::set_covariance(const Matrix &covariance,
   assert(covariance.cols()==dim());
 
   m_valid_parameters = false;
+  if (finish_statistics)
+    m_covariance_determinant=1;
   for (int i=0; i<dim(); i++) {
     assert(covariance(i,i)>0);
     m_covariance(i) = covariance(i,i);
-    if (finish_statistics && m_covariance(i) > 0)
+    if (finish_statistics && m_covariance(i) > 0) {
       m_precision(i) = 1/m_covariance(i);
+      m_covariance_determinant *= m_covariance(i);
+    }
     else
       m_precision(i) = 0;
   }
@@ -980,10 +988,14 @@ DiagonalGaussian::set_covariance(const Vector &covariance,
   m_covariance.copy(covariance);
 
   m_valid_parameters = false;
+  if (finish_statistics)
+    m_covariance_determinant=1;
   for (int i=0; i<dim(); i++) {
     m_covariance(i) = covariance(i);
-    if (finish_statistics && m_covariance(i) > 0)
+    if (finish_statistics && m_covariance(i) > 0) {
       m_precision(i) = 1/m_covariance(i);
+      m_covariance_determinant *= m_covariance(i);
+    }
     else
       m_precision(i) = 0;
   }
@@ -1234,6 +1246,7 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance,
   {
     LinearAlgebra::inverse(covariance, m_precision);
     m_constant = log(sqrt(LinearAlgebra::spd_determinant(m_precision)));
+    m_covariance_determinant = LinearAlgebra::spd_determinant(m_covariance);
     recompute_exponential_parameters();
     m_valid_parameters = true;
   }
@@ -1445,6 +1458,7 @@ PrecisionConstrainedGaussian::recompute_constant()
   Matrix t;
   m_ps->compute_precision(m_coeffs, t);
   m_constant = log(sqrt(LinearAlgebra::spd_determinant(t)));
+  m_covariance_determinant = 1/LinearAlgebra::spd_determinant(t);
   
   Vector mean(dim());
 
@@ -2074,6 +2088,20 @@ Mixture::remove_component(int index)
   m_pointers.erase(m_pointers.begin()+index);
   m_weights.erase(m_weights.begin()+index);
   normalize_weights();
+}
+
+
+double
+Mixture::cross_entropy(Mixture &g, int samples)
+{
+  double ce=0;
+  Vector sample;
+  for (int i=0; i<samples; i++) {
+    draw_sample(sample);
+    g.get_pool()->reset_cache();
+    ce += util::safe_log(g.compute_likelihood(sample));
+  }
+  return ce/samples;
 }
 
 
