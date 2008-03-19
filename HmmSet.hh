@@ -86,6 +86,9 @@ public:
   // Default constructor, creates only empty Set
   HmmSet();
 
+  // Destructor
+  ~HmmSet();
+
   // Constructor, sets only feature dimensionality
   HmmSet(int dimension);
 

@@ -23,6 +23,11 @@ HmmSet::HmmSet()
   m_statistics_mode = 0;
 }
 
+HmmSet::~HmmSet()
+{
+  for (unsigned int i=0; i<m_emission_pdfs.size(); i++)
+    delete m_emission_pdfs[i];
+}
 
 HmmSet::HmmSet(const HmmSet &hmm_set)
 {
