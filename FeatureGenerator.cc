@@ -107,8 +107,10 @@ FeatureGenerator::load_configuration(FILE *file)
       throw std::string("module name may not contain whitespaces");
   
     FeatureModule *module = NULL;
-    if (type == FFTModule::type_str())
-      module = new FFTModule(this);
+    if (type == AudioFileModule::type_str())
+      module = new AudioFileModule(this);
+    else if (type == FFTModule::type_str())
+      module = new FFTModule();
     else if (type == PreModule::type_str())
       module = new PreModule();
     else if (type == MelModule::type_str())
