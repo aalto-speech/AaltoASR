@@ -186,11 +186,11 @@ public:
 //////////////////////////////////////////////////////////////////
 
 
-class FFTModule : public BaseFeaModule {
+class AudioFileModule : public BaseFeaModule {
 public:
-  FFTModule(FeatureGenerator *fea_gen);
-  virtual ~FFTModule();
-  static const char *type_str() { return "fft"; }
+  AudioFileModule(FeatureGenerator *fea_gen);
+  virtual ~AudioFileModule();
+  static const char *type_str() { return "audiofile"; }
   
   virtual void set_file(FILE *fp);
   virtual void discard_file(void);
@@ -214,16 +214,9 @@ private:
   float m_window_advance;
   int m_window_width;
 
-  int m_eof_frame;
-
   float m_emph_coef; //!< Pre-emphasis filter coefficient
-  int m_magnitude; //!< If nonzero, compute magnitude spectrum instead of power
-  int m_log; //!< If nonzero, take logarithms of the output
-
-  std::vector<float> m_hamming_window;
-  fftw_plan m_coeffs;
-  std::vector<double> m_fftw_datain;
-  std::vector<double> m_fftw_dataout;
+  
+  int m_eof_frame;
 
   /** Should we copy border frames when negative or after-eof frames
    * are requested?  Otherwise, we assume that AudioReader gives zero
@@ -232,6 +225,29 @@ private:
   std::vector<double> m_first_feature; //!< Feature returned for negative frames
   std::vector<double> m_last_feature; //!< Feature returned after EOF
   int m_last_feature_frame; //!< The frame of the feature returned after EOF
+};
+
+
+class FFTModule : public FeatureModule {
+public:
+  FFTModule();
+  virtual ~FFTModule();
+  static const char *type_str() { return "fft"; }
+  
+private:
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
+  virtual void generate(int frame);
+
+private:
+
+  int m_magnitude; //!< If nonzero, compute magnitude spectrum instead of power
+  int m_log; //!< If nonzero, take logarithms of the output
+
+  std::vector<float> m_hamming_window;
+  fftw_plan m_coeffs;
+  std::vector<double> m_fftw_datain;
+  std::vector<double> m_fftw_dataout;
 };
 
 

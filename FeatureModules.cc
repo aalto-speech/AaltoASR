@@ -203,17 +203,16 @@ FeatureModule::print_dot_node(FILE *file)
 }
 
 //////////////////////////////////////////////////////////////////
-// FFTModule
+// AudioFileModule
 //////////////////////////////////////////////////////////////////
 
-FFTModule::FFTModule(FeatureGenerator *fea_gen) :
+AudioFileModule::AudioFileModule(FeatureGenerator *fea_gen) :
   m_fea_gen(fea_gen),
   m_sample_rate(0),
   m_frame_rate(0),
   m_window_advance(0),
   m_window_width(0),
   m_eof_frame(INT_MAX),
-  m_coeffs(NULL),
   m_copy_borders(true),
   m_last_feature_frame(INT_MIN)
 {
@@ -221,16 +220,14 @@ FFTModule::FFTModule(FeatureGenerator *fea_gen) :
 }
 
 
-FFTModule::~FFTModule()
+AudioFileModule::~AudioFileModule()
 {
-  if (m_coeffs)
-    fftw_destroy_plan(m_coeffs);
   discard_file();
 }
 
 
 void
-FFTModule::set_file(FILE *fp)
+AudioFileModule::set_file(FILE *fp)
 {
   m_reader.open(fp, m_sample_rate);
 
@@ -245,81 +242,60 @@ FFTModule::set_file(FILE *fp)
 
 
 void
-FFTModule::discard_file(void)
+AudioFileModule::discard_file(void)
 {
   m_reader.close();
 }
 
 
 bool
-FFTModule::eof(int frame)
+AudioFileModule::eof(int frame)
 {
   if (frame < m_eof_frame)
     return false;
   return true;
 }
 
-int FFTModule::last_frame(void)
+int AudioFileModule::last_frame(void)
 {
   return (int)((m_reader.num_samples()-m_window_width-1)/m_window_advance);
 }
 
 void
-FFTModule::get_module_config(ModuleConfig &config)
+AudioFileModule::get_module_config(ModuleConfig &config)
 {
   assert(m_sample_rate > 0);
+  config.set("pre_emph_coef", m_emph_coef);
   config.set("sample_rate", m_sample_rate);
   config.set("frame_rate", m_frame_rate);
   config.set("window_width", m_window_width);
   config.set("copy_borders", m_copy_borders);
-  config.set("pre_emph_coef", m_emph_coef);
-  config.set("magnitude", m_magnitude);
-  if (m_log)
-    config.set("log", m_log);
 }
 
 void
-FFTModule::set_module_config(const ModuleConfig &config)
+AudioFileModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
   
   if (!config.get("sample_rate", m_sample_rate))
-    throw std::string("FFTModule: Must set sample rate");
+    throw std::string("AudioFileModule: Must set sample rate");
 
+  m_emph_coef = 0.97;
+  config.get("pre_emph_coef", m_emph_coef);
   m_frame_rate = 125;
   config.get("frame_rate", m_frame_rate);
   m_window_advance = m_sample_rate/m_frame_rate;
   m_window_width = (int)(2*m_sample_rate/m_frame_rate);
   config.get("window_width", m_window_width);
-
+  m_dim=m_window_width;
+  
   m_copy_borders = 1;
   config.get("copy_borders", m_copy_borders);
-
-  m_emph_coef = 0.97;
-  config.get("pre_emph_coef", m_emph_coef);
-  m_magnitude = 1;
-  config.get("magnitude", m_magnitude);
-  m_log = 0;
-  config.get("log", m_log);
-
-  m_dim = m_window_width/2+1;
-  m_hamming_window.resize(m_window_width);
-  for (int i = 0; i < m_window_width; i++)
-    m_hamming_window[i] = .54 - .46*cosf(2 * M_PI * i/(m_window_width-1.0));
-
-  if (m_coeffs)
-    fftw_destroy_plan(m_coeffs);
-
-  m_fftw_datain.resize(m_window_width);
-  m_fftw_dataout.resize(m_window_width + 1);
-  m_fftw_dataout.back() = 0;
-  m_coeffs = fftw_plan_r2r_1d(m_window_width, &m_fftw_datain[0],
-                              &m_fftw_dataout[0], FFTW_R2HC, FFTW_ESTIMATE);
 }
 
 void
-FFTModule::reset_module()
+AudioFileModule::reset_module()
 {
   m_first_feature.clear();
   m_last_feature.clear();
@@ -327,7 +303,7 @@ FFTModule::reset_module()
 }
 
 void
-FFTModule::generate(int frame)
+AudioFileModule::generate(int frame)
 {
   int t;
   bool eof_found = false;
@@ -381,34 +357,13 @@ FFTModule::generate(int frame)
       assert( m_reader.eof_sample() >= window_end );
     }
   }
-  
-  // Apply lowpass filtering and hamming window
+
+  // Apply lowpass filtering
+  FeatureVec target = m_buffer[frame];
   for (t = 0; t < m_window_width; t++)
   {
-    m_fftw_datain[t] = m_hamming_window[t] * 
-      (m_reader[window_start + t + 1] - m_emph_coef * m_reader[window_start + t]);
-  }
-  
-  fftw_execute(m_coeffs);
-
-  // NOTE: fftw returns the imaginary parts in funny order
-  FeatureVec target = m_buffer[frame];
-  for (t = 0; t < m_window_width / 2; t++)
-  {
-    target[t] = m_fftw_dataout[t] * m_fftw_dataout[t] + 
-      m_fftw_dataout[m_window_width-t] * m_fftw_dataout[m_window_width-t];
-    if (m_magnitude)
-      target[t] = sqrtf(target[t]);
-    if (m_log)
-      target[t] = logf(target[t]);
-  }
-  // The highest frequency component has zero imaginary part
-  target[t] = m_fftw_dataout[t] * m_fftw_dataout[t];
-  if (m_magnitude)
-    target[t] = sqrtf(target[t]);
-
-  if (m_log)
-    target[t] = logf(target[t]);
+    target[t] = m_reader[window_start + t + 1] - m_emph_coef * m_reader[window_start + t];
+  }  
   
   if (m_copy_borders && m_first_feature.empty() && frame <= 0)
     target.get(m_first_feature);
@@ -418,6 +373,95 @@ FFTModule::generate(int frame)
     target.get(m_last_feature);
     m_last_feature_frame = (eof_found ? m_eof_frame - 1 : frame);
   }
+}
+
+//////////////////////////////////////////////////////////////////
+// FFTModule
+//////////////////////////////////////////////////////////////////
+
+FFTModule::FFTModule()
+  : m_coeffs(NULL)
+
+{
+  m_type_str = type_str();
+}
+
+FFTModule::~FFTModule()
+{
+  if (m_coeffs)
+    fftw_destroy_plan(m_coeffs);
+  m_coeffs = NULL;
+}
+
+void
+FFTModule::get_module_config(ModuleConfig &config)
+{
+  config.set("magnitude", m_magnitude);
+  if (m_log)
+    config.set("log", m_log);
+}
+
+void
+FFTModule::set_module_config(const ModuleConfig &config)
+{
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+  
+  m_magnitude = 1;
+  config.get("magnitude", m_magnitude);
+  m_log = 0;
+  config.get("log", m_log);
+
+  int source_dim = m_sources.back()->dim();
+  m_dim = source_dim/2+1;
+  m_hamming_window.resize(source_dim);
+  for (int i = 0; i < source_dim; i++)
+    m_hamming_window[i] = .54 - .46*cosf(2 * M_PI * i/(source_dim-1.0));
+
+  if (m_coeffs)
+    fftw_destroy_plan(m_coeffs);
+
+  m_fftw_datain.resize(source_dim);
+  m_fftw_dataout.resize(source_dim + 1);
+  m_fftw_dataout.back() = 0;
+  m_coeffs = fftw_plan_r2r_1d(source_dim, &m_fftw_datain[0],
+                              &m_fftw_dataout[0], FFTW_R2HC, FFTW_ESTIMATE);
+}
+
+void
+FFTModule::generate(int frame)
+{
+  int t;
+  
+  const FeatureVec source_fea = m_sources.back()->at(frame);
+  
+  // Apply Hamming window
+  for (t = 0; t < source_fea.dim(); t++)
+  {
+    m_fftw_datain[t] = m_hamming_window[t] * source_fea[t];
+  }
+  
+  fftw_execute(m_coeffs);
+
+  // NOTE: fftw returns the imaginary parts in funny order
+  FeatureVec target = m_buffer[frame];
+  for (t = 0; t < source_fea.dim() / 2; t++)
+  {
+    target[t] = m_fftw_dataout[t] * m_fftw_dataout[t] + 
+      m_fftw_dataout[source_fea.dim()-t] * m_fftw_dataout[source_fea.dim()-t];
+    if (m_magnitude)
+      target[t] = sqrtf(target[t]);
+    if (m_log)
+      target[t] = logf(target[t]);
+  }
+
+  // The highest frequency component has zero imaginary part
+  target[t] = m_fftw_dataout[t] * m_fftw_dataout[t];
+  if (m_magnitude)
+    target[t] = sqrtf(target[t]);
+
+  if (m_log)
+    target[t] = logf(target[t]);
 }
 
 
@@ -476,7 +520,6 @@ PreModule::discard_file(void)
   reset_module();
 }
 
-
 bool
 PreModule::eof(int frame)
 {
@@ -485,6 +528,7 @@ PreModule::eof(int frame)
   return true;
 
 }
+
 int PreModule::last_frame(void)
 {
   long cur_pos = ftell(m_fp);
