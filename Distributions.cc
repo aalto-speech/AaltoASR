@@ -605,9 +605,6 @@ Gaussian::merge(const std::vector<double> &weights,
 {
   assert( weights.size() == gaussians.size() );
 
-  if (weights.size() < 2)
-    return;
-  
   Vector new_mean(m_dim);
   Matrix new_covariance = Matrix::zeros(m_dim, m_dim);
   //Matrix eye = Matrix::eye(m_dim, m_dim);
