@@ -103,12 +103,6 @@ public:
    */
   void update_init_offsets(const FeatureModule &target);
 
-  /** Called by FeatureGenerator for modules which should implement the
-   *  extra buffering needed for initial buffer filling. \note This may not
-   *  be called before the normal buffering has been determined through
-   *  module configuration. */
-  void require_init_buffer(void);
-
   /** Set the module's parameters. This is used for e.g. speaker adaptation
       to change the module's behaviour on-line. */
   virtual void set_parameters(const ModuleConfig &params) { }

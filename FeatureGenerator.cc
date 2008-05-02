@@ -269,9 +269,6 @@ FeatureGenerator::compute_init_buffers()
         src_module->update_init_offsets(*module);
       }
     }
-
-    if (target_counts[i] > 1)
-      module->require_init_buffer();
   }
 }
 

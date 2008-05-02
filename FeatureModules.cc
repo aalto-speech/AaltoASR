@@ -70,17 +70,19 @@ FeatureModule::update_init_offsets(const FeatureModule &target)
 
   assert(m_init_offset_left >= m_req_offset_left);
   assert(m_init_offset_right >= m_req_offset_right);
-}
 
-void
-FeatureModule::require_init_buffer(void)
-{  
   int new_size = m_init_offset_left + m_init_offset_right + 1;
-  
   if (new_size > m_buffer_size)
   {
     m_buffer_size = new_size;
     m_buffer.resize(m_buffer_size, m_dim);
+  }
+
+  if (m_own_offset_left+m_own_offset_right > 0)
+  {
+    // Require buffering from source modules
+    for (int i = 0; i < (int)m_sources.size(); i++)
+      m_sources[i]->update_init_offsets(*this);
   }
 }
 
