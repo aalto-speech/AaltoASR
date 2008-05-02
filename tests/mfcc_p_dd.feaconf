@@ -1,8 +1,15 @@
 module
 {
-	sample_rate 16000
-	name fft
-	type fft
+  name audiofile
+  type audiofile
+  sample_rate 16000
+}
+
+module
+{
+  name fft
+  type fft
+  sources audiofile
 }
 
 module

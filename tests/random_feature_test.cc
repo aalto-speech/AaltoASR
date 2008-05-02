@@ -29,7 +29,7 @@ main(int argc, char *argv[])
 
     FeatureGenerator gen;
     gen.load_configuration(io::Stream(argv[2]));
-    gen.open(argv[1], false);
+    gen.open(argv[1]);
     int start = atoi(argv[3]);
     int end = atoi(argv[4]);
     int num_tests = atoi(argv[5]);

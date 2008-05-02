@@ -1,11 +1,18 @@
 module
 {
-  name fft
-  type fft
+  name audiofile
+  type audiofile
   sample_rate 16000
   copy_borders 1
   pre_emph_coef 0.97
+}
+
+module
+{
+  name fft
+  type fft
   magnitude 0
+  sources audiofile
 }
 
 module

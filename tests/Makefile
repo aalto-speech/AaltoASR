@@ -1,4 +1,4 @@
-CXXFLAGS = -g -Wall -I../
+CXXFLAGS = -g -Wall -I../ -I/share/puhe/x86_64/include/lapackpp -I/share/puhe/x86_64/include/hcld/
 
 OBJS = ../FeatureGenerator.o ../FeatureModules.o ../AudioReader.o \
 	../ModuleConfig.o ../conf.o ../io.o ../str.o 
@@ -9,7 +9,7 @@ default: random_feature_test tests
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 random_feature_test: random_feature_test.o $(OBJS)
-	$(CXX) -o $@ random_feature_test.o $(OBJS) -lfftw3 -lsndfile
+	$(CXX) -o $@ random_feature_test.o $(OBJS) -L/share/puhe/x86_64/lib -lfftw3 -lsndfile -lm -llapackpp -llapack -lhcld
 
 .PHONY: tests
 tests:
