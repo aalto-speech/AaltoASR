@@ -8,9 +8,9 @@
 // END fwrite-hack
 
 #include <memory>
-#include "Endian.hh"
+#include "misc/Endian.hh"
 #include "TreeGram.hh"
-#include "str.hh"
+#include "misc/str.hh"
 #include "def.hh"
 #include "TreeGramArpaReader.hh"
 
@@ -383,14 +383,14 @@ TreeGram::read(FILE *file, bool binary)
   bool ret;
 
   // Read the header
-  ret = str::read_string(&line, format_str.length(), file);
+  ret = str::read_string(line, format_str.length(), file);
   if (!ret || line != format_str) {
     fprintf(stderr, "TreeGram::read(): invalid file format\n");
     exit(1);
   }
   
   // Read LM type
-  str::read_line(&line, file, true);
+  str::read_line(line, file, true);
   if (line == "backoff")
     m_type = BACKOFF;
   else if (line == "interpolated")
@@ -401,7 +401,7 @@ TreeGram::read(FILE *file, bool binary)
   }
 
   // Read the number of words
-  if (!str::read_line(&line, file)) {
+  if (!str::read_line(line, file)) {
     fprintf(stderr, "TreeGram::read(): unexpected end of file\n");
     exit(1);
   }
@@ -415,7 +415,7 @@ TreeGram::read(FILE *file, bool binary)
   // Read the vocabulary
   clear_words();
   for (int i=0; i < words; i++) {
-    if (!str::read_line(&line, file, true)) {
+    if (!str::read_line(line, file, true)) {
       fprintf(stderr, "TreeGram::read(): "
 	      "read error while reading vocabulary\n");
       exit(1);

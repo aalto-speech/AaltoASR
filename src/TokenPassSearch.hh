@@ -1,6 +1,7 @@
 #ifndef TOKENPASSSEARCH_HH
 #define TOKENPASSSEARCH_HH
 
+#include "fsalm/LM.hh"
 #include "WordGraph.hh"
 #include "TPLexPrefixTree.hh"
 #include "TreeGram.hh"
@@ -70,6 +71,7 @@ public:
                              const std::string &end);
 
   void set_ngram(TreeGram *ngram);
+  void set_fsa_lm(fsalm::LM *lm);
   void set_lookahead_ngram(TreeGram *ngram);
   void set_generate_word_graph(bool value) { m_generate_word_graph = value; }
   void set_use_lm_cache(bool value) { m_use_lm_cache = value; }
@@ -184,6 +186,7 @@ private:
 
   // Ngram
   TreeGram *m_ngram;
+  fsalm::LM *m_fsa_lm;
   std::vector<int> m_lex2lm;
   std::vector<int> m_lex2lookaheadlm;
   TreeGram::Gram m_history_lm; // Temporary variable

@@ -1,6 +1,6 @@
 #include "BinNgramReader.hh"
 
-#include "tools.hh"
+#include "misc/tools.hh"
 
 void 
 BinNgramReader::write(FILE *file, Ngram *ng, bool reflip) 

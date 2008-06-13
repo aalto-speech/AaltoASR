@@ -1,8 +1,8 @@
 // Conversion of words to word indices and vice versa.
 #include <errno.h>
-#include "io.hh"
+#include "misc/io.hh"
 #include "Vocabulary.hh"
-#include "str.hh"
+#include "misc/str.hh"
 
 Vocabulary::Vocabulary()
 {
@@ -36,7 +36,7 @@ Vocabulary::read(FILE *file)
 {
   std::string word;
 
-  while (str::read_line(&word, file, true)) {
+  while (str::read_line(word, file, true)) {
 
     // Remove comments
     int comment = word.find('#');

@@ -96,6 +96,7 @@ public:
     float total_log_prob;
     LMHistory *lm_history;
     int lm_hist_code; // Hash code for word history (up to LM order)
+    int fsa_lm_node;
     int recent_word_graph_node;
     WordHistory *word_history;
     int word_start_frame;

@@ -5,7 +5,7 @@
 
 #include "GramSorter.hh"
 #include "TreeGramArpaReader.hh"
-#include "str.hh"
+#include "misc/str.hh"
 
 TreeGramArpaReader::TreeGramArpaReader()
   : m_lineno(0)
@@ -35,7 +35,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 
   // Find header
   while (1) {
-    ok = str::read_line(&line, file, true);
+    ok = str::read_line(line, file, true);
     m_lineno++;
 
     if (!ok) {
@@ -56,7 +56,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
   int number_of_nodes = 0;
   int max_order_count = 0;
   while (1) {
-    ok = str::read_line(&line, file, true);
+    ok = str::read_line(line, file, true);
     m_lineno++;
 
     if (!ok) {
@@ -78,7 +78,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
       read_error();
     {
       std::string tmp(line.substr(6));
-      str::split(&tmp, "=", false, &vec);
+      vec = str::split(tmp, "=", false);
     }
     if (vec.size() != 2)
       read_error();
@@ -105,8 +105,8 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 	      "\\%d-grams expected on line %d\n", order, m_lineno);
       exit(1);
     }
-    str::clean(&line, " \t");
-    str::split(&line, "-", false, &vec);
+    str::clean(line, " \t");
+    vec = str::split(line, "-", false);
 
     if (atoi(vec[0].substr(1).c_str()) != order || vec[1] != "grams:") {
       fprintf(stderr, "TreeGramArpaReader::read(): "
@@ -121,9 +121,9 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
     for (int w = 0; w < m_counts[order-1]; w++) {
 
       // Read and split the line
-      if (!str::read_line(&line, file))
+      if (!str::read_line(line, file))
 	read_error();
-      str::clean(&line, " \t\n");
+      str::clean(line, " \t\n");
       m_lineno++;
 
       // Ignore empty lines
@@ -132,7 +132,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 	continue;
       }
 
-      str::split(&line, " \t", true, &vec);
+      vec = str::split(line, " \t", true);
 
       // Check the number of columns on the line
       if (vec.size() < order + 1 || vec.size() > order + 2) {
@@ -175,7 +175,7 @@ TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
 
     // Skip empty lines before the next order.
     while (1) {
-      if (!str::read_line(&line, file, true)) {
+      if (!str::read_line(line, file, true)) {
 	if (ferror(file))
 	  read_error();
 	if (feof(file))

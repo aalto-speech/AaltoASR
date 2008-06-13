@@ -1352,8 +1352,8 @@ TPLexPrefixTree::print_node_info(int node)
   printf("model = %d\n", (node_list[node]->state==NULL?-1:
                           node_list[node]->state->model));
   printf("flags: %04x\n", node_list[node]->flags);
-  printf("LM lookahead: %ld possible word(s)\n", node_list[node]->possible_word_id_list.size());
-  printf("%ld arc(s):\n", node_list[node]->arcs.size());
+  printf("LM lookahead: %zd possible word(s)\n", node_list[node]->possible_word_id_list.size());
+  printf("%zd arc(s):\n", node_list[node]->arcs.size());
   for (int i = 0; i < node_list[node]->arcs.size(); i++)
   {
     printf(" -> %d (%d), transition: %.2f\n",
@@ -1372,7 +1372,7 @@ TPLexPrefixTree::print_lookahead_info(int node, const Vocabulary &voc)
     printf("N/A\n");
   else
   {
-    printf("%ld\n", node_list[node]->possible_word_id_list.size());
+    printf("%zd\n", node_list[node]->possible_word_id_list.size());
     for (int i=0; i < node_list[node]->possible_word_id_list.size(); i++)
       printf(" %d (%s)\n", node_list[node]->possible_word_id_list[i],
              voc.word(node_list[node]->possible_word_id_list[i]).c_str());

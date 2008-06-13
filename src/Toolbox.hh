@@ -39,8 +39,9 @@ public:
   }
 
   // Ngram
-  void ngram_read(const char *file, float weight, const bool binary=true);
-  void read_lookahead_ngram(const char *file, const bool binary=true);
+  void ngram_read(const char *file, float weight, bool binary=true);
+  void read_lookahead_ngram(const char *file, bool binary=true);
+  void fsa_lm_read(const char *file, bool binary=true);
 
   // Lna
   void lna_open(const char *file, int size);
@@ -212,6 +213,7 @@ private:
   std::string m_word_boundary;
 
   std::vector<TreeGram*> m_ngrams;
+  fsalm::LM *m_fsa_lm;
   std::deque<int> m_history;
   TreeGram *m_lookahead_ngram;
 

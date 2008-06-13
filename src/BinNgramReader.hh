@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "Ngram.hh"
 #include "Vocabulary.hh"
-#include "Endian.hh"
+#include "misc/Endian.hh"
 
 class BinNgramReader {
 public:

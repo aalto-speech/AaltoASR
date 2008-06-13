@@ -23,6 +23,7 @@ Toolbox::Toolbox()
     m_acoustics(NULL),
     m_lna_reader(),
     m_one_frame_acoustics(),
+    m_fsa_lm(NULL),
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
     m_search(m_expander, m_vocabulary)
@@ -142,6 +143,26 @@ Toolbox::ngram_read(const char *file, float weight, const bool binary)
 
   if (m_use_stack_decoder) m_search.add_ngram(m_ngrams.back(), weight);
   else m_tp_search.set_ngram(m_ngrams.back());
+}
+
+void
+Toolbox::fsa_lm_read(const char *file, bool bin)
+{
+  io::Stream in(file, "r");
+  assert(in.file);
+  assert(!m_use_stack_decoder);
+  if (m_fsa_lm) {
+    fprintf(stderr, "ERROR: can not reread fsa lm\n");
+    exit(1);
+  }
+  m_fsa_lm = new fsalm::LM();
+  if (bin)
+    m_fsa_lm->read(in.file);
+  else {
+    m_fsa_lm->read_arpa(in.file, true);
+    m_fsa_lm->trim();
+  }
+  m_tp_search.set_fsa_lm(m_fsa_lm);
 }
 
 void

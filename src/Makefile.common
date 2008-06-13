@@ -2,7 +2,5 @@
 
 CXXFLAGS = -O2
 
-##################################################
-
-cxxflags = $(CXXFLAGS) -fPIC -fno-strict-aliasing -Wall -Wno-sign-compare
+cxxflags = $(CXXFLAGS) $(includes) -fPIC -fno-strict-aliasing -Wall -Wno-sign-compare
 

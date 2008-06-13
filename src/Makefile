@@ -1,12 +1,13 @@
+includes = -Ifsalm -I.
+
 include Makefile.common
 
 ##################################################
 
-progs = arpa2bin
+progs = arpa2bin lexdebug
 
 libdecoder_srcs = ArpaNgramReader.cc \
 	BinNgramReader.cc \
-	Endian.cc \
 	Expander.cc \
 	GramSorter.cc \
 	Hmm.cc \
@@ -23,24 +24,25 @@ libdecoder_srcs = ArpaNgramReader.cc \
 	Toolbox.cc \
 	TreeGram.cc \
 	TreeGramArpaReader.cc \
-	Vocabulary.cc \
-	io.cc \
-	str.cc \
-	tools.cc
+	Vocabulary.cc
 
 ##################################################
 
+libs = libdecoder.a fsalm/libfsalm.a misc/libmisc.a
 libdecoder_objs = $(libdecoder_srcs:.cc=.o)
 progs_srcs = $(progs:=.cc)
+progs_objs = $(progs:=.o)
 all_srcs = $(libdecoder_srcs) $(progs_srcs)
 all_objs = $(all_srcs:.cc=.o)
 
 ##################################################
 
-default: libdecoder.a $(progs) swig
+.SUFFIXES:
 
-%: %.o
-	$(CXX) $< -o $@ libdecoder.a
+default: progs swig
+
+%: %.o $(libs)
+	$(CXX) $(cxxflags) $< -o $@ $(libs)
 
 %.o: %.cc
 	$(CXX) -c $(cxxflags) $< -o $@
@@ -48,15 +50,28 @@ default: libdecoder.a $(progs) swig
 libdecoder.a: $(libdecoder_objs)
 	ar r libdecoder.a $(libdecoder_objs)
 
+.PHONY: progs
+progs: libdecoder.a fsalm misc $(progs)
+
 .PHONY: swig
-swig:
+swig: libdecoder.a fsalm
 	$(MAKE) -C swig
+
+.PHONY: fsalm
+fsalm: misc
+	$(MAKE) -C fsalm
+
+.PHONY: misc
+misc: 
+	$(MAKE) -C misc
 
 .PHONY: clean
 clean:
 	rm -f $(all_objs) $(progs) libdecoder.a .depend *~
 	rm -rf html
 	$(MAKE) -C swig clean
+	$(MAKE) -C fsalm clean
+	$(MAKE) -C misc clean
 
 dep:
 	$(CXX) -MM $(cxxflags) $(DEPFLAGS) $(all_srcs) > dep
