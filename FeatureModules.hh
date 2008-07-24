@@ -158,7 +158,7 @@ protected:
 // Interface for modules that generate features from a file
 class BaseFeaModule : public FeatureModule {
 public:
-  virtual void set_file(FILE *fp) = 0;
+  virtual void set_file(FILE *fp, bool stream=false) = 0;
   virtual void discard_file(void) = 0;
 
   // Note: eof() may return false for a frame that is past the real EOF
@@ -186,7 +186,7 @@ public:
   virtual ~AudioFileModule();
   static const char *type_str() { return "audiofile"; }
   
-  virtual void set_file(FILE *fp);
+  virtual void set_file(FILE *fp, bool stream=false);
   virtual void discard_file(void);
   virtual bool eof(int frame);
   virtual int sample_rate(void) { return m_sample_rate; }
@@ -250,7 +250,7 @@ public:
   PreModule();
   static const char *type_str() { return "pre"; }
   
-  virtual void set_file(FILE *fp);
+  virtual void set_file(FILE *fp, bool stream=false);
   virtual void discard_file(void);
   virtual bool eof(int frame);
   virtual int sample_rate(void) { return m_sample_rate; }

@@ -29,7 +29,7 @@ public:
    * samples.  Otherwise, automatic file format is used.
    * \param dont_fclose = If true, the file is not closed by FeatureGenerator
    */
-  void open(FILE *file, bool dont_fclose);
+  void open(FILE *file, bool dont_fclose, bool stream = false);
 
   /** Close the previously opened file. */
   void close();

@@ -41,8 +41,12 @@ public:
    * \param file = the file to read the audio stream from
    * \param sample_rate = sample rate (needed if the file is RAW)
    * \param shall_close_file = will the class take care of closing the file?
+   * \param stream = set this if we are streaming
    */
-  void open(FILE *file, int sample_rate, bool shall_close_file = false);
+  void open(FILE *file,
+            int sample_rate,
+            bool shall_close_file = false,
+            bool stream = false);
 
   /** Close the file, but only if \ref m_shall_close_file is \c true. */
   void close();

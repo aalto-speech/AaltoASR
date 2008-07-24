@@ -36,7 +36,7 @@ FeatureGenerator::open(const std::string &filename)
 }
 
 void
-FeatureGenerator::open(FILE *file, bool dont_fclose)
+FeatureGenerator::open(FILE *file, bool dont_fclose, bool stream)
 {
   if (m_file != NULL)
     close();
@@ -45,9 +45,9 @@ FeatureGenerator::open(FILE *file, bool dont_fclose)
 
   for (int i = 0; i < (int)m_modules.size(); i++)
     m_modules[i]->reset();
-  
+
   assert( m_base_module != NULL );
-  m_base_module->set_file(m_file);
+  m_base_module->set_file(m_file, stream);
 }
 
 void

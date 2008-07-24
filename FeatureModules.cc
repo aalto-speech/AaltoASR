@@ -229,9 +229,9 @@ AudioFileModule::~AudioFileModule()
 
 
 void
-AudioFileModule::set_file(FILE *fp)
+AudioFileModule::set_file(FILE *fp, bool stream)
 {
-  m_reader.open(fp, m_sample_rate);
+  m_reader.open(fp, m_sample_rate, false, stream);
 
   // Check that sample rate matches that given in configuration
   if (m_reader.sample_rate() != m_sample_rate)
@@ -309,8 +309,7 @@ AudioFileModule::generate(int frame)
 {
   int t;
   bool eof_found = false;
-  
-  // NOTE: because of lowpass filtering, (m_window_width PLUS one)
+
   // samples are fetched from the audio file
 
   int window_start = (int)(frame * m_window_advance);
@@ -486,7 +485,7 @@ PreModule::PreModule() :
 
 
 void
-PreModule::set_file(FILE *fp)
+PreModule::set_file(FILE *fp, bool stream)
 {
   int dim;
   m_fp = fp;

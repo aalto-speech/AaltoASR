@@ -1,5 +1,7 @@
 #include "AudioReader.hh"
 #include <string>
+#include <iostream>
+#include <fcntl.h>
 
 AudioReader::AudioReader()
   : m_sndfile(NULL),
@@ -77,6 +79,7 @@ AudioReader::open(const char *filename, int sample_rate)
   reset();
 
   m_sndfile = sf_open(filename, SFM_READ, &sf_info);
+  
   if (m_sndfile == NULL)
   {
     // Try opening in RAW mode
@@ -92,15 +95,22 @@ AudioReader::open(const char *filename, int sample_rate)
 }
 
 void
-AudioReader::open(FILE *file, int sample_rate, bool shall_close_file)
+AudioReader::open(FILE *file, int sample_rate, bool shall_close_file, bool stream)
 {
   close();
   reset();
 
-  m_sndfile = sf_open_fd(fileno(file), SFM_READ, &sf_info, shall_close_file);
+  if (!stream)
+    m_sndfile = sf_open_fd(fileno(file), SFM_READ, &sf_info, shall_close_file);
+  
   if (m_sndfile == NULL)
   {
-    rewind(file); // FIXME: How about non-seekable streams?
+    if (stream)
+      sf_info.seekable = 0;
+    else {
+      sf_info.seekable = 1;
+      rewind(file); // FIXME: How about non-seekable streams?
+    }
     // Try opening in RAW mode
     sf_info.format = SF_FORMAT_RAW | SF_FORMAT_PCM_16 | SF_ENDIAN_LITTLE;
     sf_info.samplerate = sample_rate;
@@ -109,6 +119,7 @@ AudioReader::open(FILE *file, int sample_rate, bool shall_close_file)
     if (m_sndfile == NULL)
       throw std::string("AudioReader::open(): sf_open_fd() failed");
   }
+
   check_audio_parameters();
 }
 
@@ -140,8 +151,12 @@ AudioReader::close()
 void // private
 AudioReader::read_from_file(int start, int end)
 {
-  if (start != m_file_sample)
-    seek(start);
+  if (start != m_file_sample) {
+    if (sf_info.seekable)
+      seek(start);
+    else
+      throw std::string("Trying to seek a non-seekable FILE\n");
+  }
 
   int index = start - m_start_sample;
   int samples_to_read = end - start;
@@ -158,9 +173,11 @@ AudioReader::read_from_file(int start, int end)
   //
   if (start < m_eof_sample)
     while (samples_to_read > 0) {
+
       sf_count_t samples_read = 
 	sf_read_short(m_sndfile, &m_buffer[index], samples_to_read);
       assert(samples_read >= 0);
+
       if (samples_read == 0) {
 	m_eof_sample = m_file_sample;
 	break;
