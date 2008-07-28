@@ -282,6 +282,9 @@ namespace fsalm {
     m_nodes.bo_score.resize(new_n);
     m_nodes.bo_target.resize(new_n);
     m_nodes.limit_arc.resize(new_n);
+
+    // Update initial node id
+    m_initial_node_id = walk(m_empty_node_id, m_start_symbol);
   }
 
   /** Apply linear quantization to log probability values.
@@ -495,6 +498,13 @@ namespace fsalm {
     m_non_event.clear();
     m_non_event.resize(m_symbol_map.size(), false);
     m_non_event.at(m_start_symbol) = true;
+
+    // Check that initial node matches start symbol
+    int node_id = walk(m_empty_node_id, m_start_symbol);
+    if (node_id != m_initial_node_id)
+      throw Error(str::fmt(1024, "LM::read(): initial node %d does not match "
+                           "start symbol target %d", m_initial_node_id,
+                           node_id));
   }
 
   void LM::write(FILE *file) const
