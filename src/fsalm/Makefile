@@ -25,7 +25,7 @@ default: libfsalm.a progs
 .PHONY: progs
 progs: libfsalm.a $(progs)
 
-%: %.o
+%: %.o $(libs)
 	$(CXX) $< -o $@ $(libs)
 
 %.o: %.cc

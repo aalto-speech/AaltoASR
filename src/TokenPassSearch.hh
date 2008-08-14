@@ -103,6 +103,9 @@ private:
   void analyze_tokens(void);
 #endif
   
+  TPLexPrefixTree::Token*
+  find_similar_fsa_token(int fsa_lm_node, TPLexPrefixTree::Token *token_list);
+
   TPLexPrefixTree::Token* find_similar_lm_history(
     TPLexPrefixTree::LMHistory *wh, int lm_hist_code,
     TPLexPrefixTree::Token *token_list);

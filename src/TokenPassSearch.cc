@@ -1124,9 +1124,16 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     }
     else
     {
-      similar_lm_hist = find_similar_lm_history(new_lm_history,
-                                                    new_lm_hist_code,
-                                                    node->token_list);
+      if (m_fsa_lm) {
+        similar_lm_hist = find_similar_fsa_token(new_fsa_lm_node,
+                                                 node->token_list);
+      }
+      else {
+        similar_lm_hist = find_similar_lm_history(new_lm_history,
+                                                  new_lm_hist_code,
+                                                  node->token_list);
+      }
+
       if (similar_lm_hist == NULL)
       {
         // New word history for this node, create new token
@@ -1266,6 +1273,20 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 }
 
 
+TPLexPrefixTree::Token*
+TokenPassSearch::find_similar_fsa_token(int fsa_lm_node,
+                                        TPLexPrefixTree::Token *token_list)
+{
+  assert(m_fsa_lm);
+  TPLexPrefixTree::Token *token = token_list;
+  while (token != NULL) {
+    if (fsa_lm_node == token->fsa_lm_node)
+      break;
+    token = token->next_node_token;
+  }
+  return token;
+}
+
 // Note! Doesn't work if the sentence end is the first one in the word history
 TPLexPrefixTree::Token*
 TokenPassSearch::find_similar_lm_history(TPLexPrefixTree::LMHistory *wh,
@@ -1273,6 +1294,8 @@ TokenPassSearch::find_similar_lm_history(TPLexPrefixTree::LMHistory *wh,
                                            TPLexPrefixTree::Token *token_list)
 {
   TPLexPrefixTree::Token *cur_token = token_list;
+  assert(!m_fsa_lm);
+
   while (cur_token != NULL)
   {
     if (lm_hist_code == cur_token->lm_hist_code)

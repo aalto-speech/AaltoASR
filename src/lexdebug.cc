@@ -21,7 +21,7 @@ print_tree(Node *root)
     const char *fill_color = node->word_id == -1 ? "white" : "gray";
     
     printf("\t%d [label=\"%d\\n%s\\n%04X\",style=filled,color=%s,fillcolor=%s];\n", 
-	   node->node_id, node->node_id, 
+	   node->node_id, node->state == NULL ? -1 : node->state->model,
 	   node->word_id == -1 ? "-" : t.word(node->word_id).c_str(), 
 	   node->flags & 0x3fff, color, fill_color);
     node->flags |= NODE_DEBUG_PRINTED;
@@ -47,6 +47,7 @@ main(int argc, char *argv[])
     // Create decoder
     t.select_decoder(0); // Token-pass
     t.set_cross_word_triphones(true);
+    t.set_silence_is_word(1);
     t.set_lm_lookahead(1);
 
     // Load files
