@@ -23,6 +23,7 @@ namespace fsalm {
     m_current_order = -1;
     m_ngrams_read = 0;
     m_file = file;
+    m_num_ignored = 0;
     end_reached = false;
   }
 
@@ -193,14 +194,19 @@ namespace fsalm {
       if (std::find(opt.ignore_symbols.begin(), opt.ignore_symbols.end(), 
                     fields[i]) != opt.ignore_symbols.end())
       {
-        fputs("WARNING: ignored ngram:", stderr);
-        for (int i = 1; i < m_current_order + 2; i++)
-          fprintf(stderr, " %s", fields[i].c_str());
-        fputs("\n", stderr);
+        m_num_ignored++;
+        if (m_num_ignored < 10) {
+          fputs("WARNING: ignored ngram:", stderr);
+          for (int i = 1; i < m_current_order + 2; i++)
+            fprintf(stderr, " %s", fields[i].c_str());
+          fputs("\n", stderr);
+        }
+        if (m_num_ignored == 100)
+          fprintf(stderr, "WARNING: not printing more ignored ngrams\n");
         header.num_ngrams[m_current_order]--;
         goto restart;
       }
-
+    
     if (m_current_order == 0)
       ngram.symbols.push_back(symbol_map->insert_new(fields[1]));
     else {

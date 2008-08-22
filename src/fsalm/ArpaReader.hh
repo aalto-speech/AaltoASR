@@ -42,6 +42,9 @@ namespace fsalm {
     /** Return the most recently read line from input. */
     Str recent_line() const { return m_recent_line; }
 
+    /** Number of ngrams ignored while reading. */
+    int num_ignored() const { return m_num_ignored; }
+
     /** Configurable options. */
     struct Options {
       /** Throw an exception if header info does not match the
@@ -102,6 +105,7 @@ namespace fsalm {
     int m_current_order; //!< The order ngram just read from the file
     int m_ngrams_read; //!< The number of ngrams read for current order
     Str m_recent_line; //!< The most recently read line from input
+    int m_num_ignored; //!< Number of ngrams ignored while reading
   };
 };
 

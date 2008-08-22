@@ -151,10 +151,8 @@ Toolbox::fsa_lm_read(const char *file, bool bin)
   io::Stream in(file, "r");
   assert(in.file);
   assert(!m_use_stack_decoder);
-  if (m_fsa_lm) {
-    fprintf(stderr, "ERROR: can not reread fsa lm\n");
-    exit(1);
-  }
+  if (m_fsa_lm)
+    delete m_fsa_lm;
   m_fsa_lm = new fsalm::LM();
   if (bin)
     m_fsa_lm->read(in.file);

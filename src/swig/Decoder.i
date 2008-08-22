@@ -4,7 +4,9 @@
 
 %module Decoder
 %{
+#include "fsalm/LM.hh"
 #include "Toolbox.hh"
+using namespace fsalm;
 %}
 
 %exception {
@@ -49,6 +51,22 @@ class Hypo {
   float log_prob() { return self->log_prob; }
   int frame() { return self->frame; }
 }
+
+%apply float *OUTPUT { float *score };
+
+class LM {
+public:
+	LM();
+  void read_arpa(FILE *file);
+  void read(FILE *file);
+	int initial_node_id() const;
+  int walk(int node_id, int symbol, float *score) const;
+};
+
+%extend LM {
+	int sym(const std::string &str) { return self->symbol_map().index(str); }
+}
+
 
 class HypoStack {
 public:

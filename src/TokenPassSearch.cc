@@ -850,6 +850,9 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 
       if (node->word_id != -1) // Is word ID unique?
       {
+        if (m_lex2lm[node->word_id] < 0)
+          return;
+
 	// Prune two subsequent word boundaries
 	if (node->word_id == m_word_boundary_id &&
 	    token->lm_history->word_id == m_word_boundary_id)
@@ -1617,7 +1620,6 @@ void
 TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
 {
   assert(!m_ngram);
-  assert(!m_fsa_lm);
   m_fsa_lm = lm;
 
   m_lex2lm.clear();
@@ -1630,7 +1632,7 @@ TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
 
     // Warn about words not in lm.
     if (m_lex2lm[i] < 0) {
-      fprintf(stderr, "WARNING: %s not in LM\n", m_vocabulary.word(i).c_str());
+//      fprintf(stderr, "WARNING: %s not in LM\n", m_vocabulary.word(i).c_str());
       count++;
     }
   }

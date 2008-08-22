@@ -252,8 +252,11 @@ namespace fsalm {
       if (num_children(n) == 0) {
         float bo_score = m_nodes.bo_score.get(n);
         if (bo_score != 0)
-          throw Error(str::fmt(256, "LM::trim(): childless node %d "
-                               "with bo_score = %g", n, bo_score));
+          fprintf(stderr, "WARNING: LM::trim(): childless node %d "
+                  "with bo_score = %g\n", n, bo_score);
+
+//          throw Error(str::fmt(256, "LM::trim(): childless node %d "
+//                               "with bo_score = %g", n, bo_score));
         new_target[n] = new_target.at(m_nodes.bo_target.get(n));
         removed[n] = true;
       }
@@ -466,6 +469,9 @@ namespace fsalm {
           new_ngram(ngram.symbols, ngram.log_prob, ngram.backoff);
       }
     }
+    if (reader.num_ignored() > 0)
+      fprintf(stderr, "WARNING: ignored %d ngrams in total\n", 
+              reader.num_ignored());
 
     m_non_event.clear();
     m_non_event.resize(m_symbol_map.size(), false);
