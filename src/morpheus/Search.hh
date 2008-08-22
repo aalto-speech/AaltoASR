@@ -52,26 +52,76 @@ namespace mrf {
   class Search {
   public:
     Search() :
-      lm(NULL) {}
+      lm(NULL) 
+    {
+      clear();
+    }
 
     Search(fsalm::LM *lm_)
-      : lm(lm_) { }
+      : lm(lm_) 
+    { 
+      clear();
+    }
+
+    typedef std::map<Str,int> WordMap;
 
     fsalm::LM *lm;
     Str word;
     std::vector<TokenPtrVec> active_tokens;
     std::vector<Morph> morphs;
+    WordMap unsegmented_words;
+    int unsegmented_word_tokens;
+    int unsegmented_word_types;
 
-    /** Segment word into morphs.
+    /** Clear all statistics. */
+    void clear()
+    {
+      word = "";
+      active_tokens.clear();
+      morphs.clear();
+      unsegmented_words.clear();
+      unsegmented_word_tokens = 0;
+      unsegmented_word_types = 0;
+    }
+
+    /** Segment a sentence into morphs and add word boundaries and
+     * sentence boundaries. */
+    Str segment_sentence(Str sent)
+    {
+      Str seg;
+      seg.append("<s> <w> ");
+      str::clean(sent);
+      StrVec words = str::split(sent, " \t", true);
+      FOR(i, words) {
+        seg.append(segment_word(words[i]));
+        seg.append(" <w> ");
+      }
+      seg.append("</s>");
+      return seg;
+    }
+
+    /** Segment a word into morphs.
      * \param word_ = word to segment
-     * \return string containing white-space separated morphs
-     * \throw NoSeg() if no segmentation possible
+     *
+     * \return string containing white-space separated morphs (whole
+     * word if not segmentation not possible)
      */
     Str segment_word(Str word_) 
     {
-      reset(word_);
-      for (int i = 0; i < word_.length(); i++) 
-        process_pos(i);
+      set_word(word_);
+      try {
+        for (int i = 0; i < word_.length(); i++) 
+          process_pos(i);
+      }
+      catch (NoSeg &e) {
+        std::pair<WordMap::iterator, bool> result = 
+          unsegmented_words.insert(WordMap::value_type(word_, 0));
+        result.first->second++;
+        unsegmented_word_tokens++;
+        if (result.second)
+          unsegmented_word_types++;
+        return word_;
+      }
       TokenPtrVec &vec = active_tokens.at(word_.length());
       if (vec.size() != 1)
         throw std::runtime_error(
@@ -80,7 +130,7 @@ namespace mrf {
       return str(vec.back());
     }
 
-    void reset(Str word_)
+    void set_word(Str word_)
     {
       assert(word_.length() > 0);
       word = word_;

@@ -15,9 +15,10 @@ main(int argc, char *argv[])
     config("usage: morpheus [OPTION...]\n")
       ('h', "help", "", "", "display help")
       ('\0', "arpa=FILE", "arg", "", "read ARPA language model")
-      ('\0', "bin=FILE", "arg", "", "read binary fsa model")
-      ('s', "start=INT", "arg", "1", "start from word (1 = first)")
-      ('e', "end=INT", "arg", "0", "end after word")
+      ('\0', "fsa=FILE", "arg", "", "read binary fsa model")
+      ('s', "start=INT", "arg", "1", "start from line (1 = first)")
+      ('e', "end=INT", "arg", "0", "end after line")
+      ('\0', "sentences", "", "", "segment one sentence per line")
       ;
     config.default_parse(argc, argv);
     if (config.arguments.size() != 0)
@@ -26,18 +27,18 @@ main(int argc, char *argv[])
     // Read the language model
     //
     if (config["arpa"].specified) {
-      if (config["bin"].specified) {
-        fprintf(stderr, "options --arpa and --blm not allowed together\n");
+      if (config["fsa"].specified) {
+        fprintf(stderr, "options --arpa and --fsa not allowed together\n");
         exit(1);
       }
       lm.read_arpa(io::Stream(config["arpa"].get_str(), "r").file, true);
       lm.trim();
     }
-    else if (config["bin"].specified) {
-      lm.read(io::Stream(config["bin"].get_str(), "r").file);
+    else if (config["fsa"].specified) {
+      lm.read(io::Stream(config["fsa"].get_str(), "r").file);
     }
     else {
-      fprintf(stderr, "option --arpa or --bin required\n");
+      fprintf(stderr, "option --arpa or --fsa required\n");
       exit(1);
     }
     fprintf(stderr, "model order %d\n", lm.order());
@@ -48,6 +49,7 @@ main(int argc, char *argv[])
     mrf::Search s(&lm);
     Str line;
     int line_no = 1;
+    bool sentences = config["sentences"].specified;
     while (str::read_line(line, stdin, true)) {
       str::clean(line, " \n\t0123456789");
       if (line.empty())
@@ -59,20 +61,21 @@ main(int argc, char *argv[])
         break;
       line_no++;
 
-      try {
-        s.reset(line);
-        for (int i = 0; i < line.length(); i++) {
-          s.process_pos(i);
-        }
-        mrf::TokenPtrVec &vec = s.active_tokens.at(line.length());
-        assert(vec.size() == 1);
-        puts(s.str(vec.back()).c_str());
-      }
-      catch (mrf::NoSeg &e) {
-        printf("- %s\n", line.c_str());
-      }
+      if (sentences)
+        puts(s.segment_sentence(line).c_str());
+      else
+        puts(s.segment_word(line).c_str());
     }
-    fprintf(stderr, "exiting\n");
+    for (mrf::Search::WordMap::iterator it = s.unsegmented_words.begin();
+         it != s.unsegmented_words.end(); it++)
+    {
+      fprintf(stderr, "UNSEGMENTED: %s %d\n", it->first.c_str(),
+              it->second);
+    }
+    fprintf(stderr, "UNSEGMENTED TOKENS: %d\n", 
+            s.unsegmented_word_tokens);
+    fprintf(stderr, "UNSEGMENTED TYPES: %d\n", 
+            s.unsegmented_word_types);
   }
   catch (std::string &str) {
     fprintf(stderr, "exception: %s\n", str.c_str());
