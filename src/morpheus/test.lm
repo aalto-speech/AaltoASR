@@ -1,12 +1,13 @@
 \data\
 
-ngram 1=9
-ngram 2=2
+ngram 1=10
+ngram 2=3
 
 \1-grams:
 
 -99	<s>
 -1	</s>
+-2	<w>
 -3	a
 -4	u
 -5	t
@@ -17,7 +18,8 @@ ngram 2=2
 
 \2-grams:
 
--0.1	<s> au
+-0.1	<s> <w>
+-0.1	<w> </s>
 -0.3	au to
 
 \end\

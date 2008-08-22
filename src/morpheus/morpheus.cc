@@ -1,7 +1,7 @@
 #include "misc/conf.hh"
 #include "misc/io.hh"
 #include "misc/str.hh"
-#include "Search.hh"
+#include "Morpheus.hh"
 
 using namespace fsalm;
 
@@ -18,7 +18,6 @@ main(int argc, char *argv[])
       ('\0', "fsa=FILE", "arg", "", "read binary fsa model")
       ('s', "start=INT", "arg", "1", "start from line (1 = first)")
       ('e', "end=INT", "arg", "0", "end after line")
-      ('\0', "sentences", "", "", "segment one sentence per line")
       ;
     config.default_parse(argc, argv);
     if (config.arguments.size() != 0)
@@ -46,12 +45,11 @@ main(int argc, char *argv[])
     int start = config["start"].get_int();
     int end = config["end"].get_int();
 
-    mrf::Search s(&lm);
+    mrf::Morpheus m(&lm);
     Str line;
     int line_no = 1;
-    bool sentences = config["sentences"].specified;
     while (str::read_line(line, stdin, true)) {
-      str::clean(line, " \n\t0123456789");
+      str::clean(line);
       if (line.empty())
         continue;
 
@@ -61,21 +59,22 @@ main(int argc, char *argv[])
         break;
       line_no++;
 
-      if (sentences)
-        puts(s.segment_sentence(line).c_str());
-      else
-        puts(s.segment_word(line).c_str());
+      try {
+        StrVec words = str::split(line, " \t", true);
+        m.reset();
+        m.add_symbol(m.sentence_start_str);
+        m.add_symbol(m.word_boundary_str);
+        FOR(w, words) {
+          m.add_string(words[w]);
+          m.add_symbol(m.word_boundary_str);
+        }
+        m.add_symbol(m.sentence_end_str);
+        printf("%g %s\n", m.score(), m.str().c_str());
+      }
+      catch (mrf::NoSeg &e) {
+        printf("NO SEGMENTATION: %s\n", line.c_str());
+      }
     }
-    for (mrf::Search::WordMap::iterator it = s.unsegmented_words.begin();
-         it != s.unsegmented_words.end(); it++)
-    {
-      fprintf(stderr, "UNSEGMENTED: %s %d\n", it->first.c_str(),
-              it->second);
-    }
-    fprintf(stderr, "UNSEGMENTED TOKENS: %d\n", 
-            s.unsegmented_word_tokens);
-    fprintf(stderr, "UNSEGMENTED TYPES: %d\n", 
-            s.unsegmented_word_types);
   }
   catch (std::string &str) {
     fprintf(stderr, "exception: %s\n", str.c_str());

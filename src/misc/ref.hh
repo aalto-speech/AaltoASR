@@ -53,8 +53,14 @@ namespace ref {
     /** Access the pointer. */
     T *ptr() { return m_ptr; }
 
+    /** Access the pointer. */
+    const T *ptr() const { return m_ptr; }
+
     /** Access the object data. */
     T *operator->() { return m_ptr; }
+
+    /** Access the object data. */
+    const T *operator->() const { return m_ptr; }
 
     /** Access the object. */
     T &ref() { return *m_ptr; }
