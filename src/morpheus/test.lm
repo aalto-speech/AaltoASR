@@ -1,0 +1,23 @@
+\data\
+
+ngram 1=9
+ngram 2=2
+
+\1-grams:
+
+-99	<s>
+-1	</s>
+-3	a
+-4	u
+-5	t
+-6	o
+-2	au
+-3	to
+-4	auto
+
+\2-grams:
+
+-0.1	<s> au
+-0.3	au to
+
+\end\
