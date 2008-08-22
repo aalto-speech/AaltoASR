@@ -97,9 +97,9 @@ namespace misc {
       typename ArcVec::iterator it = m_nodes.at(n).insert(sym, &inserted);
       if (!inserted)
         return it->tgt;
-      it->tgt = m_nodes.size();
+      int tgt = it->tgt = m_nodes.size();
       m_nodes.push_back(Node());
-      return it->tgt;
+      return tgt;
     }
 
     /** Find a target node for the given symbol.
