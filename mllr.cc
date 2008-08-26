@@ -116,6 +116,8 @@ main(int argc, char *argv[])
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for adaptation")
       ('H', "hmmnet", "", "", "use HMM networks for training")
+      ('E', "extvit", "", "", "Use extended Viterbi over HMM networks")
+      ('V', "vit", "", "", "Use Viterbi over HMM networks")
       ('M', "mllr=MODULE", "arg must", "", "MLLR module name")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('o', "out=FILE", "arg", "", "output speaker configuration file")
@@ -148,6 +150,10 @@ main(int argc, char *argv[])
     {
       throw std::string("Must give either --base or all --gk, --mc and --ph");
     }
+
+    if ((config["vit"].specified || config["extvit"].specified) &&
+        !config["hmmnet"].specified)
+      throw std::string("--vit and --extvit require --hmmnet");
 
     ordered_spk = config["ords"].specified;
     
@@ -197,6 +203,11 @@ main(int argc, char *argv[])
           &model, false, &fea_gen, NULL);
         lattice->set_pruning_thresholds(config["bw-beam"].get_float(),
                                         config["fw-beam"].get_float());
+
+        if (config["vit"].specified)
+          lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
+        if (config["extvit"].specified)
+          lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
 
         set_speaker(recipe.infos[f].speaker_id);
         if (recipe.infos[f].utterance_id.size() > 0)
