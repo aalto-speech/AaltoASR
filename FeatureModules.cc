@@ -803,6 +803,7 @@ DCTModule::get_module_config(ModuleConfig &config)
 {
   assert(m_dim > 0);
   config.set("dim", m_dim);
+  config.set("zeroth", m_zeroth_comp);
 }
 
 void
@@ -811,10 +812,12 @@ DCTModule::set_module_config(const ModuleConfig &config)
   m_own_offset_left = 0;
   m_own_offset_right = 0;
   m_dim = 12; // Default dimension
+  m_zeroth_comp = 0; // Default: No zeroth component
 
   config.get("dim", m_dim);
   if (m_dim < 1)
     throw std::string("DCTModule: Dimension must be > 0");
+  config.get("zeroth", m_zeroth_comp);
 }
 
 void
@@ -823,8 +826,17 @@ DCTModule::generate(int frame)
   const FeatureVec source_fea = m_sources.back()->at(frame);
   FeatureVec target_fea = m_buffer[frame];
   int src_dim = m_sources.back()->dim();
+  int i = 0;
+
+  if (m_zeroth_comp)
+  {
+    target_fea[0] = 0.0;
+    for (int b = 0; b < src_dim; b++)
+      target_fea[0] += source_fea[b];
+    i++;
+  }
   
-  for (int i = 0; i < m_dim; i++)
+  for (; i < m_dim; i++)
   {
     target_fea[i] = 0.0;
     for (int b = 0; b < src_dim; b++)
