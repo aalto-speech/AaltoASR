@@ -995,6 +995,11 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     depth = 0;
   }
 
+  if (node->flags&NODE_SILENCE_FIRST && new_lm_history->word_first_silence_frame == -1)
+  {
+    new_lm_history->word_first_silence_frame = m_frame;
+  } 
+
   if (node->state == NULL) {
 
     // Moving to a node without HMM state, pass through immediately.

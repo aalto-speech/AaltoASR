@@ -56,6 +56,7 @@ public:
     int reference_count;
     bool printed;
     int word_start_frame;
+    int word_first_silence_frame; // "end frame", initialized to -1
   };
 
   struct WordHistory {
@@ -260,7 +261,8 @@ TPLexPrefixTree::LMHistory::LMHistory(int word_id, int lm_id,
     previous(previous),
     reference_count(0),
     printed(false),
-    word_start_frame(0)
+    word_start_frame(0),
+    word_first_silence_frame(-1)
 {
   if (previous)
     hist::link(previous);
