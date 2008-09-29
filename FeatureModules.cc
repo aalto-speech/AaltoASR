@@ -827,20 +827,22 @@ DCTModule::generate(int frame)
   FeatureVec target_fea = m_buffer[frame];
   int src_dim = m_sources.back()->dim();
   int i = 0;
+  int bias=0;
 
   if (m_zeroth_comp)
   {
     target_fea[0] = 0.0;
     for (int b = 0; b < src_dim; b++)
       target_fea[0] += source_fea[b];
-    i++;
+    //i++;
+    bias=1;
   }
   
-  for (; i < m_dim; i++)
+  for (; i < m_dim-bias; i++)
   {
-    target_fea[i] = 0.0;
+    target_fea[i+bias] = 0.0;
     for (int b = 0; b < src_dim; b++)
-      target_fea[i] += source_fea[b] * cosf((i+1) * (b+0.5) * M_PI / src_dim);
+      target_fea[i+bias] += source_fea[b] * cosf((i+1) * (b+0.5) * M_PI / src_dim);
   }
 }
 
