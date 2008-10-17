@@ -36,7 +36,7 @@ libfsalm.a: $(libfsalm_objs)
 
 .PHONY: clean
 clean:
-	rm -f $(all_objs) libfsalm.a .depend *~
+	rm -f $(all_objs) libfsalm.a .depend *~ $(progs)
 
 dep:
 	$(CXX) -MM $(cxxflags) $(DEPFLAGS) $(all_srcs) > dep

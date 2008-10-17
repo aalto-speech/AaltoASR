@@ -1,0 +1,12 @@
+#*
+*~
+decoder-*.tar.gz
+*.o
+lib*.a
+*.so
+Decoder_wrap.cc
+dep
+arpa2bin
+lm
+CVS*
+sphinx

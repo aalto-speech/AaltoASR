@@ -4,7 +4,7 @@ include Makefile.common
 
 ##################################################
 
-progs = arpa2bin lexdebug
+progs = arpa2bin 
 
 libdecoder_srcs = ArpaNgramReader.cc \
 	BinNgramReader.cc \
@@ -41,17 +41,17 @@ all_objs = $(all_srcs:.cc=.o)
 
 default: progs swig
 
-%: %.o $(libs)
-	$(CXX) $(cxxflags) $< -o $@ $(libs)
-
 %.o: %.cc
 	$(CXX) -c $(cxxflags) $< -o $@
+
+%: %.o $(libs)
+	$(CXX) $(cxxflags) $< -o $@ $(libs)
 
 libdecoder.a: $(libdecoder_objs)
 	ar r libdecoder.a $(libdecoder_objs)
 
 .PHONY: progs
-progs: libdecoder.a fsalm misc $(progs)
+progs: libdecoder.a fsalm misc
 
 .PHONY: swig
 swig: libdecoder.a fsalm
