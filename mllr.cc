@@ -256,7 +256,8 @@ main(int argc, char *argv[])
         segmentator = phn_reader;
       }
 
-      train_mllr(segmentator);
+      if (!skip)
+        train_mllr(segmentator);
 
       fea_gen.close();
       segmentator->close();
