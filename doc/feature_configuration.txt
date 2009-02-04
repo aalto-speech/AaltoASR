@@ -9,7 +9,7 @@ For example:
 module 
 {
   name first_module
-  type fft
+  type audiofile
 }
 
 module
@@ -32,26 +32,31 @@ earlier.  Most modules allow only one source, but some allow multiple
 sources (separated by whitespace).  The output of the last module is
 used as final features.
 
+The feature modules are defined in file FeatureModules.cc. The names
+of the new modules must be also added to the configuration loader in
+FeatureGenerator.cc
+
 
 MODULE TYPES
 ============
 
 - audiofile (BASE MODULE)
-
-    A base module that reads an audio file window by window
-    using Hamming window
+  
+    Audio file reader. Segments the audio file to windows referenced
+    with frames. These windows of samples are usually fed to fft
+    module for short-time fourier spectrum.
 
     Output dimension: window_width
 
-    Options: 
+    Options:
     - sample_rate (int, obligatory) : samples per second
     - frame_rate (float, default 125) : frames per second
     - window_width (int, default 2*sample_rate/frame_rate): width of the
       short time spectrum window.
     - copy_borders (int, default 1) : if positive, duplicates the border
       frames when requesting frames outside the file
-    - pre_emph_coef (float, default 0.97) : Coefficient for pre-emphasis
-      filter.
+    - pre_emph_coef (float, default 0.97) : Pre-emphasis filter coefficient
+
 
 - pre (BASE MODULE)
 
@@ -67,15 +72,20 @@ MODULE TYPES
     - frame_rate (int, default 125) : Frame rate of the original waveform,
       may also affect the behaviour of other modules.
 
+
 - fft
 
-    Short-time fourier power spectrum. 
+    Short-time fourier power spectrum. Computes short-time fourier
+    spectrum from sample data. Uses hamming windowing.
 
-    Output dimension: (int)(window_width/2 + 1)
+    Output dimension: (int)(source_dim/2 + 1)
 
     Options: 
     - magnitude (int, default 1) : If zero, uses power (squared) values
       instead of magnitude values.
+    - log (int, default 0): If nonzero, a logarithm of the spectrum values
+      is returned.
+
 
 - mel  
 
