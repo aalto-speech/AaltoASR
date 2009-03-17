@@ -135,9 +135,9 @@ estimate_dur_model($om);
 # estimate_mllr($tempdir, $om, $RECIPE, $om.".spkc");
 
 # Cluster the Gaussians
-if ($NUM_GAUSS_CLUSTERS > 0) {
-  cluster_gaussians($tempdir, $om);
-}
+#if ($NUM_GAUSS_CLUSTERS > 0) {
+#  cluster_gaussians($tempdir, $om);
+#}
 
 # Discriminative training
 #my $dmodel;
@@ -151,8 +151,9 @@ if ($NUM_GAUSS_CLUSTERS > 0) {
 #$om = $dmodel;
 
 # Generate lnas for the final model
-generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
+#generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
 
+print "New model: $om\n";
 
 
 sub copy_binary_to_work {
@@ -579,7 +580,7 @@ sub get_empty_batch_info {
 sub get_batch_script_pre_string {
   my $script_dir = shift(@_);
   my $out_dir = shift(@_);
-  return "#!/bin/sh\n#\$ -S /bin/sh\n#\$ -o ${out_dir}\n#\$ -e ${out_dir}\ncd ${script_dir}\n"
+  return "#!/bin/sh\n#\$ -S /bin/sh\n#\$ -o ${out_dir}\n#\$ -e ${out_dir}\nset -e\ncd ${script_dir}\n"
 }
 
 sub make_single_batch {
