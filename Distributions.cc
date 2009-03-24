@@ -89,7 +89,8 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 void
 FullStatisticsAccumulator::get_accumulated_second_moment(Matrix &second_moment) const
 {
-  second_moment = LaGenMatDouble(m_second_moment);
+  SymmetricMatrix temp = m_second_moment; // Discard const qualifier
+  second_moment = LaGenMatDouble(temp);
 }
 
 // Diagonal covariance version of get_accumulated_second_moment
