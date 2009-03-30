@@ -212,6 +212,8 @@ private:
   
   int m_eof_frame;
 
+  int m_endian; // RAW-file endianess: 0=default, 1=little, 2=big
+
   /** Should we copy border frames when negative or after-eof frames
    * are requested?  Otherwise, we assume that AudioReader gives zero
    * samples outside the file. */

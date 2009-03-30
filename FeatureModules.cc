@@ -215,6 +215,7 @@ AudioFileModule::AudioFileModule(FeatureGenerator *fea_gen) :
   m_window_advance(0),
   m_window_width(0),
   m_eof_frame(INT_MAX),
+  m_endian(0),
   m_copy_borders(true),
   m_last_feature_frame(INT_MIN)
 {
@@ -231,6 +232,10 @@ AudioFileModule::~AudioFileModule()
 void
 AudioFileModule::set_file(FILE *fp, bool stream)
 {
+  if (m_endian == 1)
+    m_reader.set_little_endian(true);
+  else if (m_endian == 2)
+    m_reader.set_little_endian(false);
   m_reader.open(fp, m_sample_rate, false, stream);
 
   // Check that sample rate matches that given in configuration
@@ -272,6 +277,10 @@ AudioFileModule::get_module_config(ModuleConfig &config)
   config.set("frame_rate", m_frame_rate);
   config.set("window_width", m_window_width);
   config.set("copy_borders", m_copy_borders);
+  if (m_endian == 1)
+    config.set("endian", "little");
+  else if (m_endian == 2)
+    config.set("endian", "big");
 }
 
 void
@@ -291,6 +300,14 @@ AudioFileModule::set_module_config(const ModuleConfig &config)
   m_window_width = (int)(2*m_sample_rate/m_frame_rate);
   config.get("window_width", m_window_width);
   m_dim=m_window_width;
+
+  std::string endian;
+  m_endian = 0;
+  config.get("endian", endian);
+  if (endian == "little")
+    m_endian = 1;
+  else if (endian == "big")
+    m_endian = 2;
   
   m_copy_borders = 1;
   config.get("copy_borders", m_copy_borders);

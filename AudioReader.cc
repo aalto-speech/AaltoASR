@@ -5,6 +5,7 @@
 
 AudioReader::AudioReader()
   : m_sndfile(NULL),
+    m_little_endian(true),
     m_eof_sample(INT_MAX),
     m_buffer_size(0),
     m_start_sample(-INT_MAX),
@@ -16,6 +17,7 @@ AudioReader::AudioReader()
 
 AudioReader::AudioReader(int buffer_size)
   : m_sndfile(NULL),
+    m_little_endian(true),
     m_eof_sample(INT_MAX),
     m_buffer_size(0),
     m_start_sample(-INT_MAX),
@@ -83,7 +85,11 @@ AudioReader::open(const char *filename, int sample_rate)
   if (m_sndfile == NULL)
   {
     // Try opening in RAW mode
-    sf_info.format = SF_FORMAT_RAW | SF_FORMAT_PCM_16 | SF_ENDIAN_LITTLE;
+    sf_info.format = SF_FORMAT_RAW | SF_FORMAT_PCM_16;
+    if (m_little_endian)
+      sf_info.format |= SF_ENDIAN_LITTLE;
+    else
+      sf_info.format |= SF_ENDIAN_BIG;
     sf_info.samplerate = sample_rate;
     sf_info.channels = 1;
     m_sndfile = sf_open(filename, SFM_READ, &sf_info);
@@ -112,7 +118,11 @@ AudioReader::open(FILE *file, int sample_rate, bool shall_close_file, bool strea
       rewind(file); // FIXME: How about non-seekable streams?
     }
     // Try opening in RAW mode
-    sf_info.format = SF_FORMAT_RAW | SF_FORMAT_PCM_16 | SF_ENDIAN_LITTLE;
+    sf_info.format = SF_FORMAT_RAW | SF_FORMAT_PCM_16;
+    if (m_little_endian)
+      sf_info.format |= SF_ENDIAN_LITTLE;
+    else
+      sf_info.format |= SF_ENDIAN_BIG;
     sf_info.samplerate = sample_rate;
     sf_info.channels = 1;
     m_sndfile = sf_open_fd(fileno(file), SFM_READ, &sf_info, shall_close_file);

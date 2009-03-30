@@ -82,6 +82,9 @@ public:
   /** Return the number of samples in the file. */
   int num_samples() const { return sf_info.frames; }
 
+  /** Sets endianess. */
+  void set_little_endian(bool endian) { m_little_endian = endian; }
+
   /** The sample format. */
   SF_INFO sf_info;
 
@@ -114,6 +117,9 @@ protected:
 
   /** Close the file eventually */
   bool m_shall_close_file;
+
+  /** Endianess for RAW-files */
+  bool m_little_endian;
 
   /** The index of the sample corresponding to end of file (INT_MAX
    * if not set yet). */
