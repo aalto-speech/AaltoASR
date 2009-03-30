@@ -56,6 +56,7 @@ MODULE TYPES
     - copy_borders (int, default 1) : if positive, duplicates the border
       frames when requesting frames outside the file
     - pre_emph_coef (float, default 0.97) : Pre-emphasis filter coefficient
+    - endian (string, little/big) : force raw-file endianess
 
 
 - pre (BASE MODULE)
