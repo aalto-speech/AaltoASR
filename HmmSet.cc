@@ -631,21 +631,26 @@ HmmSet::accumulate_ph_from_dump(const std::string filename)
   for (unsigned int t=0; t<num_transitions; t++) {
     phs >> source >> target >> occ;
     pos=-1;
-    // Find this transition in m_transition_accum
-    for (unsigned int tsearch=0; tsearch<m_transition_accum.size(); tsearch++)
+    if (phs.eof() && t == 0)
+      break; // Allow premature EOF here (no transition information)
+    else
     {
-      if (m_transition_accum[tsearch].source_index == source &&
-          m_transition_accum[tsearch].target_offset == target)
+      // Find this transition in m_transition_accum
+      for (unsigned int tsearch=0; tsearch<m_transition_accum.size(); tsearch++)
       {
-	pos=tsearch;
-	break;
+        if (m_transition_accum[tsearch].source_index == source &&
+            m_transition_accum[tsearch].target_offset == target)
+        {
+          pos=tsearch;
+          break;
+        }
       }
     }
     if (pos==-1)
       throw str::fmt(128, "HmmSet::accumulate_ph_from_dump: the transition %i could not be accumulated", t);
     
     // Accumulate the statistics
-    m_transition_accum[pos].prob += occ;
+    accumulate_transition(pos, occ);
   }
   
   phs.close();
