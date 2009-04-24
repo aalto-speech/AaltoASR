@@ -133,6 +133,9 @@ void SpeakerConfig::write_speaker_file(FILE *file,
   if (m_cur_speaker.size() > 0)
     retrieve_speaker_config(m_cur_speaker);
 
+  if (m_cur_utterance.size() > 0)
+    retrieve_utterance_config(m_cur_utterance);
+
   // Write default speaker configuration
   if (m_default_speaker_set && (speakers == NULL ||
                                 speakers->find("default") != speakers->end()))
@@ -247,7 +250,7 @@ void SpeakerConfig::set_utterance(const std::string &utterance_id)
 
   if (utterance_id.size() == 0)
   {
-    // Use the default speaker
+    // Use the default utterance
     if (!m_default_utterance_set)
       throw std::string("SpeakerConfig: Default utterance is required.");
     set_modules(m_default_utterance_config);
