@@ -120,9 +120,8 @@ if ($COPY_BINARY_TO_WORK > 0) {
 # Global GridManager object for single processes
 my $GM_SINGLE = GridManager->new;
 $GM_SINGLE->{"identifier"} = "single";
-$GM_SINGLE->{"temp_dir"} = $tempdir;
+$GM_SINGLE->{"run_dir"} = $tempdir;
 $GM_SINGLE->{"log_dir"} = $tempdir;
-$GM_SINGLE->{"script_dir"} = $SCRIPTDIR;
 
 
 # Generate initial model by context phone tying using existing alignments
@@ -371,7 +370,6 @@ sub collect_stats {
   my $spkc_switch = "";
   my $bw_option = "";
   my $mllt_option = "";
-  my $spkc_switch = "";
   $bw_option = "-H" if ($USE_HMMNETS);
   $spkc_switch = "-S $SPKC_FILE" if ($SPKC_FILE ne "");
   $mllt_option = "--mllt" if ($mllt_flag);
@@ -380,7 +378,6 @@ sub collect_stats {
   $gm->{"identifier"} = $id;
   $gm->{"run_dir"} = $temp_dir;
   $gm->{"log_dir"} = $log_dir;
-  $gm->{"script_dir"} = $SCRIPTDIR;
   if ($NUM_BATCHES > 0) {
     $gm->{"first_batch"} = 1;
     $gm->{"last_batch"} = $NUM_BATCHES;
@@ -464,7 +461,6 @@ sub align {
   $gm->{"identifier"} = "align_${BASE_ID}";
   $gm->{"run_dir"} = $temp_dir;
   $gm->{"log_dir"} = $temp_dir;
-  $gm->{"script_dir"} = $SCRIPTDIR;
   if ($NUM_BATCHES > 0) {
     $gm->{"first_batch"} = 1;
     $gm->{"last_batch"} = $NUM_BATCHES;
@@ -492,7 +488,6 @@ sub estimate_mllr {
   $gm->{"identifier"} = "mllr_${BASE_ID}";
   $gm->{"run_dir"} = $temp_dir;
   $gm->{"log_dir"} = $temp_dir;
-  $gm->{"script_dir"} = $SCRIPTDIR;
   if ($NUM_BATCHES > 0) {
     $gm->{"first_batch"} = 1;
     $gm->{"last_batch"} = $NUM_BATCHES;
@@ -528,7 +523,6 @@ sub estimate_vtln {
   $gm->{"identifier"} = "vtln_${BASE_ID}.sh";
   $gm->{"run_dir"} = $temp_dir;
   $gm->{"log_dir"} = $temp_dir;
-  $gm->{"script_dir"} = $SCRIPTDIR;
   if ($NUM_BATCHES > 0) {
     $gm->{"first_batch"} = 1;
     $gm->{"last_batch"} = $NUM_BATCHES;
@@ -589,7 +583,6 @@ sub generate_lnas {
   $gm->{"identifier"} = "lna_${BASE_ID}";
   $gm->{"run_dir"} = $temp_dir;
   $gm->{"log_dir"} = $temp_dir;
-  $gm->{"script_dir"} = $SCRIPTDIR;
   if ($NUM_BATCHES > 0) {
     $gm->{"first_batch"} = 1;
     $gm->{"last_batch"} = $NUM_BATCHES;
