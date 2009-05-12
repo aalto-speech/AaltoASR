@@ -11,5 +11,5 @@ int main(int argc, char *argv[])
   fputs("reading arpa from stdin, writing binary to stdout\n", stderr);
 
   reader.read(stdin, &gram);
-  gram.write(stdout, false);
+  gram.write(stdout, true);
 }
