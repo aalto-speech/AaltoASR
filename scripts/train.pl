@@ -35,6 +35,9 @@ my $init_cfg = $HMMDIR."/".$BASE_ID.".cfg"; # Used in tying and training
 my $NUM_BATCHES = 2; # Number of batches, maximum number of parallel jobs
 my $BATCH_PRIORITY = 0; # For large batches, use e.g. -100
 my $BATCH_MAX_MEM = 2000; # In megabytes
+# Note that you may need memory if the training data contains
+# e.g. long utterances! If too little memory is reserved, unexpected
+# termination of the training may occur.
 
 # Train/Baum-Welch settings
 my $USE_HMMNETS = 1; # If 0, the script must call align appropriately
@@ -209,7 +212,7 @@ sub convert_full_to_diagonal {
   my $gk_backup = $im."_full.gk";
   
   system("mv $gk $gk_backup");
-  system("$BINDIR/gconvert -g $gk_backup -o $gk -d");
+  $GM_SINGLE->submit("$BINDIR/gconvert -g $gk_backup -o $gk -d\n");
 }
 
 
