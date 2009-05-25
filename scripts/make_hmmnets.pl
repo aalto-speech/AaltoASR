@@ -11,6 +11,9 @@ use Fsm;
 use strict;
 use BSD::Resource;
 
+
+$ENV{PATH} .= ':/share/puhe/linux/bin'; # Ensure fst-tools are in path
+
 my $eps = ",";
 
 $Hmm::verbose = 0;
