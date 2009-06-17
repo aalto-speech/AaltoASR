@@ -24,7 +24,7 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln stats estimate align tie dur_est gconvert mllr subspace logl gcluster lda optimize optmodel cmpmodel combine_stats
+PROGS = feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr subspace logl gcluster lda optimize optmodel cmpmodel combine_stats
 
 PROGS_SRCS = $(PROGS:=.cc)
 
