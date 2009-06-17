@@ -137,6 +137,8 @@ FeatureGenerator::load_configuration(FILE *file)
       module = new VtlnModule();
     else if (type == SRNormModule::type_str())
       module = new SRNormModule();
+    else if (type == QuantEqModule::type_str())
+      module = new QuantEqModule();
     else
       throw std::string("Unknown module type '") + type + std::string("'");
     module->set_name(name);

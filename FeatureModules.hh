@@ -298,6 +298,7 @@ private:
   FeatureGenerator *m_fea_gen;
 
   int m_bins;
+  int m_root; //!< If nonzero, take 10th root of the output instead of logarithm
   std::vector<float> m_bin_edges;
 };
 
@@ -495,6 +496,30 @@ private:
   float m_speech_rate;
   std::vector< std::vector<float> > m_coef;
   std::vector<int> m_interpolation_start;
+};
+
+class QuantEqModule : public FeatureModule {
+public:
+  QuantEqModule();
+  static const char *type_str() { return "quanteq"; }
+
+  void set_alpha(std::vector<float> &alpha);
+  void set_gamma(std::vector<float> &gamma);
+  void set_quant_max(std::vector<float> &quant_max);
+  std::vector<float> get_quant_train(void) { return m_quant_train; }
+  virtual void set_parameters(const ModuleConfig &config);
+  virtual void get_parameters(ModuleConfig &config);
+  
+private:
+  virtual void get_module_config(ModuleConfig &config);
+  virtual void set_module_config(const ModuleConfig &config);
+  virtual void generate(int frame);
+
+private:
+  std::vector<float> m_quant_train;
+  std::vector<float> m_alpha;
+  std::vector<float> m_gamma;
+  std::vector<float> m_quant_max;
 };
 
 #endif /* FEATUREMODULES_HH */

@@ -667,6 +667,8 @@ MelModule::MelModule(FeatureGenerator *fea_gen) :
 void
 MelModule::get_module_config(ModuleConfig &config)
 {
+  if (m_root)
+    config.set("root", m_root);
 }
 
 void
@@ -674,6 +676,9 @@ MelModule::set_module_config(const ModuleConfig &config)
 {
   m_own_offset_left = 0;
   m_own_offset_right = 0;
+  m_root = 0;
+
+  config.get("root", m_root);
   
   m_dim = (int)((21+2)*log10f(1+m_fea_gen->sample_rate()/1400.0) /
                 log10f(1+16000/1400.0)-2);
@@ -729,7 +734,16 @@ MelModule::generate(int frame)
       sum += scale;
       t++;
     }
-    m_buffer[frame][b] = logf(val/sum + 1);
+    
+      
+    if (m_root)
+    {
+      m_buffer[frame][b] = pow(val/sum, 0.1);
+    }
+    else
+    {
+      m_buffer[frame][b] = logf(val/sum + 1);
+    }
   }
 }
 
@@ -1906,6 +1920,88 @@ SRNormModule::generate(int frame)
       // Assuming positive input/output
       target[i*m_frame_dim + d] = std::max((float)t, 0.0f);
     }
+  }
+}
+
+
+//////////////////////////////////////////////////////////////////
+// QuantEqModule
+//////////////////////////////////////////////////////////////////
+QuantEqModule::QuantEqModule()
+{
+  m_type_str = type_str();
+}
+
+void
+QuantEqModule::get_module_config(ModuleConfig &config)
+{
+  config.set("quant_train", m_quant_train);
+}
+
+void
+QuantEqModule::set_module_config(const ModuleConfig &config)
+{
+  m_own_offset_left = 0;
+  m_own_offset_right = 0;
+  m_dim = m_sources.back()->dim();
+  config.get("quant_train", m_quant_train);
+}
+
+void
+QuantEqModule::set_parameters(const ModuleConfig &config)
+{
+  if (!config.get("alpha", m_alpha))
+    m_alpha.clear();
+  if (!config.get("gamma", m_gamma))
+    m_gamma.clear();
+  if (!config.get("quant_max", m_quant_max))
+    m_quant_max.clear();
+}
+
+void
+QuantEqModule::get_parameters(ModuleConfig &config)
+{
+  config.set("alpha", m_alpha);
+  config.set("gamma", m_gamma);
+  config.set("quant_max", m_quant_max);
+}
+
+void
+QuantEqModule::set_alpha(std::vector<float> &alpha)
+{
+  m_alpha = alpha;
+}
+
+void
+QuantEqModule::set_gamma(std::vector<float> &gamma)
+{
+  m_gamma = gamma;
+}
+
+void
+QuantEqModule::set_quant_max(std::vector<float> &quant_max)
+{
+  m_quant_max = quant_max;
+}
+
+void
+QuantEqModule::generate(int frame)
+{
+  const FeatureVec source_fea = m_sources.back()->at(frame);
+  FeatureVec target_fea = m_buffer[frame];
+  
+  // Channel dependent transformation
+  if (m_alpha.size() > 0 && m_gamma.size() > 0 && m_quant_max.size() > 0)
+  {
+    for (int k = 0; k < m_dim; k++)
+    {
+      target_fea[k] = m_quant_max[k] * (m_alpha[k]*pow(source_fea[k]/m_quant_max[k], m_gamma[k]) + (1-m_alpha[k])*(source_fea[k]/m_quant_max[k]));
+    }
+  }
+  else
+  {
+    for (int k = 0; k < m_dim; k++)
+      target_fea[k] = source_fea[k];
   }
 }
 
