@@ -1611,7 +1611,7 @@ TokenPassSearch::set_ngram(TreeGram *ngram)
 
     // Warn about words not in lm.
     if (m_lex2lm[i] == 0 && i != 0) {
-      fprintf(stderr, "%s not in LM\n", m_vocabulary.word(i).c_str());
+//      fprintf(stderr, "%s not in LM\n", m_vocabulary.word(i).c_str());
       count++;
     }
   }

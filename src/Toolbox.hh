@@ -176,6 +176,10 @@ public:
   }
   void write_word_history() { m_tp_search.write_word_history(); }
   void print_lm_history() { m_tp_search.print_lm_history(); }
+  void write_state_segmentation(const std::string &file)
+  { 
+    m_tp_search.print_state_history(io::Stream(file, "w").file);
+  }
 
   TokenPassSearch &debug_get_tp() { return m_tp_search; }
   TPLexPrefixTree &debug_get_tp_lex() { return m_tp_lexicon; }

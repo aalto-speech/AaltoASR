@@ -142,6 +142,7 @@ public:
 	void print_best_lm_history();
 	void print_best_lm_history_to_file(FILE *out);
 	void select_decoder(int stack_dec);
+	void write_state_segmentation(const std::string &file);
 
   void set_forced_end(bool forced_end);
   void set_hypo_limit(int hypo_limit);
@@ -172,6 +173,7 @@ public:
 	void set_insertion_penalty(float ip);
   void set_print_text_result(int print);
   void set_print_state_segmentation(int print);
+  void set_keep_state_segmentation(int keep);
   void set_verbose(int verbose);
   void set_print_probs(bool print_probs);
   void set_print_indices(bool print_indices);

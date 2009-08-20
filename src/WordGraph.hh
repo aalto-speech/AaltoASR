@@ -161,7 +161,7 @@ struct WordGraph {
   /** Marks all nodes unreachable. */
   void reset_reachability(bool value = false)
   {
-    for (int i = 0; i < nodes.size(); i++)
+    for (size_t i = 0; i < nodes.size(); i++)
       nodes[i].reachable = value;
   }
 

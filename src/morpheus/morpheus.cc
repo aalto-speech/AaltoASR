@@ -16,6 +16,8 @@ main(int argc, char *argv[])
       ('h', "help", "", "", "display help")
       ('\0', "arpa=FILE", "arg", "", "read ARPA language model")
       ('\0', "fsa=FILE", "arg", "", "read binary fsa model")
+      ('\0', "preserve-id", "", "", "preserve trn id in parenthesis")
+      ('p', "prob", "", "", "print also LM probability")
       ('s', "start=INT", "arg", "1", "start from line (1 = first)")
       ('e', "end=INT", "arg", "0", "end after line")
       ;
@@ -61,6 +63,15 @@ main(int argc, char *argv[])
 
       try {
         StrVec words = str::split(line, " \t", true);
+
+        Str id;
+        if (config["preserve-id"].specified &&
+            words.back()[0] == '(') 
+        {
+          id = words.back();
+          words.pop_back();
+        }
+
         m.reset();
         m.add_symbol(m.sentence_start_str);
         m.add_symbol(m.word_boundary_str);
@@ -69,7 +80,12 @@ main(int argc, char *argv[])
           m.add_symbol(m.word_boundary_str);
         }
         m.add_symbol(m.sentence_end_str);
-        printf("%g %s\n", m.score(), m.str().c_str());
+        if (config["prob"].specified)
+          printf("%g ", m.score());
+        printf("%s", m.str().c_str());
+        if (config["preserve-id"].specified && !id.empty())
+          printf(" %s", id.c_str());
+        fputs("\n", stdout);
       }
       catch (mrf::NoSeg &e) {
         printf("NO SEGMENTATION: %s\n", line.c_str());

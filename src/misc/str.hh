@@ -1,6 +1,8 @@
 #ifndef STR_HH
 #define STR_HH
 
+#include <limits.h>
+#include <string.h>
 #include <assert.h>
 #include <sstream>
 #include <string>
@@ -114,8 +116,8 @@ namespace str {
    */
   inline void remove(std::string &str, const char *chars)
   {
-    int src = 0;
-    int tgt = 0;
+    size_t src = 0;
+    size_t tgt = 0;
     while (1) {
       if (src == str.length())
         break;

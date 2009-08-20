@@ -39,7 +39,7 @@ all_objs = $(all_srcs:.cc=.o)
 
 .SUFFIXES:
 
-default: progs swig
+default: progs swig morpheus
 
 %.o: %.cc
 	$(CXX) -c $(cxxflags) $< -o $@
@@ -72,6 +72,7 @@ clean:
 	$(MAKE) -C swig clean
 	$(MAKE) -C fsalm clean
 	$(MAKE) -C misc clean
+	$(MAKE) -C morpheus clean
 
 dep:
 	$(CXX) -MM $(cxxflags) $(DEPFLAGS) $(all_srcs) > dep
