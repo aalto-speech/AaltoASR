@@ -1,6 +1,7 @@
 #ifndef SEGMENTATOR_HH
 #define SEGMENTATOR_HH
 
+#include <string>
 #include <map>
 #include <vector>
 

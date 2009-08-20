@@ -3,6 +3,7 @@
 #include <string>
 #include <list>
 #include <math.h>
+#include <string.h>
 
 #include "str.hh"
 #include "io.hh"
@@ -81,12 +82,14 @@ void flush_buffer(int buffer_number)
   while (!buffers.features[buffer_number].empty())
   {
     float *buf = buffers.features[buffer_number].front().features;
-    int count = buffers.features[buffer_number].front().num_features;
-    if (binary)
-      fwrite(buf, sizeof(float), count, out);
+    size_t count = buffers.features[buffer_number].front().num_features;
+    if (binary) {
+      size_t ret = fwrite(buf, sizeof(float), count, out);
+      assert(ret == count);
+    }
     else
     {
-      for (int i = 0; i < count; i++)
+      for (size_t i = 0; i < count; i++)
       {
         for (int d = 0; d < buffers.dim; d++)
           fprintf(out,"%f ",buf[i*buffers.dim + d]);

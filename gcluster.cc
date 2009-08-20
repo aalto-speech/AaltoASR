@@ -1,3 +1,5 @@
+#include <iostream>
+#include <fstream>
 #include "Distributions.hh"
 #include "conf.hh"
 #include "LinearAlgebra.hh"

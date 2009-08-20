@@ -175,6 +175,7 @@ main(int argc, char *argv[])
                                   config["mpe-ismooth"].get_double());
 
     // Linesearch for subspace models
+#ifdef USE_SUBSPACE_COV
     HCL_LineSearch_MT_d ls;
     if (config["hcl-line-cfg"].specified)
       ls.Parameters().Merge(config["hcl-line-cfg"].get_str().c_str());
@@ -209,6 +210,12 @@ main(int argc, char *argv[])
       // Re-estimate only mixture parameters in this case
       model.estimate_parameters(mode, false, true);
     }
+#else
+    if (config["hcl-line-cfg"].specified ||
+        config["hcl-bfgs-cfg"].specified ||
+        config["coeffs"].specified)
+      throw std::runtime_error("not compiled with USE_SUBSPACE_COV");
+#endif
 
     // Normal training, FIXME: MLLT + precomputed coefficients?
     else {

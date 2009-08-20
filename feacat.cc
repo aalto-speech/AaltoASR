@@ -1,3 +1,4 @@
+#include <limits.h>
 #include "io.hh"
 #include "conf.hh"
 #include "FeatureGenerator.hh"
@@ -15,7 +16,8 @@ print_feature(const FeatureVec &fea)
   if (raw_output) {
     for (int i = 0; i < fea.dim(); i++) {
       float tmp = fea[i];
-      fwrite(&tmp, sizeof(float), 1, stdout);
+      size_t ret = fwrite(&tmp, sizeof(float), 1, stdout);
+      assert(ret == 1);
     }
   }
 
@@ -75,7 +77,8 @@ main(int argc, char *argv[])
     if (raw_output && config["header"].specified)
     {
       int dim = gen.dim();
-      fwrite(&dim, sizeof(int), 1, stdout);
+      size_t ret = fwrite(&dim, sizeof(int), 1, stdout);
+      assert(ret == 1);
     }
 
     int start_frame = 0;

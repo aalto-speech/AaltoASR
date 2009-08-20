@@ -3,7 +3,9 @@
 
 #define LA_COMPLEX_SUPPORT
 #include "lapackpp.h"
-#include "HCL_Rn_d.h"
+#ifdef USE_SUBSPACE_COV
+# include "HCL_Rn_d.h"
+#endif
 
 typedef LaGenMatDouble Matrix;
 typedef LaVectorDouble Vector;
@@ -52,11 +54,13 @@ namespace LinearAlgebra {
   void map_v2m(const Vector &v, 
                Matrix &m);
 
+#ifdef USE_SUBSPACE_COV
   void map_hclv2lapackm(const HCL_RnVector_d &hcl_v, 
                         Matrix &lapack_m);
   
   void map_lapackm2hclv(const Matrix &lapack_m,
                         HCL_RnVector_d &hcl_v);
+#endif
 
   double cond(const Matrix &m);
 

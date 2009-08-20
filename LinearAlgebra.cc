@@ -1,3 +1,4 @@
+#include <values.h>
 #include "LinearAlgebra.hh"
 #include "util.hh"
 
@@ -271,6 +272,7 @@ namespace LinearAlgebra {
   }
 */
 
+#ifdef USE_SUBSPACE_COV
   void
   map_hclv2lapackm(const HCL_RnVector_d &v, 
                    Matrix &m)
@@ -319,6 +321,7 @@ namespace LinearAlgebra {
         ++pos;
       }
   }
+#endif
 
 /*
   double

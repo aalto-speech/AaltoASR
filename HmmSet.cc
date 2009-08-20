@@ -1,7 +1,7 @@
 #include <assert.h>
+#include <iostream>
 #include <fstream>
 #include <math.h>
-#include <iostream>
 #include <values.h>
 #include <algorithm>
 
@@ -563,7 +563,7 @@ HmmSet::dump_mc_statistics(const std::string filename) const
 void
 HmmSet::dump_gk_statistics(const std::string filename) const
 {
-  std::ofstream gks(filename.c_str(), ofstream::binary);
+  std::ofstream gks(filename.c_str(), std::ofstream::binary);
   
   if (!gks) {
     fprintf(stderr, "HmmSet::dump_gk_statistics(): could not open %s\n", filename.c_str());
@@ -690,7 +690,7 @@ HmmSet::accumulate_mc_from_dump(const std::string filename)
 void
 HmmSet::accumulate_gk_from_dump(const std::string filename)
 {
-  std::ifstream gks(filename.c_str(), ifstream::binary);
+  std::ifstream gks(filename.c_str(), std::ifstream::binary);
   if (!gks) {
     fprintf(stderr, "HmmSet::accumulate_gk_from_dump(): could not open %s\n", filename.c_str());
     throw OpenError();

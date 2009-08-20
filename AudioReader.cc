@@ -1,3 +1,4 @@
+#include <limits.h>
 #include "AudioReader.hh"
 #include <string>
 #include <iostream>

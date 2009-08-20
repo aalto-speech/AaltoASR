@@ -1,5 +1,8 @@
 #include <cassert>
 
+#include <iostream>
+#include <fstream>
+
 #include "Distributions.hh"
 #include "str.hh"
 
@@ -1262,6 +1265,7 @@ FullCovarianceGaussian::set_covariance(const Matrix &covariance,
 }
 
 
+#ifdef USE_SUBSPACE_COV
 PrecisionConstrainedGaussian::PrecisionConstrainedGaussian()
 {
 }
@@ -1273,7 +1277,6 @@ PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(PrecisionSubspace *sp
   m_coeffs.resize(space->subspace_dim());
   reset(space->feature_dim());
 }
-
 
 PrecisionConstrainedGaussian::PrecisionConstrainedGaussian(const PrecisionConstrainedGaussian &g)
 {
@@ -1645,6 +1648,7 @@ SubspaceConstrainedGaussian::set_parameters(const Vector &mean, const Matrix &co
     chol = NULL;
   }
 }
+#endif
 
 
 Mixture::Mixture()
@@ -2234,6 +2238,7 @@ PDFPool::reset_cache()
     m_valid_likelihoods.pop_back();
   }
 
+#ifdef USE_SUBSPACE_COV
   std::map<int, PrecisionSubspace*>::const_iterator pitr;
   for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr)
     (*pitr).second->reset_cache();
@@ -2241,8 +2246,8 @@ PDFPool::reset_cache()
   std::map<int, ExponentialSubspace*>::const_iterator eitr;
   for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr)
     (*eitr).second->reset_cache();
+#endif
 }
-
 
 double
 PDFPool::compute_likelihood(const Vector &f, int index)
@@ -2260,6 +2265,7 @@ PDFPool::precompute_likelihoods(const Vector &f)
 {
   reset_cache();
 
+#ifdef USE_SUBSPACE_COV
   std::map<int, PrecisionSubspace*>::const_iterator pitr;
   for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr)
     (*pitr).second->precompute(f);
@@ -2267,6 +2273,7 @@ PDFPool::precompute_likelihoods(const Vector &f)
   std::map<int, ExponentialSubspace*>::const_iterator eitr;
   for (eitr = m_exponential_subspaces.begin(); eitr != m_exponential_subspaces.end(); ++eitr)
     (*eitr).second->precompute(f);
+#endif
 
   // Clustering not in use
   if (!use_clustering()) {
@@ -2346,6 +2353,7 @@ PDFPool::set_gaussian_parameters(double minvar, double covsmooth,
 }
 
 
+#ifdef USE_SUBSPACE_COV
 void
 PDFPool::set_hcl_optimization(HCL_LineSearch_MT_d *ls,
                               HCL_UMin_lbfgs_d *bfgs,
@@ -2362,19 +2370,21 @@ PDFPool::set_hcl_optimization(HCL_LineSearch_MT_d *ls,
     (*eitr).second->set_hcl_optimization(ls, bfgs, ls_cfg_file, bfgs_cfg_file);
   }
 }
-
+#endif
 
 void
 PDFPool::estimate_parameters(PDF::EstimationMode mode)
 {
   for (int i=0; i<size(); i++)
   {
+#ifdef USE_SUBSPACE_COV
     PrecisionConstrainedGaussian *pctemp = dynamic_cast< PrecisionConstrainedGaussian* > (m_pool[i]);
     SubspaceConstrainedGaussian *sctemp = dynamic_cast< SubspaceConstrainedGaussian* > (m_pool[i]);
 
     if (pctemp != NULL || sctemp != NULL)
       std::cout << "Training Gaussian: " << i << "/" << size() << std::endl;
-    
+#endif
+
     Gaussian *temp = dynamic_cast< Gaussian* > (m_pool[i]);
 
     try {
@@ -2413,7 +2423,9 @@ PDFPool::read_gk(const std::string &filename)
     throw str::fmt(512, "PDFPool::read_gk(): could not open %s\n", filename.c_str());
   
   int pdfs = 0;
+#ifdef USE_SUBSPACE_COV
   int ssid;
+#endif
   std::string type_str;
   in >> pdfs >> m_dim >> type_str;
   m_pool.resize(pdfs);
@@ -2427,7 +2439,16 @@ PDFPool::read_gk(const std::string &filename)
     for (int i=0; i<pdfs; i++) {
       in >> type_str;
 
-      if (type_str == "precision_subspace") {
+      if (type_str == "diag") {
+        m_pool[i]=new DiagonalGaussian(m_dim);
+        m_pool[i]->read(in);
+      }
+      else if (type_str == "full") {
+	m_pool[i]=new FullCovarianceGaussian(m_dim);
+        m_pool[i]->read(in);
+      }
+#ifdef USE_SUBSPACE_COV
+      else if (type_str == "precision_subspace") {
         in >> ssid;
         PrecisionSubspace *ps = new PrecisionSubspace();
         ps->read_subspace(in);
@@ -2441,14 +2462,6 @@ PDFPool::read_gk(const std::string &filename)
         m_exponential_subspaces[ssid]=es;
         i--;
       }
-      else if (type_str == "diag") {
-        m_pool[i]=new DiagonalGaussian(m_dim);
-        m_pool[i]->read(in);
-      }
-      else if (type_str == "full") {
-	m_pool[i]=new FullCovarianceGaussian(m_dim);
-        m_pool[i]->read(in);
-      }
       else if (type_str == "pcgmm") {
         in >> ssid;
         assert(m_precision_subspaces[ssid] != NULL);
@@ -2461,6 +2474,7 @@ PDFPool::read_gk(const std::string &filename)
 	m_pool[i]=new SubspaceConstrainedGaussian(m_exponential_subspaces[ssid]);
         m_pool[i]->read(in);
       }
+#endif
       else
         throw std::string("Unknown model type\n") + type_str;
     }
@@ -2480,6 +2494,7 @@ PDFPool::read_gk(const std::string &filename)
 	m_pool[i]->read(in);
       }      
     }
+#ifdef USE_SUBSPACE_COV
     else if (type_str == "pcgmm") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
 	m_pool[i]=new PrecisionConstrainedGaussian();
@@ -2492,6 +2507,7 @@ PDFPool::read_gk(const std::string &filename)
 	m_pool[i]->read(in);
       }            
     }
+#endif
     else
       throw std::string("Unknown model type\n");
   }
@@ -2510,6 +2526,7 @@ PDFPool::write_gk(const std::string &filename) const
   
   out << m_pool.size() << " " << m_dim << " variable\n";
 
+#ifdef USE_SUBSPACE_COV
   std::map<int, PrecisionSubspace*>::const_iterator pitr;
   for (pitr = m_precision_subspaces.begin(); pitr != m_precision_subspaces.end(); ++pitr) {
     out << "precision_subspace ";
@@ -2523,9 +2540,11 @@ PDFPool::write_gk(const std::string &filename) const
     out << (*eitr).first << " ";
     (*eitr).second->write_subspace(out);
   }
+#endif 
 
   for (unsigned int i=0; i<m_pool.size(); i++) {
 
+#ifdef USE_SUBSPACE_COV
     PrecisionConstrainedGaussian *pcg = dynamic_cast< PrecisionConstrainedGaussian* > (m_pool[i]);
     if (pcg != NULL) {
       out << "pcgmm ";
@@ -2545,6 +2564,7 @@ PDFPool::write_gk(const std::string &filename) const
           out << (*eitr).first; 
       }      
     }
+#endif
     
     m_pool[i]->write(out);
     out << std::endl;
@@ -2555,6 +2575,7 @@ PDFPool::write_gk(const std::string &filename) const
 }
 
 
+#ifdef USE_SUBSPACE_COV
 void
 PDFPool::set_precision_subspace(int id, PrecisionSubspace *ps)
 {
@@ -2595,7 +2616,7 @@ PDFPool::remove_exponential_subspace(int id)
 {
   m_exponential_subspaces.erase(id);
 }
-
+#endif
 
 bool
 PDFPool::split_gaussian(int index, int *new_index, double minocc, int minfeas)

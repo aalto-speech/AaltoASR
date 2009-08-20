@@ -1,5 +1,6 @@
 #include <errno.h>
 
+#include <string.h>
 #include "Recipe.hh"
 #include "str.hh"
 

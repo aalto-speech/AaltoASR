@@ -6,7 +6,9 @@
 #include "FeatureBuffer.hh"
 #include "FeatureModules.hh"
 #include "LinearAlgebra.hh"
-#include "Subspaces.hh"
+#ifdef USE_SUBSPACE_COV
+# include "Subspaces.hh"
+#endif
 #include "ziggurat.hh"
 #include "mtw.hh"
 
@@ -155,6 +157,7 @@ public:
                                double c1 = 0, double c2 = 0,
                                double mmi_ismooth = 0, double mpe_ismooth = 0);
 
+#ifdef USE_SUBSPACE_COV
   /** Set the HCL objects and settings for optimization
    * \param ls            HCL linesearch
    * \param bfgs          HCL BFGS optimization algorithm
@@ -165,6 +168,7 @@ public:
                             HCL_UMin_lbfgs_d *bfgs,
                             std::string ls_cfg_file,
                             std::string bfgs_cfg_file);
+#endif
   
   /** Splits a Gaussian in the pool with some constrains
   * \param index     Index of the Gaussian to be split
@@ -180,12 +184,14 @@ public:
   double get_covsmooth(void) const { return m_covsmooth; }
 
   /** Functions for accessing subspaces for Gaussian parameters */
+#ifdef USE_SUBSPACE_COV
   void set_precision_subspace(int id, PrecisionSubspace *ps);
   void set_exponential_subspace(int id, ExponentialSubspace *es);
   PrecisionSubspace *get_precision_subspace(int id);
   ExponentialSubspace *get_exponential_subspace(int id);
   void remove_precision_subspace(int id);
   void remove_exponential_subspace(int id);
+#endif 
   
   /** \param index PDF index
    * \return Gaussian occupancy, -1 if not a Gaussian or not accumulated. */
@@ -227,9 +233,11 @@ private:
   double m_mmi_ismooth;
   double m_mpe_ismooth;
 
+#ifdef USE_SUBSPACE_COV
   // Subspaces
   std::map<int, PrecisionSubspace*> m_precision_subspaces;
   std::map<int, ExponentialSubspace*> m_exponential_subspaces;
+#endif
 
   // Clustering
   bool m_use_clustering;
@@ -546,6 +554,7 @@ private:
 
 
 
+#ifdef USE_SUBSPACE_COV
 class PrecisionConstrainedGaussian : public Gaussian {
 public:
   PrecisionConstrainedGaussian();
@@ -636,6 +645,7 @@ public:
   /* Set the limited memory BFGS algorithm class for parameter optimization */
   void set_bfgs(HCL_UMin_lbfgs_d *bfgs) { m_bfgs = bfgs; }
 
+
   /* Get the subspace dimensionality */
   int subspace_dim() const { return m_coeffs.size(); }
   /* Get the subspace */
@@ -648,7 +658,7 @@ private:
   ExponentialSubspace *m_es;
   HCL_UMin_lbfgs_d *m_bfgs;
 };
-
+#endif
 
 
 class Mixture : public PDF {

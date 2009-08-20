@@ -1,6 +1,7 @@
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <string.h>
 
 #include "io.hh"
 #include "str.hh"

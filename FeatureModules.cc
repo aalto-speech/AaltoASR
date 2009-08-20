@@ -1,6 +1,7 @@
 #include "FeatureModules.hh"
 #include "FeatureGenerator.hh"
 
+#include <limits.h>
 #include <math.h>
 #include "util.hh"
 

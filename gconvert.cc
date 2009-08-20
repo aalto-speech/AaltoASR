@@ -3,8 +3,10 @@
 #include "LinearAlgebra.hh"
 
 conf::Config config;
+#ifdef USE_SUBSPACE_COV
 PrecisionSubspace *ps;
 ExponentialSubspace *es;
+#endif
 
 
 int
@@ -18,14 +20,18 @@ main(int argc, char *argv[])
       ('C', "coeffs=NAME", "arg", "", "Precomputed precision/subspace coefficients")
       ('d', "to-diagonal", "", "", "convert Gaussians to diagonal")
       ('f', "to-full", "", "", "convert Gaussians to full covariances")
+#ifdef USE_SUBSPACE_COV
       ('p', "to-pcgmm", "", "", "convert Gaussians to have a subspace constraint on precisions")
       ('s', "to-scgmm", "", "", "convert Gaussians to have an exponential subspace constraint")
       ('b', "subspace=FILE", "arg", "", "use an already initialized subspace")
+#endif
       ('i', "info=INT", "arg", "0", "info level")
       ('\0', "ssdim=INT", "arg", "0", "subspace dimensionality")
       ('\0', "minvar=FLOAT", "arg", "0", "minimum diagonal variance")
+#ifdef USE_SUBSPACE_COV
       ('\0', "hcl_bfgs_cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
       ('\0', "hcl_line_cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
+#endif
       ;
     config.default_parse(argc, argv);
 
@@ -35,10 +41,12 @@ main(int argc, char *argv[])
       count++;
     if (config["to-full"].specified)
       count++;
+#ifdef USE_SUBSPACE_COV
     if (config["to-pcgmm"].specified)
       count++;
     if (config["to-scgmm"].specified)
       count++;
+#endif
     if (count==0)
       throw std::string("Define a target Gaussian type!");
     if (count>1)
@@ -49,6 +57,7 @@ main(int argc, char *argv[])
     pool.read_gk(config["gk"].get_str());
     new_pool.set_dim(pool.dim());
 
+#ifdef USE_SUBSPACE_COV
     // Linesearch for subspace models
     HCL_LineSearch_MT_d ls;
     if (config["hcl_line_cfg"].specified)
@@ -141,7 +150,7 @@ main(int argc, char *argv[])
       es->set_hcl_optimization(&ls, &bfgs, config["hcl_line_cfg"].get_str(), config["hcl_bfgs_cfg"].get_str());
       new_pool.set_exponential_subspace(1, es);
     }
-    
+#endif    
 
     // Load possible precomputed Gaussians
 
@@ -151,6 +160,7 @@ main(int argc, char *argv[])
     for (unsigned int i=0; i<already_computed.size(); i++)
       already_computed[i] = false;
 
+#ifdef USE_SUBSPACE_COV
     // Go through the files
     if (config["coeffs"].specified) {
       std::ifstream coeffs_files(config["coeffs"].get_str().c_str());
@@ -176,6 +186,7 @@ main(int argc, char *argv[])
         }
       }
     }
+#endif
 
     // Go through every Gaussian in the pool
     Matrix covariance;
@@ -199,11 +210,13 @@ main(int argc, char *argv[])
         new_gaussian = new DiagonalGaussian(gaussian->dim());
       if (config["to-full"].specified)
         new_gaussian = new FullCovarianceGaussian(gaussian->dim());
+#ifdef USE_SUBSPACE_COV
       if (config["to-pcgmm"].specified)
         new_gaussian = new PrecisionConstrainedGaussian(ps);
       if (config["to-scgmm"].specified)
         new_gaussian = new SubspaceConstrainedGaussian(es);
-      
+#endif      
+
       // Get the old Gaussian parameters
       gaussian->get_covariance(covariance);
       gaussian->get_mean(mean);
@@ -224,9 +237,11 @@ main(int argc, char *argv[])
 
       // Print kullback-leibler
       if (config["info"].get_int() > 0) {
+#ifdef USE_SUBSPACE_COV
         if (config["to-pcgmm"].specified || config["to-scgmm"].specified)
           std::cout << "\tkl-divergence: " << gaussian->kullback_leibler(*new_gaussian);
         std::cout << std::endl;
+#endif
       }      
     }
 

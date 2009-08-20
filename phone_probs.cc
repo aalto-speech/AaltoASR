@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -192,7 +193,7 @@ main(int argc, char *argv[])
                           gen.frame_rate());
       end_frame = (int)(recipe.infos[recipe_index].end_time *
                         gen.frame_rate());
-      if (info > 0 && start_frame != 0 || end_frame != 0)
+      if ((info > 0 && start_frame != 0) || end_frame != 0)
         printf("Generating frames %d - %d\n", start_frame, end_frame);
       if (end_frame == 0)
         end_frame = INT_MAX;

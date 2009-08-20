@@ -439,7 +439,7 @@ LmbfgsOptimize::stopping_test(void)
   double gnorm = Blas_Norm2(*m_cur_gradient);
   double xnorm = Blas_Norm2(*m_cur_params);
   double rel_grad_norm =
-    std::max(xnorm,1.0)*gnorm/std::max(abs(m_func_val),1.0);
+    std::max(xnorm,1.0)*gnorm/std::max(fabs(m_func_val),1.0);
   if (m_verbosity > 0)
     fprintf(stderr, "Relative gradient norm: %g\n", rel_grad_norm);
   if (m_num_bfgs_updates > 0 && rel_grad_norm < m_grad_tol)

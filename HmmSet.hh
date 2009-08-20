@@ -405,6 +405,7 @@ public:
    */
   void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double mmi_ismooth, double mpe_ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, mmi_ismooth, mpe_ismooth); }
 
+#ifdef USE_SUBSPACE_COV
   /** Set the HCL objects and settings for optimization
    * \param ls            HCL linesearch
    * \param bfgs          HCL BFGS optimization algorithm
@@ -415,6 +416,7 @@ public:
                             HCL_UMin_lbfgs_d *bfgs,
                             std::string ls_cfg_file,
                             std::string bfgs_cfg_file) { m_pool.set_hcl_optimization(ls, bfgs, ls_cfg_file, bfgs_cfg_file); }
+#endif
   
   /** Deletes Gaussians which occupancy count is below the given threshold.
    * Assures that at least one Gaussian is left for each mixture.

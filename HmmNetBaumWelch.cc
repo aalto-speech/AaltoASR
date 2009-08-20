@@ -1,3 +1,4 @@
+#include <string.h>
 #include "HmmNetBaumWelch.hh"
 #include "str.hh"
 
