@@ -2,17 +2,19 @@
 #include "str.hh"
 
 
-SpeakerConfig::SpeakerConfig(FeatureGenerator &fea_gen) :
-  m_fea_gen(fea_gen)
+SpeakerConfig::SpeakerConfig(FeatureGenerator &fea_gen, HmmSet *model) :
+  m_fea_gen(fea_gen), m_model(model)
 {
   m_cur_speaker = "";
   m_cur_utterance = "";
   m_default_speaker_set = false;
   m_default_utterance_set = false;
+  if(model != NULL) m_model_trans.set_model(model);
 }
 
 
-void SpeakerConfig::read_speaker_file(FILE *file)
+void
+SpeakerConfig::read_speaker_file(FILE *file)
 {
   std::string line;
   int lineno = 0;
@@ -92,8 +94,30 @@ void SpeakerConfig::read_speaker_file(FILE *file)
         break;
       }
       // line should now contain the module name
+      // if line does not start with model, it's assumed to be a feature module
+      std::vector<std::string> parts;
+      str::split(&line, " \t", true, &parts, 2);
+
+      if(parts.size() < 2) {
+        line = "feature "+line;
+        str::split(&line, " \t", true, &parts, 2);
+        //throw str::fmt(256, "Warning: feature namespace assumed at line %d", lineno);
+      }
+      else {
+        if(parts[0] != "model" && parts[0] != "feature")
+          throw str::fmt(256, "SpeakerConfig: Unknown module namespace at line %d",
+                                 lineno);
+      }
+
+      assert(parts.size() == 2);
+
       try {
-        m_fea_gen.module(line);
+        if(parts[0] == "feature")
+          m_fea_gen.module(parts[1]);
+
+        if(parts[0] == "model")
+          m_model_trans.module(parts[1]);
+
       } catch (std::string &str) {
         throw str::fmt(256, "SpeakerConfig: error on line %d: ", lineno) + str;
       }
@@ -126,7 +150,8 @@ void SpeakerConfig::read_speaker_file(FILE *file)
 }
 
 
-void SpeakerConfig::write_speaker_file(FILE *file,
+void
+SpeakerConfig::write_speaker_file(FILE *file,
                                        std::set<std::string> *speakers,
                                        std::set<std::string> *utterances)
 {
@@ -207,7 +232,8 @@ void SpeakerConfig::write_speaker_file(FILE *file,
 }
 
 
-void SpeakerConfig::set_speaker(const std::string &speaker_id)
+void
+SpeakerConfig::set_speaker(const std::string &speaker_id)
 {
   if (m_cur_speaker.size() > 0)
     retrieve_speaker_config(m_cur_speaker);
@@ -216,12 +242,23 @@ void SpeakerConfig::set_speaker(const std::string &speaker_id)
   if (m_cur_utterance.size() > 0)
     set_utterance("");
 
+  bool load_new_model_trans = false;
+
+  if(speaker_id != m_cur_speaker) {
+    // Reset model transformations
+    m_model_trans.reset_transforms();
+  }
+
+  if(m_model_trans.is_reset()) load_new_model_trans = true;
+
+
+
   if (speaker_id.size() == 0)
   {
     // Use the default speaker
     if (!m_default_speaker_set)
       throw std::string("SpeakerConfig: No speaker defined, needs a default speaker.");
-    set_modules(m_default_speaker_config);
+    set_modules(m_default_speaker_config, load_new_model_trans);
   }
   else
   {
@@ -237,13 +274,15 @@ void SpeakerConfig::set_speaker(const std::string &speaker_id)
       speaker_it = m_speaker_config.insert(v).first;
     }
 
-    set_modules((*speaker_it).second);
+    set_modules((*speaker_it).second, load_new_model_trans);
   }
   
   m_cur_speaker = speaker_id;
+  if(load_new_model_trans) m_model_trans.load_transforms();
 }
 
-void SpeakerConfig::set_utterance(const std::string &utterance_id)
+void
+SpeakerConfig::set_utterance(const std::string &utterance_id)
 {
   if (m_cur_utterance.size() > 0)
     retrieve_utterance_config(m_cur_utterance);
@@ -275,7 +314,8 @@ void SpeakerConfig::set_utterance(const std::string &utterance_id)
 }
 
 
-void SpeakerConfig::retrieve_speaker_config(const std::string &speaker_id)
+void
+SpeakerConfig::retrieve_speaker_config(const std::string &speaker_id)
 {
   SpeakerMap::iterator speaker_it =
     m_speaker_config.find(speaker_id);
@@ -285,13 +325,20 @@ void SpeakerConfig::retrieve_speaker_config(const std::string &speaker_id)
   for (ModuleMap::iterator module_it = (*speaker_it).second.begin();
        module_it != (*speaker_it).second.end(); module_it++)
   {
-    m_fea_gen.module((*module_it).first)->get_parameters(
-      (*module_it).second);
+    std::vector<std::string> parts;
+    str::split(&(*module_it).first, " \t", true, &parts, 2);
+    if(parts[0] == "feature")
+      m_fea_gen.module(parts[1])->get_parameters((*module_it).second);
+
+    if(parts[0] == "model")
+      m_model_trans.module(parts[1])->get_parameters((*module_it).second);
+
   }
 }
 
 
-void SpeakerConfig::retrieve_utterance_config(const std::string &utterance_id)
+void
+SpeakerConfig::retrieve_utterance_config(const std::string &utterance_id)
 {
   SpeakerMap::iterator utterance_it =
     m_utterance_config.find(utterance_id);
@@ -301,17 +348,29 @@ void SpeakerConfig::retrieve_utterance_config(const std::string &utterance_id)
   for (ModuleMap::iterator module_it = (*utterance_it).second.begin();
        module_it != (*utterance_it).second.end(); module_it++)
   {
-    m_fea_gen.module((*module_it).first)->get_parameters(
-      (*module_it).second);
+    std::vector<std::string> parts;
+    str::split(&(*module_it).first, " \t", true, &parts, 2);
+    if(parts[0] == "feature")
+      m_fea_gen.module(parts[1])->set_parameters((*module_it).second);
+    if(parts[0] == "model")
+      m_model_trans.module(parts[1])->set_parameters((*module_it).second);
+
   }
 }
 
-void SpeakerConfig::set_modules(const ModuleMap &modules)
+void
+SpeakerConfig::set_modules(const ModuleMap &modules, bool load_new_model_trans)
 {
   for (ModuleMap::const_iterator module_it=modules.begin();
          module_it != modules.end(); module_it++)
   {
-    m_fea_gen.module((*module_it).first)->set_parameters(
-      (*module_it).second);
+    std::vector<std::string> parts;
+    str::split(&(*module_it).first, " \t", true, &parts, 2);
+    if(parts[0] == "feature")
+      m_fea_gen.module(parts[1])->set_parameters((*module_it).second);
+    if(parts[0] == "model")
+      m_model_trans.module(parts[1])->set_parameters((*module_it).second);
+
+
   }
 }

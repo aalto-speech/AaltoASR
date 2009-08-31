@@ -37,7 +37,7 @@ conf::Config config;
 Recipe recipe;
 HmmSet model;
 FeatureGenerator fea_gen;
-SpeakerConfig speaker_config(fea_gen);
+SpeakerConfig speaker_config(fea_gen, &model);
 
 
 class MPEEvaluator : public HmmNetBaumWelch::CustomDataQuery {

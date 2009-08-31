@@ -2,6 +2,7 @@
 #define HMMSET_HH
 
 #include <vector>
+#include <set>
 #include <string>
 #include <map>
 #include <assert.h>
@@ -71,11 +72,19 @@ public:
    */
   inline int &state(int index) { return m_states[index]; }
 
+  std::string get_center_phone();
+
 private:
   std::vector<int> m_states;
 };
 
-
+/**
+ * Interface for objects that have to be reset when the frame changes
+ */
+struct ResetCacheInterface {
+  virtual void reset_cache() = 0;
+  virtual ~ResetCacheInterface() {}
+};
 
 /// Set of hidden Markov models.
 /// Keeps track of all the Hmms/phonemes, tied states,
@@ -284,8 +293,11 @@ public:
    */
   void write_all(const std::string &base);
 
-  /** Clears the PDF likelihood cache */
+  /** Clears the PDF likelihood cache and the caches of all registered "reset_cache_objects" */
   void reset_cache();
+  void register_reset_cache_object(ResetCacheInterface* obj);
+
+  void unregister_reset_cache_object(ResetCacheInterface* obj);
   
   /** Compute a state likelihood, use cache
    * \param s the state index
@@ -523,6 +535,8 @@ private:
   PDFPool m_pool;
 
   PDF::StatisticsMode m_statistics_mode;
+
+  std::set<ResetCacheInterface*> m_reset_cache_objects;
 };
 
 

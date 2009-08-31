@@ -1,76 +1,58 @@
-#ifndef MLLRTRAINER_HH
-#define MLLRTRAINER_HH
+#ifndef MODELMLLRTRAINER_HH_
+#define MODELMLLRTRAINER_HH_
 
-#include <string>
-#include <vector>
-
-#include "FeatureGenerator.hh"
-#include "HmmSet.hh"
-
-#define max_iter 100
-
-using namespace std;
+#include "RegClassTree.hh"
+#include "LinearAlgebra.hh"
+#include "ModelModules.hh"
+#include "FeatureModules.hh"
 
 class MllrTrainer {
 
 public:
+  void collect_data(double prior, HmmState *state, const FeatureVec &f);
+  void calculate_transform(ConstrainedMllr *cm, double min_frames, int info = 0);
+  void calculate_transform(LinTransformModule *ltm);
 
-  MllrTrainer(HmmSet &model, FeatureGenerator &feagen);
-  ~MllrTrainer();
 
-  /** find the kernel probabilities
-   * \param prior prior probability of the state
-   * \param state current hmm state
-   * \param feature current feature
-   */
-  void find_probs(double prior, HmmState *state, const FeatureVec &feature);
+  class MllTrainerComponent : public PDFGroupModule  {
 
-  /** calculate the transformation matrix and set the transformation module
-   *  \param name name of the transformation module
-   */
-  void calculate_transform(LinTransformModule *mllr_mod);
+  private:
+    double calculate_alpha(const Matrix &Gi, const Vector &p, const Vector &k, double beta, Vector &work);
+    double get_product(const Vector &x, const Matrix &A, const Vector &y, Vector &work);
 
-  /** Restore transformation to identity transform. */
-  static void restore_identity(LinTransformModule *mllr_mod);
+  public:
+    double m_beta;
+    std::vector<Matrix> m_G;
+    std::vector<Vector> m_k;
 
-  void clear_stats();
+    MllTrainerComponent(HmmSet *model) : m_beta(0.0)
+    {
+      Matrix zero_m = LaGenMatDouble::zeros(model->dim() + 1, model->dim() + 1);
+      Vector zero_v(model->dim() + 1);
+      zero_v = 0;
 
-private:
+      m_G.resize(model->dim(), zero_m);
+      m_k.resize(model->dim(), zero_v);
+    }
+    ~MllTrainerComponent() { }
 
-  /** update ksum and gsum
-   *  \param state hmm-state index
-   *  \param probs kernel probabilities
-   *  \param feature the adjoining feature vector
-   */
-  void update_stats(HmmState *state, double *probs, const FeatureVec &feature);
+    virtual void merge(PDFGroupModule *pgm);
+    virtual double get_frame_count() { return m_beta; }
+    void collect_data(double prob, const Vector &mean, const Vector &covar, const Vector &feature, const Matrix &feature_feature_t);
+    Matrix calculate_transform();
+  };
 
-  /** calculats parameter alpha
-   *  \param Gi inverse of matrix G
-   *  \param p cofactor vector
-   *  \param k vector k
-   *  \param beta
-   */
-  double calculate_alpha(Matrix &Gi, Vector &p, Vector &k, double beta);
-
-  /** evaluate quadratic form x * A * y^T
-   *  \param x left-side vector (dim m)
-   *  \param A (dim m x n)
-   *  \param y right-side vector (dim n)
-   */
-  double quadratic(Vector &x, Matrix &A, Vector &y);
 
 private:
-  HmmSet &m_model;
-  FeatureGenerator &m_feagen;
+  TreeToModuleMap<MllTrainerComponent> m_comp_map;
+  HmmSet *m_model;
 
-  int m_dim; // model dimension / feature dimension
+  MllTrainerComponent* get_comp(int pdf_index) { return m_comp_map.get_module(pdf_index); }
 
-  std::vector<Vector*> k_array; // holds statistics for vector k(i)
-  std::vector<Matrix*> G_array; // holds statistics for matrix G(i)
-
-  double m_beta;  // holds statistics for variable beta
-
-  int m_zero_prob_count;
+public:
+  MllrTrainer(RegClassTree *rtree, HmmSet *model) :
+    m_comp_map(rtree, model), m_model(model)  { }
+  ~MllrTrainer() { }
 };
 
-#endif /* MLLRTRAINER_HH */
+#endif /* MODELMLLRTRAINER_HH_ */

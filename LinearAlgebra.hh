@@ -72,6 +72,10 @@ namespace LinearAlgebra {
 
   void inverse(const Matrix &m, Matrix &inv);
 
+  double full_matrix_determinant(const Matrix &A);
+
+  double full_matrix_log_determinant(const Matrix &A);
+
 };
 
 #endif /* LINEARALGEBRA_HH */

@@ -75,6 +75,10 @@ public:
                                        HmmNetBaumWelch *hnbw);
 
     Info();
+    bool operator<( const Info &i ) const {
+      return (speaker_id < i.speaker_id);
+    }
+
   };
 
   void clear();
@@ -92,6 +96,9 @@ public:
   void read(FILE *f, int num_batches, int batch_index, bool cluster_speakers);
 
   std::vector<Info> infos;
+  void sort_infos() {
+    std::stable_sort(infos.begin(), infos.end());
+  }
 };
 
 #endif /* RECIPE_HH */

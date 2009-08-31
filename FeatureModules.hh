@@ -390,6 +390,8 @@ private:
   std::vector<float> m_original_bias;
   bool m_matrix_defined, m_bias_defined;
   int m_src_dim;
+public:
+  virtual bool is_defined() { return m_matrix_defined && m_bias_defined; }
 };
 
 

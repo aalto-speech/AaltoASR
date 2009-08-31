@@ -217,6 +217,9 @@ public:
   void set_evaluate_min_gaussians(int n) { m_evaluate_min_gaussians = n; }
 
   void read_clustering(const std::string &filename);
+
+  std::vector<PDF*> &get_cluster_centers() { return m_cluster_centers; }
+  std::vector<std::vector<int> > &get_cluster_to_gaussians() { return m_cluster_to_gaussians; }
   
 private:
   // Standard things

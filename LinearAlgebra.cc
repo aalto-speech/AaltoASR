@@ -69,6 +69,36 @@ namespace LinearAlgebra {
     return log_det;
   }
 
+  double
+  full_matrix_determinant(const Matrix &A )
+  {
+    Matrix An(A.copy());
+    assert(A.rows()==A.cols());
+    LaVectorLongInt pivots(A.cols());
+
+    LUFactorizeIP(An, pivots);
+
+    double detA = 1;
+    for (int i = 0; i < A.cols(); ++i)
+      detA *= A(i, i);
+    return detA;
+  }
+
+  double
+  full_matrix_log_determinant(const Matrix &A )
+  {
+    Matrix An(A.copy());
+    assert(A.rows()==A.cols());
+    LaVectorLongInt pivots(A.cols());
+
+    LUFactorizeIP(An, pivots);
+
+    double detA = 0;
+    for (int i = 0; i < A.cols(); ++i)
+      detA += util::safe_log(A(i, i)*A(i,i));
+    return detA * 0.5;
+  }
+
 
   void 
   matrix_power(const Matrix &A,

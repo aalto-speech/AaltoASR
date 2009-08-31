@@ -39,7 +39,7 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats
+PROGS = feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats regtree
 ifeq ($(USE_SUBSPACE_COV),1)
 PROGS += subspace optimize
 endif
@@ -48,11 +48,11 @@ PROGS_SRCS = $(PROGS:=.cc)
 
 CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	ModuleConfig.cc HmmSet.cc \
-	PhnReader.cc SpeakerConfig.cc \
+	PhnReader.cc ModelModules.cc SpeakerConfig.cc \
 	Recipe.cc conf.cc io.cc str.cc endian.cc Distributions.cc \
 	LinearAlgebra.cc HmmNetBaumWelch.cc \
 	Lattice.cc Viterbi.cc PhonePool.cc \
-	MllrTrainer.cc ziggurat.cc mtw.cc LmbfgsOptimize.cc
+	MllrTrainer.cc ziggurat.cc mtw.cc LmbfgsOptimize.cc RegClassTree.cc
 
 ifeq ($(USE_SUBSPACE_COV),1)
 CLASS_SRCS += Subspaces.cc

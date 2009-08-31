@@ -17,6 +17,27 @@ Hmm::resize(int states)
 {
   m_states.resize(states);
 }
+std::string
+Hmm::get_center_phone()
+{
+  int pos1 = label.find_last_of('-');
+  int pos2 = label.find_first_of('+');
+  std::string temp = "";
+  if (pos1 >= 0 && pos2 >= 0) {
+    if (pos2 > pos1 + 1) temp = label.substr(pos1 + 1, pos2 - pos1 - 1);
+  }
+  else if (pos1 >= 0) {
+    temp = label.substr(pos1 + 1);
+  }
+  else if (pos2 >= 0) {
+    temp = label.substr(0, pos2);
+  }
+  else
+    temp = label;
+  if ((int) temp.size() <= 0) throw std::string("Invalid phone label ") + label;
+  return temp;
+}
+
 
 HmmSet::HmmSet()
 {
@@ -422,8 +443,20 @@ HmmSet::reset_cache()
   }
   // Clear also cache for base distributions
   m_pool.reset_cache();
+  for(std::set<ResetCacheInterface*>::iterator it = m_reset_cache_objects.begin(); it != m_reset_cache_objects.end(); ++it) {
+    (*it)->reset_cache();
+  }
 }
 
+void
+HmmSet::register_reset_cache_object(ResetCacheInterface* obj) {
+  m_reset_cache_objects.insert(obj);
+}
+
+void
+HmmSet::unregister_reset_cache_object(ResetCacheInterface* obj) {
+  m_reset_cache_objects.erase(obj);
+}
 
 double
 HmmSet::pdf_likelihood(const int p, const FeatureVec &feature) 
