@@ -65,7 +65,6 @@ std::vector<GaussianClustering> cluster_groups;
 
 struct CompPair {
         bool operator()(queue_item_type p1, queue_item_type p2) {
-          std::cerr << "hey" << std::endl;
           return p1.first > p2.first;
         }
     };
@@ -485,7 +484,6 @@ main(int argc, char *argv[])
 
         cluster_groups[queue_item.second.first].merge(queue_item.second.second);
         std::pair<std::pair<int,int>, double> merge_option = cluster_groups[queue_item.second.first].get_best_merge_option();
-        std::cerr << "Merge in group" << queue_item.second.first << std::endl;
         queue_item.first = merge_option.second;
         queue_item.second.second = merge_option.first;
         queue.push(queue_item);
