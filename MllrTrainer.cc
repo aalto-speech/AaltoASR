@@ -141,6 +141,8 @@ MllrTrainer::MllTrainerComponent::collect_data(double prob,
     const Vector &mean, const Vector &covar, const Vector &feature,
     const Matrix &feature_feature_t)
 {
+//  assert(prob > 0);
+  if(!(prob > 0)) return;
   for (unsigned int i = 0; i < m_k.size(); ++i) {
     Blas_Add_Mult(m_k[i], mean(i) / covar(i) * prob, feature);
     Blas_Add_Mat_Mult(m_G[i], 1 / covar(i) * prob, feature_feature_t);
