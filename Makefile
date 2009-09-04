@@ -9,7 +9,7 @@ endif
 # Opteron cluster
 ifeq ($(ARCH),x86_64)
 CXX = g++
-OPT = -O0 -g
+OPT = -O2
 INCLUDES = -I/share/puhe/x86_64/include/lapackpp -I/share/puhe/linux/include
 LDFLAGS = -L/share/puhe/x86_64/lib
 ifeq ($(USE_SUBSPACE_COV),1)
