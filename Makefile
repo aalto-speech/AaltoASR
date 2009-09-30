@@ -1,4 +1,4 @@
-OPT = -g
+OPT = -O2
 INCLUDES =
 CXXFLAGS = $(OPT) $(INCLUDES) -Wall
 LDFLAGS = 
@@ -6,6 +6,7 @@ LIBS =
 
 morph_lattice_OBJS = \
 	morph_lattice.o \
+	Latticer.o \
 	MorphSet.o \
 	io.o conf.o str.o
 

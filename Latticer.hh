@@ -12,15 +12,13 @@ public:
   /** Default constructor. */
   Latticer();
 
-  /** Create a latticer with a morph set and text corpus file. */
-  Latticer(const MorphSet *morph_set, FILE *file);
-
   /** Create the lattice by segmenting the text corpus into morphs. */
-  void create_lattice(FILE *output = stdout);
+  void create_lattice(FILE *input = stdin, FILE *output = stdout);
 
   MorphSet *morph_set; //!< The morph set to use for segmenting the text
   FILE *input; //!< The file from which the text corpus is read
 
+  std::string word_boundary_label; //!< Label for word boundary symbol
   std::string text; //!< A buffer containing part of the text
 };
 

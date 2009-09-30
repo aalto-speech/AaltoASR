@@ -32,9 +32,9 @@ public:
     Arc *first_arc; //!< The first arc of a list of arcs
   };
 
+  /** Default constructor. */
+  MorphSet::MorphSet();
   
-  Node root_node; //!< The root of the morph tree
-
   /** Insert a letter to a node (or follow an existing arc). 
    * \param letter = a letter to insert to the node
    * \param morph = a possible morph corresponding to this node (can be empty)
@@ -56,6 +56,7 @@ public:
   /** Print the contents of the tree. */
   void write(FILE *file);
 
+  Node root_node; //!< The root of the morph tree
   int max_morph_length; //!< The length of the longest morph in the set
 };
 

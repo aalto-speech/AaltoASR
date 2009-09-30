@@ -33,8 +33,8 @@ MorphSet::insert(char letter, const std::string &morph, Node *node)
   }
 
   // Maintain the length of the longest morph
-  if (morph.length() > max_morph_length)
-    max_morph_length = morph.length;
+  if ((int)morph.length() > max_morph_length)
+    max_morph_length = morph.length();
 
   return arc->target_node;
 }
