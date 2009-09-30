@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <deque>
 #include <assert.h>
 #include "conf.hh"

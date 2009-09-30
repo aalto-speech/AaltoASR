@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <vector>
 #include "MorphSet.hh"
 #include "str.hh"

@@ -33,7 +33,7 @@ public:
   };
 
   /** Default constructor. */
-  MorphSet::MorphSet();
+  MorphSet();
   
   /** Insert a letter to a node (or follow an existing arc). 
    * \param letter = a letter to insert to the node
