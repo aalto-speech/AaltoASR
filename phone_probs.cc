@@ -70,7 +70,8 @@ main(int argc, char *argv[])
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('C', "clusters=FILE", "arg", "", "Gaussian clustering file")
       ('\0', "eval-minc=FLOAT", "arg", "0", "minimum ratio of top clusters to evaluate")
-      ('\0', "eval-ming=FLOAT", "arg", "0", "minimum ratio of Gaussians to evaluate")
+      ('\0', "eval-ming=FLOAT", "arg", "0.1", "minimum ratio of Gaussians to evaluate")
+      ('N', "no-normalization", "", "", "do not normalize the likelihoods")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
@@ -219,15 +220,14 @@ main(int argc, char *argv[])
 	model.precompute_likelihoods(fea_vec);
 	obs_log_probs.resize(model.num_states());
 	double log_normalizer=0;
-	for (int i = 0; i < model.num_states(); i++) {
-	  obs_log_probs[i] = model.state_likelihood(i, fea_vec);
-	  log_normalizer += obs_log_probs[i];
-	}
-	if (log_normalizer == 0)
-	  log_normalizer = 1;
+        for (int i = 0; i < model.num_states(); i++) {
+          obs_log_probs[i] = model.state_likelihood(i, fea_vec);
+          log_normalizer += obs_log_probs[i];
+        }
+        if (config["no-normalization"].specified || log_normalizer == 0)
+          log_normalizer = 1;
 	for (int i = 0; i < (int)obs_log_probs.size(); i++)
 	  obs_log_probs[i] = util::safe_log(obs_log_probs[i] / log_normalizer);
-
 
         for (int i = 0; i < model.num_states(); i++)
         {
