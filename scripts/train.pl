@@ -403,7 +403,7 @@ sub collect_stats {
 "  echo temp_stats_\$BATCH >> temp_list_\$BATCH\n".
 "  sleep 5s\n".
 "  $BINDIR/combine_stats -b $model_base -L temp_list_\$BATCH -o ${id}_stats\n".
-"  if [ \"\$?\" -ne \"0\" ]; then rmdir stats.lock; exit 1; fi\n".
+"  if [ \"\$?\" -ne \"0\" ]; then rmdir stats.lock; rm temp_list_\$BATCH; rm temp_stats_\$BATCH.*; exit 1; fi\n".
 "  rm temp_list_\$BATCH\n".
 "  rm temp_stats_\$BATCH.*\n".
 "else\n".
