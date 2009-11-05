@@ -1017,7 +1017,7 @@ HmmNetBaumWelch::FrameScores::set_new_score(int frame, double score)
     if (score_table_size > 0)
     {
       memcpy(new_table, score_table, score_table_size*sizeof(double));
-      delete score_table;
+      delete [] score_table;
     }
     score_table = new_table;
     score_table_size = new_size;
@@ -1058,7 +1058,7 @@ void
 HmmNetBaumWelch::FrameScores::clear(void)
 {
   if (score_table_size > 0)
-    delete score_table;
+    delete [] score_table;
   score_table_size = 0;
   num_scores = 0;
   frame_blocks.clear();

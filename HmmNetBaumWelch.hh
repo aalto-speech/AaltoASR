@@ -26,7 +26,6 @@ public:
   
   class FrameScores {
   public:
-    void safe_set_score(int frame, double score);
     void set_score(int frame, double score);
     void set_new_score(int frame, double score);
     double get_score(int frame);
@@ -38,7 +37,7 @@ public:
       int start;
       int end;
 
-      /// Start index to log_prob_table. Probabilities are in reverse order.
+      /// Start index to score_table. Probabilities are in reverse order.
       int buf_start;
       
       FrameBlock(int s, int e, int b) : start(s), end(e), buf_start(b) { }
