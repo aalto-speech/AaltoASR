@@ -52,7 +52,7 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
   m_final_node = NULL;
   m_word_boundary_id = -1;
   m_silence_is_word = true;
-  m_ignore_case= true;
+  m_ignore_case = false;
 }
 
 
@@ -841,12 +841,13 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
       source_arcs.push_back(temp_arc);
     }
   }
-  if (!fan_out && ignore_length)
+  if (!fan_out && ignore_length && m_ignore_case) // Obsolete?!?
   {
     // Try with long length
-    if (m_ignore_case)
-      std::transform(++new_key.begin(), new_key.end(), ++new_key.begin(),
-		     safe_toupper);
+    // NOTE: if (m_ignore_case) used to be here for the transform only,
+    // moved to apply to the whole block as it should be obsolete
+    std::transform(++new_key.begin(), new_key.end(), ++new_key.begin(),
+                   safe_toupper);
     target_nodes = get_fan_node_list(new_key, m_fan_in_entry_nodes);
     for (i = 0; i < target_nodes->size(); i++)
     {
