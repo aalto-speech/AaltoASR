@@ -5,6 +5,7 @@
 #include <deque>
 #include <string>
 #include <map>
+#include <stdio.h>
 
 /** Configuration options, command line parameters and config files. 
  *

@@ -38,7 +38,7 @@ skip_while(FILE *file, const char *chars)
 // Reads chars to 'str' until one of the 'delims' is reached.  The
 // delim is left unread.
 void
-get_until(FILE *file, std::string &str, char *delims)
+get_until(FILE *file, std::string &str, const char *delims)
 {
   str.erase();
 

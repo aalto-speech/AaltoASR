@@ -1,5 +1,6 @@
 # -*- mode: makefile; -*-
 
+CXX = g++
 CXXFLAGS = -O2
 
 cxxflags = $(CXXFLAGS) $(includes) -fPIC -fno-strict-aliasing -Wall -Wno-sign-compare
