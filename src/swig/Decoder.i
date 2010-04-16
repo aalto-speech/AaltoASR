@@ -19,7 +19,8 @@ using namespace fsalm;
   }
 }
 
-%typemap(python,in) std::string& {
+#ifdef SWIGPYTHON
+%typemap(in) std::string& {
   if (!PyString_Check($input)) {
     PyErr_SetString(PyExc_TypeError, "not a string");
     return NULL;
@@ -28,21 +29,22 @@ using namespace fsalm;
            PyString_Size($input));
 }
 
-%typemap(python,freearg) std::string& {
+%typemap(freearg) std::string& {
   delete $1;
 }
 
-%typemap(python,out) std::string& {
+%typemap(out) std::string& {
   $result = Py_BuildValue("s#",$1->c_str(),$1->size());
 }
 
-%typemap(python,in) FILE* {
+%typemap(in) FILE* {
 	if (!(PyFile_Check($input))) {
 		PyErr_SetString(PyExc_TypeError, "not a file pointer");
 		return NULL;
 	}
 	$1=PyFile_AsFile($input);
 }
+#endif
 
 class Hypo {
 };

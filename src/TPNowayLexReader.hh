@@ -27,7 +27,7 @@ public:
   void read(FILE *file, const std::string &word_boundary);
 
   void skip_while(FILE *file, const char *chars);
-  void get_until(FILE *file, std::string &str, char *delims);
+  void get_until(FILE *file, std::string &str, const char *delims);
 
   void set_silence_is_word(bool b) { m_silence_is_word = b; }
 

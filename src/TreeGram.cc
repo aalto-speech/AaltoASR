@@ -425,7 +425,11 @@ TreeGram::read(FILE *file, bool binary)
 
   // Read the order and the number of nodes
   int number_of_nodes;
-  fscanf(file, "%d %d\n", &m_order, &number_of_nodes);
+  if (fscanf(file, "%d %d\n", &m_order, &number_of_nodes) < 2)
+  {
+    fprintf(stderr, "TreeGram::read(): unexpected end of file\n");
+    exit(1);
+  }
 
   // Read the counts for each order
   int sum = 0;

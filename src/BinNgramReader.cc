@@ -61,7 +61,11 @@ BinNgramReader::read(FILE *file, Ngram *ng)
 
   // Read the order and the number of nodes
   int m_nodes_size;
-  fscanf(file, "%d %d\n", &ng->m_order, &m_nodes_size);
+  if (fscanf(file, "%d %d\n", &ng->m_order, &m_nodes_size) < 2)
+  {
+      fprintf(stderr, "BinNgramReader::read(): unexpected end of file\n");
+    exit(1);
+  }
   ng->m_nodes.resize(m_nodes_size);
 
   // Read the nodes

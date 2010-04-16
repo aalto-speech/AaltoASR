@@ -1713,7 +1713,7 @@ TokenPassSearch::get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,
     return compute_lm_log_prob(lm_hist);
 
   float score;
-  LMScoreInfo *info, *old;
+  LMScoreInfo *info, *old = NULL;
   bool collision = false;
   int i;
 

@@ -35,7 +35,7 @@ skip_while(std::istream &in, const char *chars)
 // Reads chars to 'str' until one of the 'delims' is reached.  The
 // delim is left unread.
 std::istream&
-get_until(std::istream &in, std::string &str, char *delims)
+get_until(std::istream &in, std::string &str, const char *delims)
 {
   str.resize(0);
 
