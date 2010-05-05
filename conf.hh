@@ -6,6 +6,8 @@
 #include <string>
 #include <map>
 
+#include <stdio.h>
+
 /** Configuration options, command line parameters and config files. 
  *
  * The command line options are parsed with the following features:
