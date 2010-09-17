@@ -164,6 +164,8 @@ MllrTrainer::MllTrainerComponent::calculate_transform()
   double detA, alpha;
   int i = 0, j = 0;
 
+  std::vector<Matrix> inv_G;
+
   LaVectorLongInt pivots(dim + 1);
   Vector work(dim + 1);
 
@@ -173,9 +175,11 @@ MllrTrainer::MllTrainerComponent::calculate_transform()
 
 
   // calculate inverses of G
+  inv_G.resize(dim);
   for (i = 0; i < dim; ++i) {
-    LUFactorizeIP(m_G[i], pivots);
-    LaLUInverseIP(m_G[i], pivots, work);
+    inv_G[i] = m_G[i];
+    LUFactorizeIP(inv_G[i], pivots);
+    LaLUInverseIP(inv_G[i], pivots, work);
   }
 
   pivots.resize(dim, 1);
@@ -201,11 +205,11 @@ MllrTrainer::MllTrainerComponent::calculate_transform()
     for (i = 0; i < dim; ++i)
       p(i + 1) = A(row, i);
 
-    alpha = calculate_alpha(m_G[row], p, m_k[row], m_beta, work);
+    alpha = calculate_alpha(inv_G[row], p, m_k[row], m_beta, work);
 
     Blas_Scale(alpha, p);
     Blas_Add_Mult(p, 1.0, m_k[row]);
-    Blas_Mat_Trans_Vec_Mult(m_G[row], p, w);
+    Blas_Mat_Trans_Vec_Mult(inv_G[row], p, w);
 
     for (i = 0; i < dim + 1; ++i)
       trans(row, i) = w(i);
