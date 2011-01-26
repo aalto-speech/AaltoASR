@@ -52,6 +52,7 @@ public:
   virtual bool next_frame(void);
   virtual const std::vector<Segmentator::IndexProbPair>& pdf_probs(void) { return m_cur_pdf; }
   virtual const std::vector<Segmentator::IndexProbPair>& transition_probs(void) { return m_transition_info; }
+  virtual const std::string& highest_prob_label(void) { return m_cur_label; }
 
   /** Sets the frame rate for converting phn sample numbers to frame numbers.
    * \param frame_rate frames per second
@@ -133,6 +134,9 @@ private:
 
   /// A map which holds the information about transitions
   std::vector<Segmentator::IndexProbPair> m_transition_info;
+  
+  /// String with the current label
+  std::string m_cur_label;
 };
 
 #endif /* PHNREADER_HH */

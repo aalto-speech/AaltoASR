@@ -173,6 +173,21 @@ PhnReader::next_frame(void)
   }
   m_cur_pdf.back().index = m_model->emission_pdf_index(cur_state_index);
 
+  if (m_cur_phn.label.size() > 0)
+  {
+    m_cur_label = m_cur_phn.label[0];
+    if (m_cur_phn.label.size() > 1)
+    {
+      for (int i = 1 ; i < (int)m_cur_phn.label.size(); i++)
+      {
+        m_cur_label += ",";
+        m_cur_label += m_cur_phn.label[i];
+      }
+    }
+  }
+  else
+    m_cur_label = str::fmt(16, "%d", m_cur_phn.state);
+
   bool new_phn_loaded = false;
   Phn prev_phn = m_cur_phn;
 

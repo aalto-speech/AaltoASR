@@ -570,6 +570,7 @@ HmmNetBaumWelch::next_frame(void)
     normalizing_score = m_active_arcs.back().score;
   }
 
+  double cur_best_prob = -1;
   for (int i = 0; i < (int)m_active_arcs.size(); i++)
   {
     HmmTransition &tr = m_model.transition(
@@ -577,6 +578,14 @@ HmmNetBaumWelch::next_frame(void)
     int pdf_id = m_model.emission_pdf_index(tr.source_index);
     double cur_arc_prob = exp(loglikelihoods.divide(m_active_arcs[i].score,
                                                     normalizing_score));
+
+    // Update the most probable label
+    if (cur_best_prob < cur_arc_prob)
+    {
+      cur_best_prob = cur_arc_prob;
+      m_most_probable_label = m_arcs[m_active_arcs[i].arc_id].label;
+    }
+
     if (m_pdf_prob[pdf_id] <= loglikelihoods.zero())
     {
       // PDF didn't have probability for this frame

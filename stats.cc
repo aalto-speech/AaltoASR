@@ -40,6 +40,26 @@ FeatureGenerator fea_gen;
 SpeakerConfig speaker_config(fea_gen, &model);
 
 
+bool print_alignments = false;
+
+
+
+void
+print_alignment_line(FILE *f, float fr, 
+                     int start, int end, 
+                     const std::string &label)
+{
+  int frame_mult = (int)(16000/fr); // NOTE: phn files assume 16kHz sample rate
+    
+  if (start < 0)
+    return;
+
+  fprintf(f, "%d %d %s\n", start * frame_mult, end * frame_mult, 
+          label.c_str());
+}
+
+
+
 class MPEEvaluator : public HmmNetBaumWelch::CustomDataQuery {
 private:
   int m_first_frame;
@@ -297,9 +317,12 @@ bool initialize_hmmnet(HmmNetBaumWelch* lattice, float bw_beam, float fw_beam,
 
 
 void
-train(HmmSet *model, Segmentator *segmentator, bool numerator)
+train(HmmSet *model, Segmentator *segmentator, bool numerator,
+      FILE *alignment_out)
 {
   int frame;
+  int cur_start_frame = -1;
+  std::string cur_label = "";
 
   if ((mpe || mpe_grad) && numerator)
   {
@@ -317,6 +340,23 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
 
     if (numerator)
       num_frames++;
+
+    if (alignment_out != NULL)
+    {
+      if (cur_start_frame < 0)
+      {
+        // Initialize
+        cur_start_frame = frame;
+        cur_label = segmentator->highest_prob_label();
+      }
+      else if (cur_label != segmentator->highest_prob_label())
+      {
+        print_alignment_line(alignment_out, fea_gen.frame_rate(),
+                             cur_start_frame, frame, cur_label);
+        cur_start_frame = frame;
+        cur_label = segmentator->highest_prob_label();
+      }
+    }
     
     // Accumulate all possible states distributions for this frame
     const std::vector<Segmentator::IndexProbPair> &pdfs
@@ -404,6 +444,17 @@ train(HmmSet *model, Segmentator *segmentator, bool numerator)
     else
       total_den_log_likelihood += segmentator->get_total_log_likelihood();
   }
+  if (alignment_out != NULL)
+  {
+    if (cur_start_frame >= 0)
+    {
+      // Print the pending line
+      // FIXME: Is +1 in the last frame correct?
+      print_alignment_line(alignment_out, fea_gen.frame_rate(),
+                           cur_start_frame, segmentator->current_frame()+1,
+                           cur_label);
+    }
+  }
 }
 
 
@@ -438,6 +489,7 @@ main(int argc, char *argv[])
       ('\0', "mllt", "", "", "maximum likelihood linear transformation (for ML)")
       ('\0', "mpemode=MODE", "arg", "", "mono/mono-state/state/cp/cp-state/hyp-cp-state")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
+      ('a', "alignment", "", "", "save output alignments")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level")
@@ -556,6 +608,15 @@ main(int argc, char *argv[])
 
     if (config["binmpfe"].specified)
       binary_mpfe = true;
+
+    if (config["alignment"].specified)
+    {
+      print_alignments = true;
+      if (config["ophn"].specified)
+        throw std::string("Can not read and write to output PHNs");
+      if (config["hmmnet"].specified && hmmnet_mode != 1)
+        printf("Warning: Printing alignments will not produce sensible results if using\nhmmnet mode other than viterbi.\n");
+    }
     
     if (config["mllt"].specified)
     {
@@ -620,8 +681,20 @@ main(int argc, char *argv[])
 
       if (!skip)
       {
+        FILE *alignment_out = NULL;
+        if (print_alignments)
+        {
+          if ((alignment_out = fopen(recipe.infos[f].alignment_path.c_str(),
+                                     "w")) == NULL)
+            fprintf(stderr, "Could not open alignment file %s\n",
+                    recipe.infos[f].alignment_path.c_str());
+        }
+
         // Train the numerator
-        train(&model, segmentator, true);
+        train(&model, segmentator, true, alignment_out);
+
+        if (alignment_out != NULL)
+          fclose(alignment_out);
 
         if (mmi || mpe || mpe_grad)
         {
@@ -656,7 +729,7 @@ main(int argc, char *argv[])
           if (!skip)
           {
             // Train the denumerator
-            train(&model, segmentator, false);
+            train(&model, segmentator, false, NULL);
           }
         }
       }

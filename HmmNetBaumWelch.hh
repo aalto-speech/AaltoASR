@@ -168,6 +168,7 @@ public:
   virtual double get_total_log_likelihood(void) { return m_sum_total_loglikelihood; }
   virtual const std::vector<Segmentator::IndexProbPair>& pdf_probs(void) { return m_pdf_prob_pairs; }
   virtual const std::vector<Segmentator::IndexProbPair>& transition_probs(void) { return m_transition_prob_pairs; }
+  virtual const std::string& highest_prob_label(void) { return m_most_probable_label; }
 
 private:
 
@@ -260,6 +261,9 @@ private:
 
   /// A vector which holds the possible PDFs and their probabilities
   std::vector<Segmentator::IndexProbPair> m_pdf_prob_pairs;
+
+  /// String containing the current most probable arc label
+  std::string m_most_probable_label;
 
   /// true if eof has been detected or frame limits have been reached
   bool m_eof_flag;

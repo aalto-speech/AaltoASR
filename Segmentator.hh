@@ -87,6 +87,9 @@ public:
   /** Returns a reference to a vector of possible transitions and their
    * probabilities */
   virtual const std::vector<IndexProbPair>& transition_probs(void) = 0;
+
+  /** Returns the label of the most probable arc */
+  virtual const std::string& highest_prob_label(void) = 0;
 };
 
 #endif // SEGMENTATOR_HH
