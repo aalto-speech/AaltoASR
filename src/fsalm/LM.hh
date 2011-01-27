@@ -89,11 +89,14 @@ namespace fsalm {
      */
     int find_backoff(IntVec vec) const;
 
-    /** Move to next node throught given symbol but do not backoff.
+    /** Move to next node through given symbol but do not backoff.
+     *
+     * Finds the arc that starts from given node and has the given
+     * symbol assigned, then returns its target node.
      *
      * \param node_id = the node to start from (final node not allowed)
      * \param symbol = the symbol to search
-     * \param score = float pointer to which the possible score is ADDED 
+     * \param score = float pointer to which the possible score of the arc is ADDED
      * \return the resulting node (or -1 if explicit arc with symbol not found)
      */
     int walk_no_bo(int node_id, int symbol, float *score = NULL) const;
@@ -164,20 +167,20 @@ namespace fsalm {
     struct {
       FloatArray bo_score;
       Array bo_target;
-      Array limit_arc;
+      Array limit_arc;  //!< Index to one past the last arc that ends in this node.
     } m_nodes;
 
     /** Arc information */
     struct {
-      Array symbol;
-      Array target;
-      FloatArray score;
+      Array symbol;  //!< The symbol assigned to the arc.
+      Array target;  //!< The target node.
+      FloatArray score;  //!< Possible score of the arc.
     } m_arcs;
 
     /** Cache containing information about the last ngram inserted in
      * the strucure. */
     struct {
-      IntVec ctx_vec;
+      IntVec ctx_vec;  //!< Context vector, i.e. all but the last symbol.
       int ctx_node_id;
     } m_cache;
 
