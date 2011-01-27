@@ -167,7 +167,7 @@ namespace fsalm {
     struct {
       FloatArray bo_score;
       Array bo_target;
-      Array limit_arc;  //!< Index to one past the last arc that ends in this node.
+      Array limit_arc;  //!< Index to one past the last arc that starts from this node.
     } m_nodes;
 
     /** Arc information */
