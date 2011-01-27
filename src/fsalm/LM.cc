@@ -90,7 +90,7 @@ namespace fsalm {
   {
     assert(node_id >= 0);
     if (node_id == m_final_node_id)
-      throw Error("LM::find_child(): final node not allowed");
+      throw Error("LM::walk_no_bo(): final node not allowed");
     // Limit tells the first arc that will not be considered in the search.
     int limit = m_nodes.limit_arc.get(node_id);
     if (limit > 0) {
@@ -182,8 +182,9 @@ namespace fsalm {
   {
     assert(!vec.empty());
 
-    // Find the context node index, by checking if it is the same as
-    // on the previous insertion.
+    // If the context is not the same as on the previous insertion, find the
+    // context node by traversing the arcs specified by the context symbols
+    // (all but the last symbol in the n-gram).
     //
     IntVec ctx_vec(vec.begin(), vec.end() - 1);
     if (m_cache.ctx_node_id < 0 || ctx_vec != m_cache.ctx_vec) {      
@@ -218,7 +219,8 @@ namespace fsalm {
     if (vec.size() == 1 && vec.back() == m_start_symbol)
       m_initial_node_id = tgt_node_id;
 
-    // Create arc and update possible backoff information.
+    // Create arc from the context node to the target node, and update possible
+    // backoff information.
     //
     new_arc(m_cache.ctx_node_id, vec.back(), tgt_node_id, score);
     if (tgt_node_id != bo_node_id) {
