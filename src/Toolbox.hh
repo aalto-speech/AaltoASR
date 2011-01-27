@@ -41,6 +41,13 @@ public:
   // Ngram
   void ngram_read(const char *file, float weight, bool binary=true);
   void read_lookahead_ngram(const char *file, bool binary=true);
+
+  /// \brief Reads a finite-state automaton language model.
+  ///
+  /// \param file Name of the file where the language model is read from.
+  /// \param binary If set to true, the file is expected to be in a non-standard
+  /// format that lm utility writes. Otherwise ARPA format is expected.
+  ///
   void fsa_lm_read(const char *file, bool binary=true);
 
   // Lna

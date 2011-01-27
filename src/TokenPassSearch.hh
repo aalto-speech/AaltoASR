@@ -71,7 +71,10 @@ public:
                              const std::string &end);
 
   void set_ngram(TreeGram *ngram);
+
+  /// \brief Sets a finite-state automaton language model.
   void set_fsa_lm(fsalm::LM *lm);
+
   void set_lookahead_ngram(TreeGram *ngram);
   void set_generate_word_graph(bool value) { m_generate_word_graph = value; }
   void set_use_lm_cache(bool value) { m_use_lm_cache = value; }
