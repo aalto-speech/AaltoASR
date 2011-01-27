@@ -128,8 +128,11 @@ namespace fsalm {
     /** Push scores as early as possible. */
     void push();
 
+    /** Reads the language model in ARPA format. */
     void read_arpa(FILE *file, bool show_progress = false);
+    /** Reads the language model in a non-standard format. */
     void read(FILE *file);
+    /** Writes the language model in a non-standard format. */
     void write(FILE *file) const;
 
     /** Write the language model in MIT fst format. */
