@@ -91,13 +91,17 @@ namespace fsalm {
     assert(node_id >= 0);
     if (node_id == m_final_node_id)
       throw Error("LM::find_child(): final node not allowed");
+    // Limit tells the first arc that will not be considered in the search.
     int limit = m_nodes.limit_arc.get(node_id);
     if (limit > 0) {
+      // The first arc that will be considered in the search is limit_arc of the previous node.
       int first = m_nodes.limit_arc.get(node_id - 1);
       assert(limit >= first); 
       if (limit > first) {
+    	// Find an arc with the given symbol.
         int arc_id = fsalm::binary_search<Array,int>(m_arcs.symbol, symbol, first, limit);
         if (arc_id != limit) {
+          // The search found such an arc.
           if (score != NULL)
             *score += m_arcs.score.get(arc_id);
           return m_arcs.target.get(arc_id);
@@ -443,13 +447,17 @@ namespace fsalm {
         "' or sentence end '" + end_str + "' not in unigrams");
     }      
 
+    // Call new_ngram() on each of the read 1-grams.
+    //
     for (size_t i = 0; i < reader.order_ngrams.size(); i++) {
       ArpaReader::Ngram &ngram = reader.order_ngrams[i];
       assert(ngram.symbols.size() == 1);
       new_ngram(ngram.symbols, ngram.log_prob, ngram.backoff);
     }
 
-    // Continue from 2-grams 
+    // Read and iterate through 2-grams, 3-grams, etc. in sorted order.
+    // Insert using new_ngram() unless the first symbol is the start
+    // symbol, or the last symbol is the end symbol.
     //
     while (reader.read_order_ngrams(true)) {
       for (int i = 0; i < (int)reader.sorted_order.size(); i++) {
