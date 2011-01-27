@@ -94,12 +94,25 @@ namespace fsalm {
      * Finds the arc that starts from given node and has the given
      * symbol assigned, then returns its target node.
      *
-     * \param node_id = the node to start from (final node not allowed)
-     * \param symbol = the symbol to search
-     * \param score = float pointer to which the possible score of the arc is ADDED
-     * \return the resulting node (or -1 if explicit arc with symbol not found)
+     * \param node_id The node to start from (final node not allowed), or
+     * empty_node_id() to search every node(?)
+     * \param symbol The symbol to search for.
+     * \param score Float pointer to which the possible score of the arc is ADDED
+     * \return The resulting node (or -1 if explicit arc with symbol not found).
      */
     int walk_no_bo(int node_id, int symbol, float *score = NULL) const;
+
+    /** Walks through a list of symbols but does not backoff.
+     *
+     * Finds a path that starts from given node and has the list of symbols
+     * assigned in given order, then returns the target node of the last arc.
+     *
+     * \param node_id The node to start from (final node not allowed), or
+     * empty_node_id() to search every node(?)
+     * \param vec The list of symbols to traverse.
+     * \param score Float pointer to which the possible score of the arc is ADDED
+     * \return The resulting node (or -1 if explicit arc with symbol not found).
+     */
     int walk_no_bo(int node_id, const IntVec &vec, float *score = NULL) const;
 
     /** Move to next node through given symbols without backoffing.
