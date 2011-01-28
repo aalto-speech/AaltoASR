@@ -79,7 +79,11 @@ namespace fsalm {
     Str str(const IntVec &vec) const;
 
     /** Find context node for given backoff vector by backoffing
-     * further if necessary.  
+     * further if necessary.
+     *
+     * If possible, traverses the sequence of symbols in \a vec, and returns the
+     * resulting node. Otherwise removes the first symbol until such a sequence
+     * is found.
      *
      * \note Throws exception if given ngram ends in sentence end
      * symbol.
