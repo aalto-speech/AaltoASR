@@ -209,6 +209,8 @@ namespace fsalm {
       bo_node_id = find_backoff(IntVec(vec.begin() + 1, vec.end()));
       assert(bo_node_id >= 0);
 
+      // For highest order n-grams, an arc to the backoff node will be created.
+      // For other n-grams, a new target node is created.
       if (vec.size() == order()) {
         tgt_node_id = bo_node_id;
         assert(bo_score == 0);
