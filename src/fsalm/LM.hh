@@ -102,7 +102,8 @@ namespace fsalm {
      */
     int walk_no_bo(int node_id, int symbol, float *score = NULL) const;
 
-    /** Walks through a list of symbols but does not backoff.
+    /** Walks through a list of symbols but does not backoff. Returns the index
+     * of the resulting node.
      *
      * Finds a path that starts from given node and has the list of symbols
      * assigned in given order, then returns the target node of the last arc.
@@ -115,9 +116,18 @@ namespace fsalm {
      */
     int walk_no_bo(int node_id, const IntVec &vec, float *score = NULL) const;
 
-    /** Move to next node through given symbols without backoffing.
-     * Same as above, but returns node indices for each symbol in a
-     * vector. */
+    /** Walks through a list of symbols but does not backoff. Returns indices of
+     * all the traversed nodes.
+     *
+     * Finds a path that starts from given node and has the list of symbols
+     * assigned in given order, then returns the target node of the last arc.
+     *
+     * \param node_id The node to start from (final node not allowed), or
+     * empty_node_id() to search every node(?)
+     * \param vec The list of symbols to traverse.
+     * \param score Float pointer to which the possible score of the arc is ADDED
+     * \return Indices of all the traversed nodes.
+     */
     IntVec walk_no_bo_vec(int node_id, const IntVec &vec, 
                           float *score = NULL) const;
 
