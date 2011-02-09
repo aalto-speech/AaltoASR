@@ -28,11 +28,19 @@ public:
   const std::vector<Hmm> &hmms() const { return m_hmms; }
 
   // Lexicon
+
+  /// \brief Reads a dictionary file that specifies the lexicon and
+  /// pronunciations used in the decoding.
+  ///
+  /// \param file Name of a NOWAY dictionary file where the lexicon is
+  /// read from.
+  ///
   void lex_read(const char *file);
+
   const std::string &lex_word() const { return m_lexicon_reader.word(); }
   const std::string &lex_phone() const { return m_lexicon_reader.phone(); }
   const std::string &word(int index) const 
-  { 
+  {
     if (m_use_stack_decoder)
       return m_vocabulary.word(index); 
     return m_tp_vocabulary.word(index);
