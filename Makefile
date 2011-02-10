@@ -10,8 +10,10 @@ endif
 ifeq ($(ARCH),x86_64)
 CXX = g++
 OPT = -O2
-INCLUDES = -I/share/puhe/x86_64/include/lapackpp -I/share/puhe/linux/include
-LDFLAGS = -L/share/puhe/x86_64/lib
+INCLUDES = -I../lapackpp/include
+# -I/share/puhe/linux/include
+LDFLAGS = -L../lapackpp/src/.libs
+# -L/share/puhe/x86_64/lib
 ifeq ($(USE_SUBSPACE_COV),1)
 INCLUDES += -I/share/puhe/x86_64/include/hcld/
 endif
@@ -24,11 +26,10 @@ endif
 ifeq ($(ARCH),i686)
 CXX = /usr/bin/g++
 OPT = -O2
-INCLUDES = \
-	-I/share/puhe/linux/include \
-	-I/share/puhe/linux/include/lapackpp
-LDFLAGS = \
-	-L/share/puhe/linux/lib
+INCLUDES = -I../lapackpp/include
+# -I/share/puhe/linux/include
+LDFLAGS = -L../lapackpp/src/.libs
+# -L/share/puhe/linux/lib
 ifeq ($(USE_SUBSPACE_COV),1)
 INCLUDES += -I/home/jpylkkon/libs/hcl1.0/hcld/include
 LDFLAGS += -L/home/jpylkkon/libs/hcl1.0/hcld/lib

@@ -3,6 +3,7 @@
 	<name>aku</name>
 	<comment></comment>
 	<projects>
+		<project>lapackpp</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

@@ -1,0 +1,5 @@
+To build the aku library, checkout lapackpp project from CVS,
+into the same directory where you have aku project, and first
+build lapackpp. Other than that, aku and decoder depend on
+some pretty standard packages, such as libsndfile, liblapack,
+libfftw3 and swig.
