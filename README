@@ -1,5 +1,16 @@
-To build the aku library, checkout lapackpp project from CVS,
-into the same directory where you have aku project, and first
-build lapackpp. Other than that, aku and decoder depend on
-some pretty standard packages, such as libsndfile, liblapack,
-libfftw3 and swig.
+To build the aku library, checkout lapackpp project from CVS, into the same
+directory where you have aku project, and first build lapackpp.
+
+In Debian based systems, you need to install the following dependencies:
+liblapack-dev
+libblas-dev
+libfftw3-dev
+libsndfile1-dev
+
+In Red Hat based systems, you need to install the following dependencies:
+lapack-devel
+blas-devel
+fftw-devel
+libsndfile-devel
+
+In addition, decoder requires swig.

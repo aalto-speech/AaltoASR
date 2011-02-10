@@ -20,3 +20,4 @@ phone_probs
 combine_stats
 segfea
 *.depend
+*.a
