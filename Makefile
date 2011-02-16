@@ -61,7 +61,7 @@ endif
 
 CLASS_OBJS = $(CLASS_SRCS:.cc=.o)
 
-LIBS = -lfftw3 -lsndfile -lm -llapackpp -llapack
+LIBS = -lfftw3 -lsndfile -lm -Wl,-Bstatic -llapackpp -Wl,-Bdynamic -llapack -lblas
 ifeq ($(USE_SUBSPACE_COV),1)
 LIBS += -lhcld
 endif
