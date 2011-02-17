@@ -18,7 +18,7 @@
  * - alignment: path to an alignment file
  * - hmmnet:
  * - den-hmmnet:
- * - lna:
+ * - lna: name for a .lna file that phone_probs will write
  * - start-time: starting time
  * - end-time: ending time
  * - start-line: starting line
