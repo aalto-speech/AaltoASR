@@ -18,7 +18,8 @@
  * - alignment: path to an alignment file
  * - hmmnet:
  * - den-hmmnet:
- * - lna: name for a .lna file that phone_probs will write
+ * - lna: name for a file where phoneme probabilities will be written in NOWAY
+ *  .lna format
  * - start-time: starting time
  * - end-time: ending time
  * - start-line: starting line
