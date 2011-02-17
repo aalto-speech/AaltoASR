@@ -7,7 +7,7 @@
 #include "HmmSet.hh"
 #include "Segmentator.hh"
 
-/** A class for reading phn files
+/** A class for reading .phn phonetic label files
  *
  * Format of the phn file.  Optional fields marked with brackets.  The
  * first optional two fields exist if the first char on the line is digit.

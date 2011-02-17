@@ -12,15 +12,25 @@
  * Recipe is a list of audio files, corresponding phn-files with
  * starting and ending times.
  *
- * Format of the lines in the recipe file:
+ * Each line contains key=value pairs, where key may be
+ * - audio: path to the audio file
+ * - transcript: path to a .phn transcript file
+ * - alignment: path to an alignment file
+ * - hmmnet:
+ * - den-hmmnet:
+ * - lna:
+ * - start-time: starting time
+ * - end-time: ending time
+ * - start-line: starting line
+ * - end-line: ending line
+ * - speaker: speaker ID
+ * - utterance: utterance ID
  *
- *  audio_file phn_file phn_out_file start_time end_time start_line end_line speaker_id utterance_id
+ *  phn_file phn_out_file
  *
  * end_line is the first line excluded from processing.
- * Empty lines are skipped, and fields can be omitted from the end
- * of the line.
- *
- * Empty fields are initialized to "" and 0.
+ * Empty lines are skipped.
+ * Fields that are not given are initialized to "" and 0.
  */
 
 class Recipe {
@@ -83,7 +93,12 @@ public:
 
   void clear();
 
-  /** Reads a recipe file
+  /** Creates Info structures from the recipe file lines and adds them to infos.
+   *
+   * The task will be divided to \a num_batches parts that can be processed
+   * concurrently by supplying a different \a batch_index for read() in each
+   * process.
+   *
    * \param f                A file pointer to a recipe file.
    * \param num_batches      Number of batch processes for concurrent
    *                         execution.
