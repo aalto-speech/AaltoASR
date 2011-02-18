@@ -28,10 +28,10 @@ akumodel = sys.argv[1] + "/test_mfcc_noisy_trained";
 hmms = akumodel + ".ph"
 dur = akumodel + ".dur"
 lexicon = sys.argv[1] + "/CariologyLexicon.lex"
-ngram = sys.argv[1] + "/hammas.bin"
-lookahead_ngram = sys.argv[1] + "/hammas_2gram.bin"
+ngram = sys.argv[1] + "/CariologyLM.even.3gram.bin"
+lookahead_ngram = sys.argv[1] + "/CariologyLM.even.2gram.bin"
 
-lm_scale = 0
+lm_scale = 40
 global_beam = 320
 
 
