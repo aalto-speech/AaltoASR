@@ -32,7 +32,7 @@ ngram = sys.argv[1] + "/CariologyLM.even.3gram.bin"
 lookahead_ngram = sys.argv[1] + "/CariologyLM.even.2gram.bin"
 
 lm_scale = 10
-global_beam = 300
+global_beam = 70
 
 
 ##################################################
@@ -155,9 +155,13 @@ for lna_file in os.listdir(test_directory):
 	t.set_end(-1)
 	while (True):
 		if (not t.run()):
-			rec = open(rec_path, "rw")
+			# We have to open with only "w" first, and then later with "r"
+			# for reading, or the file will not be written.
+			rec = open(rec_path, "w")
 			t.print_best_lm_history_to_file(rec)
 			t.write_word_graph(slf_path);
+			rec.close()
+			rec = open(rec_path, "r")
 			recognition = rec.read().strip()
 			rec.close()
 			break
