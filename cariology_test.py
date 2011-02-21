@@ -31,8 +31,8 @@ lexicon = sys.argv[1] + "/CariologyLexicon.lex"
 ngram = sys.argv[1] + "/CariologyLM.even.3gram.bin"
 lookahead_ngram = sys.argv[1] + "/CariologyLM.even.2gram.bin"
 
-lm_scale = 40
-global_beam = 320
+lm_scale = 10
+global_beam = 300
 
 
 ##################################################
@@ -58,9 +58,14 @@ command = [akupath + "/phone_probs", \
 		"-b", akumodel, \
  		"-c", akumodel + ".cfg", \
  		"-r", recipe_file.name, \
-		"-C", akumodel + ".gcl", \
-		"-o", test_directory, \
-		"--eval-ming", "0.20"]
+		"-o", test_directory]
+#command = [akupath + "/phone_probs", \
+#		"-b", akumodel, \
+#		"-c", akumodel + ".cfg", \
+#		"-r", recipe_file.name, \
+#		"-C", akumodel + ".gcl", \
+#		"-o", test_directory, \
+#		"--eval-ming", "0.50"]
 try:
 	result = subprocess.check_call(command)
 except subprocess.CalledProcessError as e:
@@ -90,6 +95,11 @@ t.duration_read(dur)
 
 t.set_verbose(1)
 t.set_print_text_result(0)
+
+# Generate a lattice of the word sequences that the decoder considered. Requires
+# 2-grams or higher order model.
+t.set_generate_word_graph(1)
+
 # t.set_print_state_segmentation(1)
 # t.set_print_word_start_frame(1)
 t.set_lm_lookahead(1)
@@ -119,6 +129,8 @@ dur_scale = 3
 t.set_global_beam(global_beam)
 t.set_word_end_beam(word_end_beam)
 t.set_token_limit(30000)
+
+# Should equal to the n-gram model order.
 t.set_prune_similar(3)
 
 t.set_print_probs(0)
@@ -137,6 +149,7 @@ for lna_file in os.listdir(test_directory):
 	lna_path = test_directory + "/" + lna_file
 	rec_path = lna_path[:-4] + ".rec"
 	txt_path = lna_path[:-4] + ".txt"
+	slf_path = lna_path[:-4] + ".slf"
 	t.lna_open(lna_path, 1024)
 	t.reset(0)
 	t.set_end(-1)
@@ -144,6 +157,7 @@ for lna_file in os.listdir(test_directory):
 		if (not t.run()):
 			rec = open(rec_path, "rw")
 			t.print_best_lm_history_to_file(rec)
+			t.write_word_graph(slf_path);
 			recognition = rec.read().strip()
 			rec.close()
 			break
