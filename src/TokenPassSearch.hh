@@ -26,7 +26,15 @@ public:
 
   // Print the best path
   void write_word_history(FILE *file = stdout, bool get_best_path = true);
+
+  /// \brief Writes the LM history of an active token into a file.
+  ///
+  /// If \a get_best_path is true, finds the active token with the highest
+  /// probability. Otherwise finds any active token. Then writes the words in
+  /// the lm_history of that token into a file, separated by spaces.
+  ///
   void print_lm_history(FILE *file = stdout, bool get_best_path = true);
+
   TPLexPrefixTree::Token *get_best_token();
   void print_state_history(FILE *file = stdout);
   std::string state_history_string();
