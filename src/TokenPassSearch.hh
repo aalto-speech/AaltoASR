@@ -81,6 +81,9 @@ public:
 
   int frame(void) { return m_frame; }
 
+  /// \brief Writes nodes and arcs from word_graph to a Standard Lattice Format
+  /// file.
+  ///
   void write_word_graph(const std::string &file_name);
   void write_word_graph(FILE *file);
 
