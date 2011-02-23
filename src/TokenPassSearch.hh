@@ -39,7 +39,6 @@ public:
 	///
 	void print_lm_history(FILE *file = stdout, bool get_best_path = true);
 
-	TPLexPrefixTree::Token *get_best_token();
 	void print_state_history(FILE *file = stdout);
 	std::string state_history_string();
 	void get_state_history(std::vector<TPLexPrefixTree::StateHistory*> &stack);
@@ -172,6 +171,16 @@ public:
 			TPLexPrefixTree::LMHistory *limit);
 
 private:
+	/// \brief Finds the globally best token.
+	///
+	/// \return A reference to the active token with the highest probability.
+	///
+	TPLexPrefixTree::Token & get_best_token();
+
+	/// \brief Returns the first token in the active token list.
+	///
+	TPLexPrefixTree::Token & get_first_token();
+
 	void add_sentence_end_to_hypotheses(void);
 	void propagate_tokens(void);
 	void update_final_tokens();

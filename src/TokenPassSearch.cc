@@ -437,41 +437,17 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 		exit(1);
 	}
 
-	TPLexPrefixTree::Token *best_token = m_best_final_token;
-
 	// Use globally best token if no best final token.
-	if (get_best_path) {
-		if (best_token == NULL) {
-			for (int i = 0; i < m_active_token_list->size(); i++) {
-				TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
-
-				if (token == NULL)
-					continue;
-
-				if (best_token == NULL || token->total_log_prob
-						> best_token->total_log_prob)
-					best_token = token;
-			}
-		}
-	}
-
-	// Otherwise, find any active token
-	else {
-		for (int i = 0; i < m_active_token_list->size(); i++) {
-			best_token = (*m_active_token_list)[i];
-			if (best_token != NULL)
-				break;
-		}
-	}
-
-	assert(best_token != NULL);
+	TPLexPrefixTree::Token & token = m_best_final_token != NULL ?
+			*m_best_final_token : get_best_path ? get_best_token()
+					: get_first_token();
 
 	// Fetch the best path if requested, otherwise the common path to
 	// all tokens and not printed yet
 
 	std::vector<TPLexPrefixTree::WordHistory*> stack;
 
-	TPLexPrefixTree::WordHistory *word_history = best_token->word_history;
+	TPLexPrefixTree::WordHistory * word_history = token.word_history;
 	bool collect = get_best_path;
 	while (word_history != NULL) {
 
@@ -518,38 +494,15 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 
 void TokenPassSearch::print_lm_history(FILE *file, bool get_best_path)
 {
-	TPLexPrefixTree::Token *best_token = NULL;
-
-	// Use globally best token if requested
-	if (get_best_path) {
-		for (int i = 0; i < m_active_token_list->size(); i++) {
-			TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
-
-			if (token == NULL)
-				continue;
-
-			if (best_token == NULL || token->total_log_prob
-					> best_token->total_log_prob)
-				best_token = token;
-		}
-	}
-
-	// Otherwise, find any active token
-	else {
-		for (int i = 0; i < m_active_token_list->size(); i++) {
-			best_token = (*m_active_token_list)[i];
-			if (best_token != NULL)
-				break;
-		}
-	}
-	assert(best_token != NULL);
+	TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+			: get_first_token();
 
 	// Fetch the best path if requested, otherwise the common path to
 	// all tokens and not printed yet
 
-	std::vector<TPLexPrefixTree::LMHistory*> stack;
+	std::vector<TPLexPrefixTree::LMHistory *> stack;
 
-	TPLexPrefixTree::LMHistory *lm_history = best_token->lm_history;
+	TPLexPrefixTree::LMHistory * lm_history = token.lm_history;
 	bool collect = get_best_path;
 	while (lm_history != NULL) {
 
@@ -601,23 +554,36 @@ void TokenPassSearch::print_lm_history(FILE *file, bool get_best_path)
 	fflush(file);
 }
 
-TPLexPrefixTree::Token*
+TPLexPrefixTree::Token &
 TokenPassSearch::get_best_token()
 {
-	TPLexPrefixTree::Token *best_token = NULL;
-	float best_log_prob = -1e20;
+	TPLexPrefixTree::Token * result = NULL;
+
 	for (int i = 0; i < m_active_token_list->size(); i++) {
-		TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
+		TPLexPrefixTree::Token * token = (*m_active_token_list)[i];
+
 		if (token == NULL)
 			continue;
 
-		if (token->total_log_prob > best_log_prob) {
-			best_token = token;
-			best_log_prob = token->total_log_prob;
-		}
+		if (result == NULL || token->total_log_prob > result->total_log_prob)
+			result = token;
 	}
-	assert(best_token != NULL);
-	return best_token;
+
+	assert(result != NULL);
+	return *result;
+}
+
+TPLexPrefixTree::Token &
+TokenPassSearch::get_first_token()
+{
+	for (int i = 0; i < m_active_token_list->size(); i++) {
+		TPLexPrefixTree::Token * token = (*m_active_token_list)[i];
+
+		if (token != NULL)
+			return *token;
+	}
+
+	assert(false);
 }
 
 void TokenPassSearch::print_state_history(FILE *file)
@@ -650,11 +616,11 @@ std::string TokenPassSearch::state_history_string()
 void TokenPassSearch::get_state_history(std::vector<
 		TPLexPrefixTree::StateHistory*> &stack)
 {
-	TPLexPrefixTree::Token *token = get_best_token();
+	TPLexPrefixTree::Token & token = get_best_token();
 
 	// Determine the state sequence
 	stack.clear();
-	TPLexPrefixTree::StateHistory *state = token->state_history;
+	TPLexPrefixTree::StateHistory *state = token.state_history;
 	while (state != NULL && state->previous != NULL) {
 		stack.push_back(state);
 		state = state->previous;
@@ -2093,29 +2059,20 @@ void TokenPassSearch::write_word_graph(const std::string &file_name)
 
 void TokenPassSearch::write_word_graph(FILE *file)
 {
-	TPLexPrefixTree::Token *best_token = m_best_final_token;
+	// if (m_best_final_token == NULL) {
+	//     fprintf(stderr, "ERROR: trying to write word graph before best final token"
+	//  	    "has been decided\n");
+	//     exit(1);
+	// jpylkkon 11.9.2007: Temporary fix
+	// FIXME: What should we do if we do not want to abort?
+	// }
 
-	if (best_token == NULL) {
-		//     fprintf(stderr, "ERROR: trying to write word graph before best final token"
-		//  	    "has been decided\n");
-		//     exit(1);
-		// jpylkkon 11.9.2007: Temporary fix
-		// FIXME: What should we do if we do not want to abort?
-		for (int i = 0; i < m_active_token_list->size(); i++) {
-			TPLexPrefixTree::Token *token = (*m_active_token_list)[i];
-
-			if (token == NULL)
-				continue;
-
-			if (best_token == NULL || token->total_log_prob
-					> best_token->total_log_prob)
-				best_token = token;
-		}
-	}
+	TPLexPrefixTree::Token & best_token = m_best_final_token != NULL ?
+			*m_best_final_token : get_best_token();
 
 	if (1) {
 		word_graph.reset_reachability();
-		word_graph.mark_reachable_nodes(best_token->recent_word_graph_node);
+		word_graph.mark_reachable_nodes(best_token.recent_word_graph_node);
 	} else
 		word_graph.reset_reachability(true);
 
@@ -2144,7 +2101,7 @@ void TokenPassSearch::write_word_graph(FILE *file)
 		"lmscale=%f wdpenalty=%f\n"
 		"N=%d\tL=%d\n"
 		"start=0 end=%d\n", m_lm_scale, m_insertion_penalty, nodes, arcs,
-			best_token->recent_word_graph_node);
+			best_token.recent_word_graph_node);
 
 	for (int n = 0; n < word_graph.nodes.size(); n++) {
 
