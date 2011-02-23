@@ -12,6 +12,7 @@ import subprocess
 import re
 import tempfile
 import filecmp
+import gzip
 
 # Set your decoder swig path in here!
 sys.path.append("src/swig");
@@ -32,7 +33,7 @@ ngram = sys.argv[1] + "/CariologyLM.even.3gram.bin"
 lookahead_ngram = sys.argv[1] + "/CariologyLM.even.2gram.bin"
 
 lm_scale = 10
-global_beam = 70
+global_beam = 400
 
 
 ##################################################
@@ -161,10 +162,25 @@ for lna_file in os.listdir(test_directory):
 			t.print_best_lm_history_to_file(rec)
 			t.write_word_graph(slf_path);
 			rec.close()
+			
+			command = 'lattice-tool -read-htk -in-lattice "' + \
+					slf_path + \
+					'" -nbest-decode 10 -out-nbest-dir "' + \
+					test_directory + '"'
+			return_value = os.system(command)
+			if return_value != 0:
+				print "Command returned a non-zero exit status: ", command
+				sys.exit(1)
+    		
+			nbest_file = gzip.open(slf_path + ".gz", "rb")
+			nbest_list = nbest_file.read()
+			nbest_file.close()
+
 			rec = open(rec_path, "r")
 			recognition = rec.read().strip()
 			rec.close()
 			break
+
 	if os.path.exists(txt_path):
 		equal = filecmp.cmp(rec_path, txt_path)
 		if equal:
@@ -176,3 +192,5 @@ for lna_file in os.listdir(test_directory):
 			print "F ", recognition, " != ", transcription
 	else:
 		print "? ", recognition
+	
+	print nbest_list
