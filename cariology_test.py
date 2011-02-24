@@ -13,6 +13,7 @@ import re
 import tempfile
 import filecmp
 import gzip
+import math
 
 # Set your decoder swig path in here!
 sys.path.append("src/swig");
@@ -147,6 +148,7 @@ print "Recognizing audio files."
 for lna_file in os.listdir(test_directory):
 	if not lna_file.endswith('.lna'):
 		continue
+	print ":: " + lna_file[:-4]
 	lna_path = test_directory + "/" + lna_file
 	rec_path = lna_path[:-4] + ".rec"
 	txt_path = lna_path[:-4] + ".txt"
@@ -165,7 +167,7 @@ for lna_file in os.listdir(test_directory):
 			
 			command = 'lattice-tool -read-htk -in-lattice "' + \
 					slf_path + \
-					'" -nbest-decode 10 -out-nbest-dir "' + \
+					'" -nbest-decode 100 -out-nbest-dir "' + \
 					test_directory + '"'
 			return_value = os.system(command)
 			if return_value != 0:
@@ -173,7 +175,7 @@ for lna_file in os.listdir(test_directory):
 				sys.exit(1)
     		
 			nbest_file = gzip.open(slf_path + ".gz", "rb")
-			nbest_list = nbest_file.read()
+			nbest_list = nbest_file.readlines()
 			nbest_file.close()
 
 			rec = open(rec_path, "r")
@@ -193,4 +195,31 @@ for lna_file in os.listdir(test_directory):
 	else:
 		print "? ", recognition
 	
-	print nbest_list
+	ln10 = math.log(10)
+	exp10 = lambda x: math.exp(x * ln10)
+	alpha = 0.05
+
+	line = nbest_list[0]
+	logprob_1 = float(line.split(' ')[0])
+	scaled_logprob_1 = exp10(logprob_1 * alpha)
+	
+	total_logprob = logprob_1
+	total_scaled_logprob = scaled_logprob_1
+	for line in nbest_list[1:]:
+		logprob = float(line.split(' ')[0])
+		total_logprob += math.log10(1 + exp10(logprob - total_logprob))
+		total_scaled_logprob += exp10(logprob * alpha)
+	
+	logprob_2 = -99
+	residue_logprob = -99
+	
+	if len(nbest_list) > 1:
+		line = nbest_list[1]
+		logprob_2 = float(line.split(' ')[0])
+		
+		residue_logprob = logprob_2
+		for line in nbest_list[2:]:
+			logprob = float(line.split(' ')[0])
+			residue_logprob += math.log10(1 + exp10(logprob - residue_logprob))
+	
+	print str(scaled_logprob_1), ",", total_scaled_logprob, ",", (scaled_logprob_1 / total_scaled_logprob) * 100
