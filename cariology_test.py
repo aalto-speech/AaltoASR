@@ -194,32 +194,18 @@ for lna_file in os.listdir(test_directory):
 			print "F ", recognition, " != ", transcription
 	else:
 		print "? ", recognition
-	
-	ln10 = math.log(10)
-	exp10 = lambda x: math.exp(x * ln10)
-	alpha = 0.05
+
+	# Compensate for incorrect assumptions in the HMM by flattening the
+	# logprobs.
+	alpha = 0.1
 
 	line = nbest_list[0]
-	logprob_1 = float(line.split(' ')[0])
-	scaled_logprob_1 = exp10(logprob_1 * alpha)
+	logprob_1 = float(line.split(' ')[0]) * alpha
 	
 	total_logprob = logprob_1
-	total_scaled_logprob = scaled_logprob_1
 	for line in nbest_list[1:]:
-		logprob = float(line.split(' ')[0])
-		total_logprob += math.log10(1 + exp10(logprob - total_logprob))
-		total_scaled_logprob += exp10(logprob * alpha)
+		logprob = float(line.split(' ')[0]) * alpha
+		# Acoustic probabilities are calculated in natural logarithm space.
+		total_logprob += math.log(1 + math.exp(logprob - total_logprob))
 	
-	logprob_2 = -99
-	residue_logprob = -99
-	
-	if len(nbest_list) > 1:
-		line = nbest_list[1]
-		logprob_2 = float(line.split(' ')[0])
-		
-		residue_logprob = logprob_2
-		for line in nbest_list[2:]:
-			logprob = float(line.split(' ')[0])
-			residue_logprob += math.log10(1 + exp10(logprob - residue_logprob))
-	
-	print str(scaled_logprob_1), ",", total_scaled_logprob, ",", (scaled_logprob_1 / total_scaled_logprob) * 100
+	print str(logprob_1 - total_logprob)
