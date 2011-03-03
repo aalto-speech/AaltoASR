@@ -93,6 +93,11 @@ public:
   // Both searches
   void reset(int frame) { if (m_use_stack_decoder) m_search.reset_search(frame);  else m_tp_search.reset_search(frame);}
   void set_end(int frame) { if (m_use_stack_decoder) m_search.set_end_frame(frame); else m_tp_search.set_end_frame(frame); }
+
+  /// \brief Proceeds decoding one frame.
+  ///
+  /// \return true if a frame was available, false if there are no more frames.
+  ///
   bool run() { return (m_use_stack_decoder?m_search.run():m_tp_search.run()); }
 
   // Token pass search
