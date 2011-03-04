@@ -23,8 +23,15 @@ public:
   void select_decoder(int stack_dec) { m_use_stack_decoder = stack_dec; }
   
   // HMM models
+
+  /// \brief Reads the acoustic models of triphones from a file.
+  ///
   void hmm_read(const char *file);
+
+  /// \brief Reads an HMM duration file.
+  ///
   void duration_read(const char *dur_file);
+
   const std::vector<Hmm> &hmms() const { return m_hmms; }
 
   // Lexicon
