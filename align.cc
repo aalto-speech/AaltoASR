@@ -60,7 +60,7 @@ viterbi_align(Viterbi &viterbi, int start_frame, int end_frame,
   viterbi.set_feature_frame(window_start_frame);
   viterbi.set_force_end(!no_force_end);
 
-  if (set_speakers && speaker.size() > 0)
+  if (set_speakers)
   {
     speaker_config.set_speaker(speaker);
     if (utterance.size() > 0)
