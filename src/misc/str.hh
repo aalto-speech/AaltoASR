@@ -307,7 +307,7 @@ namespace str {
   }
 
   /** Return a strin with the possible trailing newline removed
-   * \param str = string to çhomp
+   * \param str = string to ï¿½homp
    * \param chars = characters to remove
    * \return the string without trailing newline
    */
@@ -319,7 +319,7 @@ namespace str {
   }
 
   /** Remove the possible trailing newline from a string
-   * \param str = string to çhomp
+   * \param str = string to ï¿½homp
    * \param chars = characters to remove
    * \return reference to modified \c str 
    */
@@ -568,7 +568,7 @@ namespace str {
   inline std::string str(const std::vector<int> &vec)
   {
     std::string str;
-    for (int i = 0; i < vec.size(); i++)
+    for (std::vector<int>::size_type i = 0; i < vec.size(); i++)
       str.append(fmt(256, "%s%d", i > 0 ? " " : "", vec[i]));
     return str;
   }
