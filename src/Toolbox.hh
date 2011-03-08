@@ -26,9 +26,13 @@ public:
 
   /// \brief Reads the acoustic models of triphones from a file.
   ///
+  /// \exception OpenError If unable to open the file.
+  ///
   void hmm_read(const char *file);
 
   /// \brief Reads an HMM duration file.
+  ///
+  /// \exception OpenError If unable to open the file.
   ///
   void duration_read(const char *dur_file);
 
