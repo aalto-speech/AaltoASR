@@ -400,26 +400,11 @@ void TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
 		abort();
 	}
 
-	TPLexPrefixTree::Token *orig_token = NULL;
-	float best_log_prob = -1e20;
-	for (int t = 0; t < m_active_token_list->size(); t++) {
-		TPLexPrefixTree::Token *token = (*m_active_token_list)[t];
-		if (token == NULL)
-			continue;
-		if (!use_best_token) {
-			orig_token = token;
-			break;
-		}
-		if (token->total_log_prob >= best_log_prob) {
-			orig_token = token;
-			best_log_prob = token->total_log_prob;
-		}
-	}
-
-	assert(orig_token != NULL);
+	TPLexPrefixTree::Token & token = use_best_token ? get_best_token()
+			: get_first_token();
 
 	vec.clear();
-	TPLexPrefixTree::LMHistory *hist = orig_token->lm_history;
+	TPLexPrefixTree::LMHistory *hist = token.lm_history;
 	while (hist->word_id >= 0) {
 		if (hist == limit)
 			break;
@@ -1333,7 +1318,6 @@ void TokenPassSearch::prune_tokens(void)
 
 		for (i = 0; i < m_active_token_list->size(); i++) {
 			float total_log_prob = (*m_active_token_list)[i]->total_log_prob;
-			unsigned short flags = (*m_active_token_list)[i]->node->flags;
 			if (total_log_prob < beam_limit
 #ifdef PRUNING_EXTENSIONS
 			|| ((flags&NODE_FAN_IN)?
@@ -1404,8 +1388,6 @@ void TokenPassSearch::prune_tokens(void)
 	} else {
 		// Only do the beam pruning
 		for (i = 0; i < m_active_token_list->size(); i++) {
-			float total_log_prob = (*m_active_token_list)[i]->total_log_prob;
-			unsigned short flags = (*m_active_token_list)[i]->node->flags;
 			if ((*m_active_token_list)[i]->total_log_prob < beam_limit
 #ifdef PRUNING_EXTENSIONS
 			|| ((flags&NODE_FAN_IN)?

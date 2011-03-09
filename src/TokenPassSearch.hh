@@ -42,6 +42,16 @@ public:
 	void print_state_history(FILE *file = stdout);
 	std::string state_history_string();
 	void get_state_history(std::vector<TPLexPrefixTree::StateHistory*> &stack);
+
+	/// \brief Writes the LM history of an active token into a vector.
+	///
+	/// If \a use_best_token is true, finds the active token with the highest
+	/// probability. Otherwise finds any active token. Then writes the
+	/// TPLexPrefixTree::LMHistory objects in the lm_history of that token into
+	/// a vector.
+	///
+	/// \param vec The vector where the result will be written.
+	///
 	void get_path(HistoryVector &vec, bool use_best_token,
 			TPLexPrefixTree::LMHistory *limit);
 

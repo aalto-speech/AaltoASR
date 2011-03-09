@@ -26,14 +26,27 @@ import Decoder
 
 akupath = "../aku"
 
-akumodel = sys.argv[1] + "/test_mfcc_noisy_trained";
-hmms = akumodel + ".ph"
-dur = akumodel + ".dur"
-lexicon = sys.argv[1] + "/CariologyLexicon.lex"
-ngram = sys.argv[1] + "/CariologyLM.even.3gram.bin"
-lookahead_ngram = sys.argv[1] + "/CariologyLM.even.2gram.bin"
+# 16 kHz acoustic model
+#ac_model = sys.argv[1] + "/test_mfcc_noisy_trained";
+#speech_directory = sys.argv[1] + "/speech/Sennheiser_16kHz"
+# 8 kHz (telephone?) acoustic model
+ac_model = sys.argv[1] + "/speechdat_gain5000_occ300_23.2.2009_22";
+speech_directory = sys.argv[2]
 
-lm_scale = 10
+hmms = ac_model + ".ph"
+dur = ac_model + ".dur"
+
+# language model for cariology status commands
+#lexicon = sys.argv[1] + "/CariologyLexicon.lex"
+#ngram = sys.argv[1] + "/CariologyLM.even.3gram.bin"
+#lookahead_ngram = sys.argv[1] + "/CariologyLM.even.2gram.bin"
+
+lexicon = "/share/work/jpylkkon/bin_lm/morph19k.lex"
+ngram = "/share/work/jpylkkon/bin_lm/morph19k_D20E10_varigram.bin"
+lookahead_ngram = "/share/work/jpylkkon/bin_lm/morph19k_2gram.bin"
+
+
+lm_scale = 30
 global_beam = 400
 
 
@@ -43,13 +56,12 @@ global_beam = 400
 
 recipe_file = tempfile.NamedTemporaryFile()
 
-test_directory = sys.argv[1] + "/CariologyTestSet"
-for wav_file in os.listdir(test_directory):
+for wav_file in os.listdir(speech_directory):
 	if not wav_file.endswith('.wav'):
 		continue;
-	audio = test_directory + "/" + wav_file
+	audio = speech_directory + "/" + wav_file
 	lna = wav_file[:-4] + ".lna"
-	if not os.path.exists(test_directory + "/" + lna):
+	if not os.path.exists(speech_directory + "/" + lna):
 		recipe_file.write("audio=" + audio + " lna=" + lna + "\n")
 
 # Don't close the temporary file yet, or it will get deleted.
@@ -57,16 +69,16 @@ recipe_file.flush()
 
 print "Computing phoneme probabilities."
 command = [akupath + "/phone_probs", \
-		"-b", akumodel, \
- 		"-c", akumodel + ".cfg", \
+		"-b", ac_model, \
+ 		"-c", ac_model + ".cfg", \
  		"-r", recipe_file.name, \
-		"-o", test_directory]
+		"-o", speech_directory]
 #command = [akupath + "/phone_probs", \
-#		"-b", akumodel, \
-#		"-c", akumodel + ".cfg", \
+#		"-b", ac_model, \
+#		"-c", ac_model + ".cfg", \
 #		"-r", recipe_file.name, \
-#		"-C", akumodel + ".gcl", \
-#		"-o", test_directory, \
+#		"-C", ac_model + ".gcl", \
+#		"-o", speech_directory, \
 #		"--eval-ming", "0.50"]
 try:
 	result = subprocess.check_call(command)
@@ -84,7 +96,10 @@ recipe_file.close()
 t = Decoder.Toolbox()
 
 t.select_decoder(0)
-t.set_silence_is_word(0)
+
+# Emable for morph models.
+t.set_silence_is_word(1)
+
 t.set_optional_short_silence(1)
 
 t.set_cross_word_triphones(1)
@@ -102,12 +117,10 @@ t.set_print_text_result(0)
 # 2-grams or higher order model.
 t.set_generate_word_graph(1)
 
-# t.set_print_state_segmentation(1)
-# t.set_print_word_start_frame(1)
 t.set_lm_lookahead(1)
 
-# Only needed for morph models.
-# t.set_word_boundary("<w>")
+# Emable for morph models.
+t.set_word_boundary("<w>")
 
 print "Loading lexicon."
 try:
@@ -145,11 +158,11 @@ t.set_lm_scale(lm_scale)
 # t.set_insertion_penalty(-0.5)
 
 print "Recognizing audio files."
-for lna_file in os.listdir(test_directory):
+for lna_file in os.listdir(speech_directory):
 	if not lna_file.endswith('.lna'):
 		continue
 	print ":: " + lna_file[:-4]
-	lna_path = test_directory + "/" + lna_file
+	lna_path = speech_directory + "/" + lna_file
 	rec_path = lna_path[:-4] + ".rec"
 	txt_path = lna_path[:-4] + ".txt"
 	slf_path = lna_path[:-4] + ".slf"
@@ -168,7 +181,7 @@ for lna_file in os.listdir(test_directory):
 			command = 'lattice-tool -read-htk -in-lattice "' + \
 					slf_path + \
 					'" -nbest-decode 100 -out-nbest-dir "' + \
-					test_directory + '"'
+					speech_directory + '"'
 			return_value = os.system(command)
 			if return_value != 0:
 				print "Command returned a non-zero exit status: ", command
