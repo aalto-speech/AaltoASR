@@ -7,6 +7,9 @@
 #include "str.hh"
 #include <set>
 
+
+namespace aku {
+
 void
 RegClassTree::initialize_root_node(HmmSet *model)
 {
@@ -647,4 +650,6 @@ RegClassTree::RegClassTree::get_node(int index)
   }
 
   return cur_node;
+}
+
 }

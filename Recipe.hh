@@ -8,6 +8,9 @@
 #include "HmmNetBaumWelch.hh"
 #include "FeatureGenerator.hh"
 
+
+namespace aku {
+
 /** A class for handling recipe files.
  * Recipe is a list of audio files, corresponding phn-files with
  * starting and ending times.
@@ -116,5 +119,7 @@ public:
     std::stable_sort(infos.begin(), infos.end());
   }
 };
+
+}
 
 #endif /* RECIPE_HH */

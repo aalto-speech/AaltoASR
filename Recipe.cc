@@ -4,6 +4,9 @@
 #include "Recipe.hh"
 #include "str.hh"
 
+
+namespace aku {
+
 Recipe::Info::Info()
   : start_time(0), end_time(0), start_line(0), end_line(0),
     speaker_id(""), utterance_id("")
@@ -206,4 +209,6 @@ Recipe::Info::init_hmmnet_files(HmmSet *model, bool den_hmmnet,
   }
 
   return hnbw;
+}
+
 }

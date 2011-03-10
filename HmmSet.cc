@@ -12,6 +12,8 @@
 #define MIN_STATE_PROB 1e-50
 
 
+namespace aku {
+
 void
 Hmm::resize(int states)
 {
@@ -1250,4 +1252,6 @@ HmmSet::set_clustering_min_evals(double min_clusters,
   m_pool.set_evaluate_min_clusters(int(min_clusters*m_pool.number_of_clusters()));
   m_pool.set_evaluate_min_gaussians(int(min_gaussians*m_pool.size()));
   m_pool.set_use_clustering(true);
+}
+
 }

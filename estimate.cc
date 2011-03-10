@@ -20,7 +20,7 @@ int maxg;
 
 conf::Config config;
 FeatureGenerator fea_gen;
-HmmSet model;
+aku::HmmSet model;
 
 
 int
@@ -28,7 +28,7 @@ main(int argc, char *argv[])
 {
   std::map< std::string, double > sum_statistics;
   std::string base_file_name;
-  PDF::EstimationMode mode;
+  aku::PDF::EstimationMode mode;
   
   try {
     config("usage: estimate [OPTION...]\n")
@@ -72,15 +72,15 @@ main(int argc, char *argv[])
     int count = 0;
     if (config["ml"].specified) {
       count++;
-      mode = PDF::ML_EST;
+      mode = aku::PDF::ML_EST;
     }
     if (config["mmi"].specified) {
       count++;
-      mode = PDF::MMI_EST;
+      mode = aku::PDF::MMI_EST;
     }
     if (config["mpe"].specified) {
       count++;
-      mode = PDF::MPE_EST;
+      mode = aku::PDF::MPE_EST;
     }
     if (count != 1)
       throw std::string("Define exactly one of --ml, --mmi and --mpe!");
@@ -88,12 +88,12 @@ main(int argc, char *argv[])
     if (config["mmi-ismooth"].specified &&
         (!config["mmi"].specified && !config["mmi-prior"].specified))
       fprintf(stderr, "Warning: --mmi-ismooth ignored without --mmi or --mmi-prior\n");
-    if (config["mpe-ismooth"].specified && mode != PDF::MPE_EST)
+    if (config["mpe-ismooth"].specified && mode != aku::PDF::MPE_EST)
         fprintf(stderr, "Warning: --mpe-ismooth ignored without --mpe\n");
     if (config["mmi-prior"].specified)
     {
-      if (mode == PDF::MPE_EST)
-        mode = PDF::MPE_MMI_PRIOR_EST;
+      if (mode == aku::PDF::MPE_EST)
+        mode = aku::PDF::MPE_MMI_PRIOR_EST;
       else
         fprintf(stderr, "Warning: --mmi-prior ignored without --mpe\n");
     }

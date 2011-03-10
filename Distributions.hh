@@ -19,6 +19,9 @@
 #define PDF_MPE_NUM_STATS 8
 #define PDF_MPE_DEN_STATS 16
 
+
+namespace aku {
+
 class PDF {
 public:
 
@@ -805,5 +808,6 @@ private:
   std::vector<PDF*> &m_pool;
 };
 
+}
 
 #endif /* DISTRIBUTIONS_HH */

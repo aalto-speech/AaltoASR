@@ -9,6 +9,9 @@
 #include "FeatureGenerator.hh"
 #include "ModelModules.hh"
 
+
+namespace aku {
+
 /** A class for handling speaker and utterance adaptations.
  * Speaker ID is the primary method for changing feature configurations.
  * If another level of configurations is needed, utterance IDs can
@@ -53,5 +56,7 @@ private:
   std::string m_cur_speaker;
   std::string m_cur_utterance;
 };
+
+}
 
 #endif // SPEAKERCONFIG_HH

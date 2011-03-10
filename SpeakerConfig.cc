@@ -2,6 +2,8 @@
 #include "str.hh"
 
 
+namespace aku {
+
 SpeakerConfig::SpeakerConfig(FeatureGenerator &fea_gen, HmmSet *model) :
   m_fea_gen(fea_gen), m_model(model)
 {
@@ -373,4 +375,6 @@ SpeakerConfig::set_modules(const ModuleMap &modules, bool load_new_model_trans)
 
 
   }
+}
+
 }

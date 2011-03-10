@@ -13,6 +13,8 @@
 #include "SpeakerConfig.hh"
 #include "HmmNetBaumWelch.hh"
 
+using namespace aku;
+
 int max_contexts;
 int info;
 

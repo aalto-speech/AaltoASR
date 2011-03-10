@@ -12,6 +12,7 @@
 #include "Recipe.hh"
 #include "SpeakerConfig.hh"
 
+using namespace aku;
 
 int win_size;
 int info;

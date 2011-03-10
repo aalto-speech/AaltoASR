@@ -6,6 +6,9 @@
 #include <set>
 #include <vector>
 
+
+namespace aku {
+
 /**
  * Container for the 'atomic' units in the Regression tree.
  */
@@ -436,4 +439,7 @@ template<class T>
     return comps_to_t;
 
   }
+
+}
+
 #endif /* REGCLASSTREE_H_ */

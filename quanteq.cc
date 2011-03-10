@@ -21,9 +21,9 @@ float grid_gamma_step;
 int num_quant;
 
 conf::Config config;
-Recipe recipe;
+aku::Recipe recipe;
 FeatureGenerator fea_gen;
-SpeakerConfig utterance_conf(fea_gen);
+aku::SpeakerConfig utterance_conf(fea_gen);
 std::vector<std::vector<float> > fea_mat; // Matrix of features
 std::vector<std::vector<float> > quant;   // Matrix of quantiles
 std::vector<float> quant_train;          // Training quantiles (channel independent)
@@ -211,7 +211,7 @@ main(int argc, char *argv[])
         io::Stream(config["out"].get_str(), "w"), NULL, utterance_set);
     }
   }
-  catch (HmmSet::UnknownHmm &e) {
+  catch (aku::HmmSet::UnknownHmm &e) {
     fprintf(stderr, 
 	    "Unknown HMM in transcription\n");
     abort();

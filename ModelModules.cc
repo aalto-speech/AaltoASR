@@ -6,6 +6,9 @@
 #include <iostream>
 #include <vector>
 
+
+namespace aku {
+
 ModelModule*
 ModelTransformer::get_new_module(const std::string &name, HmmSet *model)
 {
@@ -280,4 +283,6 @@ ConstrainedMllr::reset_transform()
   m_feature_vecs.clear();
   m_orig_pdfs.clear();
   m_is_loaded = false;
+}
+
 }

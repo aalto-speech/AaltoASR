@@ -6,6 +6,9 @@
 #include "ModelModules.hh"
 #include "FeatureModules.hh"
 
+
+namespace aku {
+
 class MllrTrainer {
 
 public:
@@ -54,5 +57,7 @@ public:
     m_comp_map(rtree, model), m_model(model)  { }
   ~MllrTrainer() { }
 };
+
+}
 
 #endif /* MODELMLLRTRAINER_HH_ */

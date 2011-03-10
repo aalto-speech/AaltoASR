@@ -14,6 +14,9 @@
 #define MAX_MLLT_ITER 7
 #define MAX_MLLT_A_ITER 80
 
+
+namespace aku {
+
 //
 // HmmState
 //
@@ -623,5 +626,6 @@ HmmSet::transition(int transition)
   return m_transitions[transition];
 }
 
+}
 
 #endif /* HMMSET_HH */

@@ -7,6 +7,8 @@
 #include "util.hh"
 
 
+namespace aku {
+
 Viterbi::Viterbi(HmmSet &model, FeatureGenerator &fea_gen, 
 		 PhnReader *phn_reader)
   : m_model(model),
@@ -483,4 +485,6 @@ Viterbi::debug_show_lattice()
     }
     std::cerr << std::endl;
   }
+}
+
 }

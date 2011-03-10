@@ -7,6 +7,7 @@
 #include "conf.hh"
 #include "HmmSet.hh"
 
+using namespace aku;
 
 conf::Config config;
 HmmSet model;

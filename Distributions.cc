@@ -12,6 +12,8 @@
 #include "blas3pp.h"
 
 
+namespace aku {
+
 void
 GaussianAccumulator::get_accumulated_mean(Vector &mean) const
 {
@@ -2727,4 +2729,6 @@ PDFPool::read_clustering(const std::string &filename)
     dg->merge(weights, gaussians, true);
     m_cluster_centers[i] = dg;
   }
+}
+
 }

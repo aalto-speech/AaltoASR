@@ -7,7 +7,7 @@
 conf::Config config;
 FeatureGenerator gen;
 bool raw_output = false;
-SpeakerConfig speaker_conf(gen);
+aku::SpeakerConfig speaker_conf(gen);
 
 void
 print_feature(const FeatureVec &fea)

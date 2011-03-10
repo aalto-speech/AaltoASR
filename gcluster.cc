@@ -6,6 +6,8 @@
 #include "HmmSet.hh"
 #include "RegClassTree.hh"
 
+using namespace aku;
+
 typedef std::pair< double, std::pair<int, std::pair<int, int> > > queue_item_type;
 typedef std::pair<std::pair<int,int>, double> merge_option_type;
 

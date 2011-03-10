@@ -8,6 +8,9 @@
 #include "HmmSet.hh"
 #include "Distributions.hh"
 
+
+namespace aku {
+
 /** A class for tying the states of context dependent phones.
  */
 class PhonePool {
@@ -350,6 +353,6 @@ PhonePool::add_context(const std::string &context)
   m_contexts.insert(m_contexts.begin(), context);
 }
 
-
+}
 
 #endif // PHONEPOOL_HH

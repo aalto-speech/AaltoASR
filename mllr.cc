@@ -11,6 +11,8 @@
 #include <iostream>
 #include <fstream>
 
+using namespace aku;
+
 int info;
 
 conf::Config config;

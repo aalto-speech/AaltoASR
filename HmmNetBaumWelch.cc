@@ -3,6 +3,8 @@
 #include "str.hh"
 
 
+namespace aku {
+
 HmmNetBaumWelch::LLType HmmNetBaumWelch::loglikelihoods;
 
 
@@ -1071,4 +1073,6 @@ HmmNetBaumWelch::FrameScores::clear(void)
   score_table_size = 0;
   num_scores = 0;
   frame_blocks.clear();
+}
+
 }

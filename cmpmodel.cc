@@ -8,6 +8,7 @@
 #include "HmmSet.hh"
 #include "Distributions.hh"
 
+using namespace aku;
 
 int
 main(int argc, char *argv[])

@@ -5,6 +5,8 @@
 #include "str.hh"
 
 
+namespace aku {
+
 int safe_tolower(int c)
 {
   if (c == 'Å')
@@ -267,7 +269,7 @@ PhonePool::Phone::get_initial_clustered_state(int state)
     throw str::fmt(
       128,"PhonePool::Phone::get_initial_clustered_state: Invalid state %i",
       state);
-  
+
   ContextPhoneCluster *cl = new ContextPhoneCluster(m_pool->dimension());
   ContextPhoneSet context_phones;
   for (ContextPhoneMap::iterator it = m_cp_states[state].begin();
@@ -399,7 +401,7 @@ PhonePool::load_decision_tree_rules(FILE *fp)
     {
       if ((int)fields.size() < 2)
         throw std::string("PhonePool::load_decision_tree_rules: Invalid rule line:\n") + line;
-      
+
       std::transform(fields[1].begin(), fields[1].end(),
                      fields[1].begin(), safe_tolower);
       if (fields[1] == "context")
@@ -458,7 +460,7 @@ PhonePool::decision_tree_cluster_context_phones(int max_context_index)
 {
   int context_start, context_end;
   int total_clusters = 0;
-  
+
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
     for (int s = 0; s < (*it).second->num_states(); s++)
@@ -466,7 +468,7 @@ PhonePool::decision_tree_cluster_context_phones(int max_context_index)
       if (m_info > 0)
         fprintf(stderr, "Processing phone %s, state %i\n",
                 (*it).second->label().c_str(), s);
-      
+
       std::vector<ContextPhoneCluster*> clusters;
       clusters.push_back((*it).second->get_initial_clustered_state(s));
 
@@ -529,13 +531,13 @@ PhonePool::apply_best_splitting_rule(
   bool cur_first_answer;
   std::vector< ContextPhoneSet > applied_sets;
   int num_new_context_phones;
-  
+
   // Initialize the best applied rule to invalid values (context 0)
   AppliedDecisionRule best_applied_rule(&(m_rules[0]), 0, false);
   ContextPhoneCluster best_cl1(m_dim), best_cl2(m_dim);
   double best_ll_gain = -1;
   int s;
-  
+
   // Iterate through rules
   for (int r = 0; r < (int)m_rules.size(); r++)
   {
@@ -543,7 +545,7 @@ PhonePool::apply_best_splitting_rule(
     {
       if (i == 0) // Zero is an invalid context index
         continue;
-      
+
       c1 = cl->compute_new_cluster_occupancy(&(m_rules[r]), i, true,
                                              &num_new_context_phones);
       c2 = cl->occupancy_count() - c1;
@@ -559,7 +561,7 @@ PhonePool::apply_best_splitting_rule(
         cur_first_answer = true;
       else
         cur_first_answer = false;
-      
+
       cl->fill_new_cluster_context_phones(&(m_rules[r]), i, cur_first_answer,
                                           new_context_phones);
 
@@ -571,7 +573,7 @@ PhonePool::apply_best_splitting_rule(
       }
       if (s < (int)applied_sets.size()) // Found the same set
         continue;
-      
+
       cl1.fill_cluster(new_context_phones);
       cl2.remove_from_cluster(cl1);
 
@@ -586,10 +588,10 @@ PhonePool::apply_best_splitting_rule(
                                                 cur_first_answer);
         best_ll_gain = gain;
       }
-      
+
       if (m_rules[r].rule_type != DecisionRule::CONTEXT)
         break; // Context index has no meaning, no need to iterate
-    }                                
+    }
   }
   if (best_applied_rule.context != 0)
   {
@@ -629,13 +631,13 @@ PhonePool::merge_context_phones(void)
       int orig_size = cur_clusters.size();
       if (m_info > 0)
         fprintf(stderr,"Merging clusters of phone %s, state %i, initially %i clusters\n", (*it).second->label().c_str(), s, orig_size);
-      
+
       // Merge the clusters while maximum likelihood loss is retained
       for (int c = 0; c < (int)cur_clusters.size(); c++)
       {
         double min_loss = 2*m_max_merge_ll_loss; // Just a value over maximum
         int best_target = -1;
-        
+
         for (int i = c+1; i < (int)cur_clusters.size(); i++)
         {
           ContextPhoneCluster merged_cl(m_dim);
@@ -717,7 +719,7 @@ PhonePool::save_model(const std::string &base, int max_context_index)
           fprintf(stderr, "%i  %i\n", index, state_index);
           assert( index == state_index );
         }
-        
+
         // Add transitions
         model.add_transition(state_index, 0, 0.8);
         model.add_transition(state_index, 1, 0.2);
@@ -737,9 +739,9 @@ PhonePool::save_model(const std::string &base, int max_context_index)
       }
     }
   }
-  
+
   iterate_context_phones(m, max_context_index);
-  
+
   model.write_all(base);
 }
 
@@ -802,7 +804,7 @@ PhonePool::SaveToBasebind::add_state(int state_index)
 void
 PhonePool::iterate_context_phones(ContextPhoneCallback &c,
                                   int max_context_index)
-{  
+{
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
     if ((*it).second->label()[0] != '_' && max_context_index > 0)
@@ -814,7 +816,7 @@ PhonePool::iterate_context_phones(ContextPhoneCallback &c,
           new PhoneLabelSet::iterator[max_context_index*2];
         for (int i = 0; i < max_context_index*2; i++)
           context_it[i] = m_contexts.begin();
-        
+
         while (context_it[0] != m_contexts.end())
         {
           std::string label = "";
@@ -826,7 +828,7 @@ PhonePool::iterate_context_phones(ContextPhoneCallback &c,
             label += std::string("+") + *(context_it[i]);
 
           c.add_label(label, (*it).second->num_states());
-        
+
           // Construct a ContextPhone object for rule testing
           ContextPhone cur_phone(label, this, false);
 
@@ -867,7 +869,7 @@ PhonePool::iterate_context_phones(ContextPhoneCallback &c,
             assert( cluster_index >= 0 );
             c.add_state(clusters[cluster_index]->state_index());
           }
-        
+
           // Update the iterators
           for (int i = max_context_index*2-1;
                i >= 0 && ++context_it[i] == m_contexts.end(); i--)
@@ -889,4 +891,6 @@ PhonePool::iterate_context_phones(ContextPhoneCallback &c,
       }
     }
   }
+}
+
 }

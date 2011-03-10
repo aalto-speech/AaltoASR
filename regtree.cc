@@ -5,6 +5,8 @@
 #include "RegClassTree.hh"
 #include <fstream>
 
+using namespace aku;
+
 conf::Config config;
 HmmSet model;
 RegClassTree rtree;

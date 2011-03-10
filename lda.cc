@@ -13,6 +13,8 @@
 #include "util.hh"
 #include "Distributions.hh"
 
+using namespace aku;
+
 std::string out_file;
 
 int f;

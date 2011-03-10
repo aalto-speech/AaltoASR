@@ -7,6 +7,9 @@
 #include "Distributions.hh"
 #include <iostream>
 
+
+namespace aku {
+
 /**
  * A module which performs an action on a model. This module are initiated by the SpeakerConfig like a FeatureModule
  */
@@ -205,6 +208,8 @@ inline void ConstrainedMllr::AdaptedFeatureVector::calculate_new_ada_vector(cons
   m_o_adap.copy(m_b);
   Blas_Mat_Vec_Mult(m_A, v, m_o_adap, 1.0, 1.0 );
   m_calculated = true;
+}
+
 }
 
 #endif /* MODELMODULE_HH_ */

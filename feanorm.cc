@@ -14,7 +14,7 @@ const char *out_file;
 
 conf::Config config;
 FeatureGenerator gen;
-SpeakerConfig m_speaker_config(gen); // Speaker configuration handler
+aku::SpeakerConfig m_speaker_config(gen); // Speaker configuration handler
 
 int
 main(int argc, char *argv[])
@@ -110,7 +110,7 @@ main(int argc, char *argv[])
     }
 
     // Read recipe file
-    Recipe recipe;
+    aku::Recipe recipe;
     recipe.read(io::Stream(config["recipe"].get_str()),
                 0, 0, false);
 

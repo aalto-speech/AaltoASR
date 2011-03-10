@@ -1,6 +1,9 @@
 #include "MllrTrainer.hh"
 #include "float.h"
 
+
+namespace aku {
+
 void
 MllrTrainer::MllTrainerComponent::merge(PDFGroupModule *pgm)
 {
@@ -246,4 +249,6 @@ MllrTrainer::MllTrainerComponent::get_product(const Vector &x,
 {
   Blas_Mat_Vec_Mult(A, y, work);
   return Blas_Dot_Prod(x, work);
+}
+
 }

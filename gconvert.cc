@@ -2,6 +2,8 @@
 #include "conf.hh"
 #include "LinearAlgebra.hh"
 
+using namespace aku;
+
 conf::Config config;
 #ifdef USE_SUBSPACE_COV
 PrecisionSubspace *ps;

@@ -5,6 +5,9 @@
 #include "FeatureGenerator.hh"
 #include "HmmSet.hh"
 
+
+namespace aku {
+
 /** A class for generating state probabilities for a HMM network.
  * The network is represented in FST format.
  */
@@ -274,5 +277,7 @@ private:
   /// A map which holds the information about transitions
   std::vector<Segmentator::IndexProbPair> m_transition_prob_pairs;
 };
+
+}
 
 #endif // HMMNETBAUMWELCH_HH

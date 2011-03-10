@@ -10,6 +10,8 @@
 #include "HmmSet.hh"
 #include "LmbfgsOptimize.hh"
 
+using namespace aku;
+
 std::string statistics_file;
 std::string out_model_name;
 std::string state_file;

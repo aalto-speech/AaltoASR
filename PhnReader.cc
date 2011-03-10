@@ -11,6 +11,8 @@
 #include "str.hh"
 
 
+namespace aku {
+
 PhnReader::Phn::Phn()
   : start(0), end(0)
 {
@@ -380,3 +382,4 @@ PhnReader::next_phn_line(Phn &phn)
   return true;
 }
 
+}

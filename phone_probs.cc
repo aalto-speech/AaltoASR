@@ -23,8 +23,8 @@
 
 conf::Config config;
 FeatureGenerator gen;
-HmmSet model;
-SpeakerConfig speaker_conf(gen, &model);
+aku::HmmSet model;
+aku::SpeakerConfig speaker_conf(gen, &model);
 std::vector<float> obs_log_probs;
 
 void write_int(FILE *fp, unsigned int i)
@@ -128,7 +128,7 @@ main(int argc, char *argv[])
     }
 
     // Read recipe file
-    Recipe recipe;
+    aku::Recipe recipe;
     if (config["batch"].specified^config["bindex"].specified)
       throw std::string("Must give both --batch and --bindex");
     recipe.read(io::Stream(config["recipe"].get_str()),

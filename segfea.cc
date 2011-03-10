@@ -40,7 +40,7 @@ typedef struct {
 
 conf::Config config;
 PrintBuffers buffers;
-Recipe recipe;
+aku::Recipe recipe;
 bool binary;
 
 char *get_seg_info(char *line, int *beg, int *end)
@@ -361,7 +361,7 @@ int
 main(int argc, char *argv[])
 {
   FeatureGenerator gen;
-  SpeakerConfig speaker_config(gen); // Speaker configuration handler
+  aku::SpeakerConfig speaker_config(gen); // Speaker configuration handler
   int info;
   int num_states;
   std::vector <long int> occurrences;

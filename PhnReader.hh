@@ -7,6 +7,9 @@
 #include "HmmSet.hh"
 #include "Segmentator.hh"
 
+
+namespace aku {
+
 /** A class for reading .phn phonetic label files
  *
  * Format of the phn file.  Optional fields marked with brackets.  The
@@ -138,5 +141,7 @@ private:
   /// String with the current label
   std::string m_cur_label;
 };
+
+}
 
 #endif /* PHNREADER_HH */

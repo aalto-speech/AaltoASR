@@ -9,6 +9,9 @@
 #include "Lattice.hh"
 #include "HmmSet.hh"
 
+
+namespace aku {
+
 //            |
 //            |
 //            |
@@ -319,6 +322,8 @@ Viterbi::best_transition(int frame) const
     throw RangeError();
   }
   return m_best_path[frame].transition_index;
+}
+
 }
 
 #endif /* VITERBI_HH */
