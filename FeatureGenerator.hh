@@ -6,6 +6,9 @@
 #include <string>
 #include "FeatureModules.hh"
 
+
+namespace aku {
+
 /** A class for generating feature vectors from an audio file.  The
  * FeatureGenerator and the feature modules are configured in a text
  * file that contains block for each module in the feature module
@@ -140,6 +143,6 @@ FeatureGenerator::dim(void)
   return m_last_module->dim();
 }
 
-
+}
 
 #endif /* FEATUREGENERATOR_HH */

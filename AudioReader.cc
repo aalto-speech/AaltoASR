@@ -4,6 +4,8 @@
 #include <iostream>
 #include <fcntl.h>
 
+namespace aku {
+
 AudioReader::AudioReader()
   : m_sndfile(NULL),
     m_little_endian(true),
@@ -238,4 +240,6 @@ AudioReader::seek(int sample)
   if (ret != sample)
     throw std::string("AudioReader::seek(): seek() seeked to wrong place?!");
   m_file_sample = sample;
+}
+
 }

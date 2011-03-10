@@ -18,13 +18,15 @@
 #include "SpeakerConfig.hh"
 #include "endian.hh"
 
+using namespace aku;
+
 #define BYTE unsigned char
 
 
 conf::Config config;
 FeatureGenerator gen;
-aku::HmmSet model;
-aku::SpeakerConfig speaker_conf(gen, &model);
+HmmSet model;
+SpeakerConfig speaker_conf(gen, &model);
 std::vector<float> obs_log_probs;
 
 void write_int(FILE *fp, unsigned int i)
@@ -128,7 +130,7 @@ main(int argc, char *argv[])
     }
 
     // Read recipe file
-    aku::Recipe recipe;
+    Recipe recipe;
     if (config["batch"].specified^config["bindex"].specified)
       throw std::string("Must give both --batch and --bindex");
     recipe.read(io::Stream(config["recipe"].get_str()),

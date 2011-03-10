@@ -6,6 +6,8 @@
 #include "FeatureGenerator.hh"
 
 
+namespace aku {
+
 FeatureGenerator::FeatureGenerator(void) :
   m_base_module(NULL),
   m_last_module(NULL),
@@ -323,4 +325,6 @@ FeatureGenerator::print_dot_graph(FILE *file)
   }
 
   fprintf(file, "}\n");
+}
+
 }

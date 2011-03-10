@@ -10,6 +10,8 @@
 #include "LinearAlgebra.hh"
 
 
+namespace aku {
+
 class FeatureGenerator;
 
 /** A base class of a module that computes features from other
@@ -523,5 +525,7 @@ private:
   std::vector<float> m_gamma;
   std::vector<float> m_quant_max;
 };
+
+}
 
 #endif /* FEATUREMODULES_HH */

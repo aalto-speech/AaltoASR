@@ -10,6 +10,8 @@
 #include "Recipe.hh"
 #include "SpeakerConfig.hh"
 
+using namespace aku;
+
 #define TINY 1e-10
 
 std::string save_summary_file;
@@ -22,10 +24,10 @@ int grid_size;
 bool relative_grid;
 
 conf::Config config;
-aku::Recipe recipe;
-aku::HmmSet model;
+Recipe recipe;
+HmmSet model;
 FeatureGenerator fea_gen;
-aku::SpeakerConfig speaker_conf(fea_gen);
+SpeakerConfig speaker_conf(fea_gen);
 
 VtlnModule *vtln_module;
 std::string cur_speaker;
@@ -148,7 +150,7 @@ void find_best_warp_factors(void)
 
 int main(int argc, char *argv[])
 {
-	aku::PhnReader *phn_reader;
+	PhnReader *phn_reader;
 
 	try {
 		config("usage: vtln [OPTION...]\n")('h', "help", "", "", "display help")(
@@ -285,7 +287,7 @@ int main(int argc, char *argv[])
 					utterance_set);
 		}
 	}
-	catch (aku::HmmSet::UnknownHmm &e) {
+	catch (HmmSet::UnknownHmm &e) {
 		fprintf(stderr, "Unknown HMM in transcription\n");
 		abort();
 	}

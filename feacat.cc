@@ -4,10 +4,12 @@
 #include "FeatureGenerator.hh"
 #include "SpeakerConfig.hh"
 
+using namespace aku;
+
 conf::Config config;
 FeatureGenerator gen;
 bool raw_output = false;
-aku::SpeakerConfig speaker_conf(gen);
+SpeakerConfig speaker_conf(gen);
 
 void
 print_feature(const FeatureVec &fea)

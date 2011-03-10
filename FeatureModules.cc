@@ -6,6 +6,8 @@
 #include "util.hh"
 
 
+namespace aku {
+
 FeatureModule::FeatureModule() :
   m_own_offset_left(-1),
   m_own_offset_right(-1),
@@ -2006,3 +2008,4 @@ QuantEqModule::generate(int frame)
   }
 }
 
+}

@@ -5,6 +5,8 @@
 #include <vector>
 #include <assert.h>
 
+namespace aku {
+
 /** A class for reading and buffering audio streams. 
  *
  * Currently, the class expects only streams with one channel.  For
@@ -141,5 +143,7 @@ protected:
   std::vector<short> m_buffer;
 
 };
+
+}
 
 #endif /* AUDIOREADER_HH */

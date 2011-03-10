@@ -7,6 +7,9 @@
 #include "util.hh"
 #include "LinearAlgebra.hh"
 
+
+namespace aku {
+
 /** Class for accessing feature vectors of the \ref FeatureBuffer
  * class with proper const and array-bounds checking. */
 class FeatureVec {
@@ -132,5 +135,6 @@ private:
   std::vector<Vector> m_buffer; //!< The actual data stored in the buffer
 };
 
+}
 
 #endif /* FEATUREBUFFER_HH */

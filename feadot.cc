@@ -2,6 +2,8 @@
 #include "conf.hh"
 #include "FeatureGenerator.hh"
 
+using namespace aku;
+
 conf::Config config;
 FeatureGenerator gen;
 

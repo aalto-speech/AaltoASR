@@ -12,6 +12,8 @@
 #include "FeatureGenerator.hh"
 #include "SpeakerConfig.hh"
 
+using namespace aku;
+
 #define MAXLINE 4000
 
 typedef struct {
@@ -40,7 +42,7 @@ typedef struct {
 
 conf::Config config;
 PrintBuffers buffers;
-aku::Recipe recipe;
+Recipe recipe;
 bool binary;
 
 char *get_seg_info(char *line, int *beg, int *end)
@@ -361,7 +363,7 @@ int
 main(int argc, char *argv[])
 {
   FeatureGenerator gen;
-  aku::SpeakerConfig speaker_config(gen); // Speaker configuration handler
+  SpeakerConfig speaker_config(gen); // Speaker configuration handler
   int info;
   int num_states;
   std::vector <long int> occurrences;
