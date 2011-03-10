@@ -20,6 +20,7 @@ public:
    *
    * \param filename = The name of the audio file.  
    * samples.  Otherwise, automatic file format is used.
+   * \exception string If cannot open file.
    */
   void open(const std::string &filename);
 
