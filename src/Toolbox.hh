@@ -137,7 +137,15 @@ public:
   void set_forced_end(bool forced_end) 
   { m_expander.set_forced_end(forced_end); }
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
-  void set_prune_similar(int prune_similar) { m_search.set_prune_similar(prune_similar); m_tp_search.set_similar_lm_history_span(prune_similar); } 
+
+  /// Sets how many words in the word histories of two hypotheses have to match
+  /// for the hypotheses to be considered similar (and only the better to be
+  /// saved).
+  ///
+  /// This should usually be equal to the n-gram model order.
+  ///
+  void set_prune_similar(int prune_similar) { m_search.set_prune_similar(prune_similar); m_tp_search.set_similar_lm_history_span(prune_similar); }
+
   void set_word_limit(int word_limit) { m_search.set_word_limit(word_limit); }
   void set_word_beam(float word_beam) { m_search.set_word_beam(word_beam); }
   void set_lm_scale(float lm_scale) { m_search.set_lm_scale(lm_scale); m_tp_search.set_lm_scale(lm_scale); }

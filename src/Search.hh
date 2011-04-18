@@ -136,6 +136,7 @@ public:
   inline HypoStack() : m_best_log_prob(-1e10) { }
 
   // Inherited from vector
+
   Hypo &operator[](int index) { return std::vector<Hypo>::operator[](index); }
   Hypo &at(int index) { return std::vector<Hypo>::operator[](index); }
   Hypo &front() { return std::vector<Hypo>::front(); }
@@ -148,7 +149,12 @@ public:
   void remove(int index) { std::vector<Hypo>::erase(begin() + index); }
 
   // New functions
+
+  /// Returns the first (and should be the only) hypothesis that has at least
+  /// the first \a words words in common with \a hypo.
+  ///
   int find_similar(const Hypo &hypo, int words);
+
   void sorted_insert(const Hypo &hypo);
 
 private:
@@ -193,8 +199,14 @@ public:
   void set_lm_scale(float lm_scale) { m_lm_scale = lm_scale; }
   void set_lm_offset(float lm_offset) { m_lm_offset = lm_offset; }
   void set_unk_offset(float unk_offset) { m_unk_offset = unk_offset; }
+
+  /// Sets how many words in the word histories of two hypotheses have to match
+  /// for the hypotheses to be considered similar (and only the better to be
+  /// saved).
+  ///
   void set_prune_similar(int prune_similar) 
   { m_prune_similar = prune_similar; }
+
   void set_multiple_endings(int multiple_endings) 
   { m_multiple_endings = multiple_endings; }
   void set_hypo_beam(float hypo_beam) { m_hypo_beam = hypo_beam; }
@@ -217,7 +229,12 @@ private:
   void ensure_stack(int frame);
   float compute_lm_log_prob(const Hypo &hypo);
   void update_global_pruning(int frame, float log_prob);
+
+  /// Won't insert the hypothesis, if there already is a better hypothesis that
+  /// has at least \a m_prune_similar words in common.
+  ///
   void insert_hypo(int target_frame, const Hypo &hypo);
+
   void expand_hypo_with_word(const Hypo &hypo, int word, int target_frame, 
 			     float ac_log_prob);
   void expand_hypo(const Hypo &hypo);
