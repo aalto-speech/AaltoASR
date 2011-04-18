@@ -54,13 +54,20 @@ public:
   void reserve_nodes(int nodes); 
   void set_interpolation(const std::vector<float> &interpolation);
 
-  /// Adds a new gram to the language model.
-  // 
-  // The grams must be inserted in sorted order.  The only exception
-  // is the OOV 1-gram, which can be updated any time.  It exists by
-  // default with very small log-prob and zero back-off.
+  /// \brief Adds a new gram to the language model.
+  ///
+  /// The grams must be inserted in sorted order.  The only exception
+  /// is the OOV 1-gram, which can be updated any time.  It exists by
+  /// default with very small log-prob and zero back-off.
+  ///
   void add_gram(const Gram &gram, float log_prob, float back_off);
+
+  /// \brief Reads a language model file.
+  ///
+  /// \param binary If false, the file is expected to be in ARPA file format.
+  ///
   void read(FILE *file, bool binary=false);
+
   void write(FILE *file, bool binary=false);
   void write_real(FILE *file, bool reflip);
 

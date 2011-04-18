@@ -103,8 +103,8 @@ public:
   void lex_read(const char *file);
   const std::string &lex_word();
   const std::string &lex_phone();
-  void ngram_read(const char *file, float weight, const bool binary);
-  void ngram_read(const char *file, float weight);
+  int ngram_read(const char *file, float weight, const bool binary);
+  int ngram_read(const char *file, float weight);
 	void fsa_lm_read(const char *file, bool binary);
   void read_lookahead_ngram(const char *file, const bool binary);
   void read_lookahead_ngram(const char *file);

@@ -150,8 +150,8 @@ public:
 
   // New functions
 
-  /// Returns the first (and should be the only) hypothesis that has at least
-  /// the first \a words words in common with \a hypo.
+  /// \brief Returns the first (and should be the only) hypothesis that has at
+  /// least the first \a words words in common with \a hypo.
   ///
   int find_similar(const Hypo &hypo, int words);
 
@@ -200,9 +200,9 @@ public:
   void set_lm_offset(float lm_offset) { m_lm_offset = lm_offset; }
   void set_unk_offset(float unk_offset) { m_unk_offset = unk_offset; }
 
-  /// Sets how many words in the word histories of two hypotheses have to match
-  /// for the hypotheses to be considered similar (and only the better to be
-  /// saved).
+  /// \brief Sets how many words in the word histories of two hypotheses have to
+  /// match for the hypotheses to be considered similar (and only the better to
+  /// be saved).
   ///
   void set_prune_similar(int prune_similar) 
   { m_prune_similar = prune_similar; }

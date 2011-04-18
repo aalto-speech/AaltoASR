@@ -58,7 +58,14 @@ public:
   }
 
   // Ngram
-  void ngram_read(const char *file, float weight, bool binary=true);
+
+  /// \brief Reads an n-gram language model.
+  ///
+  /// \param binary If false, the file is expected to be in ARPA file format.
+  /// \return The order of the language model.
+  ///
+  int ngram_read(const char *file, float weight, bool binary=true);
+
   void read_lookahead_ngram(const char *file, bool binary=true);
 
   /// \brief Reads a finite-state automaton language model.
@@ -138,11 +145,11 @@ public:
   { m_expander.set_forced_end(forced_end); }
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
 
-  /// Sets how many words in the word histories of two hypotheses have to match
-  /// for the hypotheses to be considered similar (and only the better to be
-  /// saved).
+  /// \brief Sets how many words in the word histories of two hypotheses have to
+  /// match for the hypotheses to be considered similar (and only the better to
+  /// be saved).
   ///
-  /// This should usually be equal to the n-gram model order.
+  /// This should usually equal to the n-gram model order.
   ///
   void set_prune_similar(int prune_similar) { m_search.set_prune_similar(prune_similar); m_tp_search.set_similar_lm_history_span(prune_similar); }
 

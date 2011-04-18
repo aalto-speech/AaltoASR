@@ -122,7 +122,7 @@ Toolbox::lex_read(const char *filename)
   fclose(file);
 }
 
-void
+int
 Toolbox::ngram_read(const char *file, float weight, const bool binary)
 {
   io::Stream in(file,"r");
@@ -143,6 +143,8 @@ Toolbox::ngram_read(const char *file, float weight, const bool binary)
 
   if (m_use_stack_decoder) m_search.add_ngram(m_ngrams.back(), weight);
   else m_tp_search.set_ngram(m_ngrams.back());
+
+  return m_ngrams.back()->order();
 }
 
 void
