@@ -136,9 +136,15 @@ public:
 
   double compute_clustered_likelihood(const Vector &f, int index);
 
-  /** Computes likelihoods for all distributions to the cache
-   * \param f the feature vector
-   */
+  /// \brief Computes likelihoods for all distributions to the cache.
+  ///
+  /// If Gaussian clustering is in use, computes likelihoods for all
+  /// distributions in the best clusters, until either evaluate_min_clusters()
+  /// or evaluate_min_gaussians() has been reached. For the rest of the
+  /// clusters, uses the cluster center likelihood.
+  ///
+  /// \param f the feature vector
+  ///
   void precompute_likelihoods(const Vector &f);
 
   /// Estimates parameters of the pdfs in the pool
@@ -216,7 +222,15 @@ public:
 
   void set_use_clustering(bool use) { m_use_clustering = use; }
   void set_number_of_clusters(int n) { m_number_of_clusters = n; }
+
+  /// \brief Specifies a minimum number of clusters to evaluate accurately
+  /// before precompute_likelihoods() may use cluster center likelihoods.
+  ///
   void set_evaluate_min_clusters(int n) { m_evaluate_min_clusters = n; }
+
+  /// \brief Specifies a minimum number of Gaussians to evaluate accurately
+  /// before precompute_likelihoods() may use cluster center likelihoods.
+  ///
   void set_evaluate_min_gaussians(int n) { m_evaluate_min_gaussians = n; }
 
   /// \brief Reads clustering of the Gaussians from a file.

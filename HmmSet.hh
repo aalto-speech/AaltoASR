@@ -464,17 +464,23 @@ public:
    */
   void read_clustering(const std::string &filename);
   
-  /** Defines minimum number of clusters and gaussians to be evaluated.
-   * These are used in \ref precompute_likelihoods()
-   * \param min_clusters   The number of best clusters to evaluate per frame as a percentage [0,1]
-   * \param min_gaussians  The minimum number of Gaussians to evaluate per frame as a percentage [0,1]
-  */ 
+  /// \brief Defines minimum number of clusters and Gaussians to be evaluated
+  /// when computing likelihoods.
+  ///
+  /// When \ref precompute_likelihoods() is computing likelihoods for a feature
+  /// vector, it will compute likelihoods accurately for Gaussians in the best
+  /// clusters, until either \a min_clusters or \a min_gaussians is reached. For
+  /// the rest of the clusters, it will use the cluster center likelihood.
+  ///
+  /// \param min_clusters   The minimum number of best clusters to evaluate per
+  ///                       frame as a percentage [0,1]
+  /// \param min_gaussians  The minimum number of Gaussians to evaluate per
+  ///                       frame as a percentage [0,1]
+  ///
   void set_clustering_min_evals(double min_clusters=1.0,
                                 double min_gaussians=0.0);
-
   
 private:
-
   /** Helper function for loading legacy ph-files
    * \param pdf_index pdf index to look for
    * \return state index with the required pdf, or -1 if not found
