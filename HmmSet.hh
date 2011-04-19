@@ -459,7 +459,7 @@ public:
   int split_gaussians(double minocc, int maxg);
 
 
-  /** Reads a clustering file
+  /** Reads clustering of the Gaussians from a file.
    * \param filename       File with the clustering information
    */
   void read_clustering(const std::string &filename);
