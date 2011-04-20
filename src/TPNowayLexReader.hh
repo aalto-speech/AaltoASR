@@ -24,6 +24,11 @@ public:
                    std::vector<Hmm> &hmms,
                    TPLexPrefixTree &lex_tree,
                    Vocabulary &vocab);
+
+  /// \brief Reads the lexicon from a file.
+  ///
+  /// \exception UnknownHmm If a phone is not found from \ref m_hmm_map.
+  ///
   void read(FILE *file, const std::string &word_boundary);
 
   void skip_while(FILE *file, const char *chars);

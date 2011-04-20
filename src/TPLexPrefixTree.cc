@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <algorithm>
+#include <stdexcept>
 
 #include "TPLexPrefixTree.hh"
+
+using namespace std;
 
 int safe_tolower(int c)
 {
@@ -1204,8 +1207,11 @@ TPLexPrefixTree::get_fan_state_node(HmmState *state, std::vector<Node*> *nodes)
   Node *new_node;
   for (int i = 0; i < nodes->size(); i++)
   {
-    if ((*nodes)[i]->state->model == state->model)
+	  if ((*nodes)[i] == NULL)
+		  throw logic_error("TPLexPrefixTree::get_fan_state_node");
+    if ((*nodes)[i]->state->model == state->model) {
       return (*nodes)[i];
+    }
   }
   // Node did not exist, create it
   new_node = new Node(-1, state);
