@@ -185,7 +185,12 @@ private:
   bool post_process_fan_triphone(Node *node, std::vector<int> *lm_la_list,
                                  bool fan_in);
 
+  /// \brief Creates fan in HMMs
+  ///
+  /// Assumes triphone models. Labels must be of form a-b+c.
+  ///
   void create_cross_word_network(void);
+
   void add_hmm_to_fan_network(int hmm_id,
                               bool fan_out);
   void link_fan_out_node_to_fan_in(Node *node, const std::string &key);

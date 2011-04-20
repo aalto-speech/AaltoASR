@@ -98,7 +98,7 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
             m_short_silence_state->transitions[0].target == 2 );
     return;
   }
-  
+
   if (hmm_list.size() == 1 && hmm_list[0]->label == "__")
     silence = true;
 
@@ -131,7 +131,7 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
           temp_arc.log_prob = source_trans_log_probs[j];
           source_nodes[j]->arcs.push_back(temp_arc);
         }
-        
+
         // Link null node to cross word network
         std::string temp1(hmm_list[i]->label, 0, 1);
         std::string temp2(hmm_list[i]->label, 2, 1);
@@ -399,7 +399,7 @@ TPLexPrefixTree::finish_tree(void)
       ++it;
       }*/
   }
-  
+
   // FIXME! Should the word id lists for LM lookahead be sorted to increase
   // processor cache utility?
 
@@ -628,7 +628,7 @@ TPLexPrefixTree::post_process_fan_triphone(Node *node,
 
 
 void
-TPLexPrefixTree::set_sentence_boundary(int sentence_start_id, 
+TPLexPrefixTree::set_sentence_boundary(int sentence_start_id,
 				       int sentence_end_id)
 {
   TPLexPrefixTree::Node *sentence_end_node;
@@ -656,17 +656,15 @@ TPLexPrefixTree::set_sentence_boundary(int sentence_start_id,
 }
 
 
-// Assumes triphone models, labels must be of form a-b+c.
 void
 TPLexPrefixTree::create_cross_word_network(void)
 {
   std::map<std::string,int>::const_iterator it;
 
-  // Create fan in HMMs
   it = m_hmm_map.begin();
   while (it != m_hmm_map.end())
   {
-    if ((*it).first.size() == 5)
+    if ((*it).first.size() == 5)  // a-b+c
     {
       std::string b((*it).first, 0, 1);
       std::string e((*it).first, 4, 1);
@@ -1003,7 +1001,7 @@ TPLexPrefixTree::analyze_cross_word_network(void)
   int temp_nodes, temp_arcs;
   int i;
   std::map<std::string,std::vector<Node*>* >::const_iterator it;
-  
+
   num_out_nodes = num_in_nodes = 0;
   num_out_arcs = num_in_arcs = 0;
 
@@ -1039,7 +1037,7 @@ TPLexPrefixTree::count_fan_size(Node *node, unsigned short flag,
 {
   int i;
   int temp_nodes, temp_arcs;
-  
+
   *num_nodes = 0;
   *num_arcs = 0;
   if (!(node->flags&flag))
@@ -1106,7 +1104,7 @@ TPLexPrefixTree::free_cross_word_network_connection_points(void)
     delete (*it).second;
     ++it;
   }
-  
+
   it = m_fan_in_connection_nodes.begin();
   while (it != m_fan_in_connection_nodes.end())
   {
