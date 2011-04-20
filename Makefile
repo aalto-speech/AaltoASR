@@ -69,7 +69,7 @@ endif
 ALL_SRCS = $(CLASS_SRCS) $(PROGS_SRCS)
 ALL_OBJS = $(ALL_SRCS:.cc=.o)
 
-CXXFLAGS += $(OPT) $(WARNINGS) -g -O0 $(INCLUDES)
+CXXFLAGS += $(OPT) $(WARNINGS) $(INCLUDES)
 
 ##################################################
 
