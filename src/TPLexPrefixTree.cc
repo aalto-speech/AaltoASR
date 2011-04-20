@@ -59,13 +59,35 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
 }
 
 
+struct delete_node_vector
+{
+	void operator()(TPLexPrefixTree::string_to_nodes_map::value_type x)
+	{
+		TPLexPrefixTree::node_vector * nodes_ptr = x.second;
+		TPLexPrefixTree::node_vector::const_iterator iter = nodes_ptr->begin();
+		for (; iter != nodes_ptr->end(); ++iter) {
+			TPLexPrefixTree::Node * node_ptr = *iter;
+			if (node_ptr != NULL)
+				throw logic_error("delete_node_vector");
+			delete node_ptr;
+		}
+		delete nodes_ptr;
+	}
+};
+
+
 void
 TPLexPrefixTree::initialize_lex_tree(void)
 {
+	for_each(m_fan_out_entry_nodes.begin(), m_fan_out_entry_nodes.end(), delete_node_vector());
 	m_fan_out_entry_nodes.clear();
+	for_each(m_fan_out_last_nodes.begin(), m_fan_out_last_nodes.end(), delete_node_vector());
 	m_fan_out_last_nodes.clear();
+	for_each(m_fan_in_entry_nodes.begin(), m_fan_in_entry_nodes.end(), delete_node_vector());
 	m_fan_in_entry_nodes.clear();
+	for_each(m_fan_in_last_nodes.begin(), m_fan_in_last_nodes.end(), delete_node_vector());
 	m_fan_in_last_nodes.clear();
+	for_each(m_fan_in_connection_nodes.begin(), m_fan_in_connection_nodes.end(), delete_node_vector());
 	m_fan_in_connection_nodes.clear();
   if (m_cross_word_triphones)
     create_cross_word_network();
@@ -322,7 +344,7 @@ TPLexPrefixTree::finish_tree(void)
   if (m_cross_word_triphones)
   {
     // Link the fan points to create a cross word network
-    std::map<std::string,node_vector* >::const_iterator fan_out_it =
+    string_to_nodes_map::const_iterator fan_out_it =
       m_fan_out_last_nodes.begin();
     while (fan_out_it != m_fan_out_last_nodes.end())
     {
@@ -373,7 +395,7 @@ TPLexPrefixTree::finish_tree(void)
 
   if (m_cross_word_triphones)
   {
-    std::map<std::string,node_vector* >::const_iterator it;
+    string_to_nodes_map::const_iterator it;
     node_vector *nlist;
     int i;
     it = m_fan_in_entry_nodes.begin();
@@ -880,7 +902,7 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
 {
   // Create another instance of a null node after the fan_in network and
   // link it back to fan in.
-  std::map<std::string,node_vector* >::const_iterator it;
+  string_to_nodes_map::const_iterator it;
   std::string middle(hmm->label, 2, 1);
   Node *wid_node;
   node_vector *nlist;
@@ -949,7 +971,7 @@ TPLexPrefixTree::link_fan_in_nodes(void)
   // to the fan_out layer. Also single HMM words have been linked back
   // to the fan_in layer. What is left is to link the last states of
   // the fan_in layer back to the beginning of the lexical prefix tree.
-  std::map<std::string,node_vector* >::const_iterator it;
+  string_to_nodes_map::const_iterator it;
   node_vector *nlist;
   int i;
   it = m_fan_in_last_nodes.begin();
@@ -975,7 +997,7 @@ TPLexPrefixTree::create_lex_tree_links_from_fan_in(Node *fan_in_node,
   // silence while adding a one-HMM word, or it is unused.
   if (out_right != "_")
   {
-    std::map<std::string,node_vector* >::const_iterator it =
+    string_to_nodes_map::const_iterator it =
       m_fan_in_connection_nodes.find(key);
     if (it != m_fan_in_connection_nodes.end())
     {
@@ -1005,7 +1027,7 @@ TPLexPrefixTree::analyze_cross_word_network(void)
   int num_out_arcs, num_in_arcs;
   int temp_nodes, temp_arcs;
   int i;
-  std::map<std::string,node_vector* >::const_iterator it;
+  string_to_nodes_map::const_iterator it;
 
   num_out_nodes = num_in_nodes = 0;
   num_out_arcs = num_in_arcs = 0;
@@ -1084,7 +1106,7 @@ TPLexPrefixTree::count_prefix_tree_size(Node *node, int *num_nodes,
 void
 TPLexPrefixTree::free_cross_word_network_connection_points(void)
 {
-  std::map<std::string,node_vector* >::const_iterator it;
+  string_to_nodes_map::const_iterator it;
   it = m_fan_out_entry_nodes.begin();
   while (it != m_fan_out_entry_nodes.end())
   {
@@ -1222,7 +1244,6 @@ TPLexPrefixTree::get_fan_state_node(HmmState *state, node_vector & nodes)
   m_nodes.push_back(new_node);
   nodes.push_back(new_node);
   return new_node;
-
 }
 
 
@@ -1230,7 +1251,7 @@ TPLexPrefixTree::node_vector &
 TPLexPrefixTree::get_fan_node_list(
   const std::string &key, std::map< std::string, node_vector* > &nmap)
 {
-  std::map<std::string,node_vector* >::const_iterator it;
+  string_to_nodes_map::const_iterator it;
 
   it = nmap.find(key);
   if (it == nmap.end())
@@ -1251,7 +1272,7 @@ TPLexPrefixTree::add_fan_in_connection_node(Node *node,
   std::string temp1(prev_label, 2, 1);
   std::string temp2(prev_label, 4, 1);
   std::string map_index = temp1+temp2;
-  std::map<std::string,node_vector* >::const_iterator it;
+  string_to_nodes_map::const_iterator it;
 
   node->flags |= NODE_FAN_IN_CONNECTION;
   it = m_fan_in_connection_nodes.find(map_index);

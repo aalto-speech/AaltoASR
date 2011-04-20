@@ -47,6 +47,9 @@ public:
 
   class Node;
 
+  typedef std::vector<Node *> node_vector;
+  typedef std::map<std::string, node_vector *> string_to_nodes_map;
+
   struct LMHistory {
     inline LMHistory(int word_id, int lm_id, LMHistory *previous);
 
@@ -174,8 +177,6 @@ public:
   
   
 private:
-  typedef std::vector<Node *> node_vector;
-
   void expand_lexical_tree(Node *source, Hmm *hmm, HmmTransition &t,
                            float cur_trans_log_prob,
                            int word_end,
@@ -218,6 +219,10 @@ private:
   Node* get_fan_out_last_node(HmmState *state, const std::string &label);
   Node* get_fan_in_entry_node(HmmState *state, const std::string &label);
   Node* get_fan_in_last_node(HmmState *state, const std::string &label);
+
+  /// \brief Finds the node with given state model, creating a new node if
+  /// necessary.
+  ///
   Node* get_fan_state_node(HmmState *state, node_vector & nodes);
 
   /// \brief Returns a reference to the entry of \ref nmap with given key,
@@ -225,7 +230,7 @@ private:
   ///
   node_vector & get_fan_node_list(
     const std::string &key,
-    std::map< std::string, node_vector* > &nmap);
+    string_to_nodes_map &nmap);
 
   void add_fan_in_connection_node(Node *node, const std::string &prev_label);
   float get_out_transition_log_prob(Node *node);
@@ -256,11 +261,11 @@ private:
   std::map<std::string,int> &m_hmm_map;
   std::vector<Hmm> &m_hmms;
 
-  std::map< std::string, node_vector* > m_fan_out_entry_nodes;
-  std::map< std::string, node_vector* > m_fan_out_last_nodes;
-  std::map< std::string, node_vector* > m_fan_in_entry_nodes;
-  std::map< std::string, node_vector* > m_fan_in_last_nodes;
-  std::map< std::string, node_vector* > m_fan_in_connection_nodes;
+  string_to_nodes_map m_fan_out_entry_nodes;
+  string_to_nodes_map m_fan_out_last_nodes;
+  string_to_nodes_map m_fan_in_entry_nodes;
+  string_to_nodes_map m_fan_in_last_nodes;
+  string_to_nodes_map m_fan_in_connection_nodes;
   std::vector<NodeArcId> m_silence_arcs;
 };
 
