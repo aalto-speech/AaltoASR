@@ -174,11 +174,13 @@ public:
   
   
 private:
+  typedef std::vector<Node *> node_vector;
+
   void expand_lexical_tree(Node *source, Hmm *hmm, HmmTransition &t,
                            float cur_trans_log_prob,
                            int word_end,
-                           std::vector<Node*> &hmm_state_nodes,
-                           std::vector<Node*> &sink_nodes,
+                           node_vector &hmm_state_nodes,
+                           node_vector &sink_nodes,
                            std::vector<float> &sink_trans_log_probs,
                            unsigned short flags);
   void post_process_lex_branch(Node *node, std::vector<int> *lm_la_list);
@@ -216,10 +218,10 @@ private:
   Node* get_fan_out_last_node(HmmState *state, const std::string &label);
   Node* get_fan_in_entry_node(HmmState *state, const std::string &label);
   Node* get_fan_in_last_node(HmmState *state, const std::string &label);
-  Node* get_fan_state_node(HmmState *state, std::vector<Node*> *nodes);
-  std::vector<Node*>* get_fan_node_list(
+  Node* get_fan_state_node(HmmState *state, node_vector *nodes);
+  node_vector* get_fan_node_list(
     const std::string &key,
-    std::map< std::string, std::vector<Node*>* > &nmap);
+    std::map< std::string, node_vector* > &nmap);
   void add_fan_in_connection_node(Node *node, const std::string &prev_label);
   float get_out_transition_log_prob(Node *node);
   void prune_lm_la_buffer(int delta_thr, int depth_thr,
@@ -233,7 +235,7 @@ private:
   Node *m_silence_node;
   Node *m_last_silence_node;
   Node *m_final_node;
-  std::vector<Node*> node_list;
+  node_vector m_nodes;
   int m_verbose;
   int m_lm_lookahead; // 0=None, 1=Only in first subtree nodes,
                       // 2=Full
@@ -249,11 +251,11 @@ private:
   std::map<std::string,int> &m_hmm_map;
   std::vector<Hmm> &m_hmms;
 
-  std::map< std::string, std::vector<Node*>* > m_fan_out_entry_nodes;
-  std::map< std::string, std::vector<Node*>* > m_fan_out_last_nodes;
-  std::map< std::string, std::vector<Node*>* > m_fan_in_entry_nodes;
-  std::map< std::string, std::vector<Node*>* > m_fan_in_last_nodes;
-  std::map< std::string, std::vector<Node*>* > m_fan_in_connection_nodes;
+  std::map< std::string, node_vector* > m_fan_out_entry_nodes;
+  std::map< std::string, node_vector* > m_fan_out_last_nodes;
+  std::map< std::string, node_vector* > m_fan_in_entry_nodes;
+  std::map< std::string, node_vector* > m_fan_in_last_nodes;
+  std::map< std::string, node_vector* > m_fan_in_connection_nodes;
   std::vector<NodeArcId> m_silence_arcs;
 };
 

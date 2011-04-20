@@ -40,13 +40,13 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
   m_root_node = new Node(-1);
   m_root_node->node_id = 0;
   m_root_node->flags = NODE_USE_WORD_END_BEAM;
-  node_list.push_back(m_root_node);
+  m_nodes.push_back(m_root_node);
   m_end_node = new Node(-1);
   m_end_node->node_id = 1;
-  node_list.push_back(m_end_node);
+  m_nodes.push_back(m_end_node);
   m_start_node = new Node(-1);
   m_start_node->node_id = 2;
-  node_list.push_back(m_start_node);
+  m_nodes.push_back(m_start_node);
   m_silence_node = NULL;
   m_lm_buf_count = 0;
   m_cross_word_triphones = true;
@@ -62,6 +62,11 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
 void
 TPLexPrefixTree::initialize_lex_tree(void)
 {
+/*	m_fan_out_entry_nodes.clear();
+	m_fan_out_last_nodes.clear();
+	m_fan_in_entry_nodes.clear();
+	m_fan_in_last_nodes.clear();
+	m_fan_in_connection_nodes.clear();*/
   if (m_cross_word_triphones)
     create_cross_word_network();
 }
@@ -71,8 +76,8 @@ void
 TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
 {
   int i, j, k;
-  std::vector<Node*> hmm_state_nodes;
-  std::vector<Node*> source_nodes, sink_nodes;
+  node_vector hmm_state_nodes;
+  node_vector source_nodes, sink_nodes;
   std::vector<float> source_trans_log_probs;
   std::vector<float> sink_trans_log_probs;
   int word_end;
@@ -118,11 +123,11 @@ TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
         Node *wid_node = new Node(word_id);
         Arc temp_arc;
         std::vector<Arc> new_arcs;
-        wid_node->node_id = node_list.size();
+        wid_node->node_id = m_nodes.size();
         wid_node->flags = NODE_USE_WORD_END_BEAM;
         if (i == 0)
           wid_node->flags |= NODE_FIRST_STATE_OF_WORD;
-        node_list.push_back(wid_node);
+        m_nodes.push_back(wid_node);
         temp_arc.next = wid_node;
 	if (i == 0)
 	  wid_node->flags |= NODE_FIRST_STATE_OF_WORD;
@@ -234,8 +239,8 @@ TPLexPrefixTree::expand_lexical_tree(Node *source, Hmm *hmm,
                                      HmmTransition &t,
                                      float cur_trans_log_prob,
                                      int word_end,
-                                     std::vector<Node*> &hmm_state_nodes,
-                                     std::vector<Node*> &sink_nodes,
+                                     node_vector &hmm_state_nodes,
+                                     node_vector &sink_nodes,
                                      std::vector<float> &sink_trans_log_probs,
                                      unsigned short flags)
 {
@@ -257,9 +262,9 @@ TPLexPrefixTree::expand_lexical_tree(Node *source, Hmm *hmm,
       {
         Node *sink;
         sink = new Node(word_end);
-        sink->node_id = node_list.size();
+        sink->node_id = m_nodes.size();
         sink->flags = NODE_USE_WORD_END_BEAM | flags;
-        node_list.push_back(sink);
+        m_nodes.push_back(sink);
         sink_nodes.push_back(sink);
       }
       // Add new arc and return
@@ -296,9 +301,9 @@ TPLexPrefixTree::expand_lexical_tree(Node *source, Hmm *hmm,
     // affect the existence of a node?
 
     hmm_state_nodes[t.target-2] = new Node(-1, &hmm->state(t.target));
-    hmm_state_nodes[t.target-2]->node_id = node_list.size();
+    hmm_state_nodes[t.target-2]->node_id = m_nodes.size();
     hmm_state_nodes[t.target-2]->flags = flags;
-    node_list.push_back(hmm_state_nodes[t.target-2]);
+    m_nodes.push_back(hmm_state_nodes[t.target-2]);
   }
 
   // Add new arc
@@ -317,11 +322,11 @@ TPLexPrefixTree::finish_tree(void)
   if (m_cross_word_triphones)
   {
     // Link the fan points to create a cross word network
-    std::map<std::string,std::vector<Node*>* >::const_iterator fan_out_it =
+    std::map<std::string,node_vector* >::const_iterator fan_out_it =
       m_fan_out_last_nodes.begin();
     while (fan_out_it != m_fan_out_last_nodes.end())
     {
-      std::vector<Node*> *nlist = (*fan_out_it).second;
+      node_vector *nlist = (*fan_out_it).second;
       for (int i = 0; i < nlist->size(); i++)
       {
         link_fan_out_node_to_fan_in((*nlist)[i], (*fan_out_it).first);
@@ -337,12 +342,12 @@ TPLexPrefixTree::finish_tree(void)
   {
     // Replace arcs to the end node in the word ends to the root to make the
     // tree re-entrant.
-    for (int i = 0; i < node_list.size(); i++)
+    for (int i = 0; i < m_nodes.size(); i++)
     {
-      for (int j = 0; j < node_list[i]->arcs.size(); j++)
+      for (int j = 0; j < m_nodes[i]->arcs.size(); j++)
       {
-        if (node_list[i]->arcs[j].next == m_end_node)
-          node_list[i]->arcs[j].next = m_root_node;
+        if (m_nodes[i]->arcs[j].next == m_end_node)
+          m_nodes[i]->arcs[j].next = m_root_node;
       }
     }
   }
@@ -368,8 +373,8 @@ TPLexPrefixTree::finish_tree(void)
 
   if (m_cross_word_triphones)
   {
-    std::map<std::string,std::vector<Node*>* >::const_iterator it;
-    std::vector<Node*> *nlist;
+    std::map<std::string,node_vector* >::const_iterator it;
+    node_vector *nlist;
     int i;
     it = m_fan_in_entry_nodes.begin();
     while (it != m_fan_in_entry_nodes.end())
@@ -427,7 +432,7 @@ TPLexPrefixTree::post_process_lex_branch(Node *node,
   int out_trans_count;
   Node *original_node = node;
   Node *real_next = NULL;
-  std::vector<Node*> prev_nodes;
+  node_vector prev_nodes;
   int i;
 
   if (!m_silence_is_word && node == m_silence_node)// Word LM, no word ID
@@ -636,10 +641,10 @@ TPLexPrefixTree::set_sentence_boundary(int sentence_start_id,
 
   // Add nodes containing the sentence start and end word ids
   sentence_end_node = new Node(sentence_end_id);
-  sentence_end_node->node_id = node_list.size();
+  sentence_end_node->node_id = m_nodes.size();
   sentence_end_node->flags |= NODE_FIRST_STATE_OF_WORD;
   sentence_end_node->state = m_last_silence_node->state;
-  node_list.push_back(sentence_end_node);
+  m_nodes.push_back(sentence_end_node);
 
   arc.next = sentence_end_node;
   arc.log_prob = get_out_transition_log_prob(m_last_silence_node);
@@ -687,8 +692,8 @@ TPLexPrefixTree::add_hmm_to_fan_network(int hmm_id,
   Hmm *hmm = &m_hmms[hmm_id];
   Node *last_node;
   int j, k;
-  std::vector<Node*> hmm_state_nodes;
-  std::vector<Node*> sink_nodes;
+  node_vector hmm_state_nodes;
+  node_vector sink_nodes;
   std::vector<float> sink_trans_log_probs;
   unsigned short flags;
 
@@ -787,7 +792,7 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
                                           bool ignore_length,
                                           float out_transition_log_prob)
 {
-  std::vector<Node*> *target_nodes;
+  node_vector *target_nodes;
   std::string new_key;
   Arc temp_arc;
   int i, j;
@@ -875,10 +880,10 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
 {
   // Create another instance of a null node after the fan_in network and
   // link it back to fan in.
-  std::map<std::string,std::vector<Node*>* >::const_iterator it;
+  std::map<std::string,node_vector* >::const_iterator it;
   std::string middle(hmm->label, 2, 1);
   Node *wid_node;
-  std::vector<Node*> *nlist;
+  node_vector *nlist;
   Arc temp_arc;
   NodeArcId node_arc_id;
   int i;
@@ -896,9 +901,9 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
 		       safe_tolower);
       // Create a null node
       wid_node = new Node(word_id);
-      wid_node->node_id = node_list.size();
+      wid_node->node_id = m_nodes.size();
       wid_node->flags = NODE_USE_WORD_END_BEAM;
-      node_list.push_back(wid_node);
+      m_nodes.push_back(wid_node);
       temp_arc.next = wid_node;
       nlist = (*it).second;
       for (i = 0; i < nlist->size(); i++) {
@@ -944,8 +949,8 @@ TPLexPrefixTree::link_fan_in_nodes(void)
   // to the fan_out layer. Also single HMM words have been linked back
   // to the fan_in layer. What is left is to link the last states of
   // the fan_in layer back to the beginning of the lexical prefix tree.
-  std::map<std::string,std::vector<Node*>* >::const_iterator it;
-  std::vector<Node*> *nlist;
+  std::map<std::string,node_vector* >::const_iterator it;
+  node_vector *nlist;
   int i;
   it = m_fan_in_last_nodes.begin();
   while (it != m_fan_in_last_nodes.end())
@@ -970,7 +975,7 @@ TPLexPrefixTree::create_lex_tree_links_from_fan_in(Node *fan_in_node,
   // silence while adding a one-HMM word, or it is unused.
   if (out_right != "_")
   {
-    std::map<std::string,std::vector<Node*>* >::const_iterator it =
+    std::map<std::string,node_vector* >::const_iterator it =
       m_fan_in_connection_nodes.find(key);
     if (it != m_fan_in_connection_nodes.end())
     {
@@ -1000,7 +1005,7 @@ TPLexPrefixTree::analyze_cross_word_network(void)
   int num_out_arcs, num_in_arcs;
   int temp_nodes, temp_arcs;
   int i;
-  std::map<std::string,std::vector<Node*>* >::const_iterator it;
+  std::map<std::string,node_vector* >::const_iterator it;
 
   num_out_nodes = num_in_nodes = 0;
   num_out_arcs = num_in_arcs = 0;
@@ -1079,7 +1084,7 @@ TPLexPrefixTree::count_prefix_tree_size(Node *node, int *num_nodes,
 void
 TPLexPrefixTree::free_cross_word_network_connection_points(void)
 {
-  std::map<std::string,std::vector<Node*>* >::const_iterator it;
+  std::map<std::string,node_vector* >::const_iterator it;
   it = m_fan_out_entry_nodes.begin();
   while (it != m_fan_out_entry_nodes.end())
   {
@@ -1120,11 +1125,11 @@ TPLexPrefixTree::get_short_silence_node(void)
   Arc temp_arc;
   assert( m_short_silence_state != NULL );
   Node *silence = new Node(m_word_boundary_id, m_short_silence_state);
-  silence->node_id = node_list.size();
+  silence->node_id = m_nodes.size();
   silence->flags = NODE_FAN_OUT | NODE_USE_WORD_END_BEAM | NODE_FINAL;
   if (m_silence_is_word)
     silence->flags |= NODE_FIRST_STATE_OF_WORD;
-  node_list.push_back(silence);
+  m_nodes.push_back(silence);
   // Make self transition
   temp_arc.next = silence;
   temp_arc.log_prob = m_short_silence_state->transitions[0].log_prob;
@@ -1141,7 +1146,7 @@ TPLexPrefixTree::get_fan_out_entry_node(HmmState *state,
   std::string temp1(label, 0, 1);
   std::string temp2(label, 2, 1);
   std::string key = temp1+temp2;
-  std::vector<Node*> *nlist = get_fan_node_list(key, m_fan_out_entry_nodes);
+  node_vector *nlist = get_fan_node_list(key, m_fan_out_entry_nodes);
   Node *node;
 
   node = get_fan_state_node(state, nlist);
@@ -1159,7 +1164,7 @@ TPLexPrefixTree::get_fan_out_last_node(HmmState *state,
   if (m_ignore_case)
     std::transform(temp1.begin(), temp1.end(), temp1.begin(), safe_tolower);
   std::string key = temp1+temp2;
-  std::vector<Node*> *nlist = get_fan_node_list(key, m_fan_out_last_nodes);
+  node_vector *nlist = get_fan_node_list(key, m_fan_out_last_nodes);
   Node *node;
 
   node = get_fan_state_node(state, nlist);
@@ -1175,7 +1180,7 @@ TPLexPrefixTree::get_fan_in_entry_node(HmmState *state,
   std::string temp1(label, 0, 1);
   std::string temp2(label, 2, 1);
   std::string key = temp1+temp2;
-  std::vector<Node*> *nlist = get_fan_node_list(key, m_fan_in_entry_nodes);
+  node_vector *nlist = get_fan_node_list(key, m_fan_in_entry_nodes);
   Node *node;
 
   node = get_fan_state_node(state, nlist);
@@ -1191,7 +1196,7 @@ TPLexPrefixTree::get_fan_in_last_node(HmmState *state,
   std::string temp1(label, 2, 1);
   std::string temp2(label, 4, 1);
   std::string key = temp1+temp2;
-  std::vector<Node*> *nlist = get_fan_node_list(key, m_fan_in_last_nodes);
+  node_vector *nlist = get_fan_node_list(key, m_fan_in_last_nodes);
   Node *node;
 
   node = get_fan_state_node(state, nlist);
@@ -1200,7 +1205,7 @@ TPLexPrefixTree::get_fan_in_last_node(HmmState *state,
 }
 
 TPLexPrefixTree::Node*
-TPLexPrefixTree::get_fan_state_node(HmmState *state, std::vector<Node*> *nodes)
+TPLexPrefixTree::get_fan_state_node(HmmState *state, node_vector *nodes)
 {
   Node *new_node;
   for (int i = 0; i < nodes->size(); i++)
@@ -1213,8 +1218,8 @@ TPLexPrefixTree::get_fan_state_node(HmmState *state, std::vector<Node*> *nodes)
   }
   // Node did not exist, create it
   new_node = new Node(-1, state);
-  new_node->node_id = node_list.size();
-  node_list.push_back(new_node);
+  new_node->node_id = m_nodes.size();
+  m_nodes.push_back(new_node);
   nodes->push_back(new_node);
   return new_node;
 
@@ -1223,14 +1228,14 @@ TPLexPrefixTree::get_fan_state_node(HmmState *state, std::vector<Node*> *nodes)
 
 std::vector<TPLexPrefixTree::Node*>*
 TPLexPrefixTree::get_fan_node_list(
-  const std::string &key, std::map< std::string, std::vector<Node*>* > &nmap)
+  const std::string &key, std::map< std::string, node_vector* > &nmap)
 {
-  std::map<std::string,std::vector<Node*>* >::const_iterator it;
+  std::map<std::string,node_vector* >::const_iterator it;
 
   it = nmap.find(key);
   if (it == nmap.end())
   {
-    nmap[key] = new std::vector<Node*>;
+    nmap[key] = new node_vector;
     return nmap[key];
   }
   return (*it).second;
@@ -1244,13 +1249,13 @@ TPLexPrefixTree::add_fan_in_connection_node(Node *node,
   std::string temp1(prev_label, 2, 1);
   std::string temp2(prev_label, 4, 1);
   std::string map_index = temp1+temp2;
-  std::map<std::string,std::vector<Node*>* >::const_iterator it;
+  std::map<std::string,node_vector* >::const_iterator it;
 
   node->flags |= NODE_FAN_IN_CONNECTION;
   it = m_fan_in_connection_nodes.find(map_index);
   if (it == m_fan_in_connection_nodes.end())
   {
-    m_fan_in_connection_nodes[map_index] = new std::vector<Node*>;
+    m_fan_in_connection_nodes[map_index] = new node_vector;
     m_fan_in_connection_nodes[map_index]->push_back(node);
   }
   else
@@ -1334,18 +1339,18 @@ TPLexPrefixTree::prune_lm_la_buffer(int delta_thr, int depth_thr,
 void
 TPLexPrefixTree::set_lm_lookahead_cache_sizes(int cache_size)
 {
-  for (int i = 0; i < node_list.size(); i++)
-    if (node_list[i]->possible_word_id_list.size() > 0)
-      node_list[i]->lm_lookahead_buffer.set_max_items(cache_size);
+  for (int i = 0; i < m_nodes.size(); i++)
+    if (m_nodes[i]->possible_word_id_list.size() > 0)
+      m_nodes[i]->lm_lookahead_buffer.set_max_items(cache_size);
 }
 
 
 void
 TPLexPrefixTree::clear_node_token_lists(void)
 {
-  for (int i = 0; i < node_list.size(); i++)
+  for (int i = 0; i < m_nodes.size(); i++)
   {
-    node_list[i]->token_list = NULL;
+    m_nodes[i]->token_list = NULL;
   }
 }
 
@@ -1353,19 +1358,19 @@ TPLexPrefixTree::clear_node_token_lists(void)
 void
 TPLexPrefixTree::print_node_info(int node)
 {
-  printf("word_id = %d\n", node_list[node]->word_id);
-  printf("model = %d\n", (node_list[node]->state==NULL?-1:
-                          node_list[node]->state->model));
-  printf("flags: %04x\n", node_list[node]->flags);
-  printf("LM lookahead: %zd possible word(s)\n", node_list[node]->possible_word_id_list.size());
-  printf("%zd arc(s):\n", node_list[node]->arcs.size());
-  for (int i = 0; i < node_list[node]->arcs.size(); i++)
+  printf("word_id = %d\n", m_nodes[node]->word_id);
+  printf("model = %d\n", (m_nodes[node]->state==NULL?-1:
+                          m_nodes[node]->state->model));
+  printf("flags: %04x\n", m_nodes[node]->flags);
+  printf("LM lookahead: %zd possible word(s)\n", m_nodes[node]->possible_word_id_list.size());
+  printf("%zd arc(s):\n", m_nodes[node]->arcs.size());
+  for (int i = 0; i < m_nodes[node]->arcs.size(); i++)
   {
     printf(" -> %d (%d), transition: %.2f\n",
-           node_list[node]->arcs[i].next->node_id,
-           (node_list[node]->arcs[i].next->state==NULL?-1:
-            node_list[node]->arcs[i].next->state->model),
-           node_list[node]->arcs[i].log_prob);
+           m_nodes[node]->arcs[i].next->node_id,
+           (m_nodes[node]->arcs[i].next->state==NULL?-1:
+            m_nodes[node]->arcs[i].next->state->model),
+           m_nodes[node]->arcs[i].log_prob);
   }
 }
 
@@ -1373,14 +1378,14 @@ void
 TPLexPrefixTree::print_lookahead_info(int node, const Vocabulary &voc)
 {
   printf("Possible word ends: ");
-  if (node_list[node]->possible_word_id_list.size() == 0)
+  if (m_nodes[node]->possible_word_id_list.size() == 0)
     printf("N/A\n");
   else
   {
-    printf("%zd\n", node_list[node]->possible_word_id_list.size());
-    for (int i=0; i < node_list[node]->possible_word_id_list.size(); i++)
-      printf(" %d (%s)\n", node_list[node]->possible_word_id_list[i],
-             voc.word(node_list[node]->possible_word_id_list[i]).c_str());
+    printf("%zd\n", m_nodes[node]->possible_word_id_list.size());
+    for (int i=0; i < m_nodes[node]->possible_word_id_list.size(); i++)
+      printf(" %d (%s)\n", m_nodes[node]->possible_word_id_list[i],
+             voc.word(m_nodes[node]->possible_word_id_list[i]).c_str());
   }
 }
 
