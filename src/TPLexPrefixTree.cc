@@ -62,11 +62,11 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
 void
 TPLexPrefixTree::initialize_lex_tree(void)
 {
-/*	m_fan_out_entry_nodes.clear();
+	m_fan_out_entry_nodes.clear();
 	m_fan_out_last_nodes.clear();
 	m_fan_in_entry_nodes.clear();
 	m_fan_in_last_nodes.clear();
-	m_fan_in_connection_nodes.clear();*/
+	m_fan_in_connection_nodes.clear();
   if (m_cross_word_triphones)
     create_cross_word_network();
 }
@@ -798,7 +798,7 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
   int i, j;
   if (fan_out)
   {
-    target_nodes = get_fan_node_list(key, m_fan_out_entry_nodes);
+    target_nodes = &get_fan_node_list(key, m_fan_out_entry_nodes);
     if (target_nodes->size() == 0)
     {
       // Fan out nodes are created on demand
@@ -829,7 +829,7 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
       std::transform(new_key.begin(), new_key.end(), new_key.begin(),
                      safe_tolower);
     }
-    target_nodes = get_fan_node_list(new_key, m_fan_in_entry_nodes);
+    target_nodes = &get_fan_node_list(new_key, m_fan_in_entry_nodes);
   }
 
   for (i = 0; i < target_nodes->size(); i++)
@@ -854,18 +854,18 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
     // moved to apply to the whole block as it should be obsolete
     std::transform(++new_key.begin(), new_key.end(), ++new_key.begin(),
                    safe_toupper);
-    target_nodes = get_fan_node_list(new_key, m_fan_in_entry_nodes);
-    for (i = 0; i < target_nodes->size(); i++)
+    node_vector & target_nodes = get_fan_node_list(new_key, m_fan_in_entry_nodes);
+    for (i = 0; i < target_nodes.size(); i++)
     {
       for (j = 0; j < source_arcs.size(); j++)
       {
-        if (source_arcs[j].next == (*target_nodes)[i])
+        if (source_arcs[j].next == target_nodes[i])
           break;
       }
       if (j == source_arcs.size())
       {
         // Link
-        temp_arc.next = (*target_nodes)[i];
+        temp_arc.next = target_nodes[i];
         temp_arc.log_prob = out_transition_log_prob;
         source_arcs.push_back(temp_arc);
       }
@@ -1146,7 +1146,7 @@ TPLexPrefixTree::get_fan_out_entry_node(HmmState *state,
   std::string temp1(label, 0, 1);
   std::string temp2(label, 2, 1);
   std::string key = temp1+temp2;
-  node_vector *nlist = get_fan_node_list(key, m_fan_out_entry_nodes);
+  node_vector & nlist = get_fan_node_list(key, m_fan_out_entry_nodes);
   Node *node;
 
   node = get_fan_state_node(state, nlist);
@@ -1164,7 +1164,7 @@ TPLexPrefixTree::get_fan_out_last_node(HmmState *state,
   if (m_ignore_case)
     std::transform(temp1.begin(), temp1.end(), temp1.begin(), safe_tolower);
   std::string key = temp1+temp2;
-  node_vector *nlist = get_fan_node_list(key, m_fan_out_last_nodes);
+  node_vector & nlist = get_fan_node_list(key, m_fan_out_last_nodes);
   Node *node;
 
   node = get_fan_state_node(state, nlist);
@@ -1180,7 +1180,7 @@ TPLexPrefixTree::get_fan_in_entry_node(HmmState *state,
   std::string temp1(label, 0, 1);
   std::string temp2(label, 2, 1);
   std::string key = temp1+temp2;
-  node_vector *nlist = get_fan_node_list(key, m_fan_in_entry_nodes);
+  node_vector & nlist = get_fan_node_list(key, m_fan_in_entry_nodes);
   Node *node;
 
   node = get_fan_state_node(state, nlist);
@@ -1196,7 +1196,7 @@ TPLexPrefixTree::get_fan_in_last_node(HmmState *state,
   std::string temp1(label, 2, 1);
   std::string temp2(label, 4, 1);
   std::string key = temp1+temp2;
-  node_vector *nlist = get_fan_node_list(key, m_fan_in_last_nodes);
+  node_vector & nlist = get_fan_node_list(key, m_fan_in_last_nodes);
   Node *node;
 
   node = get_fan_state_node(state, nlist);
@@ -1205,28 +1205,28 @@ TPLexPrefixTree::get_fan_in_last_node(HmmState *state,
 }
 
 TPLexPrefixTree::Node*
-TPLexPrefixTree::get_fan_state_node(HmmState *state, node_vector *nodes)
+TPLexPrefixTree::get_fan_state_node(HmmState *state, node_vector & nodes)
 {
   Node *new_node;
-  for (int i = 0; i < nodes->size(); i++)
+  for (int i = 0; i < nodes.size(); i++)
   {
-	  if ((*nodes)[i] == NULL)
+	  if (nodes[i] == NULL)
 		  throw logic_error("TPLexPrefixTree::get_fan_state_node");
-    if ((*nodes)[i]->state->model == state->model) {
-      return (*nodes)[i];
+    if (nodes[i]->state->model == state->model) {
+      return nodes[i];
     }
   }
   // Node did not exist, create it
   new_node = new Node(-1, state);
   new_node->node_id = m_nodes.size();
   m_nodes.push_back(new_node);
-  nodes->push_back(new_node);
+  nodes.push_back(new_node);
   return new_node;
 
 }
 
 
-std::vector<TPLexPrefixTree::Node*>*
+TPLexPrefixTree::node_vector &
 TPLexPrefixTree::get_fan_node_list(
   const std::string &key, std::map< std::string, node_vector* > &nmap)
 {
@@ -1236,9 +1236,11 @@ TPLexPrefixTree::get_fan_node_list(
   if (it == nmap.end())
   {
     nmap[key] = new node_vector;
-    return nmap[key];
+    return *nmap[key];
   }
-  return (*it).second;
+  if (it->second == NULL)
+	  throw logic_error("TPLexPrefixTree::get_fan_node_list");
+  return *it->second;
 }
 
 

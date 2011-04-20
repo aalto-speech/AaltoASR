@@ -218,10 +218,15 @@ private:
   Node* get_fan_out_last_node(HmmState *state, const std::string &label);
   Node* get_fan_in_entry_node(HmmState *state, const std::string &label);
   Node* get_fan_in_last_node(HmmState *state, const std::string &label);
-  Node* get_fan_state_node(HmmState *state, node_vector *nodes);
-  node_vector* get_fan_node_list(
+  Node* get_fan_state_node(HmmState *state, node_vector & nodes);
+
+  /// \brief Returns a reference to the entry of \ref nmap with given key,
+  /// creating a new node_vector if necessary.
+  ///
+  node_vector & get_fan_node_list(
     const std::string &key,
     std::map< std::string, node_vector* > &nmap);
+
   void add_fan_in_connection_node(Node *node, const std::string &prev_label);
   float get_out_transition_log_prob(Node *node);
   void prune_lm_la_buffer(int delta_thr, int depth_thr,
