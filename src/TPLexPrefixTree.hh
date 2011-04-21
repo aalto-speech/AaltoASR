@@ -176,7 +176,6 @@ public:
 
   void print_node_info(int node);
   void print_lookahead_info(int node, const Vocabulary &voc);
-  Node *final_node() { return m_final_node; }
   void debug_prune_dead_ends(Node *node);
   void debug_add_silence_loop();
   
@@ -249,7 +248,6 @@ private:
   Node *m_start_node;
   Node *m_silence_node;
   Node *m_last_silence_node;
-  Node *m_final_node;
   node_vector m_nodes;
   int m_verbose;
   int m_lm_lookahead; // 0=None, 1=Only in first subtree nodes,

@@ -39,7 +39,6 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string, int> &hmm_map,
 	m_cross_word_triphones = true;
 	m_optional_short_silence = true;
 	m_short_silence_state = NULL;
-	m_final_node = NULL;
 	m_word_boundary_id = -1;
 	m_silence_is_word = true;
 	m_ignore_case = false;
