@@ -30,8 +30,8 @@ int safe_toupper(int c)
 
 TPLexPrefixTree::TPLexPrefixTree(std::map<std::string, int> &hmm_map,
 		std::vector<Hmm> &hmms) :
-	m_words(0), m_verbose(0), m_lm_lookahead(0), m_hmm_map(hmm_map), m_hmms(
-			hmms)
+	m_words(0), m_verbose(0), m_lm_lookahead(0), m_silence_is_word(true),
+			m_hmm_map(hmm_map), m_hmms(hmms)
 {
 	initialize_nodes();
 	m_lm_buf_count = 0;
@@ -39,7 +39,6 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string, int> &hmm_map,
 	m_optional_short_silence = true;
 	m_short_silence_state = NULL;
 	m_word_boundary_id = -1;
-	m_silence_is_word = true;
 	m_ignore_case = false;
 }
 
@@ -78,10 +77,20 @@ void TPLexPrefixTree::initialize_nodes()
 
 void TPLexPrefixTree::initialize_lex_tree(void)
 {
-/*	free_cross_word_network_connection_points();
+	m_words = 0;
 	for_each(m_nodes.begin(), m_nodes.end(), delete_node());
 	m_nodes.clear();
-	initialize_nodes();*/
+	initialize_nodes();
+	//	m_lm_lookahead = 0;
+
+	m_lm_buf_count = 0;
+
+	m_short_silence_state = NULL;
+	m_word_boundary_id = -1;
+
+	free_cross_word_network_connection_points();
+	m_silence_arcs.clear();
+
 	if (m_cross_word_triphones)
 		create_cross_word_network();
 }
