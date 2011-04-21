@@ -9,7 +9,7 @@ endif
 # Opteron cluster
 ifeq ($(ARCH),x86_64)
 CXX = g++
-OPT = -O2
+OPT = -O2 -g
 INCLUDES = -I../lapackpp/include
 # -I/share/puhe/linux/include
 LDFLAGS = -L../lapackpp/src/.libs
@@ -25,7 +25,7 @@ endif
 # Linux
 ifeq ($(ARCH),i686)
 CXX = /usr/bin/g++
-OPT = -O2
+OPT = -O2 -g
 INCLUDES = -I../lapackpp/include
 # -I/share/puhe/linux/include
 LDFLAGS = -L../lapackpp/src/.libs
