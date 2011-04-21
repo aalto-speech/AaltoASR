@@ -27,6 +27,9 @@ public:
 
   /// \brief Reads the lexicon from a file.
   ///
+  /// Adds all the words to the vocabulary, and the word along with the HMMs of
+  /// their phones to the lexicon.
+  ///
   /// \exception UnknownHmm If a phone is not found from \ref m_hmm_map.
   ///
   void read(FILE *file, const std::string &word_boundary);
