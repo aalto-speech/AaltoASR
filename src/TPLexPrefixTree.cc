@@ -34,7 +34,6 @@ TPLexPrefixTree::TPLexPrefixTree(std::map<std::string, int> &hmm_map,
 			hmms)
 {
 	initialize_nodes();
-	m_silence_node = NULL;
 	m_lm_buf_count = 0;
 	m_cross_word_triphones = true;
 	m_optional_short_silence = true;
@@ -72,6 +71,9 @@ void TPLexPrefixTree::initialize_nodes()
 	m_start_node = new Node(-1);
 	m_start_node->node_id = 2;
 	m_nodes.push_back(m_start_node);
+	m_silence_node = NULL;
+	m_last_silence_node = NULL;
+	m_final_node = NULL;
 }
 
 void TPLexPrefixTree::initialize_lex_tree(void)
