@@ -4,10 +4,18 @@
 #include "Vocabulary.hh"
 #include "misc/str.hh"
 
+using namespace std;
 Vocabulary::Vocabulary()
 {
   m_words.push_back("<UNK>");
   m_indices["<UNK>"] = 0;
+}
+
+void Vocabulary::reset()
+{
+	clear_words();
+	m_words.push_back("<UNK>");
+	m_indices["<UNK>"] = 0;
 }
 
 int
