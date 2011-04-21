@@ -48,7 +48,7 @@ public:
   class Node;
 
   typedef std::vector<Node *> node_vector;
-  typedef std::map<std::string, node_vector *> string_to_nodes_map;
+  typedef std::map<std::string, node_vector> string_to_nodes_map;
 
   struct LMHistory {
     inline LMHistory(int word_id, int lm_id, LMHistory *previous);
@@ -146,6 +146,11 @@ public:
   };
 
   TPLexPrefixTree(std::map<std::string,int> &hmm_map, std::vector<Hmm> &hmms);
+  ~TPLexPrefixTree();
+
+  void delete_nodes();
+  void initialize_nodes();
+
   inline TPLexPrefixTree::Node *root() { return m_root_node; }
   inline TPLexPrefixTree::Node *start_node() { return m_start_node; }
   inline int words() const { return m_words; }
