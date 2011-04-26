@@ -4,7 +4,6 @@
 #include "Vocabulary.hh"
 #include "misc/str.hh"
 
-using namespace std;
 Vocabulary::Vocabulary()
 {
   m_words.push_back("<UNK>");
