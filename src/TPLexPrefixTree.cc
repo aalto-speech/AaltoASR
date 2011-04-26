@@ -585,16 +585,14 @@ bool TPLexPrefixTree::post_process_fan_triphone(Node *node,
 void TPLexPrefixTree::set_sentence_boundary(int sentence_start_id,
 		int sentence_end_id)
 {
-	TPLexPrefixTree::Node *sentence_end_node;
-	Arc arc;
-
 	// Add nodes containing the sentence start and end word ids
-	sentence_end_node = new Node(sentence_end_id);
+	TPLexPrefixTree::Node * sentence_end_node = new Node(sentence_end_id);
 	sentence_end_node->node_id = m_nodes.size();
 	sentence_end_node->flags |= NODE_FIRST_STATE_OF_WORD;
 	sentence_end_node->state = m_last_silence_node->state;
 	m_nodes.push_back(sentence_end_node);
 
+	Arc arc;
 	arc.next = sentence_end_node;
 	arc.log_prob = get_out_transition_log_prob(m_last_silence_node);
 	m_last_silence_node->arcs.push_back(arc);
