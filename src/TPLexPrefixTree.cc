@@ -57,25 +57,6 @@ TPLexPrefixTree::~TPLexPrefixTree()
 	m_nodes.clear();
 }
 
-void TPLexPrefixTree::initialize_nodes()
-{
-	for_each(m_nodes.begin(), m_nodes.end(), delete_node());
-	m_nodes.clear();
-	m_root_node = new Node(-1);
-	m_root_node->node_id = 0;
-	m_root_node->flags = NODE_USE_WORD_END_BEAM;
-	m_nodes.push_back(m_root_node);
-	m_end_node = new Node(-1);
-	m_end_node->node_id = 1;
-	m_nodes.push_back(m_end_node);
-	m_start_node = new Node(-1);
-	m_start_node->node_id = 2;
-	m_nodes.push_back(m_start_node);
-	m_silence_node = NULL;
-	m_last_silence_node = NULL;
-	m_final_node = NULL;
-}
-
 void TPLexPrefixTree::initialize_lex_tree(void)
 {
 	m_words = 0;
@@ -606,7 +587,26 @@ void TPLexPrefixTree::set_sentence_boundary(int sentence_start_id,
 	m_last_silence_node->flags |= NODE_FINAL;
 }
 
-void TPLexPrefixTree::create_cross_word_network(void)
+void TPLexPrefixTree::initialize_nodes()
+{
+	for_each(m_nodes.begin(), m_nodes.end(), delete_node());
+	m_nodes.clear();
+	m_root_node = new Node(-1);
+	m_root_node->node_id = 0;
+	m_root_node->flags = NODE_USE_WORD_END_BEAM;
+	m_nodes.push_back(m_root_node);
+	m_end_node = new Node(-1);
+	m_end_node->node_id = 1;
+	m_nodes.push_back(m_end_node);
+	m_start_node = new Node(-1);
+	m_start_node->node_id = 2;
+	m_nodes.push_back(m_start_node);
+	m_silence_node = NULL;
+	m_last_silence_node = NULL;
+	m_final_node = NULL;
+}
+
+void TPLexPrefixTree::create_cross_word_network()
 {
 	std::map<std::string, int>::const_iterator it;
 

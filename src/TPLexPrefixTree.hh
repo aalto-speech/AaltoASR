@@ -151,13 +151,20 @@ public:
   ///
   ~TPLexPrefixTree();
 
-  /// \brief Deletes all the nodes from \ref m_nodes, then creates new root,
-  /// end, and start nodes.
+  /// \brief Returns a pointer to the root node.
   ///
-  void initialize_nodes();
-
+  /// The pointer is granted to remain valid until the next call to
+  /// initialize_lex_tree().
+  ///
   inline TPLexPrefixTree::Node *root() { return m_root_node; }
+
+  /// \brief Returns a pointer to the start node.
+  ///
+  /// The pointer is granted to remain valid until the next call to
+  /// initialize_lex_tree().
+  ///
   inline TPLexPrefixTree::Node *start_node() { return m_start_node; }
+
   inline int words() const { return m_words; }
 
   void set_verbose(int verbose) { m_verbose = verbose; }
@@ -197,6 +204,11 @@ private:
   void post_process_lex_branch(Node *node, std::vector<int> *lm_la_list);
   bool post_process_fan_triphone(Node *node, std::vector<int> *lm_la_list,
                                  bool fan_in);
+
+  /// \brief Deletes all the nodes from \ref m_nodes, then creates new root,
+  /// end, and start nodes.
+  ///
+  void initialize_nodes();
 
   /// \brief Creates fan in HMMs
   ///
