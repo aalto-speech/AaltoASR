@@ -18,8 +18,13 @@ public:
 	TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
 			Acoustics *acoustics);
 
-	// Resets search and creates the initial token
+	/// \brief Resets the search and creates the initial token.
+	///
+	/// Clears the active token list and adds one token that refers to
+	/// \ref m_lexicon.start_node().
+	///
 	void reset_search(int start_frame);
+
 	void set_end_frame(int end_frame)
 	{
 		m_end_frame = end_frame;
@@ -192,16 +197,36 @@ private:
 	TPLexPrefixTree::Token & get_first_token();
 
 	void add_sentence_end_to_hypotheses(void);
+
+	/// \brief Propagates all the tokens in the active token list to the
+	/// following nodes.
+	///
 	void propagate_tokens(void);
+
 	void update_final_tokens();
 	void copy_word_graph_info(TPLexPrefixTree::Token *src_token,
 			TPLexPrefixTree::Token *tgt_token);
 	void build_word_graph_aux(TPLexPrefixTree::Token *new_token,
 			TPLexPrefixTree::WordHistory *word_history);
 	void build_word_graph(TPLexPrefixTree::Token *new_token);
+
+	/// \brief Moves the token towards all the arcs leaving the token's node.
+	///
 	void propagate_token(TPLexPrefixTree::Token *token);
+
+	/// \brief Moves token to a connected node.
+	///
+	/// Adds new tokens to \ref m_new_token_list.
+	///
+	/// \param token The token to move.
+	/// \param node A nodes that is connected to token's node
+	///
 	void move_token_to_node(TPLexPrefixTree::Token *token,
 			TPLexPrefixTree::Node *node, float transition_score);
+
+	/// \brief Copes new tokens from \ref m_new_token_list to
+	/// \ref m_active_token_list.
+	///
 	void prune_tokens(void);
 
 #ifdef PRUNING_MEASUREMENT
