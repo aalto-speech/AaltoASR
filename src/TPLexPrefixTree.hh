@@ -146,9 +146,14 @@ public:
   };
 
   TPLexPrefixTree(std::map<std::string,int> &hmm_map, std::vector<Hmm> &hmms);
+
+  /// \brief Deletes all the nodes from \ref m_nodes.
+  ///
   ~TPLexPrefixTree();
 
-  void delete_nodes();
+  /// \brief Deletes all the nodes from \ref m_nodes, then creates new root,
+  /// end, and start nodes.
+  ///
   void initialize_nodes();
 
   inline TPLexPrefixTree::Node *root() { return m_root_node; }

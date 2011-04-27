@@ -53,13 +53,14 @@ struct delete_node
 
 TPLexPrefixTree::~TPLexPrefixTree()
 {
-	free_cross_word_network_connection_points();
 	for_each(m_nodes.begin(), m_nodes.end(), delete_node());
 	m_nodes.clear();
 }
 
 void TPLexPrefixTree::initialize_nodes()
 {
+	for_each(m_nodes.begin(), m_nodes.end(), delete_node());
+	m_nodes.clear();
 	m_root_node = new Node(-1);
 	m_root_node->node_id = 0;
 	m_root_node->flags = NODE_USE_WORD_END_BEAM;
@@ -78,8 +79,6 @@ void TPLexPrefixTree::initialize_nodes()
 void TPLexPrefixTree::initialize_lex_tree(void)
 {
 	m_words = 0;
-	for_each(m_nodes.begin(), m_nodes.end(), delete_node());
-	m_nodes.clear();
 	initialize_nodes();
 	//	m_lm_lookahead = 0;
 
