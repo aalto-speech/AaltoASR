@@ -246,7 +246,6 @@ public:
 
 private:
 	TPLexPrefixTree &m_lexicon;
-	TPLexPrefixTree::Node *m_root, *m_start_node;
 	Vocabulary &m_vocabulary;
 	Acoustics *m_acoustics;
 

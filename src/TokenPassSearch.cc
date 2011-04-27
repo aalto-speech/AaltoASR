@@ -31,8 +31,6 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
 		Acoustics *acoustics) :
 	m_lexicon(lex), m_vocabulary(vocab), m_acoustics(acoustics)
 {
-	m_root = lex.root();
-	m_start_node = lex.start_node();
 	m_end_frame = -1;
 	m_global_beam = 1e10;
 	m_word_end_beam = 1e10;
@@ -129,7 +127,7 @@ void TokenPassSearch::reset_search(int start_frame)
 	m_lexicon.clear_node_token_lists();
 
 	t = acquire_token();
-	t->node = m_start_node;
+	t->node = m_lexicon.start_node();
 	t->next_node_token = NULL;
 	t->am_log_prob = 0;
 	t->lm_log_prob = 0;
@@ -197,7 +195,8 @@ void TokenPassSearch::reset_search(int start_frame)
 	if (m_keep_state_segmentation) {
 		t->state_history = new TPLexPrefixTree::StateHistory(0, 0, NULL);
 		hist::link(t->state_history);
-	} else {
+	}
+	else {
 		t->state_history = NULL;
 	}
 
@@ -423,9 +422,9 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 	}
 
 	// Use globally best token if no best final token.
-	TPLexPrefixTree::Token & token = m_best_final_token != NULL ?
-			*m_best_final_token : get_best_path ? get_best_token()
-					: get_first_token();
+	TPLexPrefixTree::Token & token =
+			m_best_final_token != NULL ? *m_best_final_token
+					: get_best_path ? get_best_token() : get_first_token();
 
 	// Fetch the best path if requested, otherwise the common path to
 	// all tokens and not printed yet
@@ -786,7 +785,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 								new_lm_history->lm_id, &new_real_lm_log_prob);
 						new_real_lm_log_prob += m_insertion_penalty;
 					}
-				} else {
+				}
+				else {
 					new_lm_hist_code
 							= compute_lm_hist_hash_code(new_lm_history);
 
@@ -827,11 +827,13 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 						if (m_word_boundary_id > 0)
 							new_fsa_lm_node = m_fsa_lm->walk(new_fsa_lm_node,
 									m_word_boundary_lm_id, NULL);
-					} else
+					}
+					else
 						new_lm_hist_code = compute_lm_hist_hash_code(
 								new_lm_history);
 				}
-			} else {
+			}
+			else {
 				// LM probability not added yet, use previous LM (lookahead) value
 				new_cur_lm_log_prob = token->cur_lm_log_prob;
 
@@ -842,7 +844,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 									depth);
 				}
 			}
-		} else
+		}
+		else
 			new_cur_lm_log_prob = new_real_lm_log_prob;
 
 		if (m_keep_state_segmentation && node->state != NULL) {
@@ -881,7 +884,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		}
 
 		new_cur_am_log_prob = new_real_am_log_prob;
-	} else {
+	}
+	else {
 		// Self transition
 		new_dur = token->dur + 1;
 		if (new_dur > MAX_STATE_DURATION && token->node->state != NULL
@@ -893,8 +897,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		new_cur_lm_log_prob = token->cur_lm_log_prob;
 	}
 
-	if ((node->flags & NODE_FAN_IN_FIRST) || node == m_root || (node->flags
-			& NODE_SILENCE_FIRST)) {
+	if ((node->flags & NODE_FAN_IN_FIRST) || node == m_lexicon.root()
+			|| (node->flags & NODE_SILENCE_FIRST)) {
 		depth = 0;
 	}
 
@@ -950,7 +954,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 
 		propagate_token(&temp_token);
 		//TPLexPrefixTree::PathHistory::unlink(temp_token.token_path);
-	} else {
+	}
+	else {
 		// Normal propagation
 		TPLexPrefixTree::Token *new_token;
 		TPLexPrefixTree::Token *similar_lm_hist;
@@ -1026,11 +1031,13 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				m_word_end_token_list->push_back(new_token);
 			else
 				m_new_token_list->push_back(new_token);
-		} else {
+		}
+		else {
 			if (m_fsa_lm) {
 				similar_lm_hist = find_similar_fsa_token(new_fsa_lm_node,
 						node->token_list);
-			} else {
+			}
+			else {
 				similar_lm_hist = find_similar_lm_history(new_lm_history,
 						new_lm_hist_code, node->token_list);
 			}
@@ -1046,7 +1053,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 					m_word_end_token_list->push_back(new_token);
 				else
 					m_new_token_list->push_back(new_token);
-			} else {
+			}
+			else {
 				// Found the same word history, pick the best token.
 				if (total_token_log_prob > similar_lm_hist->total_log_prob) {
 					// Replace the previous token
@@ -1056,7 +1064,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 					hist::unlink(new_token->state_history);
 
 					//TPLexPrefixTree::PathHistory::unlink(new_token->token_path);
-				} else {
+				}
+				else {
 					// Discard this token
 					return;
 				}
@@ -1346,7 +1355,8 @@ void TokenPassSearch::prune_tokens(void)
 			)
 			{
 				release_token((*m_active_token_list)[i]);
-			} else {
+			}
+			else {
 				bins[(int) floorf((total_log_prob - m_worst_log_prob) / bin_adv)]++;
 				m_new_token_list->push_back((*m_active_token_list)[i]);
 			}
@@ -1385,7 +1395,8 @@ void TokenPassSearch::prune_tokens(void)
 			m_current_we_beam = m_current_glob_beam / m_global_beam
 					* m_word_end_beam;
 		}
-	} else {
+	}
+	else {
 		// Only do the beam pruning
 		for (i = 0; i < m_active_token_list->size(); i++) {
 			if ((*m_active_token_list)[i]->total_log_prob < beam_limit
@@ -1416,7 +1427,8 @@ void TokenPassSearch::prune_tokens(void)
 			)
 			{
 				release_token((*m_active_token_list)[i]);
-			} else
+			}
+			else
 				m_new_token_list->push_back((*m_active_token_list)[i]);
 		}
 		m_active_token_list->clear();
@@ -1887,7 +1899,8 @@ void TokenPassSearch::update_final_tokens()
 			token->lm_hist_code = compute_lm_hist_hash_code(token->lm_history);
 			token->lm_log_prob += get_lm_score(token->lm_history,
 					token->lm_hist_code) + m_insertion_penalty;
-		} else {
+		}
+		else {
 			m_fsa_lm->walk(token->fsa_lm_node, m_sentence_end_lm_id,
 					&token->lm_log_prob);
 			token->lm_log_prob += m_insertion_penalty;
@@ -2049,13 +2062,14 @@ void TokenPassSearch::write_word_graph(FILE *file)
 	// FIXME: What should we do if we do not want to abort?
 	// }
 
-	TPLexPrefixTree::Token & best_token = m_best_final_token != NULL ?
-			*m_best_final_token : get_best_token();
+	TPLexPrefixTree::Token & best_token =
+			m_best_final_token != NULL ? *m_best_final_token : get_best_token();
 
 	if (1) {
 		word_graph.reset_reachability();
 		word_graph.mark_reachable_nodes(best_token.recent_word_graph_node);
-	} else
+	}
+	else
 		word_graph.reset_reachability(true);
 
 	// Count reachable nodes and arcs
