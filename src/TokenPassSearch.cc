@@ -1,4 +1,5 @@
 #include <sstream>
+#include <stdexcept>
 #include <stdio.h>
 #include <math.h>
 #include "TokenPassSearch.hh"
@@ -26,6 +27,7 @@
 
 //#define COUNT_LM_LA_CACHE_MISS
 
+using namespace std;
 
 TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
 		Acoustics *acoustics) :
@@ -73,9 +75,8 @@ void TokenPassSearch::set_word_boundary(const std::string &word)
 {
 	m_word_boundary_id = m_vocabulary.word_index(word);
 	if (m_word_boundary_id <= 0) {
-		fprintf(stderr, "TokenPassSearch::set_word_boundary(): "
-			"word boundary not in vocabulary: %s\n", word.c_str());
-		exit(1);
+		// word is not in vocabulary.
+		throw invalid_argument("TokenPassSearch::set_word_boundary");
 	}
 }
 
@@ -84,19 +85,13 @@ void TokenPassSearch::set_sentence_boundary(const std::string &start,
 {
 	m_sentence_start_id = m_vocabulary.word_index(start);
 	if (m_sentence_start_id == 0) {
-		fprintf(
-				stderr,
-				"Search::set_sentence_boundaries(): sentence start %s not in vocabulary\n",
-				start.c_str());
-		exit(1);
+		// start is not in vocabulary.
+		throw invalid_argument("TokenPassSearch::set_sentence_boundary");
 	}
 	m_sentence_end_id = m_vocabulary.word_index(end);
 	if (m_sentence_end_id == 0) {
-		fprintf(
-				stderr,
-				"Search::set_sentence_boundaries(): sentence end %s not in vocabulary\n",
-				end.c_str());
-		exit(1);
+		// end is not in vocabulary.
+		throw invalid_argument("TokenPassSearch::set_sentence_boundary");
 	}
 	m_use_sentence_boundary = true;
 	m_lexicon.set_sentence_boundary(m_sentence_start_id, m_sentence_end_id);
@@ -234,17 +229,11 @@ bool TokenPassSearch::run(void)
 {
 	if (m_generate_word_graph) {
 		if (m_similar_lm_hist_span < 2) {
-			fprintf(stderr,
-					"ERROR: similar word history span should be at least 2"
-						" if word graph requested\n");
-			exit(1);
+			throw CannotGenerateWordGraph("Similar word history span should be at least 2 if word graph requested.");
 		}
 
 		if (!m_use_sentence_boundary) {
-			fprintf(stderr,
-					"ERROR: word graph can be generated only if sentence"
-						" boundary is used\n");
-			exit(1);
+			throw CannotGenerateWordGraph("Word graph can be generated only if sentence boundary is used.");
 		}
 	}
 
@@ -416,9 +405,7 @@ void TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
 void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 {
 	if (!m_generate_word_graph) {
-		fprintf(stderr, "ERROR: word history can be printed only if word graph"
-			" was generated\n");
-		exit(1);
+		throw WordGraphNotGenerated();
 	}
 
 	// Use globally best token if no best final token.
@@ -2036,17 +2023,12 @@ void TokenPassSearch::build_word_graph(TPLexPrefixTree::Token *new_token)
 void TokenPassSearch::write_word_graph(const std::string &file_name)
 {
 	if (!m_generate_word_graph) {
-		fprintf(stderr, "ERROR: write_word_graph() called even if word graph"
-			" was not generated\n");
-		exit(1);
+		throw WordGraphNotGenerated();
 	}
 
 	FILE *file = fopen(file_name.c_str(), "w");
 	if (!file) {
-		fprintf(stderr, "ERROR: could not open file '%s' for writing\n",
-				file_name.c_str());
-		perror("");
-		exit(1);
+		throw IOError("Could not open word graph file for writing.");
 	}
 	write_word_graph(file);
 	fclose(file);

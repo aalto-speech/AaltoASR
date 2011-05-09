@@ -1,6 +1,8 @@
 #ifndef TOKENPASSSEARCH_HH
 #define TOKENPASSSEARCH_HH
 
+#include <stdexcept>
+
 #include "fsalm/LM.hh"
 #include "WordGraph.hh"
 #include "TPLexPrefixTree.hh"
@@ -15,6 +17,31 @@ typedef std::vector<TPLexPrefixTree::LMHistory*> HistoryVector;
 class TokenPassSearch
 {
 public:
+	struct CannotGenerateWordGraph: public std::runtime_error
+	{
+		CannotGenerateWordGraph(const std::string & message) :
+			std::runtime_error(message)
+		{
+		}
+	};
+
+	struct WordGraphNotGenerated: public std::runtime_error
+	{
+		WordGraphNotGenerated() :
+			std::runtime_error(
+					"Word graph was requested but it has not been generated.")
+		{
+		}
+	};
+
+	struct IOError: public std::runtime_error
+	{
+		IOError(const std::string & message) :
+			std::runtime_error(message)
+		{
+		}
+	};
+
 	TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
 			Acoustics *acoustics);
 
@@ -30,10 +57,17 @@ public:
 		m_end_frame = end_frame;
 	}
 
-	// Proceeds decoding one frame
+	/// \brief Proceeds decoding one frame.
+	///
+	/// \exception CannotGenerateWordGraph If it is not possible to generate the
+	/// word graph with the current parameters.
+	///
 	bool run(void);
 
-	// Print the best path
+	/// \brief Prints the best path.
+	///
+	/// \exception WordGraphNotGenerated If word graph has not been generated.
+	///
 	void write_word_history(FILE *file = stdout, bool get_best_path = true);
 
 	/// \brief Writes the LM history of an active token into a file.
@@ -137,7 +171,11 @@ public:
 	{
 		m_verbose = verbose;
 	}
+
+	/// \exception invalid_argument If \a word is not in vocabulary.
+	///
 	void set_word_boundary(const std::string &word);
+
 	void set_lm_lookahead(int order)
 	{
 		m_lm_lookahead = order;
@@ -152,9 +190,10 @@ public:
 		m_require_sentence_end = s;
 	}
 
+	/// \exception invalid_argument If \a start or \a end is not in vocabulary.
+	///
 	void
-			set_sentence_boundary(const std::string &start,
-					const std::string &end);
+	set_sentence_boundary(const std::string &start, const std::string &end);
 
 	void set_ngram(TreeGram *ngram);
 
@@ -176,8 +215,11 @@ public:
 		return m_frame;
 	}
 
-	/// \brief Writes nodes and arcs from word_graph to a Standard Lattice Format
-	/// file.
+	/// \brief Writes nodes and arcs from word_graph to a Standard Lattice
+	/// Format file.
+	///
+	/// \exception WordGraphNotGenerated If word graph has not been generated.
+	/// \exception IOError If unable to write the file.
 	///
 	void write_word_graph(const std::string &file_name);
 	void write_word_graph(FILE *file);
@@ -393,8 +435,7 @@ private:
 public:
 	void debug_print_best_lm_history();
 	void
-			debug_print_token_lm_history(FILE *file,
-					TPLexPrefixTree::Token *token);
+	debug_print_token_lm_history(FILE *file, TPLexPrefixTree::Token *token);
 
 };
 
