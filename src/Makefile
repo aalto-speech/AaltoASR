@@ -1,6 +1,7 @@
 includes = -Ifsalm -I.
 
 include Makefile.common
+#include Makefile.debug
 
 ##################################################
 
