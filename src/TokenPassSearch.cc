@@ -1471,6 +1471,9 @@ void TokenPassSearch::set_ngram(TreeGram *ngram)
 
 	if (count > 0)
 		fprintf(stderr, "there were %d out-of-LM words in total in LM\n", count);
+
+	// Initialize LM lookahead caches again.
+	m_lm_lookahead_initialized = false;
 }
 
 void TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
