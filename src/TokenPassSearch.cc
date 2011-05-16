@@ -73,10 +73,15 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
 
 void TokenPassSearch::set_word_boundary(const std::string &word)
 {
-	m_word_boundary_id = m_vocabulary.word_index(word);
-	if (m_word_boundary_id <= 0) {
-		// word is not in vocabulary.
-		throw invalid_argument("TokenPassSearch::set_word_boundary");
+	if (word.empty()) {
+		m_word_boundary_id = 0;
+	}
+	else {
+		m_word_boundary_id = m_vocabulary.word_index(word);
+		if (m_word_boundary_id <= 0) {
+			// word is not in vocabulary.
+			throw invalid_argument("TokenPassSearch::set_word_boundary");
+		}
 	}
 }
 
@@ -225,7 +230,7 @@ void TokenPassSearch::reset_search(int start_frame)
 	m_current_we_beam = m_word_end_beam;
 }
 
-bool TokenPassSearch::run(void)
+bool TokenPassSearch::run()
 {
 	if (m_generate_word_graph) {
 		if (m_similar_lm_hist_span < 2) {
@@ -647,10 +652,8 @@ void TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
 
 	if ((source_node->flags & NODE_INSERT_WORD_BOUNDARY) != 0
 			&& m_generate_word_graph) {
-		fprintf(stderr,
-				"ERROR: nodes should not have NODE_INSERT_WORD_BOUNRDARY "
-					"when word graphs are used\n");
-		exit(1);
+		throw InvalidSetup("Nodes should not have NODE_INSERT_WORD_BOUNRDARY "
+					"when word graphs are used.");
 	}
 
 	if (source_node->flags & NODE_INSERT_WORD_BOUNDARY && m_word_boundary_id

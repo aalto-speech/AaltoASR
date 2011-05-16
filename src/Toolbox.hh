@@ -196,8 +196,18 @@ public:
   { 
     m_search.set_print_frames(print_frames); 
   }
+
+  /// \brief Sets the word that represents word boundary.
+  ///
+  /// \param word Word boundary. For word models, an empty string should be
+  /// given.
+  ///
+  /// \exception invalid_argument If \a word is non-empty, but not in
+  /// vocabulary.
+  ///
   void set_word_boundary(const std::string &word)
   { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_word_boundary = word; }
+
   void set_sentence_boundary(const std::string &start, const std::string &end) { m_tp_search.set_sentence_boundary(start, end); }
   void set_dummy_word_boundaries(bool value)
   { m_search.set_dummy_word_boundaries(value); }

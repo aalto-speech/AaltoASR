@@ -34,6 +34,14 @@ public:
 		}
 	};
 
+	struct InvalidSetup: public std::runtime_error
+	{
+		InvalidSetup(const std::string & message) :
+			std::runtime_error(message)
+		{
+		}
+	};
+
 	struct IOError: public std::runtime_error
 	{
 		IOError(const std::string & message) :
@@ -172,7 +180,13 @@ public:
 		m_verbose = verbose;
 	}
 
-	/// \exception invalid_argument If \a word is not in vocabulary.
+	/// \brief Sets the word that represents word boundary.
+	///
+	/// \param word Word boundary. For word models, an empty string should be
+	/// given.
+	///
+	/// \exception invalid_argument If \a word is non-empty, but not in
+	/// vocabulary.
 	///
 	void set_word_boundary(const std::string &word);
 
