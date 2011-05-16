@@ -1,6 +1,8 @@
 #ifndef HASHCACHE_HH
 #define HASHCACHE_HH
 
+#include <stdexcept>
+
 template <typename T>
 class HashCache {
 public:
@@ -14,7 +16,7 @@ public:
 
 private:
   void rehash(int new_max);
-  inline int get_hash_index(int key) { return (key%hash_table_size); }
+  int get_hash_index(int key);
   
   class StoreType {
   public:
@@ -26,11 +28,10 @@ private:
     StoreType *priority_list_next;
     StoreType *priority_list_prev;
   };
-  std::vector< StoreType* > *hash_table;
+  std::vector< StoreType* > hash_table;
 
   StoreType *first, *last;
 
-  int hash_table_size;
   int num_items;
   int max_num_items;
 };
@@ -38,8 +39,7 @@ private:
 template<typename T>
 HashCache<T>::HashCache(void)
 {
-  hash_table = NULL;
-  hash_table_size = num_items = 0;
+  num_items = 0;
   max_num_items = 0;
   first = last = NULL;
 }
@@ -48,21 +48,19 @@ template<typename T>
 void
 HashCache<T>::rehash(int new_max)
 {
-  std::vector< StoreType* > *new_hash_table = new std::vector< StoreType* >;
-  new_hash_table->resize(new_max);
+  hash_table.resize(new_max);
   for (int i = 0; i < new_max; i++)
-    (*new_hash_table)[i] = NULL;
-  if (hash_table != NULL)
-  {
-    // Copy at most new_max items
-    // FIXME: Missing! We just delete the old hash.
-    assert( num_items == 0 );
-    delete hash_table;
-  }
-  hash_table = new_hash_table;
-  hash_table_size = new_max;
+    hash_table[i] = NULL;
   num_items = 0;
   max_num_items = new_max;
+}
+
+template<typename T>
+inline int HashCache<T>::get_hash_index(int key)
+{
+	if (hash_table.empty())
+		throw std::runtime_error("HashCache::get_hash_index");
+	return key % hash_table.size();
 }
 
 // Returns true if an item is removed, in which case the removed item is
@@ -94,11 +92,11 @@ HashCache<T>::insert(int key, T item, T *removed)
   temp = new StoreType;
   temp->key = key;
   temp->value = item;
-  temp->hash_list_next = (*hash_table)[index];
-  temp->hash_list_prev = &(*hash_table)[index];
-  if ((*hash_table)[index] != NULL)
-    (*hash_table)[index]->hash_list_prev = &temp->hash_list_next;
-  (*hash_table)[index] = temp;
+  temp->hash_list_next = hash_table[index];
+  temp->hash_list_prev = &hash_table[index];
+  if (hash_table[index] != NULL)
+    hash_table[index]->hash_list_prev = &temp->hash_list_next;
+  hash_table[index] = temp;
   temp->priority_list_prev = NULL;
   temp->priority_list_next = first;
   if (first != NULL)
@@ -142,7 +140,7 @@ HashCache<T>::remove_item(int key, T *removed)
   int index = get_hash_index(key);
   StoreType *temp;
 
-  temp = (*hash_table)[index];
+  temp = hash_table[index];
   while (temp != NULL)
   {
     if (temp->key == key)
@@ -177,7 +175,7 @@ HashCache<T>::find(int key, T *result)
   int index = get_hash_index(key);
   StoreType *temp;
 
-  temp = (*hash_table)[index];
+  temp = hash_table[index];
   while (temp != NULL)
   {
     if (temp->key == key)
