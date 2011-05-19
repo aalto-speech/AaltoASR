@@ -5,7 +5,7 @@ include Makefile.common
 
 ##################################################
 
-progs = arpa2bin 
+progs = arpa2bin bin2arpa
 
 libdecoder_srcs = ArpaNgramReader.cc \
 	BinNgramReader.cc \
@@ -52,7 +52,7 @@ libdecoder.a: $(libdecoder_objs)
 	ar r libdecoder.a $(libdecoder_objs)
 
 .PHONY: progs
-progs: libdecoder.a fsalm misc
+progs: libdecoder.a fsalm misc arpa2bin bin2arpa
 
 .PHONY: swig
 swig: libdecoder.a fsalm
