@@ -444,7 +444,7 @@ namespace LinearAlgebra {
     LaEigSolveSymmetricVecIP(a, eigs);
 
     for (int i=0; i<eigs.size(); i++)
-      if (abs(eigs(i))<0.00000001)
+      if (fabs(eigs(i))<0.00000001)
         return true;
   
     return false;
