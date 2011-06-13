@@ -643,7 +643,7 @@ RegClassTree::RegClassTree::get_node(int index)
     }
 
     //choose to go right or left based on the bit in the current level
-    if (index & (1 << targetlevel - curlevel))
+    if (index & (1 << (targetlevel - curlevel)))
       cur_node = cur_node->m_c2;
     else
       cur_node = cur_node->m_c1;
