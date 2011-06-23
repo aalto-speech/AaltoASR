@@ -41,10 +41,17 @@ dur = ac_model + ".dur"
 #ngram = sys.argv[1] + "/CariologyLM.even.3gram.bin"
 #lookahead_ngram = sys.argv[1] + "/CariologyLM.even.2gram.bin"
 
-lexicon = "/share/work/jpylkkon/bin_lm/morph19k.lex"
-ngram = "/share/work/jpylkkon/bin_lm/morph19k_D20E10_varigram.bin"
-lookahead_ngram = "/share/work/jpylkkon/bin_lm/morph19k_2gram.bin"
+lm = ''
+#lm = 'FreeDictation'
 
+if lm == 'FreeDictation':
+	lexicon = "/share/puhe/hammas/FreeDictationLexicon.lex"
+	ngram = "/share/puhe/hammas/FreeDictationLM.6gram.bin"
+	lookahead_ngram = "/share/puhe/hammas/FreeDictationLM.2gram.bin"
+else:
+	lexicon = "/share/work/jpylkkon/bin_lm/morph19k.lex"
+	ngram = "/share/work/jpylkkon/bin_lm/morph19k_D20E10_varigram.bin"
+	lookahead_ngram = "/share/work/jpylkkon/bin_lm/morph19k_2gram.bin"
 
 lm_scale = 30
 global_beam = 400
