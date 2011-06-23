@@ -123,7 +123,7 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
       // Find the index of the hmm
       std::map<std::string,int>::const_iterator it = m_hmm_map.find(m_phone);
       if (it == m_hmm_map.end()) {
-	throw UnknownHmm();
+	throw UnknownHmm(m_phone);
       }
       int hmm_id = (*it).second;
       hmm_list.push_back(&m_hmms[hmm_id]);
