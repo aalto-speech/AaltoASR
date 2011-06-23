@@ -16,7 +16,7 @@ import gzip
 import math
 
 # Set your decoder swig path in here!
-sys.path.append("src/swig");
+sys.path.append(os.path.dirname(sys.argv[0]) + "/src/swig");
 
 import Decoder
 
