@@ -26,23 +26,26 @@ import Decoder
 
 akupath = os.path.dirname(sys.argv[0]) + "/../aku"
 
-# 16 kHz acoustic model
-#ac_model = sys.argv[1] + "/test_mfcc_noisy_trained";
-#speech_directory = sys.argv[1] + "/speech/Sennheiser_16kHz"
-# 8 kHz (telephone?) acoustic model
-ac_model = sys.argv[1] + "/speechdat_gain5000_occ300_23.2.2009_22";
-speech_directory = sys.argv[2]
+am = ''
 
+if am == 'speechdat':
+	# 8 kHz telephone line
+	ac_model = sys.argv[1] + "/speechdat_gain5000_occ300_23.2.2009_22";
+else:
+	# 16 kHz acoustic model
+	ac_model = sys.argv[1] + "/test_mfcc_noisy_trained";
 hmms = ac_model + ".ph"
 dur = ac_model + ".dur"
+
+speech_directory = sys.argv[2]
 
 # language model for cariology status commands
 #lexicon = sys.argv[1] + "/CariologyLexicon.lex"
 #ngram = sys.argv[1] + "/CariologyLM.even.3gram.bin"
 #lookahead_ngram = sys.argv[1] + "/CariologyLM.even.2gram.bin"
 
-lm = ''
-#lm = 'FreeDictation'
+#lm = ''
+lm = 'FreeDictation'
 
 if lm == 'FreeDictation':
 	lexicon = "/share/puhe/hammas/FreeDictationLexicon.lex"
