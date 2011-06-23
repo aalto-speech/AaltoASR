@@ -24,7 +24,7 @@ import Decoder
 # Initialize
 #
 
-akupath = "../aku"
+akupath = os.path.dirname(sys.argv[0]) + "/../aku"
 
 # 16 kHz acoustic model
 #ac_model = sys.argv[1] + "/test_mfcc_noisy_trained";
