@@ -7,7 +7,7 @@ sub new {
     my $self = {};
 
     $self->{"identifier"} = "GM";
-    $self->{"qsub_options"} = "-q helli.q"; # Currently forced to helli.q
+    $self->{"qsub_options"} = "-q helli.q"; # Only helli.q for consistency
     $self->{"priority"} = 0;
     $self->{"mem_req"} = 0; # In megabytes
     $self->{"job_numbers"} = [];
@@ -58,7 +58,7 @@ sub submit_batches {
 
 sub submit {
   my ($self, $script) = @_;
-  my $job_script_header = "#!/bin/sh\n#\$ -S /bin/sh\n#\$ -o ".$self->{"log_dir"}."\n#\$ -e ".$self->{"log_dir"}."\n";
+  my $job_script_header = "#!/bin/bash\n#\$ -S /bin/bash\n#\$ -o ".$self->{"log_dir"}."\n#\$ -e ".$self->{"log_dir"}."\n";
   my $script_wrapper = $self->{"run_dir"}."/".$self->{"identifier"}."_wrapper.sh";
   my $script_runner = $self->{"run_dir"}."/".$self->{"identifier"}."_runner.sh";
 
@@ -85,7 +85,7 @@ sub submit {
 
   # Write the script
   open $fh, "> $script_runner" || die "Could not open script file $script_runner";
-  print $fh "#!/bin/sh\n";
+  print $fh "#!/bin/bash\n";
   print $fh "BATCH=\$1\n";
   print $fh $script."\n";
   close($fh);
@@ -107,8 +107,11 @@ sub submit {
 
   # Execute
   if ($single_mode) {
+    my $ready_file = $self->{"run_dir"}."/".$self->{"identifier"}.".ready";
     # Remove possibly existing ready-file
-    unlink($readyfile);
+
+    unlink($ready_file);
+
     my $qsub_command = "qsub ";
     $qsub_command = $qsub_command." -p ".$self->{"priority"} if ($self->{"priority"} < 0);
     $qsub_command = $qsub_command." -l mem=".$self->{"mem_req"}."M" if ($self->{"mem_req"} > 0);
@@ -116,8 +119,8 @@ sub submit {
     system($qsub_command." ".$self->{"qsub_options"}." $script_wrapper") && die("Error in qsub");
     while (1) {
       sleep($self->{"batch_check_interval"});
-      if (-e $readyfile) {
-        unlink($readyfile);
+      if (-e $ready_file) {
+        unlink($ready_file);
         last;
       }
     }
