@@ -115,7 +115,7 @@ sub get_empty_batch_info {
 sub get_batch_script_pre_string {
   my $script_dir = shift(@_);
   my $out_dir = shift(@_);
-  return "#!/bin/sh\n#\$ -S /bin/sh\n#\$ -o ${out_dir}\n#\$ -e ${out_dir}\nset -e\ncd ${script_dir}\n"
+  return "#!/bin/sh\n#\$ -S /bin/sh\n#\$ -o ${out_dir}\n#\$ -e ${out_dir}\ncd ${script_dir}\n"
 }
 
 sub make_single_batch {

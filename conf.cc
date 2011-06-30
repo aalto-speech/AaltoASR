@@ -1,6 +1,5 @@
 #include <deque>
 #include <assert.h>
-#include <stdio.h>
 #include "conf.hh"
 #include "str.hh"
 #include "io.hh"

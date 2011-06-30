@@ -59,22 +59,12 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
     line_buffer.push_back(line);
   }
 
-  int batch_remainder = 0;
   if (num_batches <= 1)
     target_lines = line_buffer.size();
   else
-  {
     target_lines = (int)line_buffer.size()/num_batches;
-    batch_remainder = line_buffer.size()%num_batches;
-  }
-  int extra_line = 1;
   if (target_lines < 1)
-  {
     target_lines = 1;
-    extra_line = 0;
-  }
-  if (batch_remainder == 0)
-    extra_line = 0;
   
   for (i = 0; i < (int)line_buffer.size(); i++)
   {
@@ -96,16 +86,14 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
         new_speaker = (*it).second;
       else
         new_speaker = "";
-      if (cur_line >= target_lines + extra_line &&
-          (!cluster_speakers || cur_speaker.size() == 0 ||
-           cur_speaker != new_speaker))
+      if (cur_line >= target_lines && (!cluster_speakers ||
+                                      cur_speaker.size() == 0 ||
+                                      cur_speaker != new_speaker))
       {
         cur_index++;
         if (cur_index > batch_index)
           break;
-        cur_line -= target_lines + extra_line;
-        if (cur_index > batch_remainder)
-          extra_line = 0;
+        cur_line -= target_lines;
       }
       cur_speaker = new_speaker;
     }
@@ -117,8 +105,6 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
       Info &info = infos.back();
       if ((it = key_value_map.find("audio")) != key_value_map.end())
         info.audio_path = (*it).second;
-      if ((it = key_value_map.find("alt-audio")) != key_value_map.end())
-        info.alt_audio_path = (*it).second;
       if ((it = key_value_map.find("transcript")) != key_value_map.end())
         info.transcript_path = (*it).second;
       if ((it = key_value_map.find("alignment")) != key_value_map.end())

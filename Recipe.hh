@@ -12,7 +12,8 @@
 namespace aku {
 
 /** A class for handling recipe files.
- * Recipe is a list of audio files with corresponding files and data.
+ * Recipe is a list of audio files, corresponding phn-files with
+ * starting and ending times.
  *
  * Each line contains key=value pairs, where key may be
  * - audio: path to the audio file
@@ -25,10 +26,13 @@ namespace aku {
  * - start-time: starting time
  * - end-time: ending time
  * - start-line: starting line
- * - end-line: ending line (first line excluded from processing)
+ * - end-line: ending line
  * - speaker: speaker ID
  * - utterance: utterance ID
  *
+ *  phn_file phn_out_file
+ *
+ * end_line is the first line excluded from processing.
  * Empty lines are skipped.
  * Fields that are not given are initialized to "" and 0.
  */
@@ -39,7 +43,6 @@ public:
   class Info {
   public:
     std::string audio_path;
-    std::string alt_audio_path;
     std::string transcript_path;
     std::string alignment_path;
     std::string hmmnet_path;

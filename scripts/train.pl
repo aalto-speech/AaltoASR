@@ -47,13 +47,6 @@ my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/lne(10)))
 my $ML_STATS_MODE = "--ml";
 my $ML_ESTIMATE_MODE = "--ml";
 
-# HMMNET options
-my $MORPH_HMMNETS = 1; # True (1) if HMMNETs are not based on words
-my $LEX_FILE = "$SCRIPTDIR/fin_voc.lex"; # Morph/word lexicon
-my $TRN_FILE = "" ; # TRN file for transcription. If empty, uses PHNs.
-                    # Required if the HMMs are not based on graphemes!
-
-
 # Alignment settings
 my $ALIGN_WINDOW = 4000;
 my $ALIGN_BEAM = 1000;
@@ -96,7 +89,7 @@ my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
 
 # Discriminative training settings
 my $num_ebw_iter = 4;
-my $EBW_STATS_MODE = "--mmi -M mpv";
+my $EBW_STATS_MODE = "--mmi -E";
 my $EBW_ESTIMATE_MODE = "--mmi";
 my $EBW_AC_SCALE = 0.08;
 my $EBW_FORWARD_BEAM = 15;
@@ -454,36 +447,7 @@ sub estimate_model {
 
 sub generate_hmmnet_files {
   my $im = shift(@_);
-  my $temp_dir = shift(@_);
-
-  # Construct helper FSTs (L.fst, C.fst, H.fst, optional_silence.fst and
-  # end_mark.fst) and vocabulary file.
-  # Assumes that the current directory is $temp_dir!
-  my $morph_switch = "";
-  if ($MORPH_HMMNETS > 0) {
-    $morph_switch = "-m";
-  }
-  system("$SCRIPTDIR/build_helper_fsts.sh $morph_switch -s $SCRIPTDIR $LEX_FILE $im.ph");
-
-  my $gm = GridManager->new;
-  $gm->{"identifier"} = "hmmnets_${BASE_ID}";
-  $gm->{"run_dir"} = $temp_dir;
-  $gm->{"log_dir"} = $temp_dir;
-  if ($NUM_BATCHES > 0) {
-    $gm->{"first_batch"} = 1;
-    $gm->{"last_batch"} = $NUM_BATCHES;
-  }
-  $gm->{"failed_batch_retry_count"} = 1;
-  my $batch_options = "";
-  $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
-  if ($MORPH_HMMNETS > 0) {
-    $morph_switch = "-m ${LEX_FILE}.voc";
-  }
-  my $trn_switch = "";
-  if (length($TRN_FILE) > 0) {
-    $trn_switch = "-t $TRN_FILE";
-  }
-  $gm->submit("$SCRIPTDIR/create_hmmnets.pl -n -r $RECIPE $morph_switch $trn_switch -T $temp_dir -F $temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
+  $GM_SINGLE->submit("export PERL5LIB=$SCRIPTDIR\n$SCRIPTDIR/make_hmmnets.pl $im.ph $RECIPE");
 }
 
 

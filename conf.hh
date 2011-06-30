@@ -12,20 +12,15 @@
  *
  * The command line options are parsed with the following features:
  * \li Short option names start with a hyphen followed by a character
- * ("-h").
- * \li If a short option needs a parameter, it must be given in
- * the next command line argument ("-i 10").
- * \li An argument consisting of just a hyphen and nothing else is not
- * interpreted as an option.
- * \li Short options can be grouped after a single hyphen ("-hi 10" or
- * "-ih 10").
- * \li Long option names start with two hyphens ("--foobar").
+ * "-h".  \li If a short option needs a parameter, it must be given in
+ * the next command line argument "-i 10". \li An argument consisting
+ * of just a hyphen and nothing else is not interpreted as an option.
+ * \li Short options can be grouped after a single hyphen "-hi 10" or
+ * "-ih 10".  \li Long option names start with two hyphens "--foobar".
  * \li The parameter can be specified in two ways: "--int 10" or
- * "--int=10"
- * \li An argument consisting of just two hyphens "--" is
+ * "--int=10" \li An argument consisting of just two hyphens "--" is
  * skipped, and all arguments after that are interpreted as
- * non-options.
- * \li The configuration options can also be read from a
+ * non-options. \li The configuration options can also be read from a
  * file: see \ref Config::read()
  * 
  *
@@ -38,39 +33,6 @@
  * \include ex_conf.cc
  */
 namespace conf {
-
-  typedef std::map<std::string, int> ChoiceMapType;
-
-  class Choice {
-  public:
-    /** Create an empty choice. */
-    Choice() { }
-
-    /** Adds a choice option with an interpreted value
-     * \param choice_name = Choice name string
-     * \param value = Interpreted value
-     */
-    Choice& operator()(std::string choice_name, int value) {
-      choice_map.insert(ChoiceMapType::value_type(choice_name, value));
-      return *this;
-    }
-
-    /** Parse the given choice.
-     * \param choice = Given choice option
-     * \param result = Where the result value is stored to
-     * \returns true if choice was found and result set, false otherwise.
-     */
-    bool parse(std::string choice, int &result) {
-      ChoiceMapType::iterator it = choice_map.find(choice);
-      if (it == choice_map.end())
-        return false;
-      result = (*it).second;
-      return true;
-    }
-
-  private:
-     ChoiceMapType choice_map;
-  };
   
   /** An option */
   struct Option {

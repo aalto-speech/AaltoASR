@@ -41,7 +41,7 @@ logl(HmmSet *model, Segmentator *segmentator)
   
   else {
     while (segmentator->next_frame()) {
-
+      
       // Fetch the current feature vector
       frame = segmentator->current_frame();
       FeatureVec feature = fea_gen.generate(frame);    
@@ -50,20 +50,18 @@ logl(HmmSet *model, Segmentator *segmentator)
         break; // EOF in FeatureGenerator
       
       // Collect likelihoods for all possible states
-      const Segmentator::IndexProbMap &pdfs = segmentator->pdf_probs();
-      const Segmentator::IndexProbMap &transitions =
-        segmentator->transition_probs();
+      const std::vector<Segmentator::IndexProbPair> &pdfs
+        = segmentator->pdf_probs();
+      const std::vector<Segmentator::IndexProbPair> &transitions
+        = segmentator->transition_probs();
       
-      for (Segmentator::IndexProbMap::const_iterator it = pdfs.begin();
-           it != pdfs.end(); ++it)
+      for (int i = 0; i < (int)pdfs.size(); i++)
         curr_log_likelihood += util::safe_log(
-          (*it).second*model->state_likelihood((*it).first, feature));
-      for (Segmentator::IndexProbMap::const_iterator it = transitions.begin();
-           it != transitions.end(); ++it)
-      {
-        HmmTransition &t = model->transition((*it).first);
+          pdfs[i].prob*model->state_likelihood(pdfs[i].index, feature));
+      for (int i = 0; i < (int)transitions.size(); i++) {
+        HmmTransition &t = model->transition(transitions[i].index);
         curr_log_likelihood +=
-          util::safe_log((*it).second*t.prob);
+          util::safe_log(transitions[i].prob*t.prob);
       }
     }
   }
@@ -97,13 +95,12 @@ main(int argc, char *argv[])
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for training")
-      ('\0', "snl", "", "", "phn-files with state number labels")
       ('H', "hmmnet", "", "", "use HMM networks for training")
       ('D', "den-hmmnet", "", "", "use denominator HMM networks for training")
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for HMM networks)")
-      ('M', "mpv", "", "", "Use Multipath Viterbi over HMM networks")
+      ('E', "extvit", "", "", "Use extended Viterbi over HMM networks")
       ('V', "vit", "", "", "Use Viterbi over HMM networks")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
@@ -171,12 +168,11 @@ main(int argc, char *argv[])
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
           &model, config["den-hmmnet"].specified, &fea_gen, NULL);
-        lattice->set_pruning_thresholds(config["fw-beam"].get_float(),
-                                        config["bw-beam"].get_float());
+        lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
-        if (config["mpv"].specified)
-          lattice->set_mode(HmmNetBaumWelch::MODE_MULTIPATH_VITERBI);
+        if (config["extvit"].specified)
+          lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
         else if (config["vit"].specified)
           lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
         
@@ -195,14 +191,14 @@ main(int argc, char *argv[])
           fprintf(stderr,
                   "Warning: Backward phase failed, increasing beam to %.1f\n",
                   ++counter*orig_beam);
-          lattice->set_pruning_thresholds(0, counter*orig_beam);
+          lattice->set_pruning_thresholds(counter*orig_beam, 0);
         }
         segmentator = lattice;
       }
       else
       {
         PhnReader* phnreader = 
-          recipe.infos[f].init_phn_files(&model, false, config["snl"].specified,
+          recipe.infos[f].init_phn_files(&model, false, false,
                                          config["ophn"].specified, &fea_gen,
                                          NULL);
         phnreader->set_collect_transition_probs(transtat);

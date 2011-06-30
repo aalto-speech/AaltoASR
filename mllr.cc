@@ -77,13 +77,13 @@ get_segmentator(Recipe::Info info)
     // Open files and configure
     HmmNetBaumWelch* lattice = info.init_hmmnet_files(&model, false, &fea_gen,
         NULL);
-    lattice->set_pruning_thresholds(config["fw-beam"].get_float(),
-                                    config["bw-beam"].get_float());
+    lattice->set_pruning_thresholds(config["bw-beam"].get_float(),
+        config["fw-beam"].get_float());
 
     if (config["vit"].specified) lattice->set_mode(
         HmmNetBaumWelch::MODE_VITERBI);
-    if (config["mpv"].specified) lattice->set_mode(
-        HmmNetBaumWelch::MODE_MULTIPATH_VITERBI);
+    if (config["extvit"].specified) lattice->set_mode(
+        HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
 
     double orig_beam = lattice->get_backward_beam();
     int counter = 1;
@@ -99,7 +99,7 @@ get_segmentator(Recipe::Info info)
       fprintf(stderr,
           "Warning: Backward phase failed, increasing beam to %.1f\n",
           ++counter * orig_beam);
-      lattice->set_pruning_thresholds(0, counter * orig_beam);
+      lattice->set_pruning_thresholds(counter * orig_beam, 0);
     }
     segmentator = lattice;
   }
@@ -128,17 +128,16 @@ void
 train_mllr(Segmentator *seg)
 {
   HmmState state;
+  int i;
 
   while (seg->next_frame()) {
-    const Segmentator::IndexProbMap &pdfs = seg->pdf_probs();
+    const std::vector<Segmentator::IndexProbPair> &pdfs = seg->pdf_probs();
     FeatureVec fea_vec = fea_gen.generate(seg->current_frame());
     if (fea_gen.eof()) break; // EOF in FeatureGenerator
 
-    for (Segmentator::IndexProbMap::const_iterator it = pdfs.begin();
-         it != pdfs.end(); ++it)
-    {
-      state = model.state((*it).first);
-      cmllr_trainer->collect_data((*it).second, &state, fea_vec);
+    for (i = 0; i < (int) pdfs.size(); i++) {
+      state = model.state(pdfs[i].index);
+      cmllr_trainer->collect_data(pdfs[i].prob, &state, fea_vec);
     }
   }
   if (seg->computes_total_log_likelihood()) total_log_likelihood
@@ -161,8 +160,8 @@ main(int argc, char *argv[])
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for adaptation")
       ('H', "hmmnet", "", "", "use HMM networks for training")
-      ('\0', "mpv", "", "", "Use Multipath Viterbi over HMM networks")
-      ('\0', "vit", "", "", "Use Viterbi over HMM networks")
+      ('E', "extvit", "", "", "Use extended Viterbi over HMM networks")
+      ('V', "vit", "", "", "Use Viterbi over HMM networks")
       ('M', "mllr=MODULE", "arg", "", "MLLR feature module name, if none given, a model transform is trained. Only for a model transform the regression tree options are used.")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('R', "regtree=FILE", "arg", "", "regression tree file, if ommitted, and the next tree options are given, a tree is generated. Otherwise no tree is used.")
