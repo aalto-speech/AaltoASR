@@ -5,37 +5,15 @@ ifeq ($(USE_SUBSPACE_COV), 1)
 DEFINES += -DUSE_SUBSPACE_COV
 endif
 
-
 #############################
-# Triton cluster
-ifeq ($(shell hostname),triton.aalto.fi)
-CXX = g++44
-OPT = -O3 -march=native
-INCLUDES = -I/wrk/htkallas/support/include -I/wrk/htkallas/support/include/lapackpp -I/opt/fftw-3.2.2-gcc44-mpi/include
-LDFLAGS = -L/wrk/htkallas/support/lib -L/share/apps/lib
-WARNINGS = -Wall -Wno-deprecated
-DEPFLAG = -MM
-else
-
-## Stimulus cluster
-ifeq ($(shell hostname -s),stimulus)
-CXX = g++
-OPT = -O2
-INCLUDES = -I/share/puhe/x86_64/include/lapackpp
-LDFLAGS = -L/share/puhe/x86_64/lib
-WARNINGS = -Wall -Wno-deprecated
-DEPFLAG = -MM
-else
-
-#############################
-# x86_64 architecture
+# Opteron cluster
 ifeq ($(ARCH),x86_64)
 CXX = g++
-OPT = -O2
-INCLUDES = -I/home/jpylkkon/local/include/lapackpp
-#INCLUDES = -I/share/puhe/x86_64/include/lapackpp -I/share/puhe/linux/include
-LDFLAGS = -L/home/jpylkkon/local/lib
-#LDFLAGS = -L/share/puhe/x86_64/lib
+OPT = -O2 -g
+INCLUDES = -I../lapackpp/include
+# -I/share/puhe/linux/include
+LDFLAGS = -L../lapackpp/src/.libs
+# -L/share/puhe/x86_64/lib
 ifeq ($(USE_SUBSPACE_COV),1)
 INCLUDES += -I/share/puhe/x86_64/include/hcld/
 endif
@@ -60,12 +38,9 @@ WARNINGS = -Wall
 DEPFLAG = -MM
 endif
 
-endif
-endif
-
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats clsstep clskld mixanalysis lattice_test
+PROGS = feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats regtree
 ifeq ($(USE_SUBSPACE_COV),1)
 PROGS += subspace optimize
 endif
@@ -78,8 +53,7 @@ CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	Recipe.cc conf.cc io.cc str.cc endian.cc Distributions.cc \
 	LinearAlgebra.cc HmmNetBaumWelch.cc \
 	Lattice.cc Viterbi.cc PhonePool.cc \
-	MllrTrainer.cc ziggurat.cc mtw.cc LmbfgsOptimize.cc \
-	LM.cc SegErrorEvaluator.cc RegClassTree.cc
+	MllrTrainer.cc ziggurat.cc mtw.cc LmbfgsOptimize.cc RegClassTree.cc
 
 ifeq ($(USE_SUBSPACE_COV),1)
 CLASS_SRCS += Subspaces.cc
