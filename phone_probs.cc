@@ -26,7 +26,7 @@ using namespace aku;
 conf::Config config;
 FeatureGenerator gen;
 HmmSet model;
-SpeakerConfig speaker_conf(gen, &model);
+SpeakerConfig speaker_conf(gen); //, &model);
 std::vector<float> obs_log_probs;
 
 void write_int(FILE *fp, unsigned int i)
@@ -137,7 +137,7 @@ main(int argc, char *argv[])
                 config["batch"].get_int(), config["bindex"].get_int(),
                 false);
 
-    recipe.sort_infos();
+    //recipe.sort_infos();
 
     // Handle each file in the recipe
     for (int recipe_index = 0; recipe_index < (int)recipe.infos.size(); 

@@ -60,4 +60,4 @@ public:
 
 }
 
-#endif /* MODELMLLRTRAINER_HH_ */
+#endif /* MLLRTRAINER_HH */

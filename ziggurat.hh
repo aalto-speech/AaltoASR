@@ -33,7 +33,7 @@ namespace ziggurat {
     Rnd()
     {
       jsr=123456789;
-      zigset(clock());
+      zigset(time(NULL));
     }
 
     Rnd(uint32_t s)

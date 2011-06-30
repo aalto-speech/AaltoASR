@@ -53,38 +53,39 @@ collect_phone_stats(PhnReader *phn_reader, PhonePool *pool)
 }
 
 
-void
-hmmnet_collect_phone_stats(HmmNetBaumWelch *seg, PhonePool *pool)
-{
-  int i;
+// FIXME: Broken after HmmNetBaumWelch update
+// void
+// hmmnet_collect_phone_stats(HmmNetBaumWelch *seg, PhonePool *pool)
+// {
+//   int i;
   
-  while (seg->next_frame())
-  {
-    std::vector<HmmNetBaumWelch::ArcInfo> arc_info;
-    seg->fill_arc_info(arc_info);
-    FeatureVec feature = fea_gen.generate(seg->current_frame());
-    if (fea_gen.eof())
-      break; // EOF in FeatureGenerator
+//   while (seg->next_frame())
+//   {
+//     std::vector<HmmNetBaumWelch::ArcInfo> arc_info;
+//     seg->fill_arc_info(arc_info);
+//     FeatureVec feature = fea_gen.generate(seg->current_frame());
+//     if (fea_gen.eof())
+//       break; // EOF in FeatureGenerator
 
-    for (i = 0; i < (int)arc_info.size(); i++)
-    {
-      int state = -1;
-      if (strchr(arc_info[i].label.c_str(), '.') != NULL){
-	state = atoi((const char*)(strchr(arc_info[i].label.c_str(),'.')+1));
-	arc_info[i].label.erase(arc_info[i].label.find('.', 0), 2);
-      }
-      if (state < 0)
-      {
-        fprintf(stderr, "Warning: Invalid label %s, ignoring current file\n",
-                arc_info[i].label.c_str());
-        return;
-      }
-      PhonePool::ContextPhoneContainer phone = pool->get_context_phone(
-        arc_info[i].label, state);
-      phone.add_feature(arc_info[i].prob, feature);
-    }
-  }
-}
+//     for (i = 0; i < (int)arc_info.size(); i++)
+//     {
+//       int state = -1;
+//       if (strchr(arc_info[i].label.c_str(), '.') != NULL){
+// 	state = atoi((const char*)(strchr(arc_info[i].label.c_str(),'.')+1));
+// 	arc_info[i].label.erase(arc_info[i].label.find('.', 0), 2);
+//       }
+//       if (state < 0)
+//       {
+//         fprintf(stderr, "Warning: Invalid label %s, ignoring current file\n",
+//                 arc_info[i].label.c_str());
+//         return;
+//       }
+//       PhonePool::ContextPhoneContainer phone = pool->get_context_phone(
+//         arc_info[i].label, state);
+//       phone.add_feature(arc_info[i].prob, feature);
+//     }
+//   }
+// }
 
 
 void
@@ -164,6 +165,8 @@ main(int argc, char *argv[])
 
     if (config["hmmnet"].specified)
     {
+      throw std::string("This feature is currently broken. Fix it?");
+      
       if (config["base"].specified)
       {
         model.read_all(config["base"].get_str());
@@ -213,8 +216,8 @@ main(int argc, char *argv[])
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
           &model, false, mfea_gen, NULL);
-        lattice->set_pruning_thresholds(config["bw-beam"].get_float(),
-                                        config["fw-beam"].get_float());
+        lattice->set_pruning_thresholds(config["fw-beam"].get_float(),
+                                        config["bw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
         if (config["vit"].specified)
@@ -242,10 +245,11 @@ main(int argc, char *argv[])
           fprintf(stderr,
                   "Warning: Backward phase failed, increasing beam to %.1f\n",
                   ++counter*orig_beam);
-          lattice->set_pruning_thresholds(counter*orig_beam, 0);
+          lattice->set_pruning_thresholds(0, counter*orig_beam);
         }
-        if (!skip)
-          hmmnet_collect_phone_stats(lattice, &phone_pool);
+        // FIXME: Broken after HmmNetBaumWelch fix
+        // if (!skip)
+        //   hmmnet_collect_phone_stats(lattice, &phone_pool);
         if (mfea_gen != &fea_gen) // fea_gen is closed elsewhere
           mfea_gen->close();
         delete lattice;

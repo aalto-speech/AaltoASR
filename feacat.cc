@@ -3,6 +3,7 @@
 #include "conf.hh"
 #include "FeatureGenerator.hh"
 #include "SpeakerConfig.hh"
+#include "ziggurat.hh"
 
 using namespace aku;
 
@@ -26,9 +27,16 @@ print_feature(const FeatureVec &fea)
   // ASCII output
   else {
     for (int i=0; i < fea.dim(); i++)
-      printf("%8.2f ", fea[i]);
+      printf("%8.4f ", fea[i]);
     printf("\n");
   }
+}
+
+void
+add_feature_noise(FeatureVec &fea, double noise_std)
+{
+  for (int i = 0; i < fea.dim(); i++)
+    fea[i] += ziggurat::rnd.rnor()*noise_std;
 }
 
 int
@@ -49,6 +57,7 @@ main(int argc, char *argv[])
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('d', "speaker-id=NAME", "arg", "", "speaker ID")
       ('u', "utterance-id=NAME", "arg", "", "utterance ID")
+      ('G', "gaussian-std=FLOAT", "arg", "", "Gaussian noise std added to features")
       ;
     config.default_parse(argc, argv);
     if (config.arguments.size() != 1)
@@ -69,7 +78,9 @@ main(int argc, char *argv[])
       speaker_conf.read_speaker_file(io::Stream(config["speakers"].get_str()));
       speaker_conf.set_speaker(config["speaker-id"].get_str());
       if (config["utterance-id"].specified)
+      {
         speaker_conf.set_utterance(config["utterance-id"].get_str());
+      }
     }
 
     if (config["write-config"].specified)
@@ -85,23 +96,30 @@ main(int argc, char *argv[])
 
     int start_frame = 0;
     int end_frame = INT_MAX;
+    double noise_std = 0.0;
     if (config["start-frame"].specified)
       start_frame = config["start-frame"].get_int();
     if (config["end-frame"].specified)
       end_frame = config["end-frame"].get_int();
+    if (config["gaussian-std"].specified)
+      noise_std = config["gaussian-std"].get_double();
     if (start_frame < end_frame)
     {
       for (int f = start_frame; f <= end_frame; f++) {
-        const FeatureVec fea = gen.generate(f);
+        FeatureVec fea = gen.generate(f);
         if (end_frame == INT_MAX && gen.eof())
           break;
+        if (noise_std > 0.0)
+          add_feature_noise(fea, noise_std);
         print_feature(fea);
       }
     }
     else
     {
       for (int f = start_frame; f >= end_frame; f--) {
-        const FeatureVec fea = gen.generate(f);
+        FeatureVec fea = gen.generate(f);
+        if (noise_std > 0.0)
+          add_feature_noise(fea, noise_std);
         print_feature(fea);
       }
     }

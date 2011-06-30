@@ -18,12 +18,13 @@ while (<>)
         $l = $1;
       } else {
         $l = $c[2]; # Monophone
+        $l =~ s/\.\d+$//;
       }
     }
   } else {
     $l = $c[0]; # PHN without time information, assumes monophones
   }
-  if ($l =~ /_+/) {
+  if ($l =~ /_+\./ || $l =~ /_+$/) {
     print $cur_word." " if ($cur_word ne "");
     $cur_word = "";
   } else {

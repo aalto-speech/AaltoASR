@@ -1,17 +1,19 @@
 #!/usr/bin/perl
 
-my $eps = ",";
-my $boundary = "#";
-my $final_symbol = "-2";
-
-open(FILE, "boundaries");
-my $max_boundary_id = <FILE>;
-chomp $max_boundary_id;
-close(FILE);
-
 use Hmm;
 use Fsm;
 use strict 'vars';
+
+my $eps = ",";
+my $boundary = "#";
+my $final_symbol = "-2";
+my $max_boundary_id = 0;
+
+if (open(FILE, "boundaries")) {
+  $max_boundary_id = <FILE>;
+  chomp $max_boundary_id;
+  close(FILE);
+}
 
 $Hmm::verbose = 0;
 my $hmmfile = shift @ARGV;
@@ -24,9 +26,12 @@ my @arcs = ();
 
 # Generate FSM
 my $fsm = Fsm->new;
-$fsm->{i} = $fsm->add_node();
+$fsm->set_initial($fsm->add_node());
 my $final = $fsm->add_node();
 $fsm->set_final($final);
+
+my @short_silences = ("_");
+my @filler_models = ();
 
 for my $label (keys %$hmms) {
 
@@ -58,6 +63,14 @@ for my $label (@labels) {
     next if ($label eq "_");
     next if ($label eq "__");
 
+    if ($label =~ /^_[^\-\+]+$/) {
+      # Filler model, can be instatiated between any two silences or
+      # similar to short silence
+      push(@short_silences, $label);
+      push(@filler_models, $label);
+      next;
+    }
+
     $label =~ /^(\S+-)?(\S+?)(\+\S+)?$/;
     my $l = $1;
     my $c = $2;
@@ -86,10 +99,26 @@ for my $label (@labels) {
     $fsm->add_arc($src, $tgt, $label, $c, 0);
 }
 
-$fsm->add_arc($fsm->{'i'}, $state_map{"-__"}, $eps, $eps, 0);
-$fsm->add_arc($state_map{"__-"}, $final, $eps, $eps, 0); #$final_symbol, $final_symbol, 0);
-$fsm->add_arc($state_map{"-__"}, $state_map{'__-'}, "__", "__", 0);
-$fsm->add_arc($state_map{"__-"}, $state_map{'-__'}, $eps, $eps, 0);
+$fsm->add_arc($fsm->initial, $state_map{"-__"}, $eps, $eps, 0);
+$fsm->add_arc($state_map{"__-"}, $final, $eps, $eps, 0);
+$fsm->add_arc($state_map{"-__"}, $state_map{"__-"}, "__", "__", 0);
+if (@filler_models) {
+  my $filler_source = $fsm->add_node();
+  my $filler_target = $fsm->add_node();
+
+  # To fill the morph boundary arcs, add these to the state map
+  $state_map{__f} = $filler_source;
+  $state_map{_f_} = $filler_target;
+
+  $fsm->add_arc($state_map{"-__"}, $filler_source, "__", "__", 0);
+  $fsm->add_arc($state_map{"-__"}, $filler_source, "_", "_", 0);
+  $fsm->add_arc($filler_target, $state_map{"__-"}, "__", "__", 0);
+  $fsm->add_arc($filler_target, $state_map{"__-"}, "_", "_", 0);
+
+  foreach my $fmlab (@filler_models) {
+    $fsm->add_arc($filler_source, $filler_target, $fmlab, $fmlab, 0);
+  }
+}
 
 while ((my $ctx, my $id) = each %state_map) {
     if ($boundary ne undef) {
@@ -99,7 +128,9 @@ while ((my $ctx, my $id) = each %state_map) {
     }
     
     next if ($ctx !~ /\S+-\S+/);
-    $fsm->add_arc($id, $id, "_", "_", 0);
+    foreach my $sslab (@short_silences) {
+      $fsm->add_arc($id, $id, $sslab, $sslab, 0);
+    }
 }
 
 $fsm->print_fst();

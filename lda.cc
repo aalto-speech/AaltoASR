@@ -60,7 +60,8 @@ main(int argc, char *argv[])
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for HMM networks)")
-      ('V', "vit", "", "", "Use Viterbi over HMM networks")
+      ('\0', "mpv", "", "", "Use Multipath Viterbi over HMM networks")
+      ('\0', "vit", "", "", "Use Viterbi over HMM networks")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('m', "maxmem=INT", "arg", "3000", "maximum memory usage in MB (default 3000)")
       ('\0', "mingamma=FLOAT", "arg", "50", "minimum gamma value per state (default 50)")
@@ -172,11 +173,12 @@ main(int argc, char *argv[])
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
           &model, config["den-hmmnet"].specified, &fea_gen, NULL);
-        lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
+        lattice->set_pruning_thresholds(config["fw-beam"].get_float(),
+                                        config["bw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
-        if (config["extvit"].specified)
-          lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
+        if (config["mpv"].specified)
+          lattice->set_mode(HmmNetBaumWelch::MODE_MULTIPATH_VITERBI);
         else if (config["vit"].specified)
           lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
         
@@ -195,7 +197,7 @@ main(int argc, char *argv[])
           fprintf(stderr,
                   "Warning: Backward phase failed, increasing beam to %.1f\n",
                   ++counter*orig_beam);
-          lattice->set_pruning_thresholds(counter*orig_beam, 0);
+          lattice->set_pruning_thresholds(0, counter*orig_beam);
         }
         segmentator = lattice;
       }
@@ -226,10 +228,12 @@ main(int argc, char *argv[])
           break; // EOF in FeatureGenerator
         
         // Update all gamma counts for this frame
-        const std::vector<Segmentator::IndexProbPair> &pdfs
-          = segmentator->pdf_probs();
-        for (int i = 0; i < (int)pdfs.size(); i++)
-          state_gammas[pdfs[i].index].second += pdfs[i].prob;
+        const Segmentator::IndexProbMap &pdfs = segmentator->pdf_probs();
+        for (Segmentator::IndexProbMap::const_iterator it = pdfs.begin();
+             it != pdfs.end(); ++it)
+        {
+          state_gammas[(*it).first].second += (*it).second;
+        }
       }
       
       // Clean up
@@ -290,11 +294,12 @@ main(int argc, char *argv[])
         // Open files and configure
         HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
           &model, config["den-hmmnet"].specified, &fea_gen, NULL);
-        lattice->set_pruning_thresholds(config["bw-beam"].get_float(), config["fw-beam"].get_float());
+        lattice->set_pruning_thresholds(config["fw-beam"].get_float(),
+                                        config["bw-beam"].get_float());
         if (config["ac-scale"].specified)
           lattice->set_acoustic_scaling(config["ac-scale"].get_float());
-        if (config["extvit"].specified)
-          lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
+        if (config["mpv"].specified)
+          lattice->set_mode(HmmNetBaumWelch::MODE_MULTIPATH_VITERBI);
         else if (config["vit"].specified)
           lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
         
@@ -313,7 +318,7 @@ main(int argc, char *argv[])
           fprintf(stderr,
                   "Warning: Backward phase failed, increasing beam to %.1f\n",
                   ++counter*orig_beam);
-          lattice->set_pruning_thresholds(counter*orig_beam, 0);
+          lattice->set_pruning_thresholds(0, counter*orig_beam);
         }
         segmentator = lattice;
       }
@@ -334,8 +339,8 @@ main(int argc, char *argv[])
       }
       
       int frame;
-      while (segmentator->next_frame()) {
-        
+      while (segmentator->next_frame())
+      {
         num_feas++;
         
         // Fetch the current feature vector
@@ -346,15 +351,18 @@ main(int argc, char *argv[])
           break; // EOF in FeatureGenerator
         
         // Accumulate all possible state distributions for this frame
-        const std::vector<Segmentator::IndexProbPair> &pdfs
-          = segmentator->pdf_probs();
-        for (int i = 0; i < (int)pdfs.size(); i++) {
-          if (state_accumulators[pdfs[i].index] != NULL) {
-            state_accumulators[pdfs[i].index]->accumulate(1, pdfs[i].prob, *feature.get_vector());
-            whole_data_accumulator.accumulate(1, pdfs[i].prob, *feature.get_vector());
+        const Segmentator::IndexProbMap &pdfs = segmentator->pdf_probs();
+        for (Segmentator::IndexProbMap::const_iterator it = pdfs.begin();
+             it != pdfs.end(); ++it)
+        {
+          if (state_accumulators[(*it).first] != NULL)
+          {
+            state_accumulators[(*it).first]->accumulate(1, (*it).second,
+                                                        *feature.get_vector());
+            whole_data_accumulator.accumulate(1, (*it).second,
+                                              *feature.get_vector());
           }
         }
-
       }
       
       // Clean up

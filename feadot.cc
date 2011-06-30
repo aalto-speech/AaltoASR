@@ -7,6 +7,7 @@ using namespace aku;
 conf::Config config;
 FeatureGenerator gen;
 
+
 int
 main(int argc, char *argv[])
 {

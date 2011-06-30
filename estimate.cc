@@ -55,10 +55,12 @@ main(int argc, char *argv[])
       ('\0', "mmi-ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for MMI")
       ('\0', "mpe-ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for MPE")
       ('\0', "mmi-prior", "", "", "Use MMI prior when I-smoothing MPE model")
+      ('\0', "prev-prior", "", "", "Use previous model as prior in I-smoothing")
       ('\0', "delete=FLOAT", "arg", "0.0", "delete Gaussians with occupancies below the threshold")
       ('\0', "mremove=FLOAT", "arg", "0.0", "remove mixture components below the weight threshold")
       ('\0', "split=FLOAT", "arg", "0.0", "split a Gaussian if the occupancy exceeds the threshold")
       ('\0', "maxg=INT", "arg", "0", "maximum number of Gaussians per state for splitting")
+      ('\0', "no-write", "", "", "Don't write anything")
       ('s', "savesum=FILE", "arg", "", "save summary information")
       ('\0', "hcl-bfgs-cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
       ('\0', "hcl-line-cfg=FILE", "arg", "", "configuration file for HCL line search algorithm")
@@ -91,7 +93,9 @@ main(int argc, char *argv[])
       fprintf(stderr, "Warning: --mmi-ismooth ignored without --mmi or --mmi-prior\n");
     if (config["mpe-ismooth"].specified && mode != PDF::MPE_EST)
         fprintf(stderr, "Warning: --mpe-ismooth ignored without --mpe\n");
-    if (config["mmi-prior"].specified)
+    if (config["prev-prior"].specified)
+      model.set_ismooth_prev_prior(true);
+    else if (config["mmi-prior"].specified)
     {
       if (mode == PDF::MPE_EST)
         mode = PDF::MPE_MMI_PRIOR_EST;
@@ -244,12 +248,15 @@ main(int argc, char *argv[])
     }
     
     // Write final models
-    model.write_all(out_file);
-    if (config["config"].specified) {
-      fea_gen.write_configuration(io::Stream(out_file + ".cfg","w"));
+    if (!config["no-write"].specified)
+    {
+      model.write_all(out_file);
+      if (config["config"].specified) {
+        fea_gen.write_configuration(io::Stream(out_file + ".cfg","w"));
+      }
     }
 
-    if (config["savesum"].specified) {
+    if (config["savesum"].specified && !config["no-write"].specified) {
       std::string summary_file_name = config["savesum"].get_str();
       std::ofstream summary_file(summary_file_name.c_str(),
                                  std::ios_base::app);
@@ -258,6 +265,7 @@ main(int argc, char *argv[])
                 summary_file_name.c_str());
       else
       {
+        summary_file.precision(12); 
         summary_file << base_file_name << std::endl;
         for (std::map<std::string, double>::const_iterator it =
                sum_statistics.begin(); it != sum_statistics.end(); it++)
