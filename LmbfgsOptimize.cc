@@ -16,6 +16,8 @@ LmbfgsOptimize::LmbfgsOptimize()
   m_max_line_search_iter = 6;
   m_max_bfgs_updates = 4;
 
+  m_limit_callback = NULL;
+
   // Initialize optimization state
   m_num_params = 0;
   m_cur_params = NULL;
@@ -26,6 +28,7 @@ LmbfgsOptimize::LmbfgsOptimize()
   m_bfgs_updates_x = NULL;
   m_bfgs_updates_grad = NULL;
   m_search_dir = NULL;
+  m_init_inv_hessian_diag_vect = NULL;
 
   m_opt_state = OSTATE_INIT;
   m_converged = false;
@@ -85,10 +88,18 @@ LmbfgsOptimize::set_gradient(const Vector &gradient)
 }
 
 void
-LmbfgsOptimize::set_inv_hessian_scale(double inv_hes)
+LmbfgsOptimize::set_inv_hessian_scale(double inv_hes_scale)
 {
-  assert( inv_hes > 0 );
-  m_inv_hessian_scale = inv_hes;
+  assert( inv_hes_scale > 0 );
+  m_inv_hessian_scale = inv_hes_scale;
+}
+
+void
+LmbfgsOptimize::set_init_diag_inv_hessian(const Vector &inv_hes_vect)
+{
+  assert( m_num_params > 0 );
+  assert( m_num_params == inv_hes_vect.size() );
+  m_init_inv_hessian_diag_vect = new Vector(inv_hes_vect);
 }
 
 void
@@ -133,6 +144,15 @@ LmbfgsOptimize::load_optimization_state(std::string &filename)
     return false;
   if (flag)
   {
+    m_init_inv_hessian_diag_vect = new Vector(m_num_params);
+    if (!read_vector(fp, m_init_inv_hessian_diag_vect))
+      return false;
+  }
+
+  if (fread(&flag, sizeof(flag), 1, fp) < 1)
+    return false;
+  if (flag)
+  {
     m_prev_params = new Vector(m_num_params);
     m_prev_gradient = new Vector(m_num_params);
     if (!read_vector(fp, m_prev_params) ||
@@ -155,6 +175,7 @@ LmbfgsOptimize::load_optimization_state(std::string &filename)
         fread(&m_bfgs_rho[i], sizeof(double), 1, fp) < 1)
       return false;
   }
+  fclose(fp);
   return true;
 }
 
@@ -184,6 +205,10 @@ LmbfgsOptimize::write_optimization_state(std::string &filename)
   fwrite(&m_bracket_val_low, sizeof(double), 1, fp);
   fwrite(&m_bracket_val_high, sizeof(double), 1, fp);
   write_vector(fp, m_cur_params);
+  flag = (m_init_inv_hessian_diag_vect == NULL ? 0 : 1);
+  fwrite(&flag, sizeof(flag), 1, fp);
+  if (flag)
+    write_vector(fp, m_init_inv_hessian_diag_vect);
   flag = (m_prev_params == NULL ? 0 : 1 );
   fwrite(&flag, sizeof(flag), 1, fp);
   if (flag)
@@ -236,6 +261,9 @@ LmbfgsOptimize::optimization_step(void)
             m_cur_mu *= 2;
             if (m_cur_mu >= m_max_mu)
               m_cur_mu = 0.99*m_max_mu;
+            if (m_limit_callback != NULL)
+              m_cur_mu = m_limit_callback->limit_search_step(m_cur_params,
+                                                             m_cur_mu);
             if (m_verbosity > 1)
               fprintf(stderr, "Line Search: Slope did not increase, increasing mu %g -> %g\n", m_prev_mu, m_cur_mu);
           }
@@ -270,6 +298,9 @@ LmbfgsOptimize::optimization_step(void)
         m_prev_mu = m_cur_mu;
         m_cur_mu = std::max(0.1*m_cur_mu,
                             std::max(m_min_mu,std::min(0.5*m_cur_mu,mu_temp)));
+        if (m_limit_callback != NULL)
+          m_cur_mu = m_limit_callback->limit_search_step(m_cur_params,
+                                                         m_cur_mu);
         if (m_verbosity > 1)
           fprintf(stderr, "Line Search: Quadratic backtrack, changing mu %g -> %g\n", m_prev_mu, m_cur_mu);
         m_opt_state = OSTATE_LINE_BACKTRACKED;
@@ -336,6 +367,9 @@ LmbfgsOptimize::optimization_step(void)
         m_prev_mu = m_cur_mu;
         m_cur_mu = std::max(0.1*m_cur_mu,
                             std::max(m_min_mu,std::min(0.5*m_cur_mu,mu_temp)));
+        if (m_limit_callback != NULL)
+          m_cur_mu = m_limit_callback->limit_search_step(m_cur_params,
+                                                         m_cur_mu);
         if (m_verbosity > 1)
           fprintf(stderr, "Line Search: Cubic backtrack, changing mu %g -> %g\n",
                   m_prev_mu, m_cur_mu);
@@ -391,6 +425,9 @@ LmbfgsOptimize::optimization_step(void)
 
       m_prev_mu = m_cur_mu;
       m_cur_mu = m_bracket_mu_low + m_bracket_mu_incr;
+      if (m_limit_callback != NULL)
+          m_cur_mu = m_limit_callback->limit_search_step(m_cur_params,
+                                                         m_cur_mu);
       if (m_verbosity > 1)
         fprintf(stderr, "Line Search: Bracketing [%g, %g], mu %g -> %g\n",
                 m_bracket_mu_low, m_bracket_mu_low+m_bracket_mu_diff,
@@ -499,7 +536,13 @@ LmbfgsOptimize::compute_search_direction(void)
   // Compute the search direction using the BFGS updates
   if (m_num_bfgs_updates == 0)
   {
-    Blas_Mult(*m_search_dir, -m_inv_hessian_scale, *m_cur_gradient);
+    m_search_dir->copy(*m_cur_gradient);
+    if (m_init_inv_hessian_diag_vect != NULL)
+    {
+      for (int i = 0; i < m_num_params; i++)
+        (*m_search_dir)(i) *= (*m_init_inv_hessian_diag_vect)(i);
+    }
+    Blas_Scale(-m_inv_hessian_scale, *m_search_dir);
   }
   else
   {
@@ -512,6 +555,11 @@ LmbfgsOptimize::compute_search_direction(void)
                                              *m_search_dir);
       Blas_Add_Mult(*m_search_dir, -alpha[i], *(m_bfgs_updates_grad[i]));
     }
+    if (m_init_inv_hessian_diag_vect != NULL)
+    {
+      for (int i = 0; i < m_num_params; i++)
+        (*m_search_dir)(i) *= (*m_init_inv_hessian_diag_vect)(i);
+    }
     Blas_Scale(m_inv_hessian_scale, *m_search_dir);
     for (int i = 0; i < m_num_bfgs_updates; i++)
     {
@@ -521,6 +569,9 @@ LmbfgsOptimize::compute_search_direction(void)
     }
     Blas_Scale(-1.0, *m_search_dir);
   }
+
+  if (m_limit_callback != NULL)
+    m_limit_callback->limit_search_direction(m_cur_params, m_search_dir);
   
   // Initialize the search step
   double step_len = Blas_Norm2(*m_search_dir);

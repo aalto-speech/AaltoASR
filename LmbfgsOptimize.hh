@@ -6,6 +6,15 @@
 #include "LinearAlgebra.hh"
 
 
+class LmbfgsLimitInterface {
+public:
+  virtual ~LmbfgsLimitInterface() { };
+  virtual void limit_search_direction(const Vector *params,
+                                      Vector *search_dir) = 0;
+  virtual double limit_search_step(const Vector *params, double step) = 0;
+};
+
+
 class LmbfgsOptimize {
 public:
   LmbfgsOptimize();
@@ -15,6 +24,9 @@ public:
   void set_parameters(const Vector &parameters);
   void set_gradient(const Vector &gradient);
   void set_inv_hessian_scale(double inv_hes);
+  void set_init_diag_inv_hessian(const Vector &inv_hes_vect);
+
+  void set_limit_interface(LmbfgsLimitInterface *li) { m_limit_callback = li; }
 
   int get_num_parameters(void) { return m_num_params; }
   void get_parameters(Vector &parameters);
@@ -50,6 +62,8 @@ private:
 
   bool m_converged;
 
+  LmbfgsLimitInterface *m_limit_callback;
+
 
   // Optimization state
   int m_num_params;
@@ -60,6 +74,7 @@ private:
   Vector **m_bfgs_updates_x;
   Vector **m_bfgs_updates_grad;
   Vector *m_search_dir;
+  Vector *m_init_inv_hessian_diag_vect;
   
   std::vector<double> m_bfgs_rho;
   int m_num_bfgs_updates;
