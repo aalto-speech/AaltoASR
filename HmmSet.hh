@@ -420,6 +420,9 @@ public:
    */
   void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double mmi_ismooth, double mpe_ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, mmi_ismooth, mpe_ismooth); }
 
+  /// Sets I-smoothing prior mode
+  void set_ismooth_prev_prior(bool prev) { m_pool.set_ismooth_prev_prior(prev); }
+
 #ifdef USE_SUBSPACE_COV
   /** Set the HCL objects and settings for optimization
    * \param ls            HCL linesearch
