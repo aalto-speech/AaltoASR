@@ -171,6 +171,7 @@ public:
 
     virtual double compute_likelihood(const Vector &f) const { return m_g->compute_likelihood(m_fv.get_adapted_vector(f))*m_fv.determinant_A; }
     virtual double compute_log_likelihood(const Vector &f) const { return m_g->compute_log_likelihood(m_fv.get_adapted_vector(f)) + m_fv.log_determinant_A ; }
+    virtual bool is_diagonal_covariance(void) const { return m_g->is_diagonal_covariance(); }
     virtual void write(std::ostream &os) const {m_g->write(os);}
     virtual void read(std::istream &is) { m_g->read(is); }
     virtual void reset(int dim) { m_g->reset(dim); }
@@ -190,7 +191,7 @@ public:
     virtual void stop_accumulating() { m_g->stop_accumulating(); }
     virtual bool accumulated(int accum_pos) const {return m_g->accumulated(accum_pos);}
     virtual void ismooth_statistics(int source, int target, double smoothing) { m_g->ismooth_statistics(source, target, smoothing); }
-    virtual void estimate_parameters(EstimationMode mode, double minvar, double covsmooth, double c1, double c2, bool ml_stats_target) { m_g->estimate_parameters(mode, minvar, covsmooth, c1, c2, ml_stats_target); }
+    virtual void estimate_parameters(EstimationMode mode, double minvar, double covsmooth, double c1, double c2, double tau, bool ml_stats_target) { m_g->estimate_parameters(mode, minvar, covsmooth, c1, c2, tau, ml_stats_target); }
     virtual void split(Gaussian &g1, Gaussian &g2, double perturbation) const { throw std::string("Not implemented!"); }
     virtual void split(Gaussian &g2, double perturbation) { throw std::string("Not implemented!");}
     virtual void merge(double weight1, const Gaussian &m1, double weight2, const Gaussian &m2, bool finish_statistics) { throw std::string("Not implemented!"); }
