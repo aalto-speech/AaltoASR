@@ -2,6 +2,9 @@
 #include <string>
 #include <string.h>
 #include <iostream>
+#include <math.h>
+#include <algorithm>
+#include <limits.h>
 
 #include "io.hh"
 #include "str.hh"
@@ -11,6 +14,7 @@
 #include "Recipe.hh"
 #include "SpeakerConfig.hh"
 #include "util.hh"
+#include "SegErrorEvaluator.hh"
 
 using namespace aku;
 
@@ -18,35 +22,43 @@ std::string out_file;
 
 int info;
 int accum_pos;
-bool transtat;
+bool transtat = false;
 float start_time, end_time;
 double total_num_log_likelihood = 0;
 double total_den_log_likelihood = 0;
-double total_mmi_score = 0;
 double total_mpe_score = 0;
 double total_mpe_num_score = 0;
 int num_frames = 0;
 
+bool print_alignments = false;
+
+double mpfe_insertion_penalty = 0;
+
 // Training modes
-bool ml = false;
-bool mmi = false;
 bool mpe = false;
-bool mpe_grad = false;
+bool gradient_statistics = false;
 
 bool binary_mpfe = false;
+
+bool compute_mpe_numerator_score = true;
+
 
 conf::Config config;
 Recipe recipe;
 HmmSet model;
+HmmSet *num_seg_model = NULL;
 FeatureGenerator fea_gen;
 SpeakerConfig speaker_config(fea_gen, &model);
 
-bool print_alignments = false;
+SegErrorEvaluator error_evaluator;
+SegErrorEvaluator::ErrorMode errmode;
+
 
 void print_alignment_line(FILE *f, float fr, int start, int end,
                           const std::string &label)
 {
-  int frame_mult = (int) (16000 / fr); // NOTE: phn files assume 16kHz sample rate
+  // NOTE: phn files assume 16kHz sample rate
+  int frame_mult = (int) (16000 / fr);
 
   if (start < 0)
     return;
@@ -55,392 +67,242 @@ void print_alignment_line(FILE *f, float fr, int start, int end,
           label.c_str());
 }
 
-class MPEEvaluator: public HmmNetBaumWelch::CustomDataQuery
+
+void simple_train(HmmSet &model, Segmentator &segmentator,
+                  bool accumulate, FILE *alignment_out, bool hmmnets)
 {
-private:
-  int m_first_frame;
-  int m_cur_frame;
-  std::vector<std::vector<HmmNetBaumWelch::ArcInfo>*> m_ref_segmentation;
-
-public:
-  typedef enum
-  {
-    MPEM_MONOPHONE_LABEL, // Correct monophone label
-    MPEM_MONOPHONE_STATE, // Correct monophone label+state index
-    MPEM_CONTEXT_LABEL, // Correct context phone label
-    MPEM_STATE, // Correct state
-    MPEM_CONTEXT_PHONE_STATE, // A state of the correct CP
-    MPEM_HYP_CONTEXT_PHONE_STATE,
-    // A correct state in hypothesis CP
-  } MPEMode;
-
-  MPEEvaluator()
-  {
-    m_first_frame = -1;
-    m_mode = MPEM_MONOPHONE_LABEL;
-    m_model = NULL;
-  }
-
-  // CustomDataQuery interface
-  virtual ~MPEEvaluator()
-  {
-  }
-  virtual double custom_data_value(int frame, HmmNetBaumWelch::Arc &arc);
-
-  // Other public methods
-  void set_mode(MPEMode mode)
-  {
-    m_mode = mode;
-  }
-  void set_model(HmmSet *model)
-  {
-    m_model = model;
-  }
-  void fetch_frame_info(HmmNetBaumWelch *seg);
-  void reset(void);
-
-  int non_silence_frames(void)
-  {
-    return m_non_silence_frames;
-  }
-  double non_silence_occupancy(void)
-  {
-    return m_non_silence_occupancy;
-  }
-  int frames(void)
-  {
-    return (int) m_ref_segmentation.size();
-  }
-
-private:
-  std::string extract_center_phone(const std::string &label);
-  std::string extract_context_phone(const std::string &label);
-  int extract_state(const std::string &label);
-
-private:
-  MPEMode m_mode;
-  HmmSet *m_model;
-  int m_non_silence_frames;
-  double m_non_silence_occupancy;
-};
-
-std::string MPEEvaluator::extract_center_phone(const std::string &label)
-{
-  int pos1 = label.find_last_of('-');
-  int pos2 = label.find_first_of('+');
-  std::string temp = "";
-  if (pos1 >= 0 && pos2 >= 0) {
-    if (pos2 > pos1 + 1)
-      temp = label.substr(pos1 + 1, pos2 - pos1 - 1);
-  }
-  else if (pos1 >= 0)
-    temp = label.substr(pos1 + 1);
-  else if (pos2 >= 0)
-    temp = label.substr(0, pos2);
-  else
-    temp = label;
-  if ((int) temp.size() > 0)
-    return temp;
-  return label;
-}
-
-std::string MPEEvaluator::extract_context_phone(const std::string &label)
-{
-  int pos = label.find_last_of('.'); // Remove the state number
-  if (pos > 0)
-    return label.substr(0, pos);
-  return label;
-}
-
-int MPEEvaluator::extract_state(const std::string &label)
-{
-  int pos = label.find_last_of('.'); // Find the state number
-  if (pos >= 0) {
-    std::string temp;
-    temp = label.substr(pos + 1);
-    return atoi(temp.c_str());
-  }
-  return -1;
-}
-
-double MPEEvaluator::custom_data_value(int frame, HmmNetBaumWelch::Arc &arc)
-{
-  int internal_frame = frame - m_first_frame;
-  if (internal_frame < 0 || internal_frame >= (int) m_ref_segmentation.size())
-    return 0;
-
-  // Ignore silence nodes
-  if (arc.label.find('-') == std::string::npos && arc.label.find('+')
-      == std::string::npos && arc.label[0] == '_') // Silence node
-    return 0;
-
-  // Check the label against the correct one
-
-  std::string label;
-  int state = -1;
-  if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_MONOPHONE_STATE)
-    label = extract_center_phone(arc.label);
-  else if (m_mode == MPEM_CONTEXT_LABEL || m_mode
-           == MPEM_HYP_CONTEXT_PHONE_STATE)
-    label = extract_context_phone(arc.label);
-  else if (m_mode == MPEM_STATE || m_mode == MPEM_CONTEXT_PHONE_STATE) {
-    HmmTransition &tr = model.transition(arc.transition_id);
-    state = model.emission_pdf_index(tr.source_index);
-  }
-  if (m_mode == MPEM_MONOPHONE_STATE)
-    state = extract_state(arc.label);
-
-  double correct_prob = 0;
-
-  for (int i = 0; i < (int) m_ref_segmentation[internal_frame]->size(); i++) {
-    if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_CONTEXT_LABEL) {
-      if ((*m_ref_segmentation[internal_frame])[i].label == label)
-        correct_prob = std::max(correct_prob,
-                                (*m_ref_segmentation[internal_frame])[i].prob);
-    }
-    else if (m_mode == MPEM_MONOPHONE_STATE) {
-      if ((*m_ref_segmentation[internal_frame])[i].label == label
-          && (*m_ref_segmentation[internal_frame])[i].pdf_index
-          == state)
-        correct_prob = std::max(correct_prob,
-                                (*m_ref_segmentation[internal_frame])[i].prob);
-    }
-    else if (m_mode == MPEM_STATE) {
-      if ((*m_ref_segmentation[internal_frame])[i].pdf_index == state)
-        correct_prob = std::max(correct_prob,
-                                (*m_ref_segmentation[internal_frame])[i].prob);
-    }
-    else if (m_mode == MPEM_CONTEXT_PHONE_STATE) {
-      Hmm &hmm = m_model->hmm(
-        (*m_ref_segmentation[internal_frame])[i].label);
-      for (int s = 0; s < hmm.num_states(); s++)
-        if (hmm.state(s) == state) {
-          correct_prob = std::max(correct_prob,
-                                  (*m_ref_segmentation[internal_frame])[i].prob);
-        }
-    }
-    else if (m_mode == MPEM_HYP_CONTEXT_PHONE_STATE) {
-      Hmm &hmm = m_model->hmm(label);
-      for (int s = 0; s < hmm.num_states(); s++)
-        if ((*m_ref_segmentation[internal_frame])[i].pdf_index
-            == hmm.state(s)) {
-          correct_prob = std::max(correct_prob,
-                                  (*m_ref_segmentation[internal_frame])[i].prob);
-        }
-    }
-  }
-
-  return (binary_mpfe ? (correct_prob > 0 ? 1 : 0) : correct_prob);
-}
-
-void MPEEvaluator::reset(void)
-{
-  m_first_frame = -1;
-  // Clear the old reference segmentation
-  for (int i = 0; i < (int) m_ref_segmentation.size(); i++)
-    delete m_ref_segmentation[i];
-  m_ref_segmentation.clear();
-  m_non_silence_frames = 0;
-  m_non_silence_occupancy = 0;
-}
-
-void MPEEvaluator::fetch_frame_info(HmmNetBaumWelch *seg)
-{
-  int seg_frame = seg->current_frame();
-  if (m_first_frame == -1)
-    m_first_frame = seg_frame;
-  else if (m_cur_frame + 1 != seg_frame)
-    throw std::string("Non-continuous numerator segmentation");
-  m_cur_frame = seg_frame;
-
-  m_ref_segmentation.push_back(new std::vector<HmmNetBaumWelch::ArcInfo>);
-  seg->fill_arc_info(*(m_ref_segmentation.back()));
-
-  bool silence = false;
-  double silence_prob = 0;
-
-  // Process the labels to speed up the custom data query
-  for (int i = 0; i < (int) m_ref_segmentation.back()->size(); i++) {
-    std::string &label = (*m_ref_segmentation.back())[i].label;
-    if (label.find('-') == std::string::npos && label.find('+')
-        == std::string::npos && label[0] == '_') // Silence node
-    {
-      silence = true;
-      silence_prob += (*m_ref_segmentation.back())[i].prob;
-    }
-    if (m_mode == MPEM_MONOPHONE_STATE)
-      (*m_ref_segmentation.back())[i].pdf_index = extract_state(label);
-    if (m_mode == MPEM_MONOPHONE_LABEL || m_mode == MPEM_MONOPHONE_STATE)
-      label = extract_center_phone(label);
-    else if (m_mode == MPEM_CONTEXT_LABEL || m_mode
-             == MPEM_CONTEXT_PHONE_STATE)
-      label = extract_context_phone(label);
-  }
-  if (!silence)
-    m_non_silence_frames++;
-  m_non_silence_occupancy += 1 - silence_prob;
-}
-
-MPEEvaluator mpe_evaluator;
-
-bool initialize_hmmnet(HmmNetBaumWelch* lattice, float bw_beam, float fw_beam,
-                       float ac_scale, int hmmnet_mode, std::string &audio_path)
-{
-  lattice->set_pruning_thresholds(bw_beam, fw_beam);
-  if (config["ac-scale"].specified)
-    lattice->set_acoustic_scaling(ac_scale);
-  if (hmmnet_mode == 1)
-    lattice->set_mode(HmmNetBaumWelch::MODE_VITERBI);
-  else if (hmmnet_mode == 2)
-    lattice->set_mode(HmmNetBaumWelch::MODE_EXTENDED_VITERBI);
-
-  double orig_beam = lattice->get_backward_beam();
-  int counter = 1;
-  while (!lattice->init_utterance_segmentation()) {
-    if (counter >= 5) {
-      fprintf(stderr, "Could not run Baum-Welch for file %s\n",
-              audio_path.c_str());
-      fprintf(stderr,
-              "The HMM network may be incorrect or initial beam too low.\n");
-      return false;
-    }
-    fprintf(stderr,
-            "Warning: Backward phase failed, increasing beam to %.1f\n",
-            ++counter * orig_beam);
-    lattice->set_pruning_thresholds(counter * orig_beam, 0);
-  }
-  return true;
-}
-
-void train(HmmSet *model, Segmentator *segmentator, bool numerator,
-           FILE *alignment_out)
-{
-  int frame;
   int cur_start_frame = -1;
   std::string cur_label = "";
 
-  if ((mpe || mpe_grad) && numerator) {
-    mpe_evaluator.reset();
+  double orig_beam = 0;
+  int counter = 1;
+  while (!segmentator.init_utterance_segmentation())
+  {
+    if (counter == 1)
+    {
+      fprintf(stderr, "Could not initialize the utterance segmentation.\n");
+    }
+    if (!hmmnets || counter >= 5)
+    {
+      fprintf(stderr, "Giving up for this file\n");
+      return;
+    }
+    HmmNetBaumWelch *hmmnet_seg =
+      dynamic_cast< HmmNetBaumWelch* > (&segmentator);
+    assert( hmmnet_seg != NULL );
+    if (counter == 1)
+    {
+      orig_beam = hmmnet_seg->get_backward_beam();
+    }
+    counter++;
+    fprintf(stderr, "Increasing beam to %.1f\n", counter*orig_beam);
+    hmmnet_seg->set_pruning_thresholds(0, counter*orig_beam);
   }
-
-  while (segmentator->next_frame()) {
+  
+  while (segmentator.next_frame())
+  {
 
     // Fetch the current feature vector
-    frame = segmentator->current_frame();
+    int frame = segmentator.current_frame();
     FeatureVec feature = fea_gen.generate(frame);
 
     if (fea_gen.eof())
       break; // EOF in FeatureGenerator
 
-    if (numerator)
-      num_frames++;
-
-    if (alignment_out != NULL) {
-      if (cur_start_frame < 0) {
+    num_frames++;
+    
+    if (alignment_out != NULL)
+    {
+      if (cur_start_frame < 0)
+      {
         // Initialize
         cur_start_frame = frame;
-        cur_label = segmentator->highest_prob_label();
+        cur_label = segmentator.highest_prob_label();
       }
-      else if (cur_label != segmentator->highest_prob_label()) {
+      else if (cur_label != segmentator.highest_prob_label())
+      {
         print_alignment_line(alignment_out, fea_gen.frame_rate(),
                              cur_start_frame, frame, cur_label);
         cur_start_frame = frame;
-        cur_label = segmentator->highest_prob_label();
+        cur_label = segmentator.highest_prob_label();
       }
     }
 
     // Accumulate all possible states distributions for this frame
-    const std::vector<Segmentator::IndexProbPair> &pdfs =
-      segmentator->pdf_probs();
+    const Segmentator::IndexProbMap &pdfs = segmentator.pdf_probs();
 
-    if (mpe || mpe_grad) {
-      HmmNetBaumWelch *seg = dynamic_cast<HmmNetBaumWelch*> (segmentator);
-      if (seg == NULL)
-        throw std::string("MPE training requires the use of hmmnets!");
-      if (numerator)
-        mpe_evaluator.fetch_frame_info(seg);
-      else {
-        std::vector<HmmNetBaumWelch::ArcInfo> arcs;
-        seg->fill_arc_info(arcs);
-        for (int i = 0; i < (int) arcs.size(); i++) {
-          double gamma = (arcs[i].custom_score
-                          - seg->get_total_custom_score()) * arcs[i].prob;
-          if (gamma > 0 || mpe_grad) {
-            model->accumulate_distribution(feature,
-                                           arcs[i].pdf_index, gamma, PDF::MPE_NUM_BUF);
-            if (mpe_grad && gamma > 0)
-              model->accumulate_aux_gamma(arcs[i].pdf_index,
-                                          gamma, PDF::MPE_NUM_BUF);
-          }
-          else
-            model->accumulate_distribution(feature,
-                                           arcs[i].pdf_index, -gamma, PDF::MPE_DEN_BUF);
-        }
+    for (Segmentator::IndexProbMap::const_iterator it = pdfs.begin();
+         it != pdfs.end(); ++it)
+    {
+      if (accumulate)
+      {
+        model.accumulate_distribution(feature, (*it).first,
+                                      (*it).second, PDF::ML_BUF);
+        // model.accumulate_aux_gamma((*it).first, (*it).second,
+        //                             PDF::ML_BUF);
+      }
+
+      if (!segmentator.computes_total_log_likelihood())
+      {
+        total_num_log_likelihood += util::safe_log(
+          (*it).second*model.state_likelihood((*it).first, feature));
       }
     }
-    if (ml || mmi) {
-      for (int i = 0; i < (int) pdfs.size(); i++) {
-        if (numerator) {
-          model->accumulate_distribution(feature, pdfs[i].index,
-                                         pdfs[i].prob, PDF::ML_BUF);
-          model->accumulate_aux_gamma(pdfs[i].index, pdfs[i].prob,
-                                      PDF::ML_BUF);
-        }
-        else if (mmi) {
-          model->accumulate_distribution(feature, pdfs[i].index,
-                                         pdfs[i].prob, PDF::MMI_BUF);
-        }
-        if (!segmentator->computes_total_log_likelihood()) {
-          if (numerator)
-            total_num_log_likelihood += util::safe_log(
-              pdfs[i].prob * model->state_likelihood(
-                pdfs[i].index, feature));
-          else
-            total_den_log_likelihood += util::safe_log(
-              pdfs[i].prob * model->state_likelihood(
-                pdfs[i].index, feature));
-        }
-      }
-    }
-
+    
     // Accumulate also transition probabilities if desired
-    if (numerator && transtat) { // No transition statistics for denumerator!
-
-      const std::vector<Segmentator::IndexProbPair> &transitions =
-        segmentator->transition_probs();
-
-      for (int i = 0; i < (int) transitions.size(); i++) {
-        model->accumulate_transition(transitions[i].index,
-                                     transitions[i].prob);
-        if (!segmentator->computes_total_log_likelihood()) {
-          HmmTransition &t = model->transition(transitions[i].index);
-          total_num_log_likelihood += util::safe_log(
-            transitions[i].prob * t.prob);
+    if (transtat && accumulate)
+    {
+      const Segmentator::IndexProbMap &transitions =
+        segmentator.transition_probs();
+      
+      for (Segmentator::IndexProbMap::const_iterator it = transitions.begin();
+         it != transitions.end(); ++it)
+      {
+        model.accumulate_transition((*it).first, (*it).second);
+        if (!segmentator.computes_total_log_likelihood())
+        {
+          HmmTransition &t = model.transition((*it).first);
+          total_num_log_likelihood+=util::safe_log((*it).second*t.prob);
         }
       }
     }
   }
-  if (segmentator->computes_total_log_likelihood()) {
-    if (numerator)
-      total_num_log_likelihood += segmentator->get_total_log_likelihood();
-    else
-      total_den_log_likelihood += segmentator->get_total_log_likelihood();
+
+  if (segmentator.computes_total_log_likelihood())
+  {
+    total_num_log_likelihood += segmentator.get_total_log_likelihood();
+    fprintf(stderr, "  %g\n", segmentator.get_total_log_likelihood());
   }
-  if (alignment_out != NULL) {
-    if (cur_start_frame >= 0) {
+
+  if (alignment_out != NULL)
+  {
+    if (cur_start_frame >= 0)
+    {
       // Print the pending line
       // FIXME: Is +1 in the last frame correct?
       print_alignment_line(alignment_out, fea_gen.frame_rate(),
-                           cur_start_frame, segmentator->current_frame() + 1,
+                           cur_start_frame, segmentator.current_frame()+1,
                            cur_label);
     }
   }
 }
 
+
+HmmNetBaumWelch::SegmentedLattice*
+create_segmented_lattice(HmmNetBaumWelch &seg, float fw_beam, float bw_beam,
+                         float ac_scale, int hmmnet_seg_mode)
+{
+  seg.set_pruning_thresholds(fw_beam, bw_beam);
+  seg.set_acoustic_scaling(ac_scale);
+  seg.set_mode(hmmnet_seg_mode);
+  double orig_beam = seg.get_backward_beam();
+  int counter = 1;
+  HmmNetBaumWelch::SegmentedLattice *lattice = NULL;
+  while ((lattice = seg.create_segmented_lattice()) == NULL)
+  {
+    if (counter >= 5)
+    {
+      fprintf(stderr, "Could not run Baum-Welch for file\n");
+      fprintf(stderr, "The HMM network may be incorrect or initial beam too low.\n");
+      return NULL;
+    }
+    counter++;
+    fprintf(stderr,
+            "Warning: Backward phase failed, increasing beam to %.1f\n",
+            counter*orig_beam);
+    seg.set_pruning_thresholds(0, counter*orig_beam);
+  }
+  
+  // Recompute the scores
+  lattice->compute_total_scores();
+  return lattice;
+}
+
+
+void
+collect_lattice_stats(HmmSet &model, HmmNetBaumWelch &seg,
+                      HmmNetBaumWelch::SegmentedLattice *lattice,
+                      PDF::StatisticsMode mode)
+{
+  std::set<int> active_nodes;
+
+  if (!lattice->frame_lattice)
+    throw std::string("collect_lattice_stats requires a frame lattice");
+  
+  active_nodes.insert(lattice->initial_node);
+  while (active_nodes.find(lattice->final_node) == active_nodes.end())
+  {
+    std::set<int> target_nodes;
+
+    num_frames++; // FIXME: Frames not counted with --no-train and DT
+
+    int frame = -1;
+    model.reset_cache();
+    
+    // Propagate the active nodes and collect the statistics
+    for (std::set<int>::iterator it = active_nodes.begin();
+         it != active_nodes.end(); ++it)
+    {
+      if (frame == -1)
+        frame = lattice->nodes[*it].frame;
+      else
+        assert( frame == lattice->nodes[*it].frame );
+      for (int i = 0; i < (int)lattice->nodes[*it].out_arcs.size(); i++)
+      {
+        HmmNetBaumWelch::SegmentedArc &arc =
+          lattice->arcs[lattice->nodes[*it].out_arcs[i]];
+        target_nodes.insert(arc.target_node); // Propagate
+
+        const FeatureVec feature = seg.get_feature(frame);
+        HmmTransition &tr = model.transition(arc.transition_index);
+        int pdf_index = model.emission_pdf_index(tr.source_index);
+        double arc_prob = exp(HmmNetBaumWelch::loglikelihoods.divide(
+                                arc.total_score, lattice->total_score));
+        
+        if (mode & PDF_ML_STATS)
+        {
+          model.accumulate_distribution(feature, pdf_index, arc_prob,
+                                         PDF::ML_BUF);
+        }
+        if (mode & PDF_MMI_STATS)
+        {
+          model.accumulate_distribution(feature, pdf_index, arc_prob,
+                                        PDF::MMI_BUF);
+        }
+        double gamma = 0;
+        if (mode & (PDF_MPE_NUM_STATS|PDF_MPE_DEN_STATS))
+          gamma = (arc.custom_path_score-lattice->total_custom_score)*
+            arc_prob;
+
+        if (mode & PDF_MPE_NUM_STATS)
+        {
+          if (gamma > 0 || gradient_statistics)
+            model.accumulate_distribution(feature, pdf_index,
+                                           gamma, PDF::MPE_NUM_BUF);
+          if (gradient_statistics)
+            model.accumulate_aux_gamma(pdf_index, gamma, PDF::MPE_NUM_BUF);
+        }
+        if (mode & PDF_MPE_DEN_STATS)
+        {
+          if (gamma <= 0)
+            model.accumulate_distribution(feature, pdf_index,
+                                          -gamma, PDF::MPE_DEN_BUF);
+        }
+      }
+    }
+
+    active_nodes.swap(target_nodes);
+  }
+}
+
 int main(int argc, char *argv[])
 {
-  Segmentator *segmentator;
-  int hmmnet_mode = 0;
+  int hmmnet_seg_mode = 0;
+  int hmmnet_num_seg_mode = 0;
+  PDF::StatisticsMode stats_mode = 0;
+  bool only_ml = true;
+  
+  std::string gkfile, mcfile, phfile;
   try {
     config("usage: stats [OPTION...]\n")
       ('h', "help", "", "", "display help")
@@ -448,6 +310,8 @@ int main(int argc, char *argv[])
       ('g', "gk=FILE", "arg", "", "Mixture base distributions")
       ('m', "mc=FILE", "arg", "", "Mixture coefficients for the states")
       ('p', "ph=FILE", "arg", "", "HMM definitions")
+      ('\0', "nsegmc=FILE", "arg", "", "mc-file for segmentating the numerator")
+      ('\0', "nseggk=FILE", "arg", "", "gk-file for segmentating the numerator")
       ('c', "config=FILE", "arg must", "", "feature configuration")
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for training")
@@ -457,16 +321,19 @@ int main(int argc, char *argv[])
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for HMM networks)")
-      ('E', "extvit", "", "", "Use extended Viterbi over HMM networks")
-      ('V', "vit", "", "", "Use Viterbi over HMM networks")
+      ('M', "segmode=MODE", "arg", "bw", "Segmentation mode: bw/vit/mpv")
+      ('\0', "numseg=MODE", "arg", "", "Numerator segmentation mode")
       ('\0', "ml", "", "", "Collect statistics for ML")
       ('\0', "mmi", "", "", "Collect statistics for MMI")
-      ('\0', "mpe", "", "", "Collect statistics for MPE")
-      ('\0', "mpegrad", "", "", "Collect statistics for gradient based MPE")('\0', "binmpfe", "", "", "Binary 0/1 MPFE score function")
-      ('\0', "mllt", "", "", "maximum likelihood linear transformation (for ML)")
-      ('\0', "mpemode=MODE", "arg", "", "mono/mono-state/state/cp/cp-state/hyp-cp-state")
+      ('\0', "mpe", "", "", "Collect statistics for MPE/MWE/MPFE")
+      ('\0', "grad", "", "", "Prepare gradient based statistics (with --mpe)")
+      ('\0', "mllt", "", "", "maximum likelihood linear transformation (for --ml)")
+      ('\0', "errmode=MODE", "arg", "", "For --mpe. Modes: mwe/mpe/mpfe/mpfe-cps/mpfe-pdf")
+      ('\0', "nosil", "", "", "Ignore silence arcs in MPE scoring")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
-      ('a', "alignment", "", "", "save output alignments")
+      ('U', "uttadap", "", "", "Enable utterance adaptation")
+      ('n', "no-train", "", "", "Only collect summary statistics")
+      ('a', "alignment", "", "", "save output alignments (only with ML training)")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
       ('i', "info=INT", "arg", "0", "info level");
@@ -478,12 +345,19 @@ int main(int argc, char *argv[])
     // Initialize the model for accumulating statistics
     if (config["base"].specified) {
       model.read_all(config["base"].get_str());
+      gkfile = config["base"].get_str() + ".gk";
+      mcfile = config["base"].get_str() + ".mc";
+      phfile = config["base"].get_str() + ".ph";
     }
-    else if (config["gk"].specified && config["mc"].specified
-             && config["ph"].specified) {
-      model.read_gk(config["gk"].get_str());
-      model.read_mc(config["mc"].get_str());
-      model.read_ph(config["ph"].get_str());
+    else if (config["gk"].specified && config["mc"].specified &&
+             config["ph"].specified)
+    {
+      gkfile = config["gk"].get_str();
+      model.read_gk(gkfile);
+      mcfile = config["mc"].get_str();
+      model.read_mc(mcfile);
+      phfile = config["ph"].get_str();
+      model.read_ph(phfile);
     }
     else {
       throw std::string(
@@ -491,7 +365,23 @@ int main(int argc, char *argv[])
     }
     out_file = config["out"].get_str();
 
-    if (config["batch"].specified ^ config["bindex"].specified)
+    if (config["nseggk"].specified || config["nsegmc"].specified)
+    {
+      if (!config["hmmnet"].specified)
+        throw std::string("Numerator segmentation requires --hmmnet");
+      num_seg_model = new HmmSet;
+      if (config["nseggk"].specified)
+        num_seg_model->read_gk(config["nseggk"].get_str());
+      else
+        num_seg_model->read_gk(gkfile);
+      if (config["nsegmc"].specified)
+        num_seg_model->read_mc(config["nsegmc"].get_str());
+      else
+        num_seg_model->read_mc(mcfile);
+      num_seg_model->read_ph(phfile);
+    }
+
+    if (config["batch"].specified^config["bindex"].specified)
       throw std::string("Must give both --batch and --bindex");
 
     // Check for state transition statistics
@@ -512,88 +402,110 @@ int main(int argc, char *argv[])
 
     // Read recipe file
     recipe.read(io::Stream(config["recipe"].get_str()),
-                config["batch"].get_int(), config["bindex"].get_int(), true);
-
-    PDF::StatisticsMode mode = 0;
-
-    if (config["ml"].specified) {
-      ml = true;
-      mode |= PDF_ML_STATS;
+                config["batch"].get_int(), config["bindex"].get_int(),
+                true);
+    
+    if (config["ml"].specified)
+    {
+      stats_mode |= PDF_ML_STATS;
     }
-    if (config["mmi"].specified) {
-      mmi = true;
-      mode |= PDF_MMI_STATS;
+    if (config["mmi"].specified)
+    {
+      only_ml = false;
+      stats_mode |= PDF_MMI_STATS;
     }
-    if (config["mpe"].specified) {
-      if (config["mpegrad"].specified)
-        throw std::string("Define only either --mpe or --mpegrad");
+    if (config["mpe"].specified)
+    {
+      only_ml = false;
       mpe = true;
-      mode |= PDF_MPE_NUM_STATS | PDF_MPE_DEN_STATS;
-      mpe_evaluator.set_model(&model);
-    }
-    else if (config["mpegrad"].specified) {
-      mpe_grad = true;
-      mode |= PDF_MPE_NUM_STATS;
-      mpe_evaluator.set_model(&model);
+      if (config["grad"].specified)
+      {
+        gradient_statistics = true;
+        stats_mode |= PDF_MPE_NUM_STATS;
+      }
+      else
+      {
+        stats_mode |= PDF_MPE_NUM_STATS|PDF_MPE_DEN_STATS;
+      }
+      error_evaluator.set_model(&model);
     }
 
-    if (mode == 0)
-      throw std::string(
-        "At least one mode (--ml, --mmi, --mpe, --mpegrad) must be given!");
+    if (stats_mode == 0)
+      throw std::string("At least one mode (--ml, --mmi, --mpe) must be given!");
 
-    if (mode != PDF_ML_STATS && !config["hmmnet"].specified)
+    if (config["nosil"].specified)
+      error_evaluator.set_ignore_silence(true);
+    else
+      error_evaluator.set_ignore_silence(false);
+
+    if (!only_ml && !config["hmmnet"].specified)
       throw std::string("Discriminative training requires --hmmnet");
 
-    if (config["vit"].specified)
-      hmmnet_mode = 1;
-    if (config["extvit"].specified)
-      hmmnet_mode = 2;
-    if (hmmnet_mode > 0 && !config["hmmnet"].specified)
-      throw std::string("--vit and --extvit require --hmmnet");
+    if (config["segmode"].specified && !config["hmmnet"].specified)
+      throw std::string("Segmentation modes are supported only with --hmmnet");
+    conf::Choice segmode_choice;
+    segmode_choice("bw", HmmNetBaumWelch::MODE_BAUM_WELCH)
+      ("vit", HmmNetBaumWelch::MODE_VITERBI)
+      ("mpv", HmmNetBaumWelch::MODE_MULTIPATH_VITERBI);
+    hmmnet_seg_mode = HmmNetBaumWelch::MODE_BAUM_WELCH;
+    if (!segmode_choice.parse(config["segmode"].get_str(), hmmnet_seg_mode))
+      throw std::string("Invalid segmentation mode ") +
+        config["segmode"].get_str();
 
-    if (config["mpemode"].specified) {
-      if (!mpe && !mpe_grad)
-        fprintf(stderr,
-                "--mpemode ignored without --mpe or --mpegrad\n");
-      else {
-        std::string mpe_mode = config["mpemode"].get_str();
-        if (mpe_mode == "mono")
-          mpe_evaluator.set_mode(MPEEvaluator::MPEM_MONOPHONE_LABEL);
-        else if (mpe_mode == "mono-state")
-          mpe_evaluator.set_mode(MPEEvaluator::MPEM_MONOPHONE_STATE);
-        else if (mpe_mode == "state")
-          mpe_evaluator.set_mode(MPEEvaluator::MPEM_STATE);
-        else if (mpe_mode == "cp")
-          mpe_evaluator.set_mode(MPEEvaluator::MPEM_CONTEXT_LABEL);
-        else if (mpe_mode == "cp-state")
-          mpe_evaluator.set_mode(
-            MPEEvaluator::MPEM_CONTEXT_PHONE_STATE);
-        else if (mpe_mode == "hyp-cp-state")
-          mpe_evaluator.set_mode(
-            MPEEvaluator::MPEM_HYP_CONTEXT_PHONE_STATE);
-        else
-          throw std::string("Invalid MPE mode ") + mpe_mode;
+    hmmnet_num_seg_mode = hmmnet_seg_mode;
+    if (config["numseg"].specified &&
+        !segmode_choice.parse(config["numseg"].get_str(),
+                              hmmnet_num_seg_mode))
+            throw std::string("Invalid segmentation mode ") +
+              config["numseg"].get_str();
+
+    if (config["errmode"].specified)
+    {
+      if (!config["mpe"].specified)
+        fprintf(stderr, "--errmode ignored without --mpe\n");
+      else
+      {
+        conf::Choice errmode_choice;
+        errmode_choice("mwe", SegErrorEvaluator::MWE)
+          ("mpe", SegErrorEvaluator::MPE)
+          ("mpfe-pdf", SegErrorEvaluator::MPFE_PDF)
+          ("mpfe-cps", SegErrorEvaluator::MPFE_CONTEXT_PHONE_STATE)
+          ("mpfe", SegErrorEvaluator::MPFE_HYP_CONTEXT_PHONE_STATE)
+          ;
+        std::string errmode_str = config["errmode"].get_str();
+        int result;
+        if (!errmode_choice.parse(errmode_str, result))
+          throw std::string("Invalid choice for --errmode: ") + errmode_str;
+        errmode = (SegErrorEvaluator::ErrorMode)result;
+        error_evaluator.set_mode(errmode);
       }
     }
+    else if (config["mpe"].specified)
+    {
+      errmode = SegErrorEvaluator::MPE;
+      error_evaluator.set_mode(errmode);
+    }
 
-    if (config["binmpfe"].specified)
-      binary_mpfe = true;
-
-    if (config["alignment"].specified) {
+    if (config["alignment"].specified)
+    {
       print_alignments = true;
       if (config["ophn"].specified)
         throw std::string("Can not read and write to output PHNs");
-      if (config["hmmnet"].specified && hmmnet_mode != 1)
-        printf(
-          "Warning: Printing alignments will not produce sensible results if using\nhmmnet mode other than viterbi.\n");
+      if (config["hmmnet"].specified &&
+          hmmnet_num_seg_mode != HmmNetBaumWelch::MODE_VITERBI)
+        printf("Warning: Printing alignments will not produce sensible results if using\nhmmnet mode other than viterbi.\n");
+      if (!only_ml)
+        printf("Warning: Alignment is disabled with discriminative training\n");
     }
 
-    if (config["mllt"].specified) {
-      if (mmi || mpe || mpe_grad)
+    if (config["mllt"].specified)
+    {
+      if (!only_ml)
         throw std::string("--mllt is only supported with --ml");
-      mode |= PDF_ML_FULL_STATS;
+      stats_mode |= PDF_ML_FULL_STATS;
     }
-    model.start_accumulating(mode);
+    if (!config["no-train"].specified)
+      model.start_accumulating(stats_mode);
 
     // Process each recipe line
     for (int f = 0; f < (int) recipe.infos.size(); f++) {
@@ -609,132 +521,201 @@ int main(int argc, char *argv[])
 
       if (config["speakers"].specified) {
         speaker_config.set_speaker(recipe.infos[f].speaker_id);
-        if (recipe.infos[f].utterance_id.size() > 0)
+        if (config["uttadap"].specified &&
+            recipe.infos[f].utterance_id.size() > 0)
           speaker_config.set_utterance(recipe.infos[f].utterance_id);
       }
 
-      bool skip = false;
-
-      if (config["hmmnet"].specified) {
-        // Open files and configure
-        HmmNetBaumWelch* lattice = recipe.infos[f].init_hmmnet_files(
-          &model, false, &fea_gen, NULL);
-        lattice->set_collect_transition_probs(transtat);
-        if (!initialize_hmmnet(lattice, config["bw-beam"].get_float(),
-                               config["fw-beam"].get_float(),
-                               config["ac-scale"].get_float(), hmmnet_mode,
-                               recipe.infos[f].audio_path))
-          skip = true;
-        segmentator = lattice;
+      FILE *alignment_out = NULL;
+      if (print_alignments)
+      {
+        if ((alignment_out = fopen(recipe.infos[f].alignment_path.c_str(),
+                                   "w")) == NULL)
+          fprintf(stderr, "Could not open alignment file %s\n",
+                  recipe.infos[f].alignment_path.c_str());
       }
-      else {
-        PhnReader* phnreader = recipe.infos[f].init_phn_files(&model,
-                                                              false, false, config["ophn"].specified, &fea_gen, NULL);
+
+      if (!config["hmmnet"].specified)
+      {
+        assert( only_ml );
+        PhnReader* phnreader = 
+          recipe.infos[f].init_phn_files(&model, false, false,
+                                         config["ophn"].specified, &fea_gen,
+                                         NULL);
         phnreader->set_collect_transition_probs(transtat);
-        segmentator = phnreader;
-        if (!segmentator->init_utterance_segmentation()) {
-          fprintf(stderr,
-                  "Could not initialize the utterance for PhnReader.");
-          fprintf(stderr, "Current file was: %s\n",
-                  recipe.infos[f].audio_path.c_str());
-          skip = true;
-        }
+        simple_train(model, *phnreader, !config["no-train"].specified,
+                     alignment_out, false);
+        delete phnreader;
       }
+      else
+      {
+        // Open files and configure
+        HmmNetBaumWelch* num_seg = recipe.infos[f].init_hmmnet_files(
+          (num_seg_model == NULL ? &model : num_seg_model),
+          false, &fea_gen, NULL);
 
-      if (!skip) {
-        FILE *alignment_out = NULL;
-        if (print_alignments) {
-          if ((alignment_out = fopen(
-                 recipe.infos[f].alignment_path.c_str(), "w"))
-              == NULL)
-            fprintf(stderr, "Could not open alignment file %s\n",
-                    recipe.infos[f].alignment_path.c_str());
+        if (only_ml)
+        {
+          num_seg->set_collect_transition_probs(transtat);
+          num_seg->set_mode(hmmnet_num_seg_mode);
+          num_seg->set_pruning_thresholds(config["fw-beam"].get_float(),
+                                          config["bw-beam"].get_float());
+          num_seg->set_acoustic_scaling(config["ac-scale"].get_float());
+          simple_train(model, *num_seg, !config["no-train"].specified,
+                       alignment_out, true);
         }
+        else
+        {
+          // Discriminative training
 
-        // Train the numerator
-        train(&model, segmentator, true, alignment_out);
-
-        if (alignment_out != NULL)
-          fclose(alignment_out);
-
-        if (mmi || mpe || mpe_grad) {
-          // Clean up
-          delete segmentator;
-          fea_gen.close();
-
-          // Open files and configure
-          HmmNetBaumWelch* lattice =
-            recipe.infos[f].init_hmmnet_files(&model, true,
-                                              &fea_gen, NULL);
-          lattice->set_collect_transition_probs(transtat);
-          if (mpe || mpe_grad) {
-            total_mpe_num_score
-              += mpe_evaluator.non_silence_occupancy();
-            lattice->set_custom_data_callback(&mpe_evaluator);
-          }
-
-          if (!initialize_hmmnet(lattice,
-                                 config["bw-beam"].get_float(),
-                                 config["fw-beam"].get_float(),
-                                 config["ac-scale"].get_float(), hmmnet_mode,
-                                 recipe.infos[f].audio_path))
+          HmmNetBaumWelch* den_seg  = NULL;
+          HmmNetBaumWelch::SegmentedLattice *den_lattice = NULL;
+          HmmNetBaumWelch::SegmentedLattice *num_lattice =
+            create_segmented_lattice(*num_seg, config["fw-beam"].get_float(),
+                                     config["bw-beam"].get_float(),
+                                     config["ac-scale"].get_float(),
+                                     hmmnet_num_seg_mode);
+          
+          bool skip = false;
+          if (num_lattice == NULL)
+          {
             skip = true;
-          segmentator = lattice;
-
-          if (mpe || mpe_grad) {
-            if (info > 0)
-              fprintf(stderr, "Total custom score %f\n",
-                      lattice->get_total_custom_score());
-            total_mpe_score += lattice->get_total_custom_score();
+            fprintf(stderr, "Failed to segment the numerator lattice, skipping\n");
           }
+          if (!skip)
+          {
+            fea_gen.close(); // init_hmmnet_files opens the file for fea_gen
+            den_seg = recipe.infos[f].init_hmmnet_files(
+              &model, true, &fea_gen, NULL);
+            den_seg->set_collect_transition_probs(transtat);
+            den_seg->set_mode(hmmnet_seg_mode);
 
-          if (!skip) {
-            // Train the denumerator
-            train(&model, segmentator, false, NULL);
+            den_lattice = create_segmented_lattice(
+              *den_seg, config["fw-beam"].get_float(),
+              config["bw-beam"].get_float(), config["ac-scale"].get_float(),
+              hmmnet_seg_mode);
+            if (den_lattice == NULL)
+            {
+              skip = true;
+              fprintf(stderr, "Failed to segment denominator lattice, skipping\n");
+            }
           }
+          if (!skip)
+          {
+            assert( num_seg->computes_total_log_likelihood() &&
+                    den_seg->computes_total_log_likelihood() );
+
+            if ((stats_mode&PDF_ML_STATS) &&
+                !config["no-train"].specified)
+              collect_lattice_stats(model, *num_seg, num_lattice,
+                                    PDF_ML_STATS);
+            total_num_log_likelihood += num_lattice->total_score;
+              
+            if (mpe)
+            {
+              if (errmode == SegErrorEvaluator::MWE ||
+                  errmode == SegErrorEvaluator::MPE)
+              {
+                // Need a higher hierarchy lattice for the error evaluation
+                int level = 0;
+                if (errmode == SegErrorEvaluator::MWE)
+                  level = 3; // FIXME? Only works for word-based lattices
+                else if (errmode == SegErrorEvaluator::MPE)
+                  level = 2;
+                HmmNetBaumWelch::SegmentedLattice *num_lat_logical =
+                  num_seg->extract_segmented_lattice(num_lattice, level);
+                HmmNetBaumWelch::SegmentedLattice *den_lat_logical =
+                  den_seg->extract_segmented_lattice(den_lattice, level);
+                error_evaluator.initialize_reference(num_lat_logical);
+                den_lat_logical->compute_custom_path_scores(error_evaluator);
+                den_lat_logical->propagate_custom_scores_to_frame_segmented_lattice(den_lattice);
+
+                if (compute_mpe_numerator_score)
+                {
+                  num_lat_logical->compute_custom_path_scores(error_evaluator);
+                  total_mpe_num_score += num_lat_logical->total_custom_score;
+                }
+                
+                delete den_lat_logical;
+                delete num_lat_logical;
+              }
+              else
+              {
+                error_evaluator.initialize_reference(num_lattice);
+                den_lattice->compute_custom_path_scores(error_evaluator);
+                if (compute_mpe_numerator_score)
+                {
+                  num_lattice->compute_custom_path_scores(error_evaluator);
+                  total_mpe_num_score += num_lattice->total_custom_score;
+                }
+              }
+              if (info > 0)
+                fprintf(stderr, "Total custom score %f\n",
+                        den_lattice->total_custom_score);
+              total_mpe_score += den_lattice->total_custom_score;
+            }
+
+            if (!config["no-train"].specified)
+              collect_lattice_stats(model, *den_seg, den_lattice,
+                                    (stats_mode&(~PDF_ML_STATS)));
+            total_den_log_likelihood += den_lattice->total_score;
+          }
+          if (den_lattice != NULL)
+            delete den_lattice;
+          if (den_seg != NULL)
+            delete den_seg;
+          if (num_lattice != NULL)
+            delete num_lattice;
         }
+        delete num_seg;
       }
 
-      // Clean up
-      delete segmentator;
+      if (alignment_out != NULL)
+        fclose(alignment_out);
       fea_gen.close();
     }
 
-    if (info > 0) {
+    if (info > 0)
+    {
       fprintf(stderr, "Finished collecting statistics (%i/%i)\n",
               config["bindex"].get_int(), config["batch"].get_int());
       fprintf(stderr, "Total num log likelihood: %g\n",
               total_num_log_likelihood);
+      if (mpe)
+        fprintf(stderr, "MPE score: %g\n", total_mpe_score);
+      if (!only_ml)
+        fprintf(stderr, "MMI score: %g\n",(total_num_log_likelihood - total_den_log_likelihood));
     }
 
-    // Hack to have proper gamma values for g-smoothing in case some data
-    // is collected only for ML
-    if ((mpe || mpe_grad) && ml)
-      model.prepare_smoothing_gamma(PDF::ML_BUF, PDF::MPE_NUM_BUF);
-
     // Write statistics to file dump and clean up
-    model.dump_statistics(out_file);
-    model.stop_accumulating();
-
-    std::string lls_file_name = out_file + ".lls";
+    if (!config["no-train"].specified)
+    {
+      model.dump_statistics(out_file);
+      model.stop_accumulating();
+    }
+    
+    std::string lls_file_name = out_file+".lls";
     std::ofstream lls_file(lls_file_name.c_str());
-    if (lls_file) {
-      lls_file << "Numerator loglikelihood: " << total_num_log_likelihood
-               << std::endl;
-      if (mmi || mpe || mpe_grad) {
-        lls_file << "Denominator loglikelihood: "
-                 << total_den_log_likelihood << std::endl;
-        lls_file << "MMI score: " << (total_num_log_likelihood
-                                      - total_den_log_likelihood) << std::endl;
+    if (lls_file)
+    {
+      lls_file.precision(12); 
+      lls_file << "Numerator loglikelihood: " << total_num_log_likelihood << std::endl;
+//      lls_file << "Summed numerator loglikelihood: " << summed_num_log_likelihood << std::endl;
+      if (!only_ml)
+      {
+        lls_file << "Denominator loglikelihood: " << total_den_log_likelihood << std::endl;
+        lls_file << "MMI score: " << (total_num_log_likelihood - total_den_log_likelihood) << std::endl;
       }
-      if (mpe || mpe_grad) {
-        lls_file << "MPFE score: " << total_mpe_score << std::endl;
-        lls_file << "MPFE numerator score: " << total_mpe_num_score
-                 << std::endl;
+      if (mpe)
+      {
+        lls_file << "MPE score: " << total_mpe_score << std::endl;
+        lls_file << "MPE numerator score: " << total_mpe_num_score << std::endl;
       }
       lls_file << "Number of frames: " << num_frames << std::endl;
       lls_file.close();
     }
+    if (num_seg_model != NULL)
+      delete num_seg_model;
   }
 
   // Handle errors
