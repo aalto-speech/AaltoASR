@@ -3,6 +3,7 @@
 #include "PhonePool.hh"
 #include "LinearAlgebra.hh"
 #include "str.hh"
+#include "util.hh"
 
 
 namespace aku {
@@ -187,6 +188,14 @@ PhonePool::ContextPhoneCluster::add_rule(AppliedDecisionRule &rule)
   if (m_applied_rules.size() == 0)
     m_applied_rules.resize(1);
   m_applied_rules[0].push_back(rule);
+}
+
+void
+PhonePool::ContextPhoneCluster::add_final_gaussian(double weight,
+                                                   int gauss_index)
+{
+  m_gauss_weight.push_back(weight);
+  m_gauss_index.push_back(gauss_index);
 }
 
 
@@ -619,6 +628,219 @@ PhonePool::apply_best_splitting_rule(
 
 
 void
+PhonePool::soft_kmeans_clustering(double mixture_threshold, bool diagonal)
+{
+  for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
+  {
+    for (int s = 0; s < (*it).second->num_states(); s++)
+    {
+      std::vector<Gaussian*> kmeans_gauss;
+      std::vector< std::vector<double> > cur_cluster_weights;
+      std::vector<ContextPhoneCluster*> &cur_clusters =
+        (*it).second->get_state_clusters(s);
+      if (m_info > 0)
+        fprintf(stderr,"Clustering state %i of phone %s, initially %i clusters\n", s, (*it).second->label().c_str(), (int)cur_clusters.size());
+
+      // Initialize the cluster Gaussians
+      cur_cluster_weights.resize(cur_clusters.size());
+      int gcount = 0;
+      for (int c = 0; c < (int)cur_clusters.size(); c++)
+      {
+        if (diagonal)
+          kmeans_gauss.push_back(new DiagonalGaussian(m_dim));
+        else
+          kmeans_gauss.push_back(new FullCovarianceGaussian(m_dim));
+        Vector mean;
+        Matrix cov;
+        cur_clusters[c]->statistics()->get_mean(mean);
+        cur_clusters[c]->statistics()->get_covariance(cov);
+        kmeans_gauss.back()->set_mean(mean);
+        kmeans_gauss.back()->set_covariance(cov, true);
+        if (!kmeans_gauss.back()->valid_parameters())
+        {
+          kmeans_gauss.pop_back();
+          fprintf(stderr, "Warning! Invalid parameters in cluster %d, ignoring the Gaussian\n", c);
+        }
+        else
+        {
+          cur_cluster_weights[c].resize(cur_clusters.size());// May be too much
+          (cur_cluster_weights[c])[gcount++] = 1;
+        }
+      }
+
+      std::vector< std::vector<double> > occupancies;
+
+      //for (int k = 0; k < 50; k++) // Iterate the weights and Gaussians
+      {
+        std::vector<double> sum_occupancies;
+        std::vector<double> likelihoods;
+        occupancies.clear();
+        occupancies.resize(cur_clusters.size());
+        sum_occupancies.resize(kmeans_gauss.size());
+        likelihoods.resize(kmeans_gauss.size());
+        for (int c = 0; c < (int)cur_clusters.size(); c++)
+        {
+          // Find context phone cluster likelihood against kmeans Gaussians
+          occupancies[c].resize(kmeans_gauss.size());
+
+          for (int l = 0; l < 1000; l++)
+          {
+            Vector sample;
+            cur_clusters[c]->statistics()->draw_sample(sample);
+            double sum = 0;
+            for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+            {
+              likelihoods[g] = kmeans_gauss[g]->compute_likelihood(sample);
+              sum += likelihoods[g];
+            }
+            if (sum > 0)
+            {
+              for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+                (occupancies[c])[g] += likelihoods[g]/sum;
+            }
+          }
+          for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+          {
+            (occupancies[c])[g] *= cur_clusters[c]->occupancy_count()/1000;
+            sum_occupancies[g] += (occupancies[c])[g];
+          }
+          
+//           Vector source_mean;
+//           Matrix source_cov;
+//           double loglikelihood_sum = 0;
+//           cur_clusters[c]->statistics()->get_mean(source_mean);
+//           cur_clusters[c]->statistics()->get_covariance(source_cov);
+//           for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+//           {
+//             Vector mean;
+//             Matrix cov;
+//             Matrix icov;
+//             kmeans_gauss[g]->get_mean(mean);
+//             kmeans_gauss[g]->get_covariance(cov);
+//             LinearAlgebra::inverse(cov, icov);
+//             double log_const = kmeans_gauss[g]->compute_log_likelihood(mean);
+//             Vector diff(mean);
+//             Vector temp(mean.size());
+//             assert( diff.size() == source_mean.size() );
+//             Blas_Add_Mult(diff, -1, source_mean);
+//             Blas_Mat_Vec_Mult(icov, diff, temp, 1, 0);
+//             Matrix m(source_cov.size(0), source_cov.size(0));
+//             Blas_Mat_Mat_Mult(icov, source_cov, m, false, false, 1.0, 0);
+//             double trace = 0;
+//             for (int i = 0; i < (int)m.size(0); i++)
+//               trace += m(i, i);
+
+//             // Fill in the loglikelihoods, normalize after summing everything
+//             (occupancies[c])[g] = log_const -
+//               0.5*(Blas_Dot_Prod(diff, temp) + trace);
+//             if (g == 0)
+//               loglikelihood_sum = (occupancies[c])[g];
+//             else
+//               loglikelihood_sum =
+//                 util::logadd(loglikelihood_sum,(occupancies[c])[g]);
+//           }
+
+//           // Compute the occupancies from the loglikelihoods
+//           for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+//           {
+//             (occupancies[c])[g] = cur_clusters[c]->occupancy_count()*
+//               exp((occupancies[c])[g] - loglikelihood_sum);
+//             sum_occupancies[g] += (occupancies[c])[g];
+//           }
+        }
+
+        // Fill in the new weights and compute the new cluster Gaussians
+//         double sswd = 0; // Sum of squared weight differences
+//         double max_wd = 0; // Maximum absolute weight difference
+//         std::vector<const Gaussian*> gaussians;
+//         gaussians.resize(cur_clusters.size());
+//         for (int c = 0; c < (int)cur_clusters.size(); c++)
+//           gaussians[c] = cur_clusters[c]->statistics();
+//         for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+//         {
+//           if (sum_occupancies[g] > 1e-10)
+//           {
+//             std::vector<double> new_weights;
+//             new_weights.resize(cur_clusters.size());
+//             for (int c = 0; c < (int)cur_clusters.size(); c++)
+//             {
+//               new_weights[c] = (occupancies[c])[g]/sum_occupancies[g];
+//               double temp = new_weights[c] - (cur_cluster_weights[c])[g];
+//               if (fabs(temp) > max_wd)
+//                 max_wd = fabs(temp);
+//               sswd += temp*temp;
+//               (cur_cluster_weights[c])[g] = new_weights[c];
+//             }
+//             kmeans_gauss[g]->merge(new_weights, gaussians);
+//           }
+//         }
+//         double rms_wdiff =
+//           sqrt(sswd/(cur_clusters.size()*kmeans_gauss.size()));
+//         if (m_info > 1)
+//         {
+//           fprintf(stderr, "  RMS weight difference %g\n", rms_wdiff);
+//           fprintf(stderr, "  Maximum absolute weight difference %g\n", max_wd);
+//         }
+//         if (max_wd < mixture_threshold)
+//           break;
+      }
+      
+      // Determine context phone mixtures and add the Gaussians to the
+      // initial model
+      std::vector<int> gauss_map;
+      int num_gaussians = 0;
+      int num_mixture_components = 0;
+      gauss_map.resize(kmeans_gauss.size(), -1);
+      for (int c = 0; c < (int)cur_clusters.size(); c++)
+      {
+        std::vector<double> mixture_weights;
+        double sum_weights = 0;
+        mixture_weights.resize(kmeans_gauss.size());
+        for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+        {
+          double cur_weight = (occupancies[c])[g]/
+            cur_clusters[c]->occupancy_count();
+          if (cur_weight > mixture_threshold)
+          {
+            mixture_weights[g] = cur_weight;
+            sum_weights += cur_weight;
+          }
+        }
+        for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+        {
+          if (mixture_weights[g] > 0)
+          {
+            if (gauss_map[g] == -1)
+            {
+              // Allocate a new Gaussian
+              gauss_map[g] = add_final_gaussian(kmeans_gauss[g]);
+              num_gaussians++;
+            }
+            cur_clusters[c]->add_final_gaussian(mixture_weights[g]/sum_weights,
+                                                gauss_map[g]);
+            num_mixture_components++;
+          }
+        }
+      }
+      if (m_info > 0)
+      {
+        fprintf(stderr, "  %i Gaussians allocated\n", num_gaussians);
+        fprintf(stderr, "  %.2f mixture components on average\n",
+                (double)num_mixture_components/(double)kmeans_gauss.size());
+      }
+      
+      // Release the allocated unused kmeans Gaussians
+      for (int g = 0; g < (int)kmeans_gauss.size(); g++)
+      {
+        if (gauss_map[g] == -1)
+          delete kmeans_gauss[g];
+      }
+      kmeans_gauss.clear();
+    }
+  }
+}
+
+void
 PhonePool::merge_context_phones(void)
 {
   int total_clusters = 0;
@@ -695,14 +917,33 @@ PhonePool::compute_log_likelihood_gain(ContextPhoneCluster &parent,
 }
 
 
+int
+PhonePool::add_final_gaussian(Gaussian *g)
+{
+  int index = (int)m_final_gaussians.size();
+  m_final_gaussians.push_back(g);
+  return index;
+}
+
+
 void
 PhonePool::save_model(const std::string &base, int max_context_index)
 {
   HmmSet model(m_dim);
   MakeHmmModel m(model);
   int state_index = 0;
+  int prev_gaussian_index = -1;
 
   // Allocate PDFs, states, transitions and mixtures
+  if (m_final_gaussians.size() > 0)
+  {
+    for (int i = 0; i < (int)m_final_gaussians.size(); i++)
+    {
+      int pool_index = model.add_pool_pdf(m_final_gaussians[i]);
+      assert( pool_index == i );
+    }
+  }
+  
   for (PhoneMap::iterator it = m_phones.begin(); it != m_phones.end(); it++)
   {
     for (int s = 0; s < (*it).second->num_states(); s++)
@@ -724,16 +965,33 @@ PhonePool::save_model(const std::string &base, int max_context_index)
         model.add_transition(state_index, 0, 0.8);
         model.add_transition(state_index, 1, 0.2);
 
-        // Add the pdf
-        FullCovarianceGaussian *g =
-          new FullCovarianceGaussian(*(clusters[i]->statistics()));
-        int pool_index = model.add_pool_pdf(g);
+        if (m_final_gaussians.size() == 0)
+        {
+          // Add the pdf
+          FullCovarianceGaussian *g =
+            new FullCovarianceGaussian(*(clusters[i]->statistics()));
+          prev_gaussian_index = model.add_pool_pdf(g);
+        }
 
         // Add the mixture
         Mixture *mixture = new Mixture();
         int mindex = model.add_mixture_pdf(mixture);
         assert( mindex == state_index );
-        mixture->add_component(pool_index, 1);
+
+        if (clusters[i]->num_final_gaussians() == 0)
+        {
+          assert( m_final_gaussians.size() == 0 );
+          mixture->add_component(prev_gaussian_index, 1);
+        }
+        else
+        {
+          assert( m_final_gaussians.size() != 0);
+          for (int j = 0; j < clusters[i]->num_final_gaussians(); j++)
+          {
+            mixture->add_component(clusters[i]->final_gauss_index(j),
+                                   clusters[i]->final_gauss_weight(j));
+          }
+        }
 
         state_index++;
       }

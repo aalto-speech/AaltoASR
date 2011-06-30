@@ -74,6 +74,7 @@ private:
     void compute_statistics(void);
     double occupancy_count(void) const { return m_sum_occupancy; }
     int num_context_phones(void) const { return (int)m_contexts.size(); }
+    FullCovarianceGaussian* statistics(void) {return &m_sum_stats;}
     const FullCovarianceGaussian* statistics(void) const {return &m_sum_stats;}
 
     double compute_new_cluster_occupancy(DecisionRule *rule, int context_index,
@@ -91,6 +92,11 @@ private:
 
     void set_state_index(int state_index) { m_state_index = state_index; }
     int state_index(void) const { return m_state_index; }
+
+    void add_final_gaussian(double weight, int gauss_index);
+    int num_final_gaussians(void) { return (int)m_gauss_index.size(); }
+    int final_gauss_index(int i) { return m_gauss_index[i]; }
+    double final_gauss_weight(int i) { return m_gauss_weight[i]; }
 
     const ContextPhoneSet& get_context_phones(void) { return m_contexts; }
     
@@ -113,6 +119,9 @@ private:
 
     /// State index allocated for this cluster
     int m_state_index;
+
+    std::vector<int> m_gauss_index;
+    std::vector<double> m_gauss_weight;
   };
 
 
@@ -136,7 +145,7 @@ private:
     ContextPhoneCluster* get_initial_clustered_state(int state);
     void add_final_cluster(int state, ContextPhoneCluster *cl);
     void merge_clusters(int state, int cl1_index, int cl2_index);
-    const std::vector<ContextPhoneCluster*>& get_state_clusters(int state) { return m_cluster_states[state]; }
+    std::vector<ContextPhoneCluster*>& get_state_clusters(int state) { return m_cluster_states[state]; }
 
     std::string& label(void) { return m_center_phone; }
     
@@ -285,6 +294,8 @@ public:
    */
   void merge_context_phones(void);
 
+  void soft_kmeans_clustering(double mixture_threshold, bool diagonal);
+
   /** Saves the result of context phone tying to a HMM model.
    * The model will have one full covariance Gaussian for each state
    * \param base              Base filename for the model
@@ -313,6 +324,8 @@ private:
 
   void iterate_context_phones(ContextPhoneCallback &c, int max_context_index);
 
+  int add_final_gaussian(Gaussian *g);
+
 private:
   double m_min_occupancy;
   double m_min_split_ll_gain;
@@ -322,6 +335,8 @@ private:
   PhoneMap m_phones;
 
   PhoneLabelSet m_contexts;
+
+  std::vector<Gaussian*> m_final_gaussians;
 
   int m_dim; //!< Feature dimension
   int m_info; //!< Verbosity
