@@ -87,6 +87,9 @@ public:
   /** Sets endianess. */
   void set_little_endian(bool endian) { m_little_endian = endian; }
 
+  /** Force to RAW mode */
+  void enforce_raw(bool raw) { m_raw = raw; }
+
   /** The sample format. */
   SF_INFO sf_info;
 
@@ -122,6 +125,9 @@ protected:
 
   /** Endianess for RAW-files */
   bool m_little_endian;
+
+  /** File mode enforced to RAW? */
+  bool m_raw;
 
   /** The index of the sample corresponding to end of file (INT_MAX
    * if not set yet). */

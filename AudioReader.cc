@@ -9,6 +9,7 @@ namespace aku {
 AudioReader::AudioReader()
   : m_sndfile(NULL),
     m_little_endian(true),
+    m_raw(false),
     m_eof_sample(INT_MAX),
     m_buffer_size(0),
     m_start_sample(-INT_MAX),
@@ -83,7 +84,8 @@ AudioReader::open(const char *filename, int sample_rate)
   close();
   reset();
 
-  m_sndfile = sf_open(filename, SFM_READ, &sf_info);
+  if (!m_raw)
+    m_sndfile = sf_open(filename, SFM_READ, &sf_info);
   
   if (m_sndfile == NULL)
   {
@@ -109,7 +111,7 @@ AudioReader::open(FILE *file, int sample_rate, bool shall_close_file, bool strea
   close();
   reset();
 
-  if (!stream)
+  if (!stream && !m_raw)
     m_sndfile = sf_open_fd(fileno(file), SFM_READ, &sf_info, shall_close_file);
   
   if (m_sndfile == NULL)
