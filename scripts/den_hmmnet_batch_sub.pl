@@ -5,6 +5,8 @@
 use locale;
 use strict;
 
+$ENV{LD_LIBRARY_PATH} = '/share/puhe/x86_64/lib';
+
 my $BATCH_ID = shift @ARGV;
 my $NUM_BATCHES = shift @ARGV;
 my $NUM_BLOCKS = shift @ARGV;
