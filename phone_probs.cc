@@ -73,6 +73,7 @@ main(int argc, char *argv[])
       ('C', "clusters=FILE", "arg", "", "Gaussian clustering file")
       ('\0', "eval-minc=FLOAT", "arg", "0", "minimum ratio of top clusters to evaluate")
       ('\0', "eval-ming=FLOAT", "arg", "0.1", "minimum ratio of Gaussians to evaluate")
+      ('\0', "sort-recipe", "", "", "sort recipe lines, useful with adaptation")
       ('N', "no-normalization", "", "", "do not normalize the likelihoods")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
@@ -137,7 +138,8 @@ main(int argc, char *argv[])
                 config["batch"].get_int(), config["bindex"].get_int(),
                 false);
 
-    recipe.sort_infos();
+    if (config["sort-recipe"].specified)
+      recipe.sort_infos();
 
     // Handle each file in the recipe
     for (int recipe_index = 0; recipe_index < (int)recipe.infos.size(); 
