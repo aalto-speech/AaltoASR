@@ -103,9 +103,16 @@ public:
     assert(dim > 0);
     m_num_frames = num_frames;
     m_dim = dim;
-    m_buffer.resize(m_num_frames * m_dim);
+    m_buffer.resize(m_num_frames);
     for (int i=0; i<m_num_frames; i++)
       m_buffer[i].resize(m_dim);
+  }
+
+  void clear(void)
+  {
+    m_dim = 1;
+    m_num_frames = 1;
+    m_buffer.resize(1);
   }
 
   /** The dimension of the feature vectors. */
