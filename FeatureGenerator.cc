@@ -255,7 +255,7 @@ FeatureGenerator::compute_init_buffers()
       cur_branch_level += module->sources().size() - 1;
   }
 
-  // Every target-branching module M must have a buffer offsets that
+  // Every target-branching module M must have buffer offsets that
   // include the largest offsets between M and the next bottle-neck
   // module.  Otherwise, duplicated computation is done when buffers
   // are filled for the first time (thus the name init_offset_left and
@@ -268,7 +268,7 @@ FeatureGenerator::compute_init_buffers()
     FeatureModule *module = m_modules[i];
 
     if (!bottle_neck[i]) {
-      for (int j = 0; j < (int)module->sources().size(); j++) {
+      for (int j = 0; j < (int)module->sources().size(); j++) {                
         FeatureModule *src_module = module->sources()[j];
         src_module->update_init_offsets(*module);
       }
