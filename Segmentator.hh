@@ -5,6 +5,8 @@
 #include <map>
 #include <vector>
 
+namespace aku {
+
 /** Virtual base class for generating or reading segmentations of
  * training utterances.
  */
@@ -12,11 +14,13 @@ class Segmentator {
 public:
 
   /** Structure for representing PDFs and their prior probabilities */
-  struct IndexProbPair {
-    int index;
-    double prob;
-    IndexProbPair(int i, double p) : index(i), prob(p) { }
-  };
+  // struct IndexProbPair {
+  //   int index;
+  //   double prob;
+  //   IndexProbPair(int i, double p) : index(i), prob(p) { }
+  // };
+
+  typedef std::map<int, double> IndexProbMap;
 
   virtual ~Segmentator() { }
 
@@ -82,14 +86,16 @@ public:
 
   /** Returns a reference to a vector of possible PDFs and their
    * probabilities */
-  virtual const std::vector<IndexProbPair>& pdf_probs(void) = 0;
+  virtual const IndexProbMap& pdf_probs(void) = 0;
 
   /** Returns a reference to a vector of possible transitions and their
    * probabilities */
-  virtual const std::vector<IndexProbPair>& transition_probs(void) = 0;
+  virtual const IndexProbMap& transition_probs(void) = 0;
 
   /** Returns the label of the most probable arc */
   virtual const std::string& highest_prob_label(void) = 0;
 };
+
+}
 
 #endif // SEGMENTATOR_HH

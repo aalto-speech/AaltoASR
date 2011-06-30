@@ -53,8 +53,8 @@ public:
   virtual bool init_utterance_segmentation(void);
   virtual int current_frame(void) { return m_current_frame; }
   virtual bool next_frame(void);
-  virtual const std::vector<Segmentator::IndexProbPair>& pdf_probs(void) { return m_cur_pdf; }
-  virtual const std::vector<Segmentator::IndexProbPair>& transition_probs(void) { return m_transition_info; }
+  virtual const Segmentator::IndexProbMap& pdf_probs(void) { return m_cur_pdf; }
+  virtual const Segmentator::IndexProbMap& transition_probs(void) { return m_transition_info; }
   virtual const std::string& highest_prob_label(void) { return m_cur_label; }
 
   /** Sets the frame rate for converting phn sample numbers to frame numbers.
@@ -133,11 +133,11 @@ private:
   bool m_collect_transitions;
 
   /// A vector which holds the current pdf and its probability
-  std::vector<Segmentator::IndexProbPair> m_cur_pdf;
+  Segmentator::IndexProbMap m_cur_pdf;
 
   /// A map which holds the information about transitions
-  std::vector<Segmentator::IndexProbPair> m_transition_info;
-  
+  Segmentator::IndexProbMap m_transition_info;
+
   /// String with the current label
   std::string m_cur_label;
 };

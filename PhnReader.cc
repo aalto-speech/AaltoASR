@@ -22,11 +22,10 @@ PhnReader::PhnReader(HmmSet *model)
   : m_file(NULL), m_model(model),
     m_state_num_labels(false), m_relative_sample_numbers(false)
 {
-  Segmentator::IndexProbPair p(-1, 1);
   set_frame_rate(125); // Default frame rate
 
   // Initialize the current state and its probability
-  m_cur_pdf.push_back(p);
+  m_cur_pdf.insert(IndexProbMap::value_type(-1, 1.0));
 }
 
 PhnReader::~PhnReader()
@@ -173,7 +172,24 @@ PhnReader::next_frame(void)
     Hmm &hmm = m_model->hmm(m_model->hmm_index(m_cur_phn.label[0]));
     cur_state_index = hmm.state(m_cur_phn.state);
   }
-  m_cur_pdf.back().index = m_model->emission_pdf_index(cur_state_index);
+  m_cur_pdf.clear();
+  m_cur_pdf.insert(IndexProbMap::value_type(
+                     m_model->emission_pdf_index(cur_state_index), 1.0));
+
+  if (m_cur_phn.label.size() > 0)
+  {
+    m_cur_label = m_cur_phn.label[0];
+    if (m_cur_phn.label.size() > 1)
+    {
+      for (int i = 1 ; i < (int)m_cur_phn.label.size(); i++)
+      {
+        m_cur_label += ",";
+        m_cur_label += m_cur_phn.label[i];
+      }
+    }
+  }
+  else
+    m_cur_label = str::fmt(16, "%d", m_cur_phn.state);
 
   if (m_cur_phn.label.size() > 0)
   {
@@ -264,8 +280,8 @@ PhnReader::next_frame(void)
       }
       if (transition_index != -1)
       {
-        Segmentator::IndexProbPair new_transition(transition_index, 1);
-        m_transition_info.push_back(new_transition);
+        m_transition_info.insert(IndexProbMap::value_type(
+                                   transition_index, 1.0));
       }
     }
   }
