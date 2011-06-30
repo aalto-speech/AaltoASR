@@ -215,6 +215,7 @@ private:
   int m_eof_frame;
 
   int m_endian; // RAW-file endianess: 0=default, 1=little, 2=big
+  bool m_raw; // File mode enforced to RAW
 
   /** Should we copy border frames when negative or after-eof frames
    * are requested?  Otherwise, we assume that AudioReader gives zero
@@ -363,6 +364,8 @@ public:
 private:
   virtual void get_module_config(ModuleConfig &config);
   virtual void set_module_config(const ModuleConfig &config);
+  virtual void set_parameters(const ModuleConfig &config);
+  virtual void get_parameters(ModuleConfig &config);
   virtual void generate(int frame);
 private:
   std::vector<float> m_mean;

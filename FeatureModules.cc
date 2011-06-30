@@ -219,6 +219,7 @@ AudioFileModule::AudioFileModule(FeatureGenerator *fea_gen) :
   m_window_width(0),
   m_eof_frame(INT_MAX),
   m_endian(0),
+  m_raw(false),
   m_copy_borders(true),
   m_last_feature_frame(INT_MIN)
 {
@@ -235,6 +236,7 @@ AudioFileModule::~AudioFileModule()
 void
 AudioFileModule::set_file(FILE *fp, bool stream)
 {
+  m_reader.enforce_raw(m_raw);
   if (m_endian == 1)
     m_reader.set_little_endian(true);
   else if (m_endian == 2)
@@ -284,6 +286,8 @@ AudioFileModule::get_module_config(ModuleConfig &config)
     config.set("endian", "little");
   else if (m_endian == 2)
     config.set("endian", "big");
+  if (m_raw)
+    config.set("raw", "1");
 }
 
 void
@@ -311,6 +315,11 @@ AudioFileModule::set_module_config(const ModuleConfig &config)
     m_endian = 1;
   else if (endian == "big")
     m_endian = 2;
+
+  int raw = 0;
+  config.get("raw", raw);
+  if (raw)
+    m_raw = true;
   
   m_copy_borders = 1;
   config.get("copy_borders", m_copy_borders);
@@ -379,7 +388,7 @@ AudioFileModule::generate(int frame)
     }
   }
 
-  // Apply lowpass filtering
+  // Apply pre-emphasis filtering
   FeatureVec target = m_buffer[frame];
   for (t = 0; t < m_window_width; t++)
   {
@@ -986,6 +995,40 @@ NormalizationModule::set_module_config(const ModuleConfig &config)
       throw std::string("NormalizationModule: Invalid scale dimension");
   }
 }
+
+
+void
+NormalizationModule::set_parameters(const ModuleConfig &config)
+{
+  config.get("mean", m_mean);
+  if ((int)m_mean.size() != m_dim)
+    throw std::string("NormalizationModule: Invalid mean dimension");
+
+  if (config.exists("var") && config.exists("scale"))
+  {
+    throw std::string("NormalizationModule: Both scale and var can not be defined simultaneously");
+  }
+  if (config.get("var", m_scale))
+  {
+    if ((int)m_scale.size() != m_dim)
+      throw std::string("Normalization module: Invalid variance dimension");
+    for (int i = 0; i < m_dim; i++)
+      m_scale[i] = 1 / sqrtf(m_scale[i]);
+  }
+  else if (config.get("scale", m_scale))
+  {
+    if ((int)m_mean.size() != m_dim)
+      throw std::string("NormalizationModule: Invalid scale dimension");
+  }
+}
+
+void
+NormalizationModule::get_parameters(ModuleConfig &config)
+{
+  config.set("mean", m_mean);
+  config.set("scale", m_scale);
+}
+
 
 void
 NormalizationModule::set_normalization(const std::vector<float> &mean,
