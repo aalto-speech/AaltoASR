@@ -166,6 +166,8 @@ namespace LinearAlgebra {
     LaGenMatDouble t(A);
     eigvals.resize(A.rows(),1);
     eigvecs.resize(A.rows(),A.cols());
+
+    // CHECKME!!! Is this correct? Complex case didn't work
   
     matrix_power(B, B_negsqrt, -0.5);
     Blas_Mat_Mat_Mult(B_negsqrt, A, t, 1.0, 0.0);
@@ -187,17 +189,28 @@ namespace LinearAlgebra {
     assert(A.rows()==B.rows());
     assert(is_spd(B));
 
-    LaGenMatDouble B_negsqrt;
-    LaGenMatDouble t(A);
-    LaGenMatDouble t2(A);
-    eigvals.resize(A.rows(),1);
-    eigvecs.resize(A.rows(),A.cols());
-  
-    matrix_power(B, B_negsqrt, -0.5);
-    Blas_Mat_Mat_Mult(B_negsqrt, A, t, 1.0, 0.0);
-    Blas_Mat_Mat_Mult(t, B_negsqrt, t2, 1.0, 0.0);
+    // Old code commented out, resulted incorrect solutions!
+
+    // LaGenMatDouble B_negsqrt;
+    // LaGenMatDouble t(A);
+    // LaGenMatDouble t2(A);
+    // eigvals.resize(A.rows(),1);
+    // eigvecs.resize(A.rows(),A.cols());
+    
+    // matrix_power(B, B_negsqrt, -0.5);
+    // Blas_Mat_Mat_Mult(B_negsqrt, A, t, 1.0, 0.0);
+    // Blas_Mat_Mat_Mult(t, B_negsqrt, t2, 1.0, 0.0);
+
+    // -- New code here -- (21 Dec 2010)
+    Matrix Binv;
+    Matrix t2(A);
+    inverse(B, Binv);
+    Blas_Mat_Mat_Mult(Binv, A, t2, 1.0, 0.0);
+    // -- New code ends here --
 
     LaGenMatComplex c(t2);
+    eigvals.resize(c.rows(),1);
+    eigvecs.resize(c.rows(),c.cols());
     LaEigSolve(c, eigvals, eigvecs);
   }
 
