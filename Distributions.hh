@@ -42,7 +42,7 @@ public:
   /** Has accumulating been started
    * \returns true if start_accumulating has been called, false otherwise
    */
-  virtual bool is_accumulating() = 0;
+  virtual bool is_accumulating() const = 0;
   /* Accumulates the statistics for this pdf */
   virtual void accumulate(double prior,
 			  const Vector &f, 
@@ -65,6 +65,7 @@ public:
   virtual double compute_likelihood(const Vector &f) const = 0;
   /* The log likelihood of the current feature given this model */
   virtual double compute_log_likelihood(const Vector &f) const = 0;
+
 
   // SAMPLING
 
@@ -166,6 +167,9 @@ public:
                                double c1 = 0, double c2 = 0,
                                double mmi_ismooth = 0, double mpe_ismooth = 0);
 
+  /// Sets I-smoothing prior mode
+  void set_ismooth_prev_prior(bool prev) { m_ismooth_prev_prior = prev; }
+
 #ifdef USE_SUBSPACE_COV
   /** Set the HCL objects and settings for optimization
    * \param ls            HCL linesearch
@@ -236,7 +240,8 @@ public:
   /// \brief Reads clustering of the Gaussians from a file.
   ///
   void read_clustering(const std::string &filename);
-
+  void write_cluster_gaussians(const std::string &filename);
+  void inject_cluster_gaussians(PDFPool *target_pool);
   std::vector<PDF*> &get_cluster_centers() { return m_cluster_centers; }
   std::vector<std::vector<int> > &get_cluster_to_gaussians() { return m_cluster_to_gaussians; }
   
@@ -254,6 +259,8 @@ private:
   double m_c2;
   double m_mmi_ismooth;
   double m_mpe_ismooth;
+
+  double m_ismooth_prev_prior;
 
 #ifdef USE_SUBSPACE_COV
   // Subspaces
@@ -376,7 +383,7 @@ public:
 
   /* Initializes the accumulator buffers */  
   virtual void start_accumulating(StatisticsMode mode) = 0;
-  virtual bool is_accumulating() { return (m_accums.size()>0?true:false); }
+  virtual bool is_accumulating() const { return (m_accums.size()>0?true:false); }
   /* Accumulates the maximum likelihood statistics for the Gaussian
      weighed with a prior. */
   virtual void accumulate(double prior, const Vector &f, 
@@ -391,10 +398,10 @@ public:
   /* Tells if this Gaussian has been accumulated */
   virtual bool accumulated(int accum_pos = 0) const;
   /* Use the accumulated statistics to update the current model parameters. */
-  virtual void estimate_parameters(EstimationMode mode) { estimate_parameters(mode, 0, 0, 1, 2, false); }
+  virtual void estimate_parameters(EstimationMode mode) { estimate_parameters(mode, 0, 0, 1, 2, 0, false); }
   virtual void estimate_parameters(EstimationMode mode, double minvar,
                                    double covsmooth, double c1, double c2,
-                                   bool ml_stats_target);
+                                   double tau, bool ml_stats_target);
 
   // GAUSSIAN SPECIFIC
   
@@ -447,6 +454,9 @@ public:
    * \param accum_pos Accumulator position
    */
   bool full_stats_accumulated(int accum_pos);
+
+  /// Is this a diagonal covariance gaussian?
+  virtual bool is_diagonal_covariance(void) const = 0;
 
   /**
    * \return true if Gaussian parameters are computed and valid
@@ -518,6 +528,9 @@ public:
   // Faster implementations for DiagonalGaussian
   virtual void draw_sample(Vector &sample);
   virtual double kullback_leibler(Gaussian &g) const;
+
+  /// Is this a diagonal covariance gaussian?
+  virtual bool is_diagonal_covariance(void) const  { return true; }
   
   // Diagonal-specific
   /// Get the diagonal of the covariance matrix
@@ -525,7 +538,7 @@ public:
   /// Set the diagonal of the covariance matrix
   virtual void set_covariance(const Vector &covariance,
                               bool finish_statistics = true);
-
+  
   /// Sets the constant after the precisions have been set
   void set_constant(void);
 
@@ -562,6 +575,9 @@ public:
   virtual Gaussian* copy_gaussian(void) { return new FullCovarianceGaussian(*this); }
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
+
+  /// Is this a diagonal covariance gaussian?
+  virtual bool is_diagonal_covariance(void) const  { return false; }
 
   // Full-covariance-specific
   void recompute_exponential_parameters();
@@ -601,6 +617,9 @@ public:
   virtual Gaussian* copy_gaussian(void) { return new PrecisionConstrainedGaussian(*this); }
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
+
+  /// Is this a diagonal covariance gaussian?
+  virtual bool is_diagonal_covariance(void) const  { return false; }
 
   // PCGMM-specific
 
@@ -657,6 +676,9 @@ public:
   virtual Gaussian* copy_gaussian(void) { return new SubspaceConstrainedGaussian(*this); }
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
+
+  /// Is this a diagonal covariance gaussian?
+  virtual bool is_diagonal_covariance(void) const  { return false; }
 
   // SCGMM-specific
 
@@ -770,7 +792,7 @@ public:
   
   // From pdf
   virtual void start_accumulating(StatisticsMode mode);
-  virtual bool is_accumulating() { return (m_accums.size()>0?true:false); }
+  virtual bool is_accumulating() const { return (m_accums.size()>0?true:false); }
   virtual void accumulate(double prior,
 			  const Vector &f,
 			  int accum_pos = 0);

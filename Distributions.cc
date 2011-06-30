@@ -62,7 +62,7 @@ FullStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 {
   int feacount;
   double gamma;
-  double aux_gamma;
+  double aux_gamma = 0;
   float t;
 
   is.read((char*)&feacount, sizeof(int));
@@ -175,7 +175,7 @@ DiagonalStatisticsAccumulator::accumulate_from_dump(std::istream &is)
 {
   int feacount;
   double gamma;
-  double aux_gamma;
+  double aux_gamma = 0;
   float t;
   
   is.read((char*)&feacount, sizeof(int));
@@ -381,7 +381,7 @@ Gaussian::ismooth_statistics(int source, int target, double smoothing)
 void
 Gaussian::estimate_parameters(EstimationMode mode, double minvar,
                               double covsmooth, double c1, double c2,
-                              bool ml_stats_target)
+                              double tau, bool ml_stats_target)
 {
   if ((mode == ML_EST && !accumulated(ML_BUF)) ||
       (mode == MMI_EST && (!accumulated(ML_BUF) || !accumulated(MMI_BUF))) ||
@@ -429,51 +429,82 @@ Gaussian::estimate_parameters(EstimationMode mode, double minvar,
     m_accums[num_buf]->get_accumulated_second_moment(sigma_tilde);
     m_accums[den_buf]->get_accumulated_second_moment(temp_denominator_sigma);
     Blas_Add_Mat_Mult(sigma_tilde, -1, temp_denominator_sigma);
-    
-    // a0
-    LaGenMatDouble a0(sigma_tilde);
-    Blas_Scale(c, a0);
-    Blas_R1_Update(a0, mu_tilde, mu_tilde, -1);
-    
-    // a1
-    LaGenMatDouble a1(old_covariance);
-    Blas_R1_Update(a1, old_mean, old_mean, 1);
-    Blas_Scale(c, a1);
-    Blas_R1_Update(a1, old_mean, mu_tilde, -1);
-    Blas_R1_Update(a1, mu_tilde, old_mean, -1);
-    Blas_Add_Mat_Mult(a1, 1, sigma_tilde);
-    
-    // a2
-    LaGenMatDouble a2(old_covariance);
 
-    // Solve the quadratic eigenvalue problem
-    // A_0 + D A_1 + D^2 A_2
-    // by linearizing to a generalized eigenvalue problem
-    // See: www.cs.utk.edu/~dongarra/etemplates/node333.html
-    // Note: complex eigenvalues, we want only the max real eigenvalue!
-    LaGenMatDouble A=LaGenMatDouble::zeros(2*dim());
-    LaGenMatDouble B=LaGenMatDouble::zeros(2*dim());
-    LaGenMatDouble identity=LaGenMatDouble::eye(dim());
-
-    A(LaIndex(dim(),2*dim()-1),LaIndex(0,dim()-1)).inject(a0);
-    A(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a1);
-    Blas_Scale(-1,A);
-    A(LaIndex(0,dim()-1),LaIndex(dim(),2*dim()-1)).inject(identity);
-
-    B(LaIndex(0,dim()-1),LaIndex(0,dim()-1)).inject(identity);
-    B(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a2);
+    double min_d = 0;
+    if (is_diagonal_covariance())
+    {
+      for (int i = 0; i < m_dim; i++)
+      {
+        double a2 = old_covariance(i, i);
+        double a1 = sigma_tilde(i, i) +
+          c*(old_covariance(i, i) + old_mean(i)*old_mean(i)) -
+          2*mu_tilde(i)*old_mean(i);
+        double a0 = c*sigma_tilde(i, i)-mu_tilde(i)*mu_tilde(i);
+        if (a2 == 0)
+        {
+          assert( a1 > 0 ); // Otherwise this defines a maximum
+          min_d = std::max(min_d, -a0/a1);
+        }
+        else
+        {
+          double temp = a1*a1 - (4*a0*a2);
+          if (temp >= 0) // Otherwise ignore
+            min_d = std::max(min_d, (-a1+sqrt(temp))/(2*a2));
+        }
+      }
+    }
+    else
+    {
+      // Full covariance case
+      // a0
+      LaGenMatDouble a0(sigma_tilde);
+      Blas_Scale(c, a0);
+      Blas_R1_Update(a0, mu_tilde, mu_tilde, -1);
     
-    LaVectorComplex eigvals;
-    LaGenMatComplex eigvecs;
-    LinearAlgebra::generalized_eigenvalues(A,B,eigvals,eigvecs);
+      // a1
+      LaGenMatDouble a1(old_covariance);
+      Blas_R1_Update(a1, old_mean, old_mean, 1);
+      Blas_Scale(c, a1);
+      Blas_R1_Update(a1, old_mean, mu_tilde, -1);
+      Blas_R1_Update(a1, mu_tilde, old_mean, -1);
+      Blas_Add_Mat_Mult(a1, 1, sigma_tilde);
+    
+      // a2
+      LaGenMatDouble a2(old_covariance);
 
-    // Find a good D
-    double d=0;
-    for (int i=0; i<eigvals.size(); i++)
-      if (std::fabs(eigvals(i).i) < 0.000000001)
-        d=std::max(d, eigvals(i).r);    
+      // Solve the quadratic eigenvalue problem
+      // A_0 + D A_1 + D^2 A_2
+      // by linearizing to a generalized eigenvalue problem
+      // See: www.cs.utk.edu/~dongarra/etemplates/node333.html
+      // Note: complex eigenvalues, we want only the max real eigenvalue!
+      LaGenMatDouble A=LaGenMatDouble::zeros(2*dim());
+      LaGenMatDouble B=LaGenMatDouble::zeros(2*dim());
+      LaGenMatDouble identity=LaGenMatDouble::eye(dim());
+
+      A(LaIndex(dim(),2*dim()-1),LaIndex(0,dim()-1)).inject(a0);
+      A(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a1);
+      Blas_Scale(-1,A);
+      A(LaIndex(0,dim()-1),LaIndex(dim(),2*dim()-1)).inject(identity);
+      
+      B(LaIndex(0,dim()-1),LaIndex(0,dim()-1)).inject(identity);
+      B(LaIndex(dim(),2*dim()-1),LaIndex(dim(),2*dim()-1)).inject(a2);
+    
+      LaVectorComplex eigvals;
+      LaGenMatComplex eigvecs;
+      LinearAlgebra::generalized_eigenvalues(A,B,eigvals,eigvecs);
+
+      // Find a good D
+      for (int i=0; i<eigvals.size(); i++)
+        if (std::fabs(eigvals(i).i) < 0.000000001)
+          min_d=std::max(min_d, eigvals(i).r);
+    }
+
     assert(c2>1);
-    d=std::max(c1*m_accums[den_buf]->gamma(), c2*d);
+    double d=std::max(c1*m_accums[den_buf]->gamma() + tau, c2*min_d);
+
+    fprintf(stderr, "num-gamma: %g  den-gamma: %g  d: %g  %s\n",
+            m_accums[num_buf]->gamma(),
+            m_accums[den_buf]->gamma(), d, (d>c2*min_d?"DEN":"MIN"));
     
     // COMPUTE NEW MEAN
     // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
@@ -740,6 +771,8 @@ Gaussian::get_covariance(Vector &covariance) const
     covariance(i)=cov(i,i);
 }
 
+
+
 DiagonalGaussian::DiagonalGaussian(int dim)
 {
   reset(dim);
@@ -880,9 +913,15 @@ void
 DiagonalGaussian::read(std::istream &is)
 {
   for (int i=0; i<dim(); i++)
+  {
     is >> m_mean(i);
+    if (is.fail())
+      throw std::string("Error in reading Gaussian specifications");
+  }
   for (int i=0; i<dim(); i++) {
     is >> m_covariance(i);
+    if (is.fail())
+      throw std::string("Error in reading Gaussian specifications");
     if (m_covariance(i) > 0)
       m_precision(i) = 1/m_covariance(i);
     else
@@ -1160,10 +1199,20 @@ FullCovarianceGaussian::read(std::istream &is)
   Matrix covariance(dim(), dim());
   
   for (int i=0; i<dim(); i++)
+  {
     is >> m_mean(i);
+    if (is.fail())
+      throw std::string("Error in reading Gaussian specifications");
+  }
   for (int i=0; i<dim(); i++)
+  {
     for (int j=0; j<dim(); j++)
+    {
       is >> covariance(i,j);
+      if (is.fail())
+        throw std::string("Error in reading Gaussian specifications");
+    }
+  }
   
   set_covariance(covariance);
 }
@@ -1363,9 +1412,17 @@ PrecisionConstrainedGaussian::read(std::istream &is)
   is >> ss_dim;  
   m_coeffs.resize(ss_dim);
   for (int i=0; i<dim(); i++)
+  {
     is >> m_transformed_mean(i);
+    if (is.fail())
+      throw std::string("Error in reading Gaussian specifications");
+  }
   for (int i=0; i<subspace_dim(); i++)
+  {
     is >> m_coeffs(i);
+    if (is.fail())
+      throw std::string("Error in reading Gaussian specifications");
+  }
 
   recompute_constant();
 }
@@ -1564,7 +1621,11 @@ SubspaceConstrainedGaussian::read(std::istream &is)
   is >> ss_dim;
   m_coeffs.resize(ss_dim);
   for (int i=0; i<m_coeffs.size()-1; i++)
+  {
     is >> m_coeffs(i);
+    if (is.fail())
+      throw std::string("Error in reading Gaussian specifications");
+  }
   is >> m_coeffs(m_coeffs.size()-1);
 
   Vector psi;
@@ -1655,12 +1716,14 @@ SubspaceConstrainedGaussian::set_parameters(const Vector &mean, const Matrix &co
 
 Mixture::Mixture()
 {
+  m_dim = 0;
 }
 
 
 Mixture::Mixture(PDFPool *pool)
 {
   m_pool = pool;
+  m_dim = 0; // Use m_pool to figure out the dimension
 }
 
 
@@ -1816,10 +1879,12 @@ Mixture::accumulate(double gamma,
       this_likelihood = m_pool->compute_likelihood(f, m_pointers[i]);
       weighted_likelihood = gamma * m_weights[i] * this_likelihood;
       this_gamma = weighted_likelihood / total_likelihood;
+      
       m_accums[accum_pos]->gamma[i] += this_gamma;
       get_base_pdf(i)->accumulate(this_gamma, f, accum_pos);
-      get_base_pdf(i)->accumulate_aux_gamma(
-        this_gamma*util::safe_log(this_likelihood), accum_pos);
+//       get_base_pdf(i)->accumulate_aux_gamma(
+//         this_gamma*util::safe_log(this_likelihood), accum_pos);
+      get_base_pdf(i)->accumulate_aux_gamma(fabs(this_gamma), accum_pos);
     }
     m_accums[accum_pos]->accumulated = true;
   }
@@ -1955,7 +2020,7 @@ Mixture::estimate_parameters(EstimationMode mode)
       den_buf = MPE_DEN_BUF;
     }
 
-    double currfval=0, oldfval=0, diff=1, norm;
+    double currfval=0, oldfval=0, diff=1;
 
     // Iterate until convergence
     std::vector<double> old_weights = m_weights;
@@ -1963,7 +2028,7 @@ Mixture::estimate_parameters(EstimationMode mode)
     while (diff > 0.00001 && iter < 1000) {
       iter++;
       diff = 0;
-      std::vector<double> previous_weights = m_weights;
+      //std::vector<double> previous_weights = m_weights;
 
       if (size() == 1)
       {
@@ -1974,18 +2039,24 @@ Mixture::estimate_parameters(EstimationMode mode)
 
       // Go through every mixture weight
       for (int i=0; i<size(); i++) {
+
+        // JPy: Moved previous weights here
+        std::vector<double> previous_weights = m_weights;
+        
         // Solve a quadratic equation
         // See Povey: Frame discrimination training ... 3.3 (9)
         // Note: the equation isn't given explicitly, needs some derivation
-        double a, b, c, temp, sol1, sol2;
+        double a, b, c, partsum, sol1, sol2;
         // a
-        a=0, temp=0;
+        a=0, partsum=0;
         for (int j=0; j<size(); j++)
           if (i != j)
-            temp += previous_weights[j];
+            partsum += previous_weights[j];
+        if (partsum <= 0)
+          continue;
         for (int j=0; j<size(); j++)
           if (i != j)
-            a -= m_accums[den_buf]->gamma[j] * previous_weights[j] / (old_weights[j] * temp);
+            a -= m_accums[den_buf]->gamma[j] * previous_weights[j] / (old_weights[j] * partsum);
         a += m_accums[den_buf]->gamma[i] / old_weights[i];
         // b
         b = -a;
@@ -1997,34 +2068,65 @@ Mixture::estimate_parameters(EstimationMode mode)
         sol1 = (-b-sqrt(b*b-4*a*c)) / (2*a);
         sol2 = (-b+sqrt(b*b-4*a*c)) / (2*a);
 
+        if (sol1 <= 0 || sol1 >= 1.0 || (sol2 > 0 && sol2 < 1.0))
+        {
+          fprintf(stderr, "Warning: Mixture size %i, iter %i, sol1 = %g, sol2 = %g, old = %g\n", size(), iter, sol1, sol2, old_weights[i]);
+        }
+        // else if (sol2 > 0 && sol2 < 1.0)
+        // {
+        //   fprintf(stderr, "Warning: Mixture size %i, alternative solution, sol1 = %g, sol2 = %g\n", size(), sol1, sol2);
+        // }
+
         // Mixture component was removed
-        if (sol1 <= 0) {
-          std::cout << "Warning: mixture component " << i << " was removed." << std::endl;
-          remove_component(i);
-          diff = 100;
-          break;
+        // if (sol1 <= 0) {
+        //   std::cout << "Warning: mixture component " << i << " was removed." << std::endl;
+        //   remove_component(i);
+        //   diff = 100;
+        //   break;
+        // }
+                
+        // assert(sol1 > 0); assert(sol1 <= 1.00001);
+        // m_weights[i] = sol1;
+
+        // // Renormalize weights
+        // norm=0;
+        // for (int i=0; i<size(); i++)
+        //   norm += m_weights[i];
+        // for (int i=0; i<size(); i++)
+        //   m_weights[i] /= norm;
+
+        // Heuristics: If outside permitted region, move halfway
+        if (!isnan(sol1))
+        {
+          if (sol1 <= 0)
+            m_weights[i] = m_weights[i]/2.0;
+          else if (sol1 >= 1.0)
+            m_weights[i] = m_weights[i] + (1-m_weights[i])/2.0;
+          else
+            m_weights[i] = sol1;
+          m_weights[i] = std::max(m_weights[i], 1e-8); // FIXME: Minimum weight
         }
         
-        assert(sol1 > 0); assert(sol1 <= 1.00001);
-        m_weights[i] = sol1;
-
-        // Renormalize weights
-        norm=0;
-        for (int i=0; i<size(); i++)
-          norm += m_weights[i];
-        for (int i=0; i<size(); i++)
-          m_weights[i] /= norm;
+        // Renormalize others
+        double norm_m = (1-m_weights[i]) / partsum;
+        for (int j = 0; j < size(); j++)
+          if (j != i)
+            m_weights[j] *= norm_m;
       }
       
       // Compute function value
       oldfval = currfval;
       currfval = 0;
       for (int i=0; i<size(); i++)
-        currfval += m_accums[num_buf]->gamma[i] * m_weights[i] -
+        currfval += m_accums[num_buf]->gamma[i] * log(m_weights[i]) -
           m_accums[den_buf]->gamma[i] * m_weights[i] / old_weights[i];
       diff = std::fabs(oldfval-currfval);
+      if (iter > 1 && oldfval > currfval)
+      {
+        fprintf(stderr, "Warning: Mixture size %i, iter %i, reduced function value, %g\n", size(), iter, currfval - oldfval);
+      }
     }
-  }  
+  }
 }
 
 
@@ -2050,8 +2152,11 @@ Mixture::read(std::istream &is)
   double weight;
   for (int w = 0; w < num_weights; w++) {
     is >> index >> weight;
+    if (is.fail())
+      throw std::string("Error in reading mixture specifications");
     add_component(index, weight);
   }
+  
   normalize_weights();
 }
 
@@ -2175,6 +2280,8 @@ PDFPool::~PDFPool()
 {
   for (unsigned int i=0; i<m_pool.size(); i++)
     delete m_pool[i];
+  for (unsigned int i = 0; i < m_cluster_centers.size(); i++)
+    delete m_cluster_centers[i];
 }
 
 
@@ -2192,6 +2299,8 @@ PDFPool::reset()
   m_use_clustering = 0;
   m_evaluate_min_clusters = 1;
   m_evaluate_min_gaussians = 1;
+  m_cluster_centers.clear();
+  m_ismooth_prev_prior = false;
 }
 
 
@@ -2392,20 +2501,26 @@ PDFPool::estimate_parameters(PDF::EstimationMode mode)
     try {
       if (temp != NULL)
       {
-        if (mode == PDF::MPE_MMI_PRIOR_EST)
+        double tau = 0;
+        if (!m_ismooth_prev_prior)
         {
-          if (m_mmi_ismooth > 0)
+          if (mode == PDF::MPE_MMI_PRIOR_EST)
+          {
+            if (m_mmi_ismooth > 0)
+              temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
+            temp->estimate_parameters(PDF::MMI_EST, m_minvar, m_covsmooth,
+                                      m_c1, m_c2, 0, true);
+            temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF,m_mpe_ismooth);
+          }
+          else if (mode == PDF::MPE_EST && m_mpe_ismooth > 0)
+            temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF,m_mpe_ismooth);
+          else if (mode == PDF::MMI_EST && m_mmi_ismooth > 0)
             temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
-          temp->estimate_parameters(PDF::MMI_EST, m_minvar, m_covsmooth,
-                                    m_c1, m_c2, true);
-          temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF,m_mpe_ismooth);
         }
-        else if (mode == PDF::MPE_EST && m_mpe_ismooth > 0)
-          temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF,m_mpe_ismooth);
-        else if (mode == PDF::MMI_EST && m_mmi_ismooth > 0)
-          temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
+        else
+          tau = (mode == PDF::MPE_EST?m_mpe_ismooth:m_mmi_ismooth);
         temp->estimate_parameters(mode, m_minvar, m_covsmooth,
-                                  m_c1, m_c2, false);
+                                  m_c1, m_c2, tau, false);
       }
       else
         m_pool[i]->estimate_parameters(mode);
@@ -2728,6 +2843,35 @@ PDFPool::read_clustering(const std::string &filename)
     DiagonalGaussian *dg = new DiagonalGaussian(dim());
     dg->merge(weights, gaussians, true);
     m_cluster_centers[i] = dg;
+  }
+}
+
+
+void
+PDFPool::write_cluster_gaussians(const std::string &filename)
+{
+  std::ofstream out(filename.c_str());
+  if (!out)
+    throw std::string("PDFPool::write_cluster_gaussians(): could not open ") + filename;
+  
+  out << number_of_clusters() << " " << m_dim << " variable\n";
+  for (int i = 0; i < number_of_clusters(); i++)
+  {
+    m_cluster_centers[i]->write(out);
+    out << std::endl;
+  }
+
+  if (!out)
+    throw std::string("PDFPool::write_cluster_gaussians(): error writing file: ") + filename;
+}
+
+
+void
+PDFPool::inject_cluster_gaussians(PDFPool *target_pool)
+{
+  for (int i = 0; i < number_of_clusters(); i++)
+  {
+    target_pool->add_pdf(m_cluster_centers[i]);
   }
 }
 
