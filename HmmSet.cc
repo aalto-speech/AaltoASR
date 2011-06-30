@@ -73,6 +73,8 @@ HmmSet::copy(const HmmSet &hmm_set)
   m_states = hmm_set.m_states;
   // Note! Copies just the pointers, not the objects!
   m_emission_pdfs = hmm_set.m_emission_pdfs;
+  m_pdf_likelihoods.resize(m_emission_pdfs.size(), -1);
+  m_valid_pdf_likelihoods.clear();
   m_hmms = hmm_set.m_hmms;
   m_statistics_mode = hmm_set.m_statistics_mode;
 }
@@ -785,14 +787,20 @@ HmmSet::estimate_transition_parameters()
     for (int t = 0; t < (int)state_transitions.size(); t++)
       sum += m_transition_accum[state_transitions[t]].prob;
     
-    // If no data, do nothing
-    if (sum != 0.0) {
-      for (int t = 0; t < (int)state_transitions.size(); t++) {
-	
-	m_transition_accum[state_transitions[t]].prob = 
-	  m_transition_accum[state_transitions[t]].prob/sum;
-	if (m_transition_accum[state_transitions[t]].prob < .001)
-	  m_transition_accum[state_transitions[t]].prob = .001;
+    // If no data, copy the old transition probabilities
+    for (int t = 0; t < (int)state_transitions.size(); t++)
+    {
+      if (sum > 0.0)
+      {
+        m_transition_accum[state_transitions[t]].prob = 
+          m_transition_accum[state_transitions[t]].prob/sum;
+        if (m_transition_accum[state_transitions[t]].prob < .001)
+          m_transition_accum[state_transitions[t]].prob = .001;
+      }
+      else
+      {
+        m_transition_accum[state_transitions[t]].prob =
+          m_transitions[state_transitions[t]].prob;
       }
     }
     m_transitions = m_transition_accum;
