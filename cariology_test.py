@@ -18,6 +18,7 @@ import math
 
 # Set your decoder swig path in here!
 sys.path.append(os.path.dirname(sys.argv[0]) + "/src/swig");
+#sys.path.append('/home/jpylkkon/decoder_new/decoder/src/swig/');
 
 import Decoder
 
@@ -72,14 +73,17 @@ if lm == 'FreeDictation':
 	lexicon = "/share/puhe/hammas/FreeDictationLexicon.lex"
 	ngram = "/share/puhe/hammas/FreeDictationLM.6gram.bin"
 	lookahead_ngram = "/share/puhe/hammas/FreeDictationLM.2gram.bin"
+	morph_model = True
 elif lm == 'StatusDictation':
 	lexicon = "/share/puhe/hammas/StatusDictationLexicon.lex"
 	ngram = "/share/puhe/hammas/StatusDictationLM.even.3gram.bin"
 	lookahead_ngram = "/share/puhe/hammas/StatusDictationLM.even.2gram.bin"
+	morph_model = False
 else:
 	lexicon = "/share/work/jpylkkon/bin_lm/morph19k.lex"
 	ngram = "/share/work/jpylkkon/bin_lm/morph19k_D20E10_varigram.bin"
 	lookahead_ngram = "/share/work/jpylkkon/bin_lm/morph19k_2gram.bin"
+	morph_model = True
 
 lm_scale = 30
 global_beam = 400
@@ -132,9 +136,10 @@ t = Decoder.Toolbox()
 
 t.select_decoder(0)
 
-if lm != 'StatusDictation':
-	# Emable for morph models.
+if morph_model:
 	t.set_silence_is_word(1)
+else:
+	t.set_silence_is_word(0)
 
 t.set_optional_short_silence(1)
 
@@ -154,8 +159,7 @@ t.set_generate_word_graph(1)
 
 t.set_lm_lookahead(1)
 
-if lm != 'StatusDictation':
-	# Emable for morph models.
+if morph_model:
 	t.set_word_boundary("<w>")
 
 print "Loading lexicon."
@@ -168,7 +172,6 @@ t.set_sentence_boundary("<s>", "</s>")
 
 print "Loading language model."
 t.ngram_read(ngram, 1)
-# t.fsa_lm_read(ngram, 1)
 t.read_lookahead_ngram(lookahead_ngram)
 
 t.prune_lm_lookahead_buffers(0, 4) # min_delta, max_depth
@@ -234,10 +237,11 @@ for lna_file in os.listdir(speech_directory):
 
 	rec = open(rec_path, "r")
 	recognition = rec.read()
-	recognition = recognition.replace(' ', '')
+	if morph_model:
+		recognition = recognition.replace(' ', '')
+		recognition = recognition.replace('<w>', ' ')
 	recognition = recognition.replace('<s>', '')
 	recognition = recognition.replace('</s>', '')
-	recognition = recognition.replace('<w>', ' ')
 	recognition = recognition.strip()
 	rec.close()
 
