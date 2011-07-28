@@ -27,12 +27,12 @@ import Decoder
 # http://en.wikibooks.org/wiki/Algorithm_implementation/Strings/Levenshtein_distance#Python
 #
 
-def levenshtein(s1, s2):
+def levenshtein_l(s1, s2):
     if len(s1) < len(s2):
-        return levenshtein(s2, s1)
+        return levenshtein_l(s2, s1)
     if not s1:
         return len(s2)
- 
+
     previous_row = xrange(len(s2) + 1)
     for i, c1 in enumerate(s1):
         current_row = [i + 1]
@@ -42,8 +42,32 @@ def levenshtein(s1, s2):
             substitutions = previous_row[j] + (c1 != c2)
             current_row.append(min(insertions, deletions, substitutions))
         previous_row = current_row
- 
+
     return previous_row[-1]
+
+def levenshtein_w(s1, s2):
+	words1 = s1.split(None)
+	words2 = s2.split(None)
+	
+	count1 = len(words1)
+	count2 = len(words2)
+
+	if count1 < count2:
+		return levenshtein_w(s2, s1)
+	if not s1:
+		return count2
+
+	previous_row = xrange(count2 + 1)
+	for i, w1 in enumerate(words1):
+		current_row = [i + 1]
+		for j, w2 in enumerate(words2):
+			insertions = previous_row[j + 1] + 1 # j+1 instead of j since previous_row and current_row are one character longer
+			deletions = current_row[j] + 1       # than s2
+			substitutions = previous_row[j] + (w1 != w2)
+			current_row.append(min(insertions, deletions, substitutions))
+		previous_row = current_row
+
+	return previous_row[-1]
 
 
 ##################################################
@@ -201,10 +225,10 @@ output_file = open(sys.argv[3], "w")
 for lna_file in os.listdir(speech_directory):
 	if not lna_file.endswith('.lna'):
 		continue
-	
+
 	name = lna_file[:-4]
 	print name
-	
+
 	lna_path = speech_directory + "/" + lna_file
 	rec_path = lna_path[:-4] + ".rec"
 	txt_path = lna_path[:-4] + ".txt"
@@ -214,14 +238,14 @@ for lna_file in os.listdir(speech_directory):
 	t.set_end(-1)
 	while t.run():
 		pass
-	
+
 	# We have to open with only "w" first, and then later with "r"
 	# for reading, or the file will not be written.
 	rec = open(rec_path, "w")
 	t.print_best_lm_history_to_file(rec)
 	t.write_word_graph(slf_path);
 	rec.close()
-	
+
 	command = 'lattice-tool -read-htk -in-lattice "' + \
 			slf_path + \
 			'" -nbest-decode 100 -out-nbest-dir "' + \
@@ -230,7 +254,7 @@ for lna_file in os.listdir(speech_directory):
 	if return_value != 0:
 		print "Command returned a non-zero exit status: ", command
 		sys.exit(1)
-	
+
 	nbest_file = gzip.open(slf_path + ".gz", "rb")
 	nbest_list = nbest_file.readlines()
 	nbest_file.close()
@@ -255,22 +279,24 @@ for lna_file in os.listdir(speech_directory):
 
 	line = nbest_list[0]
 	logprob_1 = float(line.split(' ')[0]) * alpha
-	
+
 	total_logprob = logprob_1
 	for line in nbest_list[1:]:
 		logprob = float(line.split(' ')[0]) * alpha
 		# Acoustic probabilities are calculated in natural logarithm space.
 		total_logprob += math.log(1 + math.exp(logprob - total_logprob))
-	
+
 	log_confidence = logprob_1 - total_logprob
 
 	if os.path.exists(txt_path):
 		txt = open(txt_path, "r")
 		transcription = txt.read().strip()
 		txt.close()
-		distance = levenshtein(recognition, transcription)
+		letter_errors = levenshtein_l(recognition, transcription)
 		num_letters = len(transcription)
-		line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5:.4}\n'.format(name, transcription, recognition, distance, num_letters, log_confidence)
+		word_errors = levenshtein_w(recognition, transcription)
+		num_words = len(transcription.split(None))
+		line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.4}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words, log_confidence)
 		output_file.write(line)
 		output_file.flush()
 	else:
