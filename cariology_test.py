@@ -69,6 +69,11 @@ def levenshtein_w(s1, s2):
 
 	return previous_row[-1]
 
+def natural_sorted(list): 
+	convert = lambda text: int(text) if text.isdigit() else text.lower() 
+	alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+	return sorted(list, key = alphanum_key)
+
 
 ##################################################
 # Initialize
@@ -76,7 +81,7 @@ def levenshtein_w(s1, s2):
 
 akupath = os.path.dirname(sys.argv[0]) + "/../aku"
 
-am = ''
+am = 'speechdat'
 
 if am == 'speechdat':
 	# 8 kHz telephone line
@@ -90,7 +95,8 @@ dur = ac_model + ".dur"
 speech_directory = sys.argv[2]
 
 #lm = 'FreeDictation'
-lm = 'StatusDictation'
+#lm = 'StatusDictation'
+lm = 'StatusDictationEven'
 #lm = ''
 
 if lm == 'FreeDictation':
@@ -99,6 +105,11 @@ if lm == 'FreeDictation':
 	lookahead_ngram = "/share/puhe/hammas/FreeDictationLM.2gram.bin"
 	morph_model = True
 elif lm == 'StatusDictation':
+	lexicon = "/share/puhe/hammas/StatusDictationLexicon.lex"
+	ngram = "/share/puhe/hammas/StatusDictationLM.3gram.bin"
+	lookahead_ngram = "/share/puhe/hammas/StatusDictationLM.2gram.bin"
+	morph_model = False
+elif lm == 'StatusDictationEven':
 	lexicon = "/share/puhe/hammas/StatusDictationLexicon.lex"
 	ngram = "/share/puhe/hammas/StatusDictationLM.even.3gram.bin"
 	lookahead_ngram = "/share/puhe/hammas/StatusDictationLM.even.2gram.bin"
@@ -222,7 +233,7 @@ t.set_lm_scale(lm_scale)
 
 print "Recognizing audio files."
 output_file = open(sys.argv[3], "w")
-for lna_file in os.listdir(speech_directory):
+for lna_file in natural_sorted(os.listdir(speech_directory)):
 	if not lna_file.endswith('.lna'):
 		continue
 
