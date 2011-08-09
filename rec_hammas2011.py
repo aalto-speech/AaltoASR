@@ -3,7 +3,7 @@
 # Recognizes cariological status dictation, or free dictation (select using the
 # lm variable). Takes the model directory, speech directory, and output file as
 # arguments, e.g.
-#   ./cariology_test.py /share/puhe/hammas /share/puhe/audio/hammas2011/andre050711 output.csv
+#   ./cariology_test.py /share/puhe/hammas2011 /share/puhe/audio/hammas2011/andre050711 output.csv
 
 import time
 import string
@@ -95,24 +95,18 @@ dur = ac_model + ".dur"
 speech_directory = sys.argv[2]
 
 #lm = 'FreeDictation'
-#lm = 'StatusDictation'
-lm = 'StatusDictationEven'
+lm = 'StatusDictation'
 #lm = ''
 
 if lm == 'FreeDictation':
-	lexicon = "/share/puhe/hammas/FreeDictationLexicon.lex"
-	ngram = "/share/puhe/hammas/FreeDictationLM.6gram.bin"
-	lookahead_ngram = "/share/puhe/hammas/FreeDictationLM.2gram.bin"
+	lexicon = sys.argv[1] + "/FreeDictationLexicon.lex"
+	ngram = sys.argv[1] + "/FreeDictationLM.6gram.bin"
+	lookahead_ngram = sys.argv[1] + "/FreeDictationLM.2gram.bin"
 	morph_model = True
 elif lm == 'StatusDictation':
-	lexicon = "/share/puhe/hammas/StatusDictationLexicon.lex"
-	ngram = "/share/puhe/hammas/StatusDictationLM.3gram.bin"
-	lookahead_ngram = "/share/puhe/hammas/StatusDictationLM.2gram.bin"
-	morph_model = False
-elif lm == 'StatusDictationEven':
-	lexicon = "/share/puhe/hammas/StatusDictationLexicon.lex"
-	ngram = "/share/puhe/hammas/StatusDictationLM.even.3gram.bin"
-	lookahead_ngram = "/share/puhe/hammas/StatusDictationLM.even.2gram.bin"
+	lexicon = sys.argv[1] + "/StatusDictationLexicon.lex"
+	ngram = sys.argv[1] + "/StatusDictationLM.3gram.bin"
+	lookahead_ngram = sys.argv[1] + "/StatusDictationLM.2gram.bin"
 	morph_model = False
 else:
 	lexicon = "/share/work/jpylkkon/bin_lm/morph19k.lex"
