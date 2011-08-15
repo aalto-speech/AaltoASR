@@ -1,9 +1,19 @@
 #!/usr/bin/python
 #
-# Recognizes cariological status dictation, or free dictation (select using the
-# lm variable). Takes the model directory, speech directory, and output file as
-# arguments, e.g.
-#   ./cariology_test.py /share/puhe/hammas2011 /share/puhe/audio/hammas2011/andre050711 output.csv
+# Recognizes status dictation or free dictation speech files (select using the
+# -l option.
+#
+# Arguments:
+#   model-directory
+#   speech-directory
+#   output-file
+#   -a acoustic-model [speechdat | noisy]
+#   -l language-model [status | free | morph19k]
+#
+# Example:
+#   rec_hammas2011.py /share/puhe/hammas2011 \
+#     /share/puhe/audio/hammas2011/status_dictation_8khz output.csv \
+#     -a speechdat -l status
 
 import time
 import string
@@ -15,6 +25,8 @@ import tempfile
 import filecmp
 import gzip
 import math
+from optparse import OptionParser
+
 
 # Set your decoder swig path in here!
 sys.path.append(os.path.dirname(sys.argv[0]) + "/src/swig");
@@ -79,36 +91,42 @@ def natural_sorted(list):
 # Initialize
 #
 
+parser = OptionParser()
+parser.add_option('-a', '--acoustic-model',
+				  action='store', type='string', dest='am', default='speechdat')
+parser.add_option('-l', '--language-model',
+				  action='store', type='string', dest='lm', default='status')
+
+(options, args) = parser.parse_args()
+if len(args) != 3:
+	parser.error("incorrect number of arguments")
+
+model_directory = args[0]
+speech_directory = args[1]
+output_file = args[2]
+
 akupath = os.path.dirname(sys.argv[0]) + "/../aku"
 
-am = 'speechdat'
-
-if am == 'speechdat':
+if options.am == 'speechdat':
 	# 8 kHz telephone line
-	ac_model = sys.argv[1] + "/speechdat_gain5000_occ300_23.2.2009_22";
-else:
+	ac_model = model_directory + "/speechdat_gain5000_occ300_23.2.2009_22";
+elif options.am == 'noisy':
 	# 16 kHz acoustic model
-	ac_model = sys.argv[1] + "/test_mfcc_noisy_trained";
+	ac_model = model_directory + "/test_mfcc_noisy_trained";
 hmms = ac_model + ".ph"
 dur = ac_model + ".dur"
 
-speech_directory = sys.argv[2]
-
-#lm = 'FreeDictation'
-lm = 'StatusDictation'
-#lm = ''
-
-if lm == 'FreeDictation':
-	lexicon = sys.argv[1] + "/FreeDictationLexicon.lex"
-	ngram = sys.argv[1] + "/FreeDictationLM.6gram.bin"
-	lookahead_ngram = sys.argv[1] + "/FreeDictationLM.2gram.bin"
+if options.lm == 'free':
+	lexicon = model_directory + "/FreeDictationLexicon.lex"
+	ngram = model_directory + "/FreeDictationLM.6gram.bin"
+	lookahead_ngram = model_directory + "/FreeDictationLM.2gram.bin"
 	morph_model = True
-elif lm == 'StatusDictation':
-	lexicon = sys.argv[1] + "/StatusDictationLexicon.lex"
-	ngram = sys.argv[1] + "/StatusDictationLM.3gram.bin"
-	lookahead_ngram = sys.argv[1] + "/StatusDictationLM.2gram.bin"
+elif options.lm == 'status':
+	lexicon = model_directory + "/StatusDictationLexicon.lex"
+	ngram = model_directory + "/StatusDictationLM.3gram.bin"
+	lookahead_ngram = model_directory + "/StatusDictationLM.2gram.bin"
 	morph_model = False
-else:
+elif options.lm == 'morph19k':
 	lexicon = "/share/work/jpylkkon/bin_lm/morph19k.lex"
 	ngram = "/share/work/jpylkkon/bin_lm/morph19k_D20E10_varigram.bin"
 	lookahead_ngram = "/share/work/jpylkkon/bin_lm/morph19k_2gram.bin"
@@ -226,7 +244,7 @@ t.set_lm_scale(lm_scale)
 # t.set_insertion_penalty(-0.5)
 
 print "Recognizing audio files."
-output_file = open(sys.argv[3], "w")
+output_file = open(output_file, "w")
 for lna_file in natural_sorted(os.listdir(speech_directory)):
 	if not lna_file.endswith('.lna'):
 		continue
