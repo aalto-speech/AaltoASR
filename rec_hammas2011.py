@@ -9,6 +9,7 @@
 #   output-file
 #   -a acoustic-model [speechdat | noisy]
 #   -l language-model [status | free | morph19k]
+#   -s language-model-scale
 #
 # Example:
 #   rec_hammas2011.py /share/puhe/hammas2011 \
@@ -96,6 +97,8 @@ parser.add_option('-a', '--acoustic-model',
 				  action='store', type='string', dest='am', default='speechdat')
 parser.add_option('-l', '--language-model',
 				  action='store', type='string', dest='lm', default='status')
+parser.add_option('-s', '--language-model-scale',
+				  action='store', type='int', dest='lm_scale', default=30)
 
 (options, args) = parser.parse_args()
 if len(args) != 3:
@@ -132,7 +135,6 @@ elif options.lm == 'morph19k':
 	lookahead_ngram = "/share/work/jpylkkon/bin_lm/morph19k_2gram.bin"
 	morph_model = True
 
-lm_scale = 30
 global_beam = 400
 
 
@@ -153,7 +155,7 @@ for wav_file in os.listdir(speech_directory):
 # Don't close the temporary file yet, or it will get deleted.
 recipe_file.flush()
 
-print "Computing phoneme probabilities."
+print "Computing state probabilities."
 command = [akupath + "/phone_probs", \
 		"-b", ac_model, \
  		"-c", ac_model + ".cfg", \
@@ -240,7 +242,7 @@ t.set_print_frames(0)
 
 t.set_duration_scale(dur_scale)
 t.set_transition_scale(trans_scale)
-t.set_lm_scale(lm_scale)
+t.set_lm_scale(options.lm_scale)
 # t.set_insertion_penalty(-0.5)
 
 print "Recognizing audio files."
