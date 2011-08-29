@@ -473,9 +473,6 @@ void TokenPassSearch::print_lm_history(FILE *file, bool get_best_path)
 	TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
 			: get_first_token();
 
-	// Fetch the best path if requested, otherwise the common path to
-	// all tokens and not printed yet
-
 	std::vector<TPLexPrefixTree::LMHistory *> stack;
 
 	TPLexPrefixTree::LMHistory * lm_history = token.lm_history;

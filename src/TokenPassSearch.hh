@@ -81,8 +81,9 @@ public:
 	/// \brief Writes the LM history of an active token into a file.
 	///
 	/// If \a get_best_path is true, finds the active token with the highest
-	/// probability. Otherwise finds any active token. Then writes the words in
-	/// the lm_history of that token into a file, separated by spaces.
+	/// probability, and writes the words in the lm_history of that token into a
+	/// file, separated by spaces. Otherwise finds the common path to all
+	/// tokens, and prints the rest that has not been printed yet.
 	///
 	void print_lm_history(FILE *file = stdout, bool get_best_path = true);
 
