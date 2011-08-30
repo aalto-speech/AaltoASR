@@ -213,13 +213,26 @@ public:
 	void set_ngram(TreeGram *ngram);
 
 	/// \brief Sets a finite-state automaton language model.
+	///
 	void set_fsa_lm(fsalm::LM *lm);
 
 	void set_lookahead_ngram(TreeGram *ngram);
+
+	/// \brief If set to true, generates a word graph of the hypotheses during
+	/// decoding (requires memory).
+	///
 	void set_generate_word_graph(bool value)
 	{
 		m_generate_word_graph = value;
 	}
+
+	/// \brief Returns the value of the word graph generation flag.
+	///
+	bool get_generate_word_graph() const
+	{
+		return m_generate_word_graph;
+	}
+
 	void set_use_lm_cache(bool value)
 	{
 		m_use_lm_cache = value;

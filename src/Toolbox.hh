@@ -216,8 +216,18 @@ public:
   void set_optional_short_silence(bool state) { m_tp_lexicon.set_optional_short_silence(state); }
 
   void prune_lm_lookahead_buffers(int min_delta, int max_depth) { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
+
+  /// \brief If set to true, generates a word graph of the hypotheses during
+  /// decoding (requires memory).
+  ///
   void set_generate_word_graph(bool value)
   { m_tp_search.set_generate_word_graph(value); }
+
+  /// \brief Returns the value of the word graph generation flag.
+  ///
+  bool get_generate_word_graph() const
+  { return m_tp_search.get_generate_word_graph(); }
+
   void set_use_lm_cache(bool value)
   { m_tp_search.set_use_lm_cache(value); }
 

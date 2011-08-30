@@ -124,16 +124,19 @@ if options.lm == 'free':
 	ngram = model_directory + "/FreeDictationLM.6gram.bin"
 	lookahead_ngram = model_directory + "/FreeDictationLM.2gram.bin"
 	morph_model = True
+	generate_word_graph = False
 elif options.lm == 'status':
 	lexicon = model_directory + "/StatusDictationLexicon.lex"
 	ngram = model_directory + "/StatusDictationLM.3gram.bin"
 	lookahead_ngram = model_directory + "/StatusDictationLM.2gram.bin"
 	morph_model = False
+	generate_word_graph = True
 elif options.lm == 'morph19k':
 	lexicon = "/share/work/jpylkkon/bin_lm/morph19k.lex"
 	ngram = "/share/work/jpylkkon/bin_lm/morph19k_D20E10_varigram.bin"
 	lookahead_ngram = "/share/work/jpylkkon/bin_lm/morph19k_2gram.bin"
 	morph_model = True
+	generate_word_graph = False
 
 global_beam = 400
 
@@ -204,7 +207,7 @@ t.set_print_text_result(0)
 
 # Generate a lattice of the word sequences that the decoder considered. Requires
 # 2-grams or higher order model.
-t.set_generate_word_graph(1)
+t.set_generate_word_graph(generate_word_graph)
 
 t.set_lm_lookahead(1)
 
