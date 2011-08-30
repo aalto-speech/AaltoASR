@@ -87,7 +87,6 @@ def natural_sorted(list):
 	alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
 	return sorted(list, key = alphanum_key)
 
-
 ##################################################
 # Initialize
 #
@@ -139,6 +138,13 @@ elif options.lm == 'morph19k':
 	generate_word_graph = False
 
 global_beam = 400
+
+print 'AM:', ac_model
+print 'Lexicon:', lexicon
+print 'LM:', ngram
+print 'Lookahead LM:', lookahead_ngram
+print 'Generate word graph:', generate_word_graph
+print 'Beam:', global_beam
 
 
 ##################################################
@@ -248,7 +254,7 @@ t.set_transition_scale(trans_scale)
 t.set_lm_scale(options.lm_scale)
 # t.set_insertion_penalty(-0.5)
 
-print "Recognizing audio files."
+print "Decoding."
 output_file = open(output_file, "w")
 for lna_file in natural_sorted(os.listdir(speech_directory)):
 	if not lna_file.endswith('.lna'):
@@ -271,22 +277,8 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	# for reading, or the file will not be written.
 	rec = open(rec_path, "w")
 	t.print_best_lm_history_to_file(rec)
-	t.write_word_graph(slf_path);
 	rec.close()
-
-	command = 'lattice-tool -read-htk -in-lattice "' + \
-			slf_path + \
-			'" -nbest-decode 100 -out-nbest-dir "' + \
-			speech_directory + '"'
-	return_value = os.system(command)
-	if return_value != 0:
-		print "Command returned a non-zero exit status: ", command
-		sys.exit(1)
-
-	nbest_file = gzip.open(slf_path + ".gz", "rb")
-	nbest_list = nbest_file.readlines()
-	nbest_file.close()
-
+	
 	rec = open(rec_path, "r")
 	recognition = rec.read()
 	if morph_model:
@@ -295,26 +287,43 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	recognition = recognition.replace('<s>', '')
 	recognition = recognition.replace('</s>', '')
 	recognition = recognition.strip()
-	rec.close()
-
+	
 	rec = open(rec_path, "w")
 	rec.write(recognition)
 	rec.close()
 
-	# Compensate for incorrect assumptions in the HMM by flattening the
-	# logprobs.
-	alpha = 0.1
-
-	line = nbest_list[0]
-	logprob_1 = float(line.split(' ')[0]) * alpha
-
-	total_logprob = logprob_1
-	for line in nbest_list[1:]:
-		logprob = float(line.split(' ')[0]) * alpha
-		# Acoustic probabilities are calculated in natural logarithm space.
-		total_logprob += math.log(1 + math.exp(logprob - total_logprob))
-
-	log_confidence = logprob_1 - total_logprob
+	if not generate_word_graph:
+		log_confidence = None
+	else:
+		t.write_word_graph(slf_path);
+	
+		command = 'lattice-tool -read-htk -in-lattice "' + \
+				slf_path + \
+				'" -nbest-decode 100 -out-nbest-dir "' + \
+				speech_directory + '"'
+		return_value = os.system(command)
+		if return_value != 0:
+			print "Command returned a non-zero exit status: ", command
+			sys.exit(1)
+	
+		nbest_file = gzip.open(slf_path + ".gz", "rb")
+		nbest_list = nbest_file.readlines()
+		nbest_file.close()
+	
+		# Compensate for incorrect assumptions in the HMM by flattening the
+		# logprobs.
+		alpha = 0.1
+	
+		line = nbest_list[0]
+		logprob_1 = float(line.split(' ')[0]) * alpha
+	
+		total_logprob = logprob_1
+		for line in nbest_list[1:]:
+			logprob = float(line.split(' ')[0]) * alpha
+			# Acoustic probabilities are calculated in natural logarithm space.
+			total_logprob += math.log(1 + math.exp(logprob - total_logprob))
+	
+		log_confidence = logprob_1 - total_logprob
 
 	if os.path.exists(txt_path):
 		txt = open(txt_path, "r")
@@ -324,7 +333,10 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 		num_letters = len(transcription)
 		word_errors = levenshtein_w(recognition, transcription)
 		num_words = len(transcription.split(None))
-		line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.4}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words, log_confidence)
+		if log_confidence != None:
+			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.4}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words, log_confidence)
+		else:
+			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words)
 		output_file.write(line)
 		output_file.flush()
 	else:
