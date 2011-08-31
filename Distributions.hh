@@ -187,11 +187,9 @@ public:
   * \param index     Index of the Gaussian to be split
   * \param new_index The index of the newly created Gaussian is saved
   *                  to this pointer
-  * \param minocc    Minimum occupancy count needed for splitting this Gaussian
-  * \param minfeas   Minimum number of features for splitting this Gaussian
   * \return true if the split was succesful, false otherwise
   */
-  bool split_gaussian(int index, int *new_index, double minocc, int minfeas);
+  bool split_gaussian(int index, int *new_index);
 
   double get_minvar(void) const { return m_minvar; }
   double get_covsmooth(void) const { return m_covsmooth; }
@@ -433,9 +431,9 @@ public:
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
 
   /* Splits the current Gaussian to two by disturbing the mean */
-  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2) const;
+  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.3) const;
   /* Splits the current Gaussian to two by disturbing the mean */
-  virtual void split(Gaussian &s2, double perturbation = 0.2);
+  virtual void split(Gaussian &s2, double perturbation = 0.3);
   /* Sets the parameters for the current Gaussian by merging m1 and m2 */
   virtual void merge(double w1, const Gaussian &m1,
                      double w2, const Gaussian &m2,
@@ -521,7 +519,7 @@ public:
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
   virtual Gaussian* copy_gaussian(void) { return new DiagonalGaussian(*this); }
-  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2) const;
+  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.3) const;
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
 

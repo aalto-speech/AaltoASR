@@ -17,7 +17,6 @@ std::string out_file;
 
 int info;
 bool transtat;
-int maxg;
 
 conf::Config config;
 FeatureGenerator fea_gen;
@@ -58,8 +57,11 @@ main(int argc, char *argv[])
       ('\0', "prev-prior", "", "", "Use previous model as prior in I-smoothing")
       ('\0', "delete=FLOAT", "arg", "0.0", "delete Gaussians with occupancies below the threshold")
       ('\0', "mremove=FLOAT", "arg", "0.0", "remove mixture components below the weight threshold")
-      ('\0', "split=FLOAT", "arg", "0.0", "split a Gaussian if the occupancy exceeds the threshold")
-      ('\0', "maxg=INT", "arg", "0", "maximum number of Gaussians per state for splitting")
+      ('\0', "split", "", "", "split a Gaussian if the occupancy exceeds the threshold")
+      ('\0', "minocc=FLOAT", "arg", "0.0", "Minimum occupancy gaussian have to have")
+      ('\0', "maxmixgauss=INT", "arg", "0", "maximum number of Gaussians per state for splitting")
+      ('\0', "numgauss=INT", "arg", "-1", "Target number of Gaussians in the final model")
+      ('\0', "splitalpha=FLOAT", "arg", "1.0", "Smoothing constant for splitting condition")
       ('\0', "no-write", "", "", "Don't write anything")
       ('s', "savesum=FILE", "arg", "", "save summary information")
       ('\0', "hcl-bfgs-cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
@@ -70,7 +72,6 @@ main(int argc, char *argv[])
     transtat = config["transitions"].specified;    
     info = config["info"].get_int();
     out_file = config["out"].get_str();
-    maxg = config["maxg"].get_int();
 
     int count = 0;
     if (config["ml"].specified) {
@@ -87,6 +88,15 @@ main(int argc, char *argv[])
     }
     if (count != 1)
       throw std::string("Define exactly one of --ml, --mmi and --mpe!");
+
+    if ((config["minocc"].specified &&
+	 config["numgauss"].specified) ||
+	(!config["split"].specified && (config["minocc"].specified ||
+					config["numgauss"].specified)))
+    {
+      fprintf(stderr, "Give either --minocc or --numgauss with --split\n");
+      exit(1);
+    }
 
     if (config["mmi-ismooth"].specified &&
         (!config["mmi"].specified && !config["mmi-prior"].specified))
@@ -242,7 +252,10 @@ main(int argc, char *argv[])
       
       // Split Gaussians if desired
       if (config["split"].specified)
-        model.split_gaussians(config["split"].get_double(), maxg);
+        model.split_gaussians(config["minocc"].get_double(),
+			      config["maxmixgauss"].get_int(),
+                              config["numgauss"].get_int(), 
+                              config["splitalpha"].get_double());
       
       model.stop_accumulating();
     }

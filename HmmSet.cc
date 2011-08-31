@@ -1195,12 +1195,46 @@ int HmmSet::remove_mixture_components(double min_weight)
 
 
 int
-HmmSet::split_gaussians(double minocc, int maxg)
+HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
+			double splitalpha)
 {
   int num_splits = 0;
+  
   std::vector<int> sorted_gaussians;
 
-  m_pool.get_occ_sorted_gaussians(sorted_gaussians, minocc);
+  m_pool.get_occ_sorted_gaussians(sorted_gaussians, 0); 
+
+  if (numgauss != -1){
+   /* Loop calculates suitable value of minimum occupancy (minocc) 
+    * depending on amount of gaussian we want */
+    for (;;){
+      int lkm = 0;
+      for (int p = 0; p < num_emission_pdfs(); p++){
+
+        // Occupancy of GMMs
+        double g_occ_sum = 0;  
+        for (int k = 0; k < m_emission_pdfs[p]->size(); k++){
+	  g_occ_sum += m_emission_pdfs[p]->get_accumulated_gamma(PDF::ML_BUF, k);
+        }
+
+        /* Used formula is from article: EM algorithms for Gaussian mixture with 
+         * split-and-merge operation by Zhihua Zhang, Chibiao Chen, Jian Sun, Kap Luk Chan */	
+        int mix_g_lkm = (int)ceil(pow(g_occ_sum, splitalpha) / minocc);
+        if (mix_g_lkm > 100) mix_g_lkm = 100;
+        lkm += mix_g_lkm;
+      }
+    
+      if ( lkm > (numgauss+500) ){
+        minocc += minocc/2;
+      }
+      else if ( lkm < (numgauss-500) ){ 
+        minocc -= minocc/2;
+      }    
+      else break;
+    }
+  }
+
+
   for (int i = 0; i < (int)sorted_gaussians.size(); i++)
   {
     bool split = true;
@@ -1211,10 +1245,20 @@ HmmSet::split_gaussians(double minocc, int maxg)
     
     for (int p = 0; p < num_emission_pdfs(); p++)
     {
-      if (m_emission_pdfs[p]->component_index(sorted_gaussians[i]) >= 0)
+      if (m_emission_pdfs[p]->component_index(sorted_gaussians[i]) >= 0) 
       {
-        if (m_emission_pdfs[p]->size() >= maxg)
-        {
+	// Occupancy of GMMs
+	double g_occ_sum = 0;
+	for (int k = 0; k < m_emission_pdfs[p]->size(); k++){
+	  g_occ_sum += m_emission_pdfs[p]->get_accumulated_gamma(PDF::ML_BUF, k);
+	}
+
+        /* Can gaussian be split?
+         * Used formula is from article: EM algorithms for Gaussian mixture with 
+         * split-and-merge operation by Zhihua Zhang, Chibiao Chen, Jian Sun, Kap Luk Chan */	
+        if ( (pow(g_occ_sum, splitalpha) / (m_emission_pdfs[p]->size()) < minocc) || 
+             (m_emission_pdfs[p]->size() >= maxg))
+        { 	  
           split = false;
           break;
         }
@@ -1225,8 +1269,8 @@ HmmSet::split_gaussians(double minocc, int maxg)
     {
       // OK to split this Gaussian
       int new_pool_index;
-      split = m_pool.split_gaussian(sorted_gaussians[i], &new_pool_index,
-                                    minocc, 0);
+      split = m_pool.split_gaussian(sorted_gaussians[i], &new_pool_index);
+
       if (split)
       {
         // Update the mixtures

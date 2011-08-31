@@ -454,12 +454,19 @@ public:
 
   /** Splits every Gaussian in the pool with some constrains
    * OBS!! ASSUMES CURRENTLY CONTINUOUS-DENSITY HMMS!!
-   * \param minocc    Minimum occupancy count needed for splitting a gaussian
-   * \param maxg      Maximum number of Gaussians for any state containing
-   *                  the Gaussian
-   * \return          Amount of new Gaussians created to the pool
+   * Split condition: (Occupancy of Mixture)^splitalpha / (Number of Gaussians in Mixture) > minocc
+   * \param minocc        Minimum occupancy count needed for splitting a gaussian
+   * \param maxg          Maximum number of Gaussians for any state containing
+   *                      the Gaussian
+   * \param numgauss      Target number of Gaussians in the final model.
+   *                      In use if numgauss != -1
+   * \param splitalpha    Smoothing constant for splitting condition.
+   *                      If not determined splitalpha = 1.
+   *                      With clean speech best result splitalpha = 0.5.
+   *                      With noise best result splitalpha = 0.2/0.3.
+   * \return              Amount of new Gaussians created to the pool
   */ 
-  int split_gaussians(double minocc, int maxg);
+  int split_gaussians(double minocc, int maxg, int numgauss, double splitalpha);
 
 
   /** Reads clustering of the Gaussians from a file.
