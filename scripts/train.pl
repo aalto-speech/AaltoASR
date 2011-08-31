@@ -445,7 +445,7 @@ sub estimate_model {
 
   $extra_options = "--mllt $MLLT_MODULE_NAME" if ($mllt_flag);
   $extra_options = $extra_options." --mremove $GAUSS_REMOVE_THRESHOLD" if ($GAUSS_REMOVE_THRESHOLD > 0);
-  $extra_options = $extra_options." --split $SPLIT_MIN_OCCUPANCY --maxg $SPLIT_MAX_GAUSSIANS" if ($split_flag);
+  $extra_options = $extra_options." --split --minocc $SPLIT_MIN_OCCUPANCY --maxmixgauss $SPLIT_MAX_GAUSSIANS" if ($split_flag);
 
   $GM_SINGLE->submit("$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -t -i $VERBOSITY --minvar $minvar $estimate_mode -s ${BASE_ID}_summary $extra_options\n");
   $GM_SINGLE->{"log_dir"} = $old_log_dir;
