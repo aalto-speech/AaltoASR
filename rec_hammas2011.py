@@ -283,6 +283,9 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	recognition = rec.read()
 	if morph_model:
 		recognition = recognition.replace(' ', '')
+		# Automatically detected sentence boundaries aren't usually any good.
+		#recognition = recognition.replace('<w></s><s><w>', '. ')
+		recognition = recognition.replace('<w></s><s><w>', ' ')
 		recognition = recognition.replace('<w>', ' ')
 	recognition = recognition.replace('<s>', '')
 	recognition = recognition.replace('</s>', '')
