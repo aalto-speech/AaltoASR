@@ -256,6 +256,8 @@ t.set_lm_scale(options.lm_scale)
 
 print "Decoding."
 output_file = open(output_file, "w")
+line = 'File Name\tReference Transcription\tRecognition Result\tLetter Errors\tLetters\tWord Errors\tWords\tLog Confidence\tDecode Time\n'
+output_file.write(line)
 for lna_file in natural_sorted(os.listdir(speech_directory)):
 	if not lna_file.endswith('.lna'):
 		continue
@@ -270,8 +272,12 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	t.lna_open(lna_path, 1024)
 	t.reset(0)
 	t.set_end(-1)
+	start_time = time.clock()
 	while t.run():
 		pass
+	end_time = time.clock()
+	decode_time = end_time - start_time
+	print 'CPU seconds used:', decode_time
 
 	# We have to open with only "w" first, and then later with "r"
 	# for reading, or the file will not be written.
@@ -337,9 +343,9 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 		word_errors = levenshtein_w(recognition, transcription)
 		num_words = len(transcription.split(None))
 		if log_confidence != None:
-			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.4}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words, log_confidence)
+			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.4}\t{8:.3}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words, log_confidence, decode_time)
 		else:
-			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words)
+			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\tN/A\t{7:.3}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words, decode_time)
 		output_file.write(line)
 		output_file.flush()
 	else:
