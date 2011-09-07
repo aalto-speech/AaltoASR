@@ -98,6 +98,8 @@ parser.add_option('-l', '--language-model',
 				  action='store', type='string', dest='lm', default='status')
 parser.add_option('-s', '--language-model-scale',
 				  action='store', type='int', dest='lm_scale', default=30)
+parser.add_option('-b', '--beam',
+				  action='store', type='int', dest='beam', default=300)
 
 (options, args) = parser.parse_args()
 if len(args) != 3:
@@ -137,7 +139,7 @@ elif options.lm == 'morph19k':
 	morph_model = True
 	generate_word_graph = False
 
-global_beam = 400
+global_beam = options.beam
 
 print 'AM:', ac_model
 print 'Lexicon:', lexicon
