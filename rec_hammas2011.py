@@ -61,7 +61,7 @@ def levenshtein_l(s1, s2):
 def levenshtein_w(s1, s2):
 	words1 = s1.split(None)
 	words2 = s2.split(None)
-	
+
 	count1 = len(words1)
 	count2 = len(words2)
 
@@ -82,10 +82,10 @@ def levenshtein_w(s1, s2):
 
 	return previous_row[-1]
 
-def natural_sorted(list): 
-	convert = lambda text: int(text) if text.isdigit() else text.lower() 
-	alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
-	return sorted(list, key = alphanum_key)
+def natural_sorted(list):
+	convert = lambda text: int(text) if text.isdigit() else text.lower()
+	alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
+	return sorted(list, key=alphanum_key)
 
 ##################################################
 # Initialize
@@ -121,13 +121,13 @@ hmms = ac_model + ".ph"
 dur = ac_model + ".dur"
 
 if options.lm == 'free':
-	lexicon = model_directory + "/FreeDictationLexicon.lex"
+	lexicon = model_directory + "/FreeDictationLM.lex"
 	ngram = model_directory + "/FreeDictationLM.6gram.bin"
 	lookahead_ngram = model_directory + "/FreeDictationLM.2gram.bin"
 	morph_model = True
 	generate_word_graph = False
 elif options.lm == 'status':
-	lexicon = model_directory + "/StatusDictationLexicon.lex"
+	lexicon = model_directory + "/StatusDictationLM.lex"
 	ngram = model_directory + "/StatusDictationLM.3gram.bin"
 	lookahead_ngram = model_directory + "/StatusDictationLM.2gram.bin"
 	morph_model = False
@@ -140,6 +140,7 @@ elif options.lm == 'morph19k':
 	generate_word_graph = False
 
 global_beam = options.beam
+lm_scale = options.lm_scale
 
 print 'AM:', ac_model
 print 'Lexicon:', lexicon
@@ -147,6 +148,7 @@ print 'LM:', ngram
 print 'Lookahead LM:', lookahead_ngram
 print 'Generate word graph:', generate_word_graph
 print 'Beam:', global_beam
+print 'LM scale factor:', lm_scale
 
 
 ##################################################
@@ -253,12 +255,12 @@ t.set_print_frames(0)
 
 t.set_duration_scale(dur_scale)
 t.set_transition_scale(trans_scale)
-t.set_lm_scale(options.lm_scale)
+t.set_lm_scale(lm_scale)
 # t.set_insertion_penalty(-0.5)
 
 print "Decoding."
 output_file = open(output_file, "w")
-line = 'File Name\tReference Transcription\tRecognition Result\tLetter Errors\tLetters\tWord Errors\tWords\tLog Confidence\tDecode Time\n'
+line = 'File Name\tReference Transcription\tRecognition Result\tLM Scale\tBeam\tLetter Errors\tLetters\tWord Errors\tWords\tLog Confidence\tDecode Time\n'
 output_file.write(line)
 for lna_file in natural_sorted(os.listdir(speech_directory)):
 	if not lna_file.endswith('.lna'):
@@ -286,7 +288,7 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	rec = open(rec_path, "w")
 	t.print_best_lm_history_to_file(rec)
 	rec.close()
-	
+
 	rec = open(rec_path, "r")
 	recognition = rec.read()
 	if morph_model:
@@ -298,7 +300,7 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	recognition = recognition.replace('<s>', '')
 	recognition = recognition.replace('</s>', '')
 	recognition = recognition.strip()
-	
+
 	rec = open(rec_path, "w")
 	rec.write(recognition)
 	rec.close()
@@ -307,7 +309,7 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 		log_confidence = None
 	else:
 		t.write_word_graph(slf_path);
-	
+
 		command = 'lattice-tool -read-htk -in-lattice "' + \
 				slf_path + \
 				'" -nbest-decode 100 -out-nbest-dir "' + \
@@ -316,24 +318,24 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 		if return_value != 0:
 			print "Command returned a non-zero exit status: ", command
 			sys.exit(1)
-	
+
 		nbest_file = gzip.open(slf_path + ".gz", "rb")
 		nbest_list = nbest_file.readlines()
 		nbest_file.close()
-	
+
 		# Compensate for incorrect assumptions in the HMM by flattening the
 		# logprobs.
 		alpha = 0.1
-	
+
 		line = nbest_list[0]
 		logprob_1 = float(line.split(' ')[0]) * alpha
-	
+
 		total_logprob = logprob_1
 		for line in nbest_list[1:]:
 			logprob = float(line.split(' ')[0]) * alpha
 			# Acoustic probabilities are calculated in natural logarithm space.
 			total_logprob += math.log(1 + math.exp(logprob - total_logprob))
-	
+
 		log_confidence = logprob_1 - total_logprob
 
 	if os.path.exists(txt_path):
@@ -345,9 +347,9 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 		word_errors = levenshtein_w(recognition, transcription)
 		num_words = len(transcription.split(None))
 		if log_confidence != None:
-			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.4}\t{8:.3}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words, log_confidence, decode_time)
+			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9:.4}\t{10}\n'.format(name, transcription, recognition, lm_scale, global_beam, letter_errors, num_letters, word_errors, num_words, log_confidence, decode_time)
 		else:
-			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\tN/A\t{7:.3}\n'.format(name, transcription, recognition, letter_errors, num_letters, word_errors, num_words, decode_time)
+			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\tN/A\t{9}\n'.format(name, transcription, recognition, lm_scale, global_beam, letter_errors, num_letters, word_errors, num_words, decode_time)
 		output_file.write(line)
 		output_file.flush()
 	else:
