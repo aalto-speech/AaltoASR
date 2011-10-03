@@ -216,7 +216,12 @@ public:
 	///
 	void set_fsa_lm(fsalm::LM *lm);
 
-	void set_lookahead_ngram(TreeGram *ngram);
+	/// \brief Sets a lookahead n-gram language model.
+	///
+	/// \return The number of vocabulary entries that were not found in the
+	/// language model.
+	///
+	int set_lookahead_ngram(TreeGram *ngram);
 
 	/// \brief If set to true, generates a word graph of the hypotheses during
 	/// decoding (requires memory).

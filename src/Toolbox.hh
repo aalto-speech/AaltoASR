@@ -66,7 +66,13 @@ public:
   ///
   int ngram_read(const char *file, float weight, bool binary=true);
 
-  void read_lookahead_ngram(const char *file, bool binary=true);
+  /// \brief Reads a lookahead n-gram language model.
+  ///
+  /// \param binary If false, the file is expected to be in ARPA file format.
+  /// \param quiet If true, doesn't print warnings to stderr.
+  /// \return The order of the language model.
+  ///
+  void read_lookahead_ngram(const char *file, bool binary=true, bool quiet=false);
 
   /// \brief Reads a finite-state automaton language model.
   ///

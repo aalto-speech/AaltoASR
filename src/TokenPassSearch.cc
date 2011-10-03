@@ -1498,7 +1498,7 @@ void TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
 		fprintf(stderr, "WARNING: %d out-of-LM words in lexicon\n", count);
 }
 
-void TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
+int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
 {
 	int count = 0;
 
@@ -1515,20 +1515,16 @@ void TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
 		//if (m_lex2lm[i] != m_lookahead_ngram->word_index(m_vocabulary.word(i)))
 		//  assert( 0 );
 
-		// Warn about words not in lm.
 		if (m_lex2lookaheadlm[i] == 0 && i != 0) {
-			fprintf(stderr, "%s not in lookahead LM\n",
-					m_vocabulary.word(i).c_str());
+			// Don't print warnings to stderr, since the xinetd backend will
+			// forward stderr directly to the client!
+//			fprintf(stderr, "%s not in lookahead LM\n",
+//					m_vocabulary.word(i).c_str());
 			count++;
 		}
 	}
 
-	if (count > 0) {
-		fprintf(stderr,
-				"there were %d out-of-LM words in total in lookahead LM\n",
-				count);
-		//exit(-1);
-	}
+	return count;
 }
 
 float TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::LMHistory *lm_hist)

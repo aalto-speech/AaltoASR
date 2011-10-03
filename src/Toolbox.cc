@@ -163,28 +163,33 @@ Toolbox::fsa_lm_read(const char *file, bool bin)
 }
 
 void
-Toolbox::read_lookahead_ngram(const char *file, const bool binary)
+Toolbox::read_lookahead_ngram(const char *file, const bool binary, bool quiet)
 {
+  int num_oovs = 0;
+
   if (strlen(file) == 0)
   {
     if (m_ngrams.size() > 0)
-      m_tp_search.set_lookahead_ngram(m_ngrams.back());
+      num_oovs = m_tp_search.set_lookahead_ngram(m_ngrams.back());
   }
   else
   {
     io::Stream in(file,"r");
     if (!in.file) {
-      fprintf(stderr, "ngram_read(): could not open %s: %s\n", 
-              file, strerror(errno));
-      exit(1);
+        throw OpenError();
     }
     m_lookahead_ngram = new TreeGram();
     m_lookahead_ngram->read(in.file, binary);
     assert(m_lookahead_ngram->get_type()==TreeGram::BACKOFF);
-    m_tp_search.set_lookahead_ngram(m_lookahead_ngram);
+    num_oovs = m_tp_search.set_lookahead_ngram(m_lookahead_ngram);
+  }
+
+  if ((num_oovs > 0) && !quiet) {
+  	fprintf(stderr,
+  			"there were %d out-of-LM words in total in lookahead LM\n",
+  			num_oovs);
   }
 }
-
 
 void
 Toolbox::lna_open(const char *file, int size)
