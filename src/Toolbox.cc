@@ -1,10 +1,13 @@
 #include <algorithm>
+#include <iostream>
 #include <assert.h>
 #include <errno.h>
 
 #include "Toolbox.hh"
 #include "TreeGramArpaReader.hh"
 #include "io.hh"
+
+using namespace std;
 
 Toolbox::Toolbox()
   : m_use_stack_decoder(0),
@@ -120,14 +123,12 @@ Toolbox::lex_read(const char *filename)
 }
 
 int
-Toolbox::ngram_read(const char *file, float weight, const bool binary)
+Toolbox::ngram_read(const char *file, float weight, const bool binary, bool quiet)
 {
   io::Stream in(file,"r");
   
   if (!in.file) {
-    fprintf(stderr, "ngram_read(): could not open %s: %s\n", 
-	    file, strerror(errno));
-    exit(1);
+    throw OpenError();
   }
 
   if (!m_use_stack_decoder && (m_ngrams.size() > 0)) {
@@ -138,14 +139,23 @@ Toolbox::ngram_read(const char *file, float weight, const bool binary)
   m_ngrams.push_back(new TreeGram());
   m_ngrams.back()->read(in.file, binary);
 
-  if (m_use_stack_decoder) m_search.add_ngram(m_ngrams.back(), weight);
-  else m_tp_search.set_ngram(m_ngrams.back());
+  int num_oolm = 0;
+  if (m_use_stack_decoder) {
+    num_oolm = m_search.add_ngram(m_ngrams.back(), weight);
+  }
+  else {
+    num_oolm = m_tp_search.set_ngram(m_ngrams.back());
+  }
+
+  if ((num_oolm > 0) && !quiet) {
+    cerr << num_oolm << " words in the vocabulary were not found in the LM." << endl;
+  }
 
   return m_ngrams.back()->order();
 }
 
 void
-Toolbox::fsa_lm_read(const char *file, bool bin)
+Toolbox::fsa_lm_read(const char *file, bool bin, bool quiet)
 {
   io::Stream in(file, "r");
   assert(in.file);
@@ -159,18 +169,23 @@ Toolbox::fsa_lm_read(const char *file, bool bin)
     m_fsa_lm->read_arpa(in.file, true);
     m_fsa_lm->trim();
   }
-  m_tp_search.set_fsa_lm(m_fsa_lm);
+
+  int num_oolm = m_tp_search.set_fsa_lm(m_fsa_lm);
+
+  if ((num_oolm > 0) && !quiet) {
+    cerr << num_oolm << " words in the vocabulary were not found in the FSA LM." << endl;
+  }
 }
 
 void
 Toolbox::read_lookahead_ngram(const char *file, const bool binary, bool quiet)
 {
-  int num_oovs = 0;
+  int num_oolm = 0;
 
   if (strlen(file) == 0)
   {
     if (m_ngrams.size() > 0)
-      num_oovs = m_tp_search.set_lookahead_ngram(m_ngrams.back());
+      num_oolm = m_tp_search.set_lookahead_ngram(m_ngrams.back());
   }
   else
   {
@@ -181,13 +196,11 @@ Toolbox::read_lookahead_ngram(const char *file, const bool binary, bool quiet)
     m_lookahead_ngram = new TreeGram();
     m_lookahead_ngram->read(in.file, binary);
     assert(m_lookahead_ngram->get_type()==TreeGram::BACKOFF);
-    num_oovs = m_tp_search.set_lookahead_ngram(m_lookahead_ngram);
+    num_oolm = m_tp_search.set_lookahead_ngram(m_lookahead_ngram);
   }
 
-  if ((num_oovs > 0) && !quiet) {
-  	fprintf(stderr,
-  			"there were %d out-of-LM words in total in lookahead LM\n",
-  			num_oovs);
+  if ((num_oolm > 0) && !quiet) {
+    cerr << num_oolm << " words in the vocabulary were not found in the lookahead LM." << endl;
   }
 }
 
@@ -254,9 +267,10 @@ Toolbox::segment(const std::string &str, int start_frame, int end_frame)
 void
 Toolbox::init(int expand_window)
 {
-  if (m_lna_reader.num_models() != m_hmm_reader.num_models())
-    fprintf(stderr, "WARNING: %d states in LNA, but %d states in HMMs\n",
-	    m_lna_reader.num_models(), m_hmm_reader.num_models());
+  if (m_lna_reader.num_models() != m_hmm_reader.num_models()) {
+    cerr << "WARNING: " << m_lna_reader.num_models() << " states in LNA, but "
+    		<< m_hmm_reader.num_models() << " states in HMMs" << endl;
+  }
 
   m_search.init_search(expand_window);
 }

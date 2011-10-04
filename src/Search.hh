@@ -174,7 +174,7 @@ public:
   void print_sure();
 
   // Operate
-  void add_ngram(TreeGram *ngram, float weight);
+  int add_ngram(TreeGram *ngram, float weight);
   void reset_search(int start_frame);
   void init_search(int expand_window);
   bool expand_stack(int frame);

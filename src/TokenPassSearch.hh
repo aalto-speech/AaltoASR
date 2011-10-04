@@ -210,11 +210,19 @@ public:
 	void
 	set_sentence_boundary(const std::string &start, const std::string &end);
 
-	void set_ngram(TreeGram *ngram);
+	/// \brief Sets an n-gram language model.
+	///
+	/// \return The number of vocabulary entries that were not found in the
+	/// language model.
+	///
+	int set_ngram(TreeGram *ngram);
 
 	/// \brief Sets a finite-state automaton language model.
 	///
-	void set_fsa_lm(fsalm::LM *lm);
+	/// \return The number of vocabulary entries that were not found in the
+	/// language model.
+	///
+	int set_fsa_lm(fsalm::LM *lm);
 
 	/// \brief Sets a lookahead n-gram language model.
 	///

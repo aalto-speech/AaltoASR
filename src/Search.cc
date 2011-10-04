@@ -219,7 +219,7 @@ void Search::reset_search(int start_frame)
 	m_history_lex.clear();
 }
 
-void Search::add_ngram(TreeGram *ngram, float weight)
+int Search::add_ngram(TreeGram *ngram, float weight)
 {
 	int count = 0;
 
@@ -243,9 +243,7 @@ void Search::add_ngram(TreeGram *ngram, float weight)
 		}
 	}
 
-	if (count > 0)
-		fprintf(stderr, "there were %d out-of-LM words in total in LM %zd\n",
-				count, m_ngrams.size());
+	return count;
 }
 
 void Search::init_search(int expand_window)

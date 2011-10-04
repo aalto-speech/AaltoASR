@@ -1445,7 +1445,7 @@ void TokenPassSearch::clear_active_node_token_lists(void)
 	m_active_node_list.clear();
 }
 
-void TokenPassSearch::set_ngram(TreeGram *ngram)
+int TokenPassSearch::set_ngram(TreeGram *ngram)
 {
 	assert(!m_fsa_lm);
 
@@ -1461,19 +1461,17 @@ void TokenPassSearch::set_ngram(TreeGram *ngram)
 
 		// Warn about words not in lm.
 		if (m_lex2lm[i] == 0 && i != 0) {
-			//      fprintf(stderr, "%s not in LM\n", m_vocabulary.word(i).c_str());
 			count++;
 		}
 	}
 
-	if (count > 0)
-		fprintf(stderr, "there were %d out-of-LM words in total in LM\n", count);
-
 	// Initialize LM lookahead caches again.
 	m_lm_lookahead_initialized = false;
+
+	return count;
 }
 
-void TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
+int TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
 {
 	assert(!m_ngram);
 	m_fsa_lm = lm;
@@ -1487,15 +1485,12 @@ void TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
 		m_lex2lm[i]
 				= m_fsa_lm->symbol_map().index_nothrow(m_vocabulary.word(i));
 
-		// Warn about words not in lm.
 		if (m_lex2lm[i] < 0) {
-			//      fprintf(stderr, "WARNING: %s not in LM\n", m_vocabulary.word(i).c_str());
 			count++;
 		}
 	}
 
-	if (count > 0)
-		fprintf(stderr, "WARNING: %d out-of-LM words in lexicon\n", count);
+	return count;
 }
 
 int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
@@ -1516,10 +1511,6 @@ int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
 		//  assert( 0 );
 
 		if (m_lex2lookaheadlm[i] == 0 && i != 0) {
-			// Don't print warnings to stderr, since the xinetd backend will
-			// forward stderr directly to the client!
-//			fprintf(stderr, "%s not in lookahead LM\n",
-//					m_vocabulary.word(i).c_str());
 			count++;
 		}
 	}
