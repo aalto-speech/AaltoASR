@@ -8,12 +8,12 @@
 #   speech-directory
 #   output-file
 #   -a acoustic-model [speechdat | noisy]
-#   -l language-model [status | free | morph19k]
+#   -l language-model [status | free]
 #   -s language-model-scale
 #
 # Example:
-#   rec_hammas2011.py /share/puhe/hammas2011 \
-#     /share/puhe/audio/hammas2011/status_dictation_8khz output.csv \
+#   rec_hammaspuhe.py /share/puhe/hammaspuhe/models \
+#     /share/puhe/hammaspuhe/audio/status_commands output.csv \
 #     -a speechdat -l status
 
 import time
@@ -26,7 +26,7 @@ import tempfile
 import filecmp
 import gzip
 import math
-from optparse import OptionParser
+from optparse import OptionParser, OptionValueError
 
 
 # Set your decoder swig path in here!
@@ -132,12 +132,8 @@ elif options.lm == 'status':
 	lookahead_ngram = model_directory + "/StatusDictationLM.2gram.bin"
 	morph_model = False
 	generate_word_graph = True
-elif options.lm == 'morph19k':
-	lexicon = "/share/work/jpylkkon/bin_lm/morph19k.lex"
-	ngram = "/share/work/jpylkkon/bin_lm/morph19k_D20E10_varigram.bin"
-	lookahead_ngram = "/share/work/jpylkkon/bin_lm/morph19k_2gram.bin"
-	morph_model = True
-	generate_word_graph = False
+else:
+	raise OptionValueError("language-model has to be either 'free' or 'status'")
 
 global_beam = options.beam
 lm_scale = options.lm_scale
