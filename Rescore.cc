@@ -71,7 +71,7 @@ Rescore::sort_nodes()
 }
 
 void
-Rescore::rescore(Lattice *src_lattice, TreeGram *tree_gram)
+Rescore::rescore(Lattice *src_lattice, TreeGram *tree_gram, bool quiet)
 {
   m_src_lattice = src_lattice;
   m_tree_gram = tree_gram;
@@ -100,9 +100,11 @@ Rescore::rescore(Lattice *src_lattice, TreeGram *tree_gram)
   }
 
   // Traverse source lattice in topological order
-  fprintf(stderr, "sorting...");
+  if (!quiet)
+    fprintf(stderr, "sorting...");
   sort_nodes();
-  fprintf(stderr, "rescoring...");
+  if (!quiet)
+    fprintf(stderr, "rescoring...");
   for (int s = 0; s < (int)m_sorted_nodes.size(); s++) {
     int src_id = m_sorted_nodes[s];
     Lattice::Node &src_node = m_src_lattice->node(src_id);

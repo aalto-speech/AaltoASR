@@ -18,7 +18,7 @@ public:
   Rescore();
 
   /** Expand and rescore the lattice with a language model. */
-  void rescore(Lattice *src_lattice, TreeGram *tree_gram);
+  void rescore(Lattice *src_lattice, TreeGram *tree_gram, bool quiet=false);
 
   /** Get the rescored lattice. */
   Lattice &rescored_lattice() { return m_rescored_lattice; }

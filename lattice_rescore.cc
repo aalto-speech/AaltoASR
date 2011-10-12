@@ -130,7 +130,7 @@ main(int argc, char *argv[])
     if (!quiet)
       fprintf(stderr, "processing %s...", input_files[i].c_str());
     src_lattice.read(io::Stream(input_files[i], "r").file);
-    rescore.rescore(&src_lattice, &tree_gram);
+    rescore.rescore(&src_lattice, &tree_gram, quiet);
 
     if (!quiet)
       fprintf(stderr, "writing %s...", output_file.c_str());
