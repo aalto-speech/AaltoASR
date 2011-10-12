@@ -1204,11 +1204,21 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
 
   m_pool.get_occ_sorted_gaussians(sorted_gaussians, 0); 
 
-  if (numgauss != -1){
-   /* Loop calculates suitable value of minimum occupancy (minocc) 
-    * depending on amount of gaussian we want */
-    for (;;){
-      int lkm = 0;
+  if (numgauss > 0)
+  {
+    // Calculates suitable value of minimum occupancy (minocc) 
+    // depending on amount of gaussian we want
+    
+    // Allow 1% deviations in the number of Gaussians
+    double max_rel_error = .01;
+
+    // Maximum of 50 iterations
+    minocc = 10*dim();
+    double interval = minocc;
+    bool growing = true;
+    for (int i = 0; i < 50; i++)
+    {
+      int total_gaussians = 0;
       for (int p = 0; p < num_emission_pdfs(); p++){
 
         // Occupancy of GMMs
@@ -1217,20 +1227,30 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
 	  g_occ_sum += m_emission_pdfs[p]->get_accumulated_gamma(PDF::ML_BUF, k);
         }
 
-        /* Used formula is from article: EM algorithms for Gaussian mixture with 
-         * split-and-merge operation by Zhihua Zhang, Chibiao Chen, Jian Sun, Kap Luk Chan */	
-        int mix_g_lkm = (int)ceil(pow(g_occ_sum, splitalpha) / minocc);
-        if (mix_g_lkm > 100) mix_g_lkm = 100;
-        lkm += mix_g_lkm;
+        // Determine the approximate number of Gaussians after all the splits
+        int num_mix_g = (int)ceil(pow(g_occ_sum, splitalpha) / minocc);
+        total_gaussians += std::min(num_mix_g, maxg);
       }
     
-      if ( lkm > (numgauss+500) ){
-        minocc += minocc/2;
+      if ( total_gaussians > (1+max_rel_error)*numgauss )
+      {
+        if (growing)
+        {
+          minocc *= 2;
+          interval = minocc/2.0;
+        }
+        else
+          minocc += interval/2.0;
       }
-      else if ( lkm < (numgauss-500) ){ 
-        minocc -= minocc/2;
-      }    
-      else break;
+      else if ( total_gaussians < (1-max_rel_error)*numgauss )
+      {
+        growing = false;
+        minocc -= interval/2.0;
+      }
+      else
+        break;
+      if (!growing)
+        interval /= 2.0;
     }
   }
 
