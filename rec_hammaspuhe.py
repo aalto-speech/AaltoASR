@@ -87,6 +87,20 @@ def natural_sorted(list):
 	alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
 	return sorted(list, key=alphanum_key)
 
+def log(x):
+	#return math.log(x)
+	return math.log10(x)
+
+def exp(x):
+	#return math.exp(x)
+	return math.pow(10, x)
+
+def logprobsum(x, y):
+	return y + log(1 + exp(x - y))
+
+def logprobmul(x, y):
+	return x + y
+
 ##################################################
 # Initialize
 #
@@ -256,7 +270,7 @@ t.set_lm_scale(lm_scale)
 
 print "Decoding."
 output_file = open(output_file, "w")
-line = 'File Name\tReference Transcription\tRecognition Result\tLM Scale\tBeam\tLetter Errors\tLetters\tWord Errors\tWords\tLog Confidence\tDecode Time\n'
+line = 'File Name\tReference Transcription\tRecognition Result\tLM Scale\tBeam\tLetter Errors\tLetters\tWord Errors\tWords\tDecode Time\tNum Frames\tConfidence\tLogprob 1\tLogprob 2\n'
 output_file.write(line)
 for lna_file in natural_sorted(os.listdir(speech_directory)):
 	if not lna_file.endswith('.lna'):
@@ -268,12 +282,17 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	lna_path = speech_directory + "/" + lna_file
 	rec_path = lna_path[:-4] + ".rec"
 	txt_path = lna_path[:-4] + ".txt"
-	slf_path = lna_path[:-4] + ".slf"
+	initial_slf = lna_path[:-4] + ".initial.slf"
+	rescored_slf = lna_path[:-4] + ".slf"
+	nbest_path = rescored_slf + ".gz"
+	
 	t.lna_open(lna_path, 1024)
 	t.reset(0)
 	t.set_end(-1)
 	start_time = time.clock()
+	num_frames = 0
 	while t.run():
+		num_frames = num_frames + 1
 		pass
 	end_time = time.clock()
 	decode_time = end_time - start_time
@@ -304,33 +323,52 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	if not generate_word_graph:
 		log_confidence = None
 	else:
-		t.write_word_graph(slf_path);
+		t.write_word_graph(initial_slf);
 
-		command = 'lattice-tool -read-htk -in-lattice "' + \
-				slf_path + \
-				'" -nbest-decode 100 -out-nbest-dir "' + \
-				speech_directory + '"'
+		command = 'lattice_rescore -f -l ' + ngram + \
+				' -i "' + initial_slf + '"' + \
+				' -o "' + rescored_slf + '"'
+		return_value = os.system(command)
+		if return_value != 0:
+			print "Command returned a non-zero exit status: ", command
+			sys.exit(1)
+		
+		os.remove(initial_slf);
+
+		command = 'lattice-tool -htk-acscale 1 -htk-lmscale 1 -read-htk' + \
+				' -in-lattice "' + rescored_slf + '"' + \
+				' -nbest-decode 100' + \
+				' -out-nbest-dir "' + speech_directory + '"'
 		return_value = os.system(command)
 		if return_value != 0:
 			print "Command returned a non-zero exit status: ", command
 			sys.exit(1)
 
-		nbest_file = gzip.open(slf_path + ".gz", "rb")
+		nbest_file = gzip.open(nbest_path, "rb")
 		nbest_list = nbest_file.readlines()
 		nbest_file.close()
 
 		# Compensate for incorrect assumptions in the HMM by flattening the
 		# logprobs.
-		alpha = 0.1
+		alpha = 1.0 / lm_scale
 
 		line = nbest_list[0]
-		logprob_1 = float(line.split(' ')[0]) * alpha
+		fields = line.split(' ')
+		ac_logprob = float(fields[0]) * alpha
+		lm_logprob = float(fields[1]) * alpha
+		logprob_1 = ac_logprob#logprobmul(ac_logprob, lm_logprob)
+		logprob_2 = 'N/A'
 
 		total_logprob = logprob_1
 		for line in nbest_list[1:]:
-			logprob = float(line.split(' ')[0]) * alpha
+			fields = line.split(' ')
+			ac_logprob = float(fields[0]) * alpha
+			lm_logprob = float(fields[1]) * alpha
+			logprob = ac_logprob#logprobmul(ac_logprob, lm_logprob)
+			if logprob_2 == 'N/A':
+				logprob_2 = logprob
 			# Acoustic probabilities are calculated in natural logarithm space.
-			total_logprob += math.log(1 + math.exp(logprob - total_logprob))
+			total_logprob += log(1 + exp(logprob - total_logprob))
 
 		log_confidence = logprob_1 - total_logprob
 
@@ -343,9 +381,10 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 		word_errors = levenshtein_w(recognition, transcription)
 		num_words = len(transcription.split(None))
 		if log_confidence != None:
-			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9:.4}\t{10}\n'.format(name, transcription, recognition, lm_scale, global_beam, letter_errors, num_letters, word_errors, num_words, log_confidence, decode_time)
+			confidence = exp(log_confidence)
+			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11:.4f}\t{12}\t{13}\n'.format(name, transcription, recognition, lm_scale, global_beam, letter_errors, num_letters, word_errors, num_words, decode_time, num_frames, confidence, logprob_1, logprob_2)
 		else:
-			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\tN/A\t{9}\n'.format(name, transcription, recognition, lm_scale, global_beam, letter_errors, num_letters, word_errors, num_words, decode_time)
+			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\n'.format(name, transcription, recognition, lm_scale, global_beam, letter_errors, num_letters, word_errors, num_words, decode_time, num_frames)
 		output_file.write(line)
 		output_file.flush()
 	else:
