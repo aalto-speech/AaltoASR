@@ -316,7 +316,7 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	rec.close()
 
 	if not generate_word_graph:
-		log_confidence = None
+		n_avg_best = None
 	else:
 		t.write_word_graph(initial_slf);
 
@@ -332,7 +332,7 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 
 		command = 'lattice-tool -htk-acscale 1 -htk-lmscale 1 -read-htk' + \
 				' -in-lattice "' + rescored_slf + '"' + \
-				' -nbest-decode 100' + \
+				' -nbest-decode 10' + \
 				' -out-nbest-dir "' + speech_directory + '"'
 		return_value = os.system(command)
 		if return_value != 0:
@@ -365,7 +365,10 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 			# Acoustic probabilities are calculated in natural logarithm space.
 			total_logprob += log(1 + exp(logprob - total_logprob))
 
-		log_confidence = logprob_1 - total_logprob
+		n = len(nbest_list)
+		average_logprob = total_logprob - log(n)
+		n_avg_best = average_logprob - logprob_1 
+		print "best:", logprob_1, "total:", total_logprob, "n:", n, "average:", average_logprob, "n_avg_best:", n_avg_best 
 
 	if os.path.exists(txt_path):
 		txt = open(txt_path, "r")
@@ -375,8 +378,8 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 		num_letters = len(transcription)
 		word_errors = levenshtein_w(recognition, transcription)
 		num_words = len(transcription.split(None))
-		if log_confidence != None:
-			confidence = exp(log_confidence)
+		if n_avg_best != None:
+			confidence = 1 - exp(n_avg_best)
 			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11:.4f}\t{12}\t{13}\n'.format(name, transcription, recognition, lm_scale, global_beam, letter_errors, num_letters, word_errors, num_words, decode_time, num_frames, confidence, logprob_1, logprob_2)
 		else:
 			line = '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\n'.format(name, transcription, recognition, lm_scale, global_beam, letter_errors, num_letters, word_errors, num_words, decode_time, num_frames)
@@ -385,6 +388,6 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	else:
 		print 'No transcription.'
 		print 'Recognition result:', recognition
-		print 'Log confidence:', log_confidence
+		print 'Log confidence:', n_avg_best
 
 output_file.close()
