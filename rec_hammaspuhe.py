@@ -7,14 +7,14 @@
 #   model-directory
 #   speech-directory
 #   output-file
-#   -a acoustic-model [speechdat | noisy]
+#   -a acoustic-model [basename]
 #   -l language-model [status | free]
 #   -s language-model-scale
 #
 # Example:
 #   rec_hammaspuhe.py /share/puhe/hammaspuhe/models \
-#     /share/puhe/hammaspuhe/audio/status_commands output.csv \
-#     -a speechdat -l status
+#     /share/puhe/hammaspuhe/audio/free_complete output.csv \
+#     -a speecon_test_ml_12.10.2011_20 -l free
 
 import time
 import string
@@ -107,7 +107,7 @@ def logprobmul(x, y):
 
 parser = OptionParser()
 parser.add_option('-a', '--acoustic-model',
-				  action='store', type='string', dest='am', default='speechdat')
+				  action='store', type='string', dest='am', default='speecon_test_ml_12.10.2011_20')
 parser.add_option('-l', '--language-model',
 				  action='store', type='string', dest='lm', default='status')
 parser.add_option('-s', '--language-model-scale',
@@ -125,12 +125,7 @@ output_file = args[2]
 
 akupath = os.path.dirname(sys.argv[0]) + "/../aku"
 
-if options.am == 'speechdat':
-	# 8 kHz telephone line
-	ac_model = model_directory + "/speechdat_gain5000_occ300_23.2.2009_22";
-elif options.am == 'noisy':
-	# 16 kHz acoustic model
-	ac_model = model_directory + "/test_mfcc_noisy_trained";
+ac_model = model_directory + "/" + options.am
 hmms = ac_model + ".ph"
 dur = ac_model + ".dur"
 
