@@ -546,20 +546,20 @@ HmmNetBaumWelch::check_network_structure(void)
       {
         if (m_arcs[arc_id].target == m_arcs[arc_id].source)
           throw std::string("HmmNetBaumWelch: Epsilon self loops are not allowed");
-        if (non_eps_in_transitions > 0)
-        {
-          fprintf(stderr, "At node %i:\n", i);
-          throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
-        }
+//         if (non_eps_in_transitions > 0)
+//         {
+//           fprintf(stderr, "At node %i:\n", i);
+//           throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+//         }
         epsilon_transitions = true;
       }
       else if (m_arcs[arc_id].target != m_arcs[arc_id].source)
       {
-        if (epsilon_transitions)
-        {
-          fprintf(stderr, "At node %i:\n", i);
-          throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
-        }
+//         if (epsilon_transitions)
+//         {
+//           fprintf(stderr, "At node %i:\n", i);
+//           throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+//         }
         non_eps_in_transitions++;
       }
       else
@@ -580,8 +580,8 @@ HmmNetBaumWelch::check_network_structure(void)
         if (non_eps_out_transitions > 0)
         {
           // Actually these might be supported now. Try at your own risk!
-          fprintf(stderr, "At node %i:\n", i);
-          throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+          // fprintf(stderr, "At node %i:\n", i);
+          // throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + std::string(")");
         }
         eps_out_transitions++;
       }
@@ -590,8 +590,8 @@ HmmNetBaumWelch::check_network_structure(void)
         if (eps_out_transitions > 0)
         {
           // Actually these might be supported now. Try at your own risk!
-          fprintf(stderr, "At node %i:\n", i);
-          throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+          // fprintf(stderr, "At node %i:\n", i);
+          // throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + std::string(")");
         }
         non_eps_out_transitions++;
       }
@@ -823,12 +823,13 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
   node_token_map.insert(NodeTokenMap::value_type(m_final_node_id, 0));
 
   // Propagate the epsilon arcs leading to the final node
-  double ref_score =
-    backward_propagate_epsilon_arcs(active_tokens, node_token_map, cur_frame);
+  backward_propagate_epsilon_arcs(active_tokens, node_token_map, cur_frame);
   
   cur_frame++;
   while (--cur_frame >= m_first_frame)
   {
+    double best_score = loglikelihoods.zero();
+    
     m_model.reset_cache();
     active_transitions.clear();
 
@@ -836,11 +837,6 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     // transitions.
     for (int i = 0; i < (int)active_tokens.size(); i++)
     {
-      // Pruning
-      if (loglikelihoods.divide(active_tokens[i].score, ref_score) <
-          -m_backward_beam)
-        continue;
-      
       int node_id = active_tokens[i].node_id;
       for (int a = 0; a < (int)m_nodes[node_id].in_arcs.size(); a++)
       {
@@ -856,6 +852,8 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
         // Check the backward score is valid
         if (backward_score > loglikelihoods.zero())
         {
+          if (backward_score > best_score)
+            best_score = backward_score;
           // Activate the transition
           active_transitions.insert(
             NodeTransitionMap::value_type(
@@ -870,9 +868,17 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     // Go through the active transitions and create tokens to the nodes
     for (NodeTransitionMap::iterator it = active_transitions.begin();
          it != active_transitions.end();) // Iterator updated in the code
-    {      
+    {
       double new_node_score = (*it).second.score;
       int best_arc_id = (*it).second.arc_id; // For MODE_VITERBI
+
+      // Pruning
+      if (loglikelihoods.divide((*it).second.score, best_score) <
+          -m_backward_beam)
+      {
+        ++it;
+        continue;
+      }
 
       // Go through all the transitions to the same node (sequantially
       // ordered) and update the node probabilities according to the
@@ -899,6 +905,11 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
       while (++it2 != active_transitions.end() &&
              (*it2).first == (*it).first)
       {
+        // Pruning
+        if (loglikelihoods.divide((*it2).second.score, best_score) <
+            -m_backward_beam)
+          continue;
+
         if (m_segmentation_mode == MODE_BAUM_WELCH)
         {
           new_node_score = loglikelihoods.plus(new_node_score,
@@ -972,8 +983,8 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
     }
 
     // Propagate epsilon transitions
-    ref_score = backward_propagate_epsilon_arcs(active_tokens,
-                                                node_token_map, cur_frame);
+    backward_propagate_epsilon_arcs(active_tokens,
+                                    node_token_map, cur_frame);
   }
 
   // Set the total lattice scores
@@ -992,18 +1003,16 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
 }
 
 
-double
+void
 HmmNetBaumWelch::backward_propagate_epsilon_arcs(
   std::vector< BackwardToken > &active_tokens,
   NodeTokenMap &node_token_map,
   int cur_frame)
 {
   FeatureVec empty_fea_vec;
-  double best_node_score = loglikelihoods.zero();
   for (int i = 0; i < (int)active_tokens.size(); i++)
   {
     int node_id = active_tokens[i].node_id;
-    best_node_score = std::max(active_tokens[i].score, best_node_score);
     for (int a = 0; a < (int)m_nodes[node_id].in_arcs.size(); a++)
     {
       int arc_id = m_nodes[node_id].in_arcs[a];
@@ -1036,7 +1045,6 @@ HmmNetBaumWelch::backward_propagate_epsilon_arcs(
             loglikelihoods.plus(active_tokens[token_id].score,
                                 backward_score);
         }
-        best_node_score = std::max(active_tokens[i].score, best_node_score);
       }
       else
       {
@@ -1044,11 +1052,9 @@ HmmNetBaumWelch::backward_propagate_epsilon_arcs(
         node_token_map.insert(
           NodeTokenMap::value_type(next_node_id, active_tokens.size()));
         active_tokens.push_back(BackwardToken(next_node_id, backward_score));
-        best_node_score = std::max(backward_score, best_node_score);
       }
     }
   }
-  return best_node_score;
 }
 
 

@@ -508,9 +508,8 @@ private:
   void generate_segmented_lattice(void);
 
   /** Propagates the epsilon arcs of the active nodes
-   * \returns the best score in the active nodes
    */
-  double backward_propagate_epsilon_arcs(
+  void backward_propagate_epsilon_arcs(
     std::vector< BackwardToken > &active_tokens,
     NodeTokenMap &node_token_map, int cur_frame);
   
