@@ -222,7 +222,7 @@ create_segmented_lattice(HmmNetBaumWelch &seg, float fw_beam, float bw_beam,
 void
 collect_lattice_stats(HmmSet &model, HmmNetBaumWelch &seg,
                       HmmNetBaumWelch::SegmentedLattice *lattice,
-                      PDF::StatisticsMode mode)
+                      PDF::StatisticsMode mode, bool count_frames)
 {
   std::set<int> active_nodes;
 
@@ -234,7 +234,9 @@ collect_lattice_stats(HmmSet &model, HmmNetBaumWelch &seg,
   {
     std::set<int> target_nodes;
 
-    num_frames++; // FIXME: Frames not counted with --no-train and DT
+    // FIXME: Frames are not counted with --no-train and DT
+    if (count_frames)
+      num_frames++;
 
     int frame = -1;
     model.reset_cache();
@@ -412,7 +414,7 @@ int main(int argc, char *argv[])
     if (config["mmi"].specified)
     {
       only_ml = false;
-      stats_mode |= PDF_MMI_STATS;
+      stats_mode |= PDF_MMI_STATS|PDF_ML_STATS;
     }
     if (config["mpe"].specified)
     {
@@ -588,8 +590,6 @@ int main(int argc, char *argv[])
             den_seg = recipe.infos[f].init_hmmnet_files(
               &model, true, &fea_gen, NULL);
             den_seg->set_collect_transition_probs(transtat);
-            den_seg->set_mode(hmmnet_seg_mode);
-
             den_lattice = create_segmented_lattice(
               *den_seg, config["fw-beam"].get_float(),
               config["bw-beam"].get_float(), config["ac-scale"].get_float(),
@@ -605,10 +605,13 @@ int main(int argc, char *argv[])
             assert( num_seg->computes_total_log_likelihood() &&
                     den_seg->computes_total_log_likelihood() );
 
+            // FIXME: We don't compute the number of frames here. Should
+            // it be saved anyway and be compared to the frames of
+            // denominator statistics?
             if ((stats_mode&PDF_ML_STATS) &&
                 !config["no-train"].specified)
               collect_lattice_stats(model, *num_seg, num_lattice,
-                                    PDF_ML_STATS);
+                                    PDF_ML_STATS, false);
             total_num_log_likelihood += num_lattice->total_score;
               
             if (mpe)
@@ -657,7 +660,7 @@ int main(int argc, char *argv[])
 
             if (!config["no-train"].specified)
               collect_lattice_stats(model, *den_seg, den_lattice,
-                                    (stats_mode&(~PDF_ML_STATS)));
+                                    (stats_mode&(~PDF_ML_STATS)), true);
             total_den_log_likelihood += den_lattice->total_score;
           }
           if (den_lattice != NULL)
