@@ -49,11 +49,10 @@ main(int argc, char *argv[])
       ('\0', "mpe", "", "", "minimum phone error estimation")
       ('\0', "minvar=FLOAT", "arg", "0.1", "minimum variance (default 0.1)")
       ('\0', "covsmooth", "arg", "0", "covariance smoothing (default 0.0)")
-      ('\0', "C1=FLOAT", "arg", "1.0", "constant \"C1\" for MMI updates (default 1.0)")
-      ('\0', "C2=FLOAT", "arg", "2.0", "constant \"C2\" for MMI updates (default 2.0)")
-      ('\0', "mmi-ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for MMI")
-      ('\0', "mpe-ismooth=FLOAT", "arg", "0.0", "I-smoothing constant for MPE")
-      ('\0', "mmi-prior", "", "", "Use MMI prior when I-smoothing MPE model")
+      ('\0', "C1=FLOAT", "arg", "2.0", "constant \"C1\" for EBW updates (default 2.0)")
+      ('\0', "C2=FLOAT", "arg", "2.0", "constant \"C2\" for EBW updates (default 2.0)")
+      ('\0', "ismooth=FLOAT", "arg", "0.0", "I-smoothing constant")
+      ('\0', "mmi-prior-ismooth=FLOAT", "arg", "0.0", "Use MMI prior when I-smoothing MPE model")
       ('\0', "prev-prior", "", "", "Use previous model as prior in I-smoothing")
       ('\0', "delete=FLOAT", "arg", "0.0", "delete Gaussians with occupancies below the threshold")
       ('\0', "mremove=FLOAT", "arg", "0.0", "remove mixture components below the weight threshold")
@@ -97,19 +96,17 @@ main(int argc, char *argv[])
       exit(1);
     }
 
-    if (config["mmi-ismooth"].specified &&
-        (!config["mmi"].specified && !config["mmi-prior"].specified))
-      fprintf(stderr, "Warning: --mmi-ismooth ignored without --mmi or --mmi-prior\n");
-    if (config["mpe-ismooth"].specified && mode != PDF::MPE_EST)
-        fprintf(stderr, "Warning: --mpe-ismooth ignored without --mpe\n");
+    if (config["ismooth"].specified &&
+        (!config["mmi"].specified && !config["mpe"].specified))
+      fprintf(stderr, "Warning: --ismooth ignored without --mmi or --mpe\n");
     if (config["prev-prior"].specified)
       model.set_ismooth_prev_prior(true);
-    else if (config["mmi-prior"].specified)
+    else if (config["mmi-prior-ismooth"].specified)
     {
       if (mode == PDF::MPE_EST)
         mode = PDF::MPE_MMI_PRIOR_EST;
       else
-        fprintf(stderr, "Warning: --mmi-prior ignored without --mpe\n");
+        fprintf(stderr, "Warning: --mmi-prior-ismooth ignored without --mpe\n");
     }
     
     // Load the previous models
@@ -185,8 +182,8 @@ main(int argc, char *argv[])
                                   config["covsmooth"].get_double(),
                                   config["C1"].get_double(),
                                   config["C2"].get_double(),
-                                  config["mmi-ismooth"].get_double(),
-                                  config["mpe-ismooth"].get_double());
+                                  config["ismooth"].get_double(),
+                                  config["mmi-prior-ismooth"].get_double());
 
     // Linesearch for subspace models
 #ifdef USE_SUBSPACE_COV

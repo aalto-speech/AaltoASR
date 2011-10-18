@@ -414,11 +414,13 @@ public:
   /** Sets the parameters for Gaussian estimation
    * \param minvar    Minimum variance
    * \param covsmooth Smoothing value for off-diagonal covariance terms
-   * \param c1 the C1 constant
-   * \param c2 the C2 constant
+   * \param c1 EBW C1 constant
+   * \param c2 EBW C2 constant
    * \param ismooth the I-smoothing constant
+   * \param mmi_prior_ismooth I-smoothing constant for the MMI model which
+   *                          acts as a prior model
    */
-  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double mmi_ismooth, double mpe_ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, mmi_ismooth, mpe_ismooth); }
+  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double ismooth, double mmi_prior_ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, ismooth, mmi_prior_ismooth); }
 
   /// Sets I-smoothing prior mode
   void set_ismooth_prev_prior(bool prev) { m_pool.set_ismooth_prev_prior(prev); }

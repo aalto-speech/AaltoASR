@@ -159,13 +159,14 @@ public:
   /** Sets the parameters used in Gaussian estimation
    * \param minvar    Minimum diagonal variance term for Gaussians
    * \param covsmooth Covariance smoothing value
-   * \param c1        MMI C1 constant
-   * \param c2        MMI C2 constant
-   * \param ismooth   MMI I-smoothing constant
+   * \param c1        EBW C1 constant
+   * \param c2        EBW C2 constant
+   * \param ismooth   I-smoothing constant
+   * \param mmi_prior_ismooth I-smoothing for the prior MMI-model
    */
   void set_gaussian_parameters(double minvar = 0, double covsmooth = 0,
                                double c1 = 0, double c2 = 0,
-                               double mmi_ismooth = 0, double mpe_ismooth = 0);
+                               double ismooth = 0, double mmi_prior_ismooth = 0);
 
   /// Sets I-smoothing prior mode
   void set_ismooth_prev_prior(bool prev) { m_ismooth_prev_prior = prev; }
@@ -255,10 +256,9 @@ private:
   double m_covsmooth;
   double m_c1;
   double m_c2;
-  double m_mmi_ismooth;
-  double m_mpe_ismooth;
-
-  double m_ismooth_prev_prior;
+  double m_ismooth;
+  double m_mmi_prior_ismooth;
+  bool m_ismooth_prev_prior;
 
 #ifdef USE_SUBSPACE_COV
   // Subspaces

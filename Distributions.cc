@@ -2517,15 +2517,15 @@ PDFPool::precompute_likelihoods(const Vector &f)
 
 void
 PDFPool::set_gaussian_parameters(double minvar, double covsmooth,
-                                 double c1, double c2, double mmi_ismooth,
-                                 double mpe_ismooth)
+                                 double c1, double c2, double ismooth,
+                                 double mmi_prior_ismooth)
 {
   m_minvar = minvar;
   m_covsmooth = covsmooth;
   m_c1 = c1;
   m_c2 = c2;
-  m_mmi_ismooth = mmi_ismooth;
-  m_mpe_ismooth = mpe_ismooth;
+  m_ismooth = ismooth;
+  m_mmi_prior_ismooth = mmi_prior_ismooth;
 }
 
 
@@ -2571,19 +2571,20 @@ PDFPool::estimate_parameters(PDF::EstimationMode mode)
         {
           if (mode == PDF::MPE_MMI_PRIOR_EST)
           {
-            if (m_mmi_ismooth > 0)
-              temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
+            if (m_mmi_prior_ismooth > 0)
+              temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF,
+                                       m_mmi_prior_ismooth);
             temp->estimate_parameters(PDF::MMI_EST, m_minvar, m_covsmooth,
                                       m_c1, m_c2, 0, true);
-            temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF,m_mpe_ismooth);
+            temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF, m_ismooth);
           }
-          else if (mode == PDF::MPE_EST && m_mpe_ismooth > 0)
-            temp->ismooth_statistics(PDF::ML_BUF,PDF::MPE_NUM_BUF,m_mpe_ismooth);
-          else if (mode == PDF::MMI_EST && m_mmi_ismooth > 0)
-            temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_mmi_ismooth);
+          else if (mode == PDF::MPE_EST && m_ismooth > 0)
+            temp->ismooth_statistics(PDF::ML_BUF, PDF::MPE_NUM_BUF, m_ismooth);
+          else if (mode == PDF::MMI_EST && m_ismooth > 0)
+            temp->ismooth_statistics(PDF::ML_BUF, PDF::ML_BUF, m_ismooth);
         }
         else
-          tau = (mode == PDF::MPE_EST?m_mpe_ismooth:m_mmi_ismooth);
+          tau = m_ismooth;
         temp->estimate_parameters(mode, m_minvar, m_covsmooth,
                                   m_c1, m_c2, tau, false);
       }
