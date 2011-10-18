@@ -1201,38 +1201,54 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
   int num_splits = 0;
   
   std::vector<int> sorted_gaussians;
+  std::vector<double> emission_pdf_occ;
 
-  m_pool.get_occ_sorted_gaussians(sorted_gaussians, 0); 
+  m_pool.get_occ_sorted_gaussians(sorted_gaussians, 0);
+
+  emission_pdf_occ.resize(num_emission_pdfs());
+  double sum_occ = 0;
+  for (int p = 0; p < num_emission_pdfs(); p++)
+  {
+    double g_occ_sum = 0;  
+    for (int k = 0; k < m_emission_pdfs[p]->size(); k++)
+      g_occ_sum += m_emission_pdfs[p]->get_accumulated_gamma(PDF::ML_BUF, k);
+    emission_pdf_occ[p] = g_occ_sum;
+    sum_occ += g_occ_sum;
+  }
 
   if (numgauss > 0)
   {
-    // Calculates suitable value of minimum occupancy (minocc) 
-    // depending on amount of gaussian we want
-    
-    // Allow 1% deviations in the number of Gaussians
-    double max_rel_error = .01;
+    // Calculates the suitable value of minimum occupancy (minocc) 
+    // depending on the amount of Gaussian we want.
 
-    // Maximum of 50 iterations
-    minocc = 10*dim();
+    if (m_pool.size() >= numgauss)
+      return 0; // Stop splitting if there are already enough Gaussians
+    
+    // Allow 0.1% deviations in the number of Gaussians
+    double max_rel_error = .001;
+      
+    minocc = 10*dim(); // Initial minimum occupancy without power rule
+    // Compensate initial minocc when splitalpha < 1
+    double temp = sum_occ/(double)num_emission_pdfs(); // Avg occ per mixture
+    minocc = pow(temp, splitalpha)/(temp/minocc);
+    
     double interval = minocc;
     bool growing = true;
-    for (int i = 0; i < 50; i++)
+    for (int i = 0; i < 50; i++) // Maximum of 50 binary search iterations
     {
       int total_gaussians = 0;
-      for (int p = 0; p < num_emission_pdfs(); p++){
-
-        // Occupancy of GMMs
-        double g_occ_sum = 0;  
-        for (int k = 0; k < m_emission_pdfs[p]->size(); k++){
-	  g_occ_sum += m_emission_pdfs[p]->get_accumulated_gamma(PDF::ML_BUF, k);
-        }
-
-        // Determine the approximate number of Gaussians after all the splits
-        int num_mix_g = (int)ceil(pow(g_occ_sum, splitalpha) / minocc);
-        total_gaussians += std::min(num_mix_g, maxg);
+      for (int p = 0; p < num_emission_pdfs(); p++)
+      {
+        // Determine the approximate number of Gaussians after all the splits.
+        // Assumes the Gaussians are not shared among the mixtures.
+        int num_mix_g = (int)floor(pow(emission_pdf_occ[p], splitalpha)/minocc);
+        total_gaussians += std::max(std::min(num_mix_g, maxg),
+                                    m_emission_pdfs[p]->size());
       }
-    
-      if ( total_gaussians > (1+max_rel_error)*numgauss )
+
+      printf("iter %-2d: %d Gaussians, occ=%.4f\n", i, total_gaussians, minocc);
+      
+      if (total_gaussians > (1+max_rel_error)*numgauss)
       {
         if (growing)
         {
@@ -1251,9 +1267,11 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
         break;
       if (!growing)
         interval /= 2.0;
-    }
-  }
 
+    }
+
+    printf("FINAL Minocc: %.4f\n", minocc);
+  }
 
   for (int i = 0; i < (int)sorted_gaussians.size(); i++)
   {
@@ -1267,18 +1285,12 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
     {
       if (m_emission_pdfs[p]->component_index(sorted_gaussians[i]) >= 0) 
       {
-	// Occupancy of GMMs
-	double g_occ_sum = 0;
-	for (int k = 0; k < m_emission_pdfs[p]->size(); k++){
-	  g_occ_sum += m_emission_pdfs[p]->get_accumulated_gamma(PDF::ML_BUF, k);
-	}
-
         /* Can gaussian be split?
          * Used formula is from article: EM algorithms for Gaussian mixture with 
          * split-and-merge operation by Zhihua Zhang, Chibiao Chen, Jian Sun, Kap Luk Chan */	
-        if ( (pow(g_occ_sum, splitalpha) / (m_emission_pdfs[p]->size()) < minocc) || 
-             (m_emission_pdfs[p]->size() >= maxg))
-        { 	  
+        if (pow(emission_pdf_occ[p], splitalpha)/(m_emission_pdfs[p]->size()+1)
+             < minocc || m_emission_pdfs[p]->size() >= maxg)
+        {
           split = false;
           break;
         }
