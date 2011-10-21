@@ -250,15 +250,33 @@ sub load_recipe {
     if ($num_batches <= 1 || $cur_index == $batch_index) {
       my ($audio, $tr, $lna, $wgfile, $temp_target, $numfile, $denfile);
       my $utterance;
+      $audio = "";
       $audio = $1 if ($line =~ /audio=(\S*)/);
       $tr = $1 if ($line =~ /transcript=(\S*)/);
       if ($line =~ /lna=(\S*)/) {
         $lna = $1;
         $wgfile = $temp_dir."/".$1.".wg";
         $temp_target = $1."_$cur_line";
+      } else {
+        $lna = "";
+        if ($line =~ /audio=\S*\/([^\/]+)(\.[^\/]*)?\s/ ||
+            $line =~ /audio=(\S*)/) {
+          $wgfile = $temp_dir."/".$1.".wg";
+          $temp_target = $1."_$cur_line";
+        } else {
+          die "No valid audio field in the recipe";
+        }
       }
-      $numfile = $1 if ($line =~ /hmmnet=(\S*)/);
-      $denfile = $1 if ($line =~ /den\-hmmnet=(\S*)/);
+      if ($line =~ /hmmnet=(\S*)/) {
+        $numfile = $1;
+      } elsif (defined $opt_hash{'n'}) {
+        die "Recipe must have hmmnet-fields with -n";
+      }
+      if ($line =~ /den\-hmmnet=(\S*)/) {
+        $denfile = $1;
+      } elsif (defined $opt_hash{'d'}) {
+        die "Recipe must have den-hmmnet-fields with -d";
+      }
       $utterance = $1 if ($line =~ /utterance=(\S*)/);
       if (!defined $opt_hash{'e'} || 
           (defined $opt_hash{'n'} && !(-e $numfile)) ||
@@ -295,6 +313,10 @@ sub generate_word_graphs {
   my $temp_recipe = "$temp_dir/temp.recipe";
   open $fh, "> $temp_recipe";
   for my $record (@$rinfo) {
+    if (!defined $record->{audio} || length($record->{audio}) == 0 ||
+        !defined $record->{lna} || length($record->{lna}) == 0) {
+      die "recipe needs audio and lna fields for generating word graphs";
+    }
     if (!(-e $record->{wg}) || !check_wg_file($record->{wg})) {
       print $fh "audio=".$record->{audio}." lna=".$record->{lna}."\n";
       $num_files++;
