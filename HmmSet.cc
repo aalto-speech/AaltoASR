@@ -1246,8 +1246,6 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
                                     m_emission_pdfs[p]->size());
       }
 
-      printf("iter %-2d: %d Gaussians, occ=%.4f\n", i, total_gaussians, minocc);
-      
       if (total_gaussians > (1+max_rel_error)*numgauss)
       {
         if (growing)
@@ -1269,8 +1267,6 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
         interval /= 2.0;
 
     }
-
-    printf("FINAL Minocc: %.4f\n", minocc);
   }
 
   for (int i = 0; i < (int)sorted_gaussians.size(); i++)
