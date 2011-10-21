@@ -18,7 +18,7 @@ if (open(FILE, "boundaries")) {
 $Hmm::verbose = 0;
 my $hmmfile = shift @ARGV;
 my $hmms = Hmm::read($hmmfile);
-my @accept = @ARGV;
+my @accept_list = @ARGV;
 
 my %state_map = ();
 my @labels = ();
@@ -36,7 +36,7 @@ my @filler_models = ();
 for my $label (keys %$hmms) {
 
     my $accept = 0;
-    for (@accept) {
+    for (@accept_list) {
 	$accept = 1 if (eval "\$label =~ /$_/");
     }
     next if ($accept == 0);
@@ -106,14 +106,14 @@ if (@filler_models) {
   my $filler_source = $fsm->add_node();
   my $filler_target = $fsm->add_node();
 
-  # To fill the morph boundary arcs, add these to the state map
+  # To fill the morph/word boundary arcs, add these to the state map
   $state_map{__f} = $filler_source;
-  $state_map{_f_} = $filler_target;
+  $state_map{f__} = $filler_target;
 
   $fsm->add_arc($state_map{"-__"}, $filler_source, "__", "__", 0);
-  $fsm->add_arc($state_map{"-__"}, $filler_source, "_", "_", 0);
-  $fsm->add_arc($filler_target, $state_map{"__-"}, "__", "__", 0);
-  $fsm->add_arc($filler_target, $state_map{"__-"}, "_", "_", 0);
+  #$fsm->add_arc($state_map{"-__"}, $filler_source, "_", "_", 0);
+  $fsm->add_arc($filler_target, $state_map{"-__"}, $eps, $eps, 0);
+  #$fsm->add_arc($filler_target, $state_map{"__-"}, "_", "_", 0);
 
   foreach my $fmlab (@filler_models) {
     $fsm->add_arc($filler_source, $filler_target, $fmlab, $fmlab, 0);
@@ -127,7 +127,7 @@ while ((my $ctx, my $id) = each %state_map) {
 	}
     }
     
-    next if ($ctx !~ /\S+-\S+/);
+    #next if ($ctx !~ /\S+-\S+/);
     foreach my $sslab (@short_silences) {
       $fsm->add_arc($id, $id, $sslab, $sslab, 0);
     }

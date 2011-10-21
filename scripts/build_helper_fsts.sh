@@ -34,7 +34,11 @@ ${script_dir}hmms2fsm.pl $ph . | fst_closure -p - H.fst
 echo "#FSTBasic MaxPlus" > optional_silence.fst
 echo "I 0" >> optional_silence.fst
 echo "F 3" >> optional_silence.fst
-echo "T 0 1 #1" >> optional_silence.fst
+if [[ $mswitch == "-m" ]]; then
+  echo "T 0 1 #1 <w>" >> optional_silence.fst
+else
+  echo "T 0 1 #1" >> optional_silence.fst
+fi
 echo "T 1 2 __" >> optional_silence.fst
 echo "T 2 3 #1" >> optional_silence.fst
 echo "T 0 3" >> optional_silence.fst
