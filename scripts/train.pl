@@ -4,114 +4,119 @@
 # modify appropriately. You MUST modify at least the path settings,
 # training file list and BASE_ID/initial model names!
 
-# Run this script at stimulus.hut.fi, it uses GridEngine for scheduling
-# the jobs to cluster machines.
+# Run this script at your desktop machine, which acts as the host
+# for the Condor batch system.
 
-use lib '/share/puhe/x86_64/lib'; # For GridManager (or use aku/scripts dir)
+use lib '/share/puhe/scripts/cluster'; # For CondorManager (or use aku/scripts path)
 use locale;
 use strict;
-use GridManager;
+use CondorManager;
 
 
-# Model name
-my $BASE_ID="mfcc";
+## Model name ##
+  my $BASE_ID="speecon_mfcc";
 
-# Path settings
-my $BINDIR="/home/".$ENV{"USER"}."/aku";
-my $SCRIPTDIR="$BINDIR/scripts";
-my $HMMDIR="/share/puhe/".$ENV{"USER"}."/hmms";
-my $workdir="/share/work/".$ENV{"USER"}."/aku_work";
-my $lna_outdir = "/share/work/".$ENV{"USER"}."/lnas";
+## Path settings ##
+  my $BINDIR="/home/".$ENV{"USER"}."/aku/cvs/aku";
+  my $SCRIPTDIR="$BINDIR/scripts";
+  my $HMMDIR="/share/puhe/".$ENV{"USER"}."/aku_test/hmms";
+  my $workdir="/share/work/".$ENV{"USER"}."/aku_work";
+  my $lna_outdir = "/share/work/".$ENV{"USER"}."/lnas";
 
-# Training file list
-my $RECIPE="/share/puhe/jpylkkon/speecon_new/speecon_new_train.recipe";
-my $lna_recipe="/share/puhe/jpylkkon/speecon_new/speecon_new_devel.recipe";
+## Training file list ##
+my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
 
-# Initial model names
-my $init_model = $HMMDIR."/".$BASE_ID;      # Created in tying
-my $init_cfg = $HMMDIR."/".$BASE_ID.".cfg"; # Used in tying and training
+## Initial model names ##
+  my $init_model = $HMMDIR."/".$BASE_ID;      # Created in tying
+  my $init_cfg = $HMMDIR."/".$BASE_ID.".cfg"; # Used in tying and training
 
-# Batch settings
-my $NUM_BATCHES = 2; # Number of batches, maximum number of parallel jobs
-my $BATCH_PRIORITY = 0; # For large batches, use e.g. -100
-my $BATCH_MAX_MEM = 2000; # In megabytes
-# Note that you may need memory if the training data contains
-# e.g. long utterances! If too little memory is reserved, unexpected
-# termination of the training may occur.
+## Batch settings ##
+  my $NUM_BATCHES = 20; # Number of batches, maximum number of parallel jobs
+  my $BATCH_PRIORITY = 0; # Not used currently.
+  my $BATCH_MAX_MEM = 2000; # In megabytes
+  # Note that you may need considerable amount of memory if the
+  # training data contains e.g. long utterances! If too little memory
+  # is reserved, unexpected termination of the training may occur. On
+  # Condor there are currently no memory restrictions so this has no
+  # effect when training with Condor.
 
-# Train/Baum-Welch settings
-my $USE_HMMNETS = 1; # If 0, the script must call align appropriately
-my $FORWARD_BEAM = 15;
-my $BACKWARD_BEAM = 150;
-my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/lne(10)))
-my $ML_STATS_MODE = "--ml";
-my $ML_ESTIMATE_MODE = "--ml";
+## Training/Baum-Welch settings ##
+  my $USE_HMMNETS = 1; # If 0, the script must call align appropriately
+  my $FORWARD_BEAM = 15;
+  my $BACKWARD_BEAM = 200;
+  my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/lne(10)))
+  my $ML_STATS_MODE = "--ml";
+  my $ML_ESTIMATE_MODE = "--ml";
 
-# HMMNET options
-my $MORPH_HMMNETS = 1; # True (1) if HMMNETs are not based on words
-my $LEX_FILE = "$SCRIPTDIR/fin_voc.lex"; # Morph/word lexicon
-my $TRN_FILE = "" ; # TRN file for transcription. If empty, uses PHNs.
-                    # Required if the HMMs are not based on graphemes!
+## HMMNET options ##
+  my $MORPH_HMMNETS = 1; # True (1) if HMMNETs are not based on words
+  my $LEX_FILE = "$SCRIPTDIR/fin_voc.lex"; # Morph/word lexicon
+  # TRN file for transcription. If empty, uses PHNs. Required if the HMMs
+  # are not based on graphemes!
+  my $TRN_FILE = "" ;
+
+## Alignment settings ##
+  my $ALIGN_WINDOW = 4000;
+  my $ALIGN_BEAM = 1000;
+  my $ALIGN_SBEAM = 100;
+
+## Context phone tying options ##
+  my $TIE_USE_OUT_PHN = 0; # 0=read transcript field, 1=read alignment field
+  my $TIE_RULES = "$SCRIPTDIR/finnish_rules.txt";
+  my $TIE_MIN_COUNT = 1500; # Minimum number of features per state
+  my $TIE_MIN_GAIN = 4000;  # Minimum loglikelihood gain for a state split
+  my $TIE_MAX_LOSS = 4000;  # Maximum loglikelihood loss for merging states
+
+## Gaussian splitting options ##
+  my $SPLIT_MIN_OCCUPANCY = 300; # Accumulated state probability
+  my $SPLIT_MAX_GAUSSIANS = 80; # Per state
+
+  # If $SPLIT_TARGET_GAUSSIANS > 0, it defines the Gaussian splitting instead
+  # of $SPLIT_MIN_OCCUPANCY
+  my $SPLIT_TARGET_GAUSSIANS = 30000; # Number of Gaussians in the final model
+
+  # Smoothing power for occupancies, 0 < alpha <= 1. Note that if not using
+  # $SPLIT_TARGET_GAUSSIANS, this drastically changes the proper range for
+  # $SPLIT_MIN_OCCUPANCY.
+  my $SPLIT_ALPHA = 0.5;
+
+  my $GAUSS_REMOVE_THRESHOLD = 0.001; # Mixture component weight threshold
+
+## Minimum variance ##
+  my $MINVAR = 0.1;
+
+## Gaussian clustering options ##
+  my $NUM_GAUSS_CLUSTERS = 1000; # 0 if no clustering
+  my $GAUSS_EVAL_RATIO = 0.1;
+
+## MLLT options ##
+  my $mllt_start_iter = 14; # At which iteration MLLT estimation should begin
+  my $mllt_frequency = 2; # How many EM iterations between MLLT estimation
+  my $MLLT_MODULE_NAME = "transform";
+
+## Training iterations ##
+  my $num_ml_train_iter = 20;
+  my $split_frequency = 2; # How many EM iterations between Gaussian splits
+  my $split_stop_iter = 16; # Iteration after which no more splits are done
+
+## Adaptation settings ##
+  my $VTLN_MODULE = "vtln";
+  my $MLLR_MODULE = "mllr";
+  my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
 
 
-# Alignment settings
-my $ALIGN_WINDOW = 4000;
-my $ALIGN_BEAM = 1000;
-my $ALIGN_SBEAM = 100;
+## Misc settings ##
+  # States without duration model (silences/noises). These must be first
+  # states of the models!
+  my $DUR_SKIP_MODELS = 6;
+ 
+  my $VERBOSITY = 1;
 
-# Context phone tying options
-my $TIE_USE_OUT_PHN = 0; # 0=read transcript field, 1=read alignment field
-my $TIE_RULES = "$SCRIPTDIR/finnish_rules.txt";
-my $TIE_MIN_COUNT = 1000; # Minimum number of features per state
-my $TIE_MIN_GAIN = 3500;  # Minimum loglikelihood gain for a state split
-my $TIE_MAX_LOSS = 3500;  # Maximum loglikelihood loss for merging states
+  # NOTE: If you plan to recompile executables at the same time as running
+  # them, it is a good idea to copy the old binaries to a different directory.
+  my $COPY_BINARY_TO_WORK = 1;
 
-# Gaussian splitting options
-my $SPLIT_MIN_OCCUPANCY = 300; # Accumulated state probability
-my $SPLIT_MAX_GAUSSIANS = 100; # Per state
-my $GAUSS_REMOVE_THRESHOLD = 0.001; # Mixture component weight threshold
-
-# Minimum variance
-my $MINVAR = 0.1;
-
-# Gaussian clustering options
-my $NUM_GAUSS_CLUSTERS = 1000; # 0 if no clustering
-my $GAUSS_EVAL_RATIO = 0.1;
-
-# MLLT options
-my $mllt_start_iter = 14; # At which iteration MLLT estimation should begin
-my $mllt_frequency = 1; # How many EM iterations between MLLT estimation
-my $MLLT_MODULE_NAME = "transform";
-
-# Training iterations
-my $num_ml_train_iter = 20;
-my $split_frequency = 2; # How many EM iterations between Gaussian splits
-my $split_stop_iter = 16; # Iteration after which no more splits are done
-
-# Adaptation settings
-my $VTLN_MODULE = "vtln";
-my $MLLR_MODULE = "mllr";
-my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
-
-
-# Discriminative training settings
-my $num_ebw_iter = 4;
-my $EBW_STATS_MODE = "--mmi -M mpv";
-my $EBW_ESTIMATE_MODE = "--mmi";
-my $EBW_AC_SCALE = 0.08;
-my $EBW_FORWARD_BEAM = 15;
-my $EBW_BACKWARD_BEAM = 20; # Affected by the acoustic scaling 
-
-
-# Misc settings
-my $DUR_SKIP_MODELS = 6; # Models without duration model (silences/noises)
-my $VERBOSITY = 1;
-
-# NOTE: if you plan to recompile executables at the same time as running them, 
-# it is a good idea to copy the old binaries to a different directory
-my $COPY_BINARY_TO_WORK = 0;
-
-my $SAVE_STATISTICS = 1; # Keep the statistics files in iteration directories
+  my $SAVE_STATISTICS = 0; # Save the statistics files in iteration directories
 
 
 ######################################################################
@@ -127,12 +132,6 @@ if ($COPY_BINARY_TO_WORK > 0) {
     copy_binary_to_work($BINDIR, $tempdir."/bin");
 }
 
-# Global GridManager object for single processes
-my $GM_SINGLE = GridManager->new;
-$GM_SINGLE->{"identifier"} = "single";
-$GM_SINGLE->{"run_dir"} = $tempdir;
-$GM_SINGLE->{"log_dir"} = $tempdir;
-
 
 # Generate initial model by context phone tying using existing alignments
 context_phone_tying($init_model, $init_cfg);
@@ -141,16 +140,21 @@ context_phone_tying($init_model, $init_cfg);
 convert_full_to_diagonal($init_model);
 
 # Create the hmmnet files
-generate_hmmnet_files($init_model);
+generate_hmmnet_files($init_model, $tempdir);
 
 # ML/EM training
 my $ml_model;
 $ml_model=ml_train($tempdir, 1, $num_ml_train_iter, $init_model, $init_cfg,
-                   $mllt_start_iter, $mllt_frequency, $split_frequency, $split_stop_iter);
+                   $mllt_start_iter, $mllt_frequency,
+                   $split_frequency, $split_stop_iter);
 my $om = $ml_model;
 
 # Estimate duration model
-align($tempdir, $om, $RECIPE);
+if ($USE_HMMNETS) {
+  align_hmmnets($tempdir, $om, $RECIPE);
+} else {
+  align($tempdir, $om, $RECIPE);
+}
 estimate_dur_model($om);
 
 # VTLN
@@ -161,21 +165,12 @@ estimate_dur_model($om);
 # estimate_mllr($tempdir, $om, $RECIPE, $om.".spkc");
 
 # Cluster the Gaussians
-if ($NUM_GAUSS_CLUSTERS > 0) {
-  cluster_gaussians($om);
-}
-
-# Discriminative training
-#my $dmodel;
-#$AC_SCALE=$DISCRIMINATIVE_AC_SCALE;    # for MMI 1/(LMSCALE/ln(10)))
-#$FORWARD_BEAM=$DISCRIMINATIVE_FORWARD_BEAM;
-#$BACKWARD_BEAM=$DISCRIMINATIVE_BACKWARD_BEAM;
-#$USE_HMMNETS = 1;
-#$dmodel=ebw_train($tempdir, 1, $num_ebw_iter, $ml_model, $ml_model.".cfg");
-#$om = $dmodel;
+# if ($NUM_GAUSS_CLUSTERS > 0) {
+#   cluster_gaussians($om);
+# }
 
 # Generate lnas for the final model
-generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
+#generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
 
 
 
@@ -205,7 +200,12 @@ sub context_phone_tying {
   my $phn_flag = "";
   $phn_flag = "-O" if ($TIE_USE_OUT_PHN);
 
-  $GM_SINGLE->submit("$BINDIR/tie -c $im_cfg -o $out_model -r $RECIPE $phn_flag -u $TIE_RULES --count $TIE_MIN_COUNT --sgain $TIE_MIN_GAIN --mloss $TIE_MAX_LOSS -i $VERBOSITY\n");
+  my $cm = CondorManager->new;
+  $cm->{"identifier"} = "tie_".$BASE_ID;
+  $cm->{"run_dir"} = $tempdir;
+  $cm->{"log_dir"} = $tempdir;
+
+  $cm->submit("$BINDIR/tie -c $im_cfg -o $out_model -r $RECIPE $phn_flag -u $TIE_RULES --count $TIE_MIN_COUNT --sgain $TIE_MIN_GAIN --mloss $TIE_MAX_LOSS -i $VERBOSITY\n", "");
 
   if (!(-e $out_model.".ph")) {
     die "Error in context phone tying\n";
@@ -219,7 +219,7 @@ sub convert_full_to_diagonal {
   my $gk_backup = $im."_full.gk";
   
   system("mv $gk $gk_backup");
-  $GM_SINGLE->submit("$BINDIR/gconvert -g $gk_backup -o $gk -d\n");
+  system("$BINDIR/gconvert -g $gk_backup -o $gk -d > $tempdir/gconvert.stdout 2> $tempdir/gconvert.stderr\n");
 }
 
 
@@ -270,7 +270,6 @@ sub ml_train {
       my $cur_file;
       foreach $cur_file (@stats_files) {
         chomp $cur_file;
-        print "cp $cur_file.* $log_dir\n";
         system("cp $cur_file.* $log_dir");
       }
       system("cp $stats_list_file $log_dir");
@@ -281,70 +280,6 @@ sub ml_train {
                         (($i-1) % $split_frequency) == 0);
     estimate_model($log_dir, $im, $im_cfg, $om, $stats_list_file, $MINVAR,
                    $ML_ESTIMATE_MODE, $mllt_flag, $split_flag);
-    
-    # Check the models were really created
-    if (!(-e $om.".ph")) {
-      die "Error in training, no models were written\n";
-    }
-
-    # Remove the statistics files
-    my $cur_file;
-    foreach $cur_file (@stats_files) {
-      chomp $cur_file;
-      system("rm $cur_file.*");
-    }
-    system("rm $stats_list_file");
-
-    # Read input from previously written model
-    $im = $om;
-    $im_cfg = $om.".cfg";
-  }
-  return $im;
-}
-
-
-sub ebw_train {
-  my $temp_dir = shift(@_);
-  my $iter_init = shift(@_);
-  my $iter_end = shift(@_);
-
-  my $im = shift(@_);
-  my $im_cfg = shift(@_);
-
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $dstring = "$mday.".($mon+1).".".(1900+$year);
-  my $model_base = "$HMMDIR/${BASE_ID}_ebw_${dstring}";
-
-  my $stats_list_file = "statsfiles.lst";
-  my $batch_info;
-
-  for (my $i = $iter_init; $i <= $iter_end ; $i ++) {
-
-    print "EBW iteration ".$i."\n" if ($VERBOSITY > 0);
-    my $om = $model_base."_".$i;
-
-    my $log_dir = "$temp_dir/ebw_iter_".$i;
-    mkdir $log_dir;
-
-    collect_stats("ebw_$i", $temp_dir, $log_dir, $im, $im_cfg,
-                  $stats_list_file, $EBW_STATS_MODE, 0);
-
-    my $fh;
-    open($fh, $stats_list_file) || die("Could not open file $stats_list_file!");
-    my @stats_files=<$fh>;
-    close($fh);
-
-    if ($SAVE_STATISTICS) {
-      my $cur_file;
-      foreach $cur_file (@stats_files) {
-        chomp $cur_file;
-        system("cp $cur_file.* $log_dir");
-      }
-      system("cp $stats_list_file $log_dir");
-    }
-
-    estimate_model($log_dir, $im, $im_cfg, $om, $stats_list_file,
-                   $MINVAR, $EBW_ESTIMATE_MODE, 0, 0);
     
     # Check the models were really created
     if (!(-e $om.".ph")) {
@@ -384,42 +319,45 @@ sub collect_stats {
   $spkc_switch = "-S $SPKC_FILE" if ($SPKC_FILE ne "");
   $mllt_option = "--mllt" if ($mllt_flag);
 
-  my $gm = GridManager->new;
-  $gm->{"identifier"} = $id;
-  $gm->{"run_dir"} = $temp_dir;
-  $gm->{"log_dir"} = $log_dir;
+  my $cm = CondorManager->new;
+  $cm->{"identifier"} = $id;
+  $cm->{"run_dir"} = $temp_dir;
+  $cm->{"log_dir"} = $log_dir;
   if ($NUM_BATCHES > 0) {
-    $gm->{"first_batch"} = 1;
-    $gm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"first_batch"} = 1;
+    $cm->{"last_batch"} = $NUM_BATCHES;
   }
-  $gm->{"priority"} = $BATCH_PRIORITY;
-  $gm->{"mem_req"} = $BATCH_MAX_MEM;
-  #$gm->{"emergency_shutdown"} = 0;
-  $gm->{"failed_batch_retry_count"} = 1;
+  $cm->{"priority"} = $BATCH_PRIORITY;
+  $cm->{"mem_req"} = $BATCH_MAX_MEM;
+  $cm->{"failed_batch_retry_count"} = 1;
 
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
 
   my $failed_batches_file = "${id}_failed_batches.lst";
   unlink($failed_batches_file);
 
-  $gm->submit("$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $bw_option -o temp_stats_\$BATCH $stats_mode -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE -t $spkc_switch $batch_options -i $VERBOSITY $mllt_option\n".
-"if [ \"\$?\" -ne \"0\" ]; then echo \$BATCH >> $failed_batches_file; exit 1; fi\n".
-"while ! mkdir stats.lock 2>/dev/null; do sleep 5s; done\n".
+  $cm->submit("$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $bw_option -o temp_stats_\$BATCH $stats_mode -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE -t $spkc_switch $batch_options -i $VERBOSITY $mllt_option\n".
+"if [ \"\$?\" -ne \"0\" ]; then echo \$BATCH >> $failed_batches_file; exit 1; fi\n",
+# Epilog script:
 "if [ -f ${id}_stats.gks ] ; then\n".
-"  echo ${id}_stats > temp_list_\$BATCH\n".
-"  echo temp_stats_\$BATCH >> temp_list_\$BATCH\n".
-"  sleep 5s\n".
-"  $BINDIR/combine_stats -b $model_base -L temp_list_\$BATCH -o ${id}_stats\n".
-"  if [ \"\$?\" -ne \"0\" ]; then rmdir stats.lock; rm temp_list_\$BATCH; rm temp_stats_\$BATCH.*; exit 1; fi\n".
-"  rm temp_list_\$BATCH\n".
-"  rm temp_stats_\$BATCH.*\n".
+"  if [ ! -f ${id}_stats_list ] ; then\n".
+"    echo ${id}_stats > ${id}_stats_list\n".
+"  fi\n".
+"  echo temp_stats_\$BATCH >> ${id}_stats_list\n".
+"  l=`wc -l ${id}_stats_list | cut -f 1 -d ' '`\n".
+"  s=`ls -1 temp_stats_*.lls | wc -l | cut -f 1 -d ' '`\n".
+"  if [[ \$l -gt \$s || \$RUNNING_JOBS -eq 0 ]]; then\n".
+"    $BINDIR/combine_stats -b $model_base -L ${id}_stats_list -o ${id}_stats\n".
+"    if [ \"\$?\" -ne \"0\" ]; then rm ${id}_stats_list; rm temp_stats_\$BATCH.*; exit 1; fi\n".
+"    for i in `tail -n +2 ${id}_stats_list`; do rm \$i.*; done\n".
+"    rm ${id}_stats_list\n".
+"  fi\n".
 "else\n".
 "  mv temp_stats_\$BATCH.gks ${id}_stats.gks\n".
 "  mv temp_stats_\$BATCH.mcs ${id}_stats.mcs\n".
 "  mv temp_stats_\$BATCH.phs ${id}_stats.phs\n".
 "  mv temp_stats_\$BATCH.lls ${id}_stats.lls\n".
-"fi\n".
-"rmdir stats.lock\n");
+"fi\n");
 
   die "Some batches failed (see $temp_dir/$failed_batches_file)\n" if (-e $failed_batches_file);
 
@@ -440,21 +378,30 @@ sub estimate_model {
   my $split_flag = shift(@_);
   my $extra_options = "";
 
-  my $old_log_dir = $GM_SINGLE->{"log_dir"};
-  $GM_SINGLE->{"log_dir"} = $log_dir;
-
   $extra_options = "--mllt $MLLT_MODULE_NAME" if ($mllt_flag);
   $extra_options = $extra_options." --mremove $GAUSS_REMOVE_THRESHOLD" if ($GAUSS_REMOVE_THRESHOLD > 0);
-  $extra_options = $extra_options." --split --minocc $SPLIT_MIN_OCCUPANCY --maxmixgauss $SPLIT_MAX_GAUSSIANS" if ($split_flag);
+  if ($split_flag) {
+    if ($SPLIT_TARGET_GAUSSIANS > 0) {
+      $extra_options = $extra_options." --split --numgauss $SPLIT_TARGET_GAUSSIANS --maxmixgauss $SPLIT_MAX_GAUSSIANS";
+    } else {
+      $extra_options = $extra_options." --split --minocc $SPLIT_MIN_OCCUPANCY --maxmixgauss $SPLIT_MAX_GAUSSIANS";
+    }
+    if (defined $SPLIT_ALPHA && $SPLIT_ALPHA > 0) {
+      $extra_options = $extra_options." --splitalpha $SPLIT_ALPHA";
+    }
+  }
 
-  $GM_SINGLE->submit("$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -t -i $VERBOSITY --minvar $minvar $estimate_mode -s ${BASE_ID}_summary $extra_options\n");
-  $GM_SINGLE->{"log_dir"} = $old_log_dir;
+  system("$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -t -i $VERBOSITY --minvar $minvar $estimate_mode -s ${BASE_ID}_summary $extra_options > $log_dir/estimate.stdout 2> $log_dir/estimate.stderr");
 }
 
 
 sub generate_hmmnet_files {
   my $im = shift(@_);
   my $temp_dir = shift(@_);
+
+  my $new_temp_dir = "$temp_dir/hmmnets";
+  mkdir $new_temp_dir;
+  chdir $new_temp_dir || die("Could not chdir to $new_temp_dir");
 
   # Construct helper FSTs (L.fst, C.fst, H.fst, optional_silence.fst and
   # end_mark.fst) and vocabulary file.
@@ -465,15 +412,15 @@ sub generate_hmmnet_files {
   }
   system("$SCRIPTDIR/build_helper_fsts.sh $morph_switch -s $SCRIPTDIR $LEX_FILE $im.ph");
 
-  my $gm = GridManager->new;
-  $gm->{"identifier"} = "hmmnets_${BASE_ID}";
-  $gm->{"run_dir"} = $temp_dir;
-  $gm->{"log_dir"} = $temp_dir;
+  my $cm = CondorManager->new;
+  $cm->{"identifier"} = "hmmnets_${BASE_ID}";
+  $cm->{"run_dir"} = $new_temp_dir;
+  $cm->{"log_dir"} = $new_temp_dir;
   if ($NUM_BATCHES > 0) {
-    $gm->{"first_batch"} = 1;
-    $gm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"first_batch"} = 1;
+    $cm->{"last_batch"} = $NUM_BATCHES;
   }
-  $gm->{"failed_batch_retry_count"} = 1;
+  $cm->{"failed_batch_retry_count"} = 1;
   my $batch_options = "";
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
   if ($MORPH_HMMNETS > 0) {
@@ -483,7 +430,13 @@ sub generate_hmmnet_files {
   if (length($TRN_FILE) > 0) {
     $trn_switch = "-t $TRN_FILE";
   }
-  $gm->submit("$SCRIPTDIR/create_hmmnets.pl -n -r $RECIPE $morph_switch $trn_switch -T $temp_dir -F $temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
+  $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -r $RECIPE $morph_switch $trn_switch -T $new_temp_dir -F $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options\n", "");
+
+  # Example of using create_hmmnets.pl with transcription directly from
+  # PHN files, i.e. without lexicon and alternative paths:
+  # $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -o -r $RECIPE -b $im -T $temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
+
+  chdir($temp_dir);
 }
 
 
@@ -496,22 +449,56 @@ sub align {
   my $spkc_switch = "";
   $spkc_switch = "-S $spkc_file" if ($spkc_file ne "");
 
-  my $gm = GridManager->new;
-  $gm->{"identifier"} = "align_${BASE_ID}";
-  $gm->{"run_dir"} = $temp_dir;
-  $gm->{"log_dir"} = $temp_dir;
+  my $new_temp_dir = "$temp_dir/align";
+  mkdir $new_temp_dir;
+  chdir $new_temp_dir || die("Could not chdir to $new_temp_dir");
+
+  my $cm = CondorManager->new;
+  $cm->{"identifier"} = "align_${BASE_ID}";
+  $cm->{"run_dir"} = $new_temp_dir;
+  $cm->{"log_dir"} = $new_temp_dir;
   if ($NUM_BATCHES > 0) {
-    $gm->{"first_batch"} = 1;
-    $gm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"first_batch"} = 1;
+    $cm->{"last_batch"} = $NUM_BATCHES;
   }
-  $gm->{"priority"} = $BATCH_PRIORITY;
-  #$gm->{"mem_req"} = $BATCH_MAX_MEM; # No large mem requirements
-  #$gm->{"emergency_shutdown"} = 0;
-  $gm->{"failed_batch_retry_count"} = 1;
+  $cm->{"priority"} = $BATCH_PRIORITY;
+  $cm->{"failed_batch_retry_count"} = 1;
 
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
-  $gm->submit("$BINDIR/align -b $model -c $model.cfg -r $recipe --swins $ALIGN_WINDOW --beam $ALIGN_BEAM --sbeam $ALIGN_SBEAM $spkc_switch $batch_options -i $VERBOSITY\n");
+  $cm->submit("$BINDIR/align -b $model -c $model.cfg -r $recipe --swins $ALIGN_WINDOW --beam $ALIGN_BEAM --sbeam $ALIGN_SBEAM $spkc_switch $batch_options -i $VERBOSITY\n", "");
+
+  chdir($temp_dir);
 }
+
+
+sub align_hmmnets {
+  my $temp_dir = shift(@_);
+  my $model = shift(@_);
+  my $recipe = shift(@_);
+  my $spkc_file = shift(@_);
+  my $batch_options = "";
+  my $spkc_switch = "";
+  $spkc_switch = "-S $spkc_file" if ($spkc_file ne "");
+
+  my $new_temp_dir = "$temp_dir/align";
+  mkdir $new_temp_dir;
+  chdir $new_temp_dir || die("Could not chdir to $new_temp_dir");
+
+  my $cm = CondorManager->new;
+  $cm->{"identifier"} = "align_${BASE_ID}";
+  $cm->{"run_dir"} = $new_temp_dir;
+  $cm->{"log_dir"} = $new_temp_dir;
+  if ($NUM_BATCHES > 0) {
+    $cm->{"first_batch"} = 1;
+    $cm->{"last_batch"} = $NUM_BATCHES;
+  }
+  $cm->{"priority"} = $BATCH_PRIORITY;
+  $cm->{"failed_batch_retry_count"} = 1;
+
+  $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
+  $cm->submit("$BINDIR/stats -b $model -c $model.cfg -r $recipe -H --ml -M vit -a -n -o /dev/null $spkc_switch $batch_options -i $VERBOSITY\n", "");
+}
+
 
 
 # This version runs Baum-Welch
@@ -523,25 +510,24 @@ sub estimate_mllr {
   my $temp_out;
   my $batch_options = "";
 
-  my $gm = GridManager->new;
-  $gm->{"identifier"} = "mllr_${BASE_ID}";
-  $gm->{"run_dir"} = $temp_dir;
-  $gm->{"log_dir"} = $temp_dir;
+  my $cm = CondorManager->new;
+  $cm->{"identifier"} = "mllr_${BASE_ID}";
+  $cm->{"run_dir"} = $temp_dir;
+  $cm->{"log_dir"} = $temp_dir;
   if ($NUM_BATCHES > 0) {
-    $gm->{"first_batch"} = 1;
-    $gm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"first_batch"} = 1;
+    $cm->{"last_batch"} = $NUM_BATCHES;
   }
-  $gm->{"priority"} = $BATCH_PRIORITY;
-  $gm->{"mem_req"} = $BATCH_MAX_MEM; # No large mem requirements
-  #$gm->{"emergency_shutdown"} = 0;
-  $gm->{"failed_batch_retry_count"} = 1;
+  $cm->{"priority"} = $BATCH_PRIORITY;
+  $cm->{"mem_req"} = $BATCH_MAX_MEM; # No large mem requirements
+  $cm->{"failed_batch_retry_count"} = 1;
 
   $temp_out = $out_file;
   if ($NUM_BATCHES > 1) {
     $batch_options = "-B $NUM_BATCHES -I \$BATCH";
     $temp_out = "mllr_temp_\$BATCH.spkc";
   }
-  $gm->submit("$BINDIR/mllr -b $model -c $model.cfg -r $recipe -H -F $FORWARD_BEAM -W $BACKWARD_BEAM -M $MLLR_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY");
+  $cm->submit("$BINDIR/mllr -b $model -c $model.cfg -r $recipe -H -F $FORWARD_BEAM -W $BACKWARD_BEAM -M $MLLR_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY\n", "");
 
   if ($NUM_BATCHES > 1) {
     system("cat mllr_temp_*.spkc > $out_file") && die("mllr estimation failed");
@@ -558,25 +544,23 @@ sub estimate_vtln {
   my $temp_out;
   my $batch_options = "";
 
-  my $gm = GridManager->new;
-  $gm->{"identifier"} = "vtln_${BASE_ID}.sh";
-  $gm->{"run_dir"} = $temp_dir;
-  $gm->{"log_dir"} = $temp_dir;
+  my $cm = CondorManager->new;
+  $cm->{"identifier"} = "vtln_${BASE_ID}.sh";
+  $cm->{"run_dir"} = $temp_dir;
+  $cm->{"log_dir"} = $temp_dir;
   if ($NUM_BATCHES > 0) {
-    $gm->{"first_batch"} = 1;
-    $gm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"first_batch"} = 1;
+    $cm->{"last_batch"} = $NUM_BATCHES;
   }
-  $gm->{"priority"} = $BATCH_PRIORITY;
-  #$gm->{"mem_req"} = $BATCH_MAX_MEM; # No large mem requirements
-  #$gm->{"emergency_shutdown"} = 0;
-  $gm->{"failed_batch_retry_count"} = 1;
+  $cm->{"priority"} = $BATCH_PRIORITY;
+  $cm->{"failed_batch_retry_count"} = 1;
 
   $temp_out = $out_file;
   if ($NUM_BATCHES > 1) {
     $batch_options = "-B $NUM_BATCHES -I \$BATCH";
     $temp_out = "vtln_temp_\$BATCH.spkc";
   }
-  $gm->submit("$BINDIR/vtln -b $model -c $model.cfg -r $recipe -O -v $VTLN_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY");
+  $cm->submit("$BINDIR/vtln -b $model -c $model.cfg -r $recipe -O -v $VTLN_MODULE -S $SPKC_FILE -o $temp_out $batch_options -i $VERBOSITY\n", "");
   if ($NUM_BATCHES > 1) {
     system("cat vtln_temp_*.spkc > $out_file") && die("vtln estimation failed");
   }
@@ -587,7 +571,7 @@ sub estimate_vtln {
 # NOTE: Uses alignments
 sub estimate_dur_model {
   my $om = shift(@_);
-  $GM_SINGLE->submit("$BINDIR/dur_est -p $om.ph -r $RECIPE -O --gamma $om.dur --skip $DUR_SKIP_MODELS");
+  system("$BINDIR/dur_est -p $om.ph -r $RECIPE -O --gamma $om.dur --skip $DUR_SKIP_MODELS > $tempdir/dur_est.stdout 2> $tempdir/dur_est.stderr");
   if (!(-e $om.".dur")) {
     die("Error estimating duration models\n");
   }
@@ -596,7 +580,7 @@ sub estimate_dur_model {
 
 sub cluster_gaussians {
   my $im = shift(@_);
-  $GM_SINGLE->submit("$BINDIR/gcluster -g $im.gk -o $im.gcl -C $NUM_GAUSS_CLUSTERS -i $VERBOSITY");
+  system("$BINDIR/gcluster -g $im.gk -o $im.gcl -C $NUM_GAUSS_CLUSTERS -i $VERBOSITY > $tempdir/gcluster.stdout 2> $tempdir/gcluster.stderr");
   if (!(-e $im.".gcl")) {
     die("Error in Gaussian clustering\n");
   }
@@ -618,20 +602,18 @@ sub generate_lnas {
 
   mkdir $out_dir;
 
-  my $gm = GridManager->new;
-  $gm->{"identifier"} = "lna_${BASE_ID}";
-  $gm->{"run_dir"} = $temp_dir;
-  $gm->{"log_dir"} = $temp_dir;
+  my $cm = CondorManager->new;
+  $cm->{"identifier"} = "lna_${BASE_ID}";
+  $cm->{"run_dir"} = $temp_dir;
+  $cm->{"log_dir"} = $temp_dir;
   if ($NUM_BATCHES > 0) {
-    $gm->{"first_batch"} = 1;
-    $gm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"first_batch"} = 1;
+    $cm->{"last_batch"} = $NUM_BATCHES;
   }
-  $gm->{"priority"} = $BATCH_PRIORITY;
-  #$gm->{"mem_req"} = $BATCH_MAX_MEM; # No large mem requirements
-  #$gm->{"emergency_shutdown"} = 0;
-  $gm->{"failed_batch_retry_count"} = 1;
+  $cm->{"priority"} = $BATCH_PRIORITY;
+  $cm->{"failed_batch_retry_count"} = 1;
 
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
   $cluster_options = "-C $model.gcl --eval-ming $GAUSS_EVAL_RATIO" if ($NUM_GAUSS_CLUSTERS);
-  $gm->submit("$BINDIR/phone_probs -b $model -c $model.cfg -r $recipe -o $out_dir $spkc_switch $batch_options -i $VERBOSITY $cluster_options");
+  $cm->submit("$BINDIR/phone_probs -b $model -c $model.cfg -r $recipe -o $out_dir $spkc_switch $batch_options -i $VERBOSITY $cluster_options\n", "");
 }
