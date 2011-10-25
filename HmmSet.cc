@@ -1224,7 +1224,7 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
     if (m_pool.size() >= numgauss)
       return 0; // Stop splitting if there are already enough Gaussians
     
-    // Allow 0.1% deviations in the number of Gaussians
+    // Allow 0.1% overallocation of the Gaussians
     double max_rel_error = .001;
       
     minocc = 10*dim(); // Initial minimum occupancy without power rule
@@ -1256,7 +1256,7 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
         else
           minocc += interval/2.0;
       }
-      else if ( total_gaussians < (1-max_rel_error)*numgauss )
+      else if ( total_gaussians < numgauss )
       {
         growing = false;
         minocc -= interval/2.0;
@@ -1265,7 +1265,6 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
         break;
       if (!growing)
         interval /= 2.0;
-
     }
   }
 
