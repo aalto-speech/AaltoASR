@@ -1,0 +1,106 @@
+Silence context _
+Continuent context  m n N f v T D s z S Z H l r j w 
+Nasal context  m n N 
+eney context  E 
+IVowel context  i I 
+enaa context  A 
+C-Central context  t d n s z Z T D l r 
+Back-Stop context  k g 
+eneh context  e 
+enng context  N 
+Dental context  t d n 
+Front context  p b m f v w I i E e 
+Front-Fricative context  f v 
+EVowel context  E e 
+Voiced-cons context  J b d D g j l m n N r v w z 
+eny context  j 
+Voiced-Stop context  b d g 
+env context  v 
+NonCoronal context  p b m k g N f v H j w 
+NonStrident context  f v T D H 
+enoy context  Å 
+enaw context  å 
+Unvoiced-cons context  p t k s S f T H C 
+Palatal context  k g N 
+enth context  T 
+ench context  C 
+Long context  I o å O u 
+Syllabic context  ö 
+Medium context  E ö a o e 
+UnStrident context  p b m t d n k g N l r j w 
+SuppeaEtu context  I i E e 
+Coronal context  t d n T D s z S Z C J l r 
+RoundBack context  u U o 
+Unvoiced-all context  p t k s S f T H C 
+Short context  ä E A e i Ä Å a U 
+Central context  t d n s z Z T D l r ä A ö O 
+Palatal_h context  k g N H 
+enuh context  U 
+enuw context  u 
+FricatAffricative context  s S z Z f v C J T D 
+endh context  D 
+DemiVowel context  j v 
+Rounded context  O u U Å o w 
+Lenis context  b d g v D z Z J 
+Back context  S C J j k g N H u U o a 
+V-Front context  I i E e 
+V-Back context  u U o a 
+Back-Fricative context  S Z C J 
+Dental_s context  t d n s z Z T 
+Front-Start context  E å ö 
+eniy context  I 
+Unvoiced-Fricative context  s S T f C 
+Glide context  H l r j w 
+enzh context  Z 
+enah context  a 
+enao context  O 
+enih context  i 
+Low context  ä Ä å A O Å 
+enay context  Ä 
+Unvoiced-Stop context  p t k 
+Front-Stop context  p b 
+Dipthong context  E Ä Å å ö 
+V-Central context  ä A ö O 
+KeskiEtu context  E e 
+Unrounded context  e i ä A ö Ä E I å a H l r j 
+enow context  o 
+Liquid context  l r w j H 
+enjh context  J 
+NonAnterior context  k g N S Z H C J r j 
+Anterior context  p b m t d n f v T D s z l w 
+Fricative context  s S z Z f v T D 
+Voiced-Fricative context  z Z D C v 
+enhh context  H 
+AVowel context  ä A ö Ä å 
+ensh context  S 
+Class-Stop context  p b t d k g 
+enb context  b 
+end context  d 
+NonContinuent context  p b t d k g C J 
+enf context  f 
+eng context  g 
+enk context  k 
+enl context  l 
+enm context  m 
+enn context  n 
+enp context  p 
+enr context  r 
+ens context  s 
+ent context  t 
+Vowel context  E e i O ä A u U ö Ä Å I å o a 
+enw context  w 
+Fortis context  p t k f T s S C 
+enz context  z 
+Strident context  s z S Z C J 
+Central-Fricative context  s z T D 
+C-Back context  S C J j k g N H 
+OVowel context  O Å o 
+C-Front context  p b m f v w 
+Central-Stop context  t d 
+UVowel context  a U u 
+Affricate context  C J 
+Bilabial context  p b m 
+High context  i u U I 
+Fronting context  Ä E Å 
+UnFortLenis context  m n N H l r j w 
+enae_dif context  ä 
