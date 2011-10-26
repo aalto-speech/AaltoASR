@@ -79,7 +79,7 @@ CLASS_SRCS = FeatureGenerator.cc FeatureModules.cc AudioReader.cc \
 	LinearAlgebra.cc HmmNetBaumWelch.cc \
 	Lattice.cc Viterbi.cc PhonePool.cc \
 	MllrTrainer.cc ziggurat.cc mtw.cc LmbfgsOptimize.cc RegClassTree.cc \
-	SegErrorEvaluator.cc
+	SegErrorEvaluator.cc util.cc
 
 ifeq ($(USE_SUBSPACE_COV),1)
 CLASS_SRCS += Subspaces.cc
