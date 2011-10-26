@@ -37,6 +37,7 @@ main(int argc, char *argv[])
       ('\0', "mc2=FILE", "arg", "", "Mixture coefficients for the states of the updated model")
       ('\0', "ph2=FILE", "arg", "", "HMM definitions for the updated model")
       ('w', "mixtures", "", "", "Print KLDs of mixture weights")
+      ('g', "gaussians", "", "", "Print KLDs of Gaussians")
       ('m', "means", "", "", "Print KLDs of Gaussian means")
       ('c', "covs", "", "", "Print KLDs of Gaussian covariances")
       ;
@@ -99,6 +100,39 @@ main(int argc, char *argv[])
         printf("%g\n", kld);
       }
     }
+    if (config["gaussians"].specified)
+    {
+      PDFPool *pool1 = model1.get_pool();
+      PDFPool *pool2 = model2.get_pool();
+
+      for (int i = 0; i < pool1->size(); i++)
+      {
+        Gaussian *pdf1 = dynamic_cast< Gaussian* >(pool1->get_pdf(i));
+        Gaussian *pdf2 = dynamic_cast< Gaussian* >(pool2->get_pdf(i));
+        if (pdf1 == NULL || pdf2 == NULL)
+          throw std::string("Only Gaussian PDFs are supported!");
+
+        Vector mean1;
+        Vector mean2;
+        Vector cov1;
+        Vector cov2;
+        pdf1->get_mean(mean1);
+        pdf2->get_mean(mean2);
+        pdf1->get_covariance(cov1);
+        pdf2->get_covariance(cov2);
+        int dim = cov1.size();
+        double kld = 0;
+        for (int j = 0; j < dim; j++)
+        {
+          double d = mean2(j)-mean1(j);
+          kld += d*d/cov1(j);
+          kld += cov2(j)/cov1(j) + log(cov1(j)/cov2(j));
+        }
+        kld = (kld - dim)/2.0;
+        printf("%g\n", kld);
+      }
+    }
+    
     if (config["means"].specified)
     {
       PDFPool *pool1 = model1.get_pool();
