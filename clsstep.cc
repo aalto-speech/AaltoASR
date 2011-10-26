@@ -3009,6 +3009,124 @@ void kld_constrained_mean_covariance_update(void)
 }
 
 
+void ebw_mixture_update(void)
+{
+  for (int i = 0; i < model.num_emission_pdfs(); i++)
+  {
+    Mixture *m = model.get_emission_pdf(i);
+    std::vector<double> num_gamma;
+    std::vector<double> den_gamma;
+    std::vector<double> weights;
+
+    num_gamma.resize(m->size());
+    den_gamma.resize(m->size());
+    weights.resize(m->size());
+    for (int j = 0; j < (int)m->size(); j++)
+    {
+      Gaussian *g = dynamic_cast< Gaussian* >(m->get_base_pdf(j));
+      if (opt_mode == MODE_MPE)
+      {
+        num_gamma[j] = (m->get_accumulated_gamma(PDF::MPE_NUM_BUF, j) +
+                        g->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF))/2.0;
+        den_gamma[j] = (-m->get_accumulated_gamma(PDF::MPE_NUM_BUF, j) +
+                        g->get_accumulated_aux_gamma(PDF::MPE_NUM_BUF))/2.0;
+      }
+      else
+      {
+        num_gamma[j] = m->get_accumulated_gamma(PDF::ML_BUF, j);
+        den_gamma[j] = m->get_accumulated_gamma(PDF::MMI_BUF, j);
+      }
+      weights[j] = m->get_mixture_coefficient(j);
+    }
+
+    double currfval=0, oldfval=0, diff=1;
+
+    // Iterate until convergence
+    std::vector<double> old_weights = weights;
+    int iter=0;
+    while (diff > 0.00001 && iter < 1000)
+    {
+      iter++;
+      diff = 0;
+
+      if (m->size() == 1)
+      {
+        weights[0] = 1;
+        break;
+      }
+
+      // Go through every mixture weight
+      for (int w = 0; w < m->size(); w++)
+      {
+        std::vector<double> previous_weights = weights;
+        
+        // Solve a quadratic equation
+        // See Povey: Frame discrimination training ... 3.3 (9)
+        // Note: the equation isn't given explicitly, needs some derivation
+        double a, b, c, partsum, sol1, sol2;
+        // a
+        a=0;
+        partsum=0;
+        for (int j = 0; j < m->size(); j++)
+          if (w != j)
+            partsum += previous_weights[j];
+        if (partsum <= 0)
+          continue;
+        for (int j = 0; j < m->size(); j++)
+          if (w != j)
+            a -= den_gamma[j] * previous_weights[j] / (old_weights[j] * partsum);
+        a += den_gamma[w] / old_weights[w];
+        // b
+        b = -a;
+        for (int j = 0; j < m->size(); j++)
+          b -= num_gamma[j];
+        // c
+        c = num_gamma[w];
+        // Solve
+        sol1 = (-b-sqrt(b*b-4*a*c)) / (2*a);
+        sol2 = (-b+sqrt(b*b-4*a*c)) / (2*a);
+        
+        if (sol1 <= 0 || sol1 >= 1.0 || (sol2 > 0 && sol2 < 1.0))
+        {
+          fprintf(stderr, "Warning: Mixture size %i, iter %i, sol1 = %g, sol2 = %g, old = %g\n", m->size(), iter, sol1, sol2, old_weights[w]);
+        }
+
+        // Heuristics: If outside permitted region, move halfway
+        if (!isnan(sol1))
+        {
+          if (sol1 <= 0)
+            weights[w] = weights[w]/2.0;
+          else if (sol1 >= 1.0)
+            weights[w] = weights[w] + (1-weights[w])/2.0;
+          else
+            weights[w] = sol1;
+          weights[w] = std::max(weights[w], 1e-8); // FIXME: Minimum weight
+        }
+        
+        // Renormalize others
+        double norm_m = (1-weights[w]) / partsum;
+        for (int j = 0; j < m->size(); j++)
+          if (j != w)
+            weights[j] *= norm_m;
+      }
+      
+      // Compute function value
+      oldfval = currfval;
+      currfval = 0;
+      for (int w = 0; w < m->size(); w++)
+        currfval += num_gamma[w] * log(weights[w]) -
+          den_gamma[w] * weights[w] / old_weights[w];
+      diff = std::fabs(oldfval-currfval);
+      if (iter > 1 && oldfval > currfval)
+      {
+        fprintf(stderr, "Warning: Mixture size %i, iter %i, reduced function value, %g\n", m->size(), iter, currfval - oldfval);
+      }
+    }
+    for (int j = 0; j < (int)m->size(); j++)
+      m->set_mixture_coefficient(j, weights[j]);
+  }
+}
+
 
 void cls_step(bool kldcs) //const std::string &in_grad_file, const std::string &out_grad_file)
 {
@@ -3017,11 +3135,12 @@ void cls_step(bool kldcs) //const std::string &in_grad_file, const std::string &
     // soft_max_mixture_cls_step();
     // separate_mean_covariance_cls_update();
     original_cls_mixture_step();
+    //ebw_mixture_update();
     original_cls_mean_cov_step();
   }
   else
   {
-    //kld_constrained_mixture_update();
+    kld_constrained_mixture_update();
     kld_constrained_mean_covariance_update();
   }
 }
@@ -3065,15 +3184,18 @@ main(int argc, char *argv[])
     info = config["info"].get_int();
     out_model_name = config["out"].get_str();
 
-    if (config["mode"].get_str() == "MMI")
+    std::string mode_str = config["mode"].get_str();
+    std::transform(mode_str.begin(), mode_str.end(), mode_str.begin(),
+                   ::tolower);
+    if (mode_str == "mmi")
     {
       opt_mode = MODE_MMI;
       statistics_mode |= (PDF_ML_STATS|PDF_MMI_STATS);
     }
-    else if (config["mode"].get_str() == "MPE")
+    else if (mode_str == "mpe")
     {
       opt_mode = MODE_MPE;
-      statistics_mode |= (PDF_MPE_NUM_STATS|PDF_MPE_DEN_STATS);
+      statistics_mode |= PDF_MPE_NUM_STATS; // And PDF_MPE_DEN_STATS?!?
     }
     else
     {
