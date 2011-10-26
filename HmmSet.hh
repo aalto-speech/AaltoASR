@@ -420,7 +420,7 @@ public:
    * \param mmi_prior_ismooth I-smoothing constant for the MMI model which
    *                          acts as a prior model
    */
-  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double ismooth, double mmi_prior_ismooth) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, ismooth, mmi_prior_ismooth); }
+  void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double ismooth, double mmi_prior_ismooth, double ebw_max_kld = 0.0) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, ismooth, mmi_prior_ismooth, ebw_max_kld); }
 
   /// Sets I-smoothing prior mode
   void set_ismooth_prev_prior(bool prev) { m_pool.set_ismooth_prev_prior(prev); }

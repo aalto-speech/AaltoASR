@@ -8,6 +8,20 @@
 /** Common utility functions. */
 namespace util {
 
+  /** Function evaluation object for search function(s) */
+  class FuncEval {
+  public:
+    virtual double evaluate_function(double p) = 0;
+    virtual ~FuncEval() {}
+  };
+  /** Binary search for finding the parameter value with which the
+   * given function evaluates to max_value within the given accuracy. */
+  double bin_search_param_max_value(double lower_bound, double low_value,
+                                    double upper_bound, double up_value,
+                                    double max_value, double value_acc,
+                                    double param_acc, FuncEval &f);
+
+
   /** The square of the value. */
   template <typename T>
   T sqr(T a)

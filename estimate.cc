@@ -54,6 +54,7 @@ main(int argc, char *argv[])
       ('\0', "ismooth=FLOAT", "arg", "0.0", "I-smoothing constant")
       ('\0', "mmi-prior-ismooth=FLOAT", "arg", "0.0", "Use MMI prior when I-smoothing MPE model")
       ('\0', "prev-prior", "", "", "Use previous model as prior in I-smoothing")
+      ('\0', "limit", "arg", "0.0", "Global KLD limit for parameter change")
       ('\0', "delete=FLOAT", "arg", "0.0", "delete Gaussians with occupancies below the threshold")
       ('\0', "mremove=FLOAT", "arg", "0.0", "remove mixture components below the weight threshold")
       ('\0', "split", "", "", "Enable Gaussian splitting")
@@ -183,7 +184,8 @@ main(int argc, char *argv[])
                                   config["C1"].get_double(),
                                   config["C2"].get_double(),
                                   config["ismooth"].get_double(),
-                                  config["mmi-prior-ismooth"].get_double());
+                                  config["mmi-prior-ismooth"].get_double(),
+                                  config["limit"].get_double());
 
     // Linesearch for subspace models
 #ifdef USE_SUBSPACE_COV

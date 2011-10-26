@@ -380,6 +380,120 @@ Gaussian::ismooth_statistics(int source, int target, double smoothing)
 
 
 void
+Gaussian::mean_ebw_update(const Vector &old_mean, double m0_stat,
+                          const Vector &m1_stat, double d, Vector &new_mean) const
+{
+  new_mean.copy(old_mean);
+  Blas_Scale(d, new_mean);
+  Blas_Add_Mult(new_mean, 1, m1_stat);
+  Blas_Scale(1/(m0_stat+d), new_mean);
+}
+
+void
+Gaussian::cov_ebw_update(const Matrix &old_cov, const Vector &old_mean,
+                         const Vector &new_mean, double m0_stat,
+                         const Matrix &m2_stat, double d, Matrix &new_cov) const
+{
+  new_cov.copy(old_cov);
+  Blas_R1_Update(new_cov, old_mean, old_mean, 1);
+  Blas_Scale(d, new_cov);
+  Blas_Add_Mat_Mult(new_cov, 1, m2_stat);
+  Blas_Scale(1/(m0_stat+d), new_cov);
+  Blas_R1_Update(new_cov, new_mean, new_mean, -1);
+}
+
+
+double
+Gaussian::ConstrainedEBWSolver::evaluate_function(double p)
+{
+  solve_mean_and_cov(p);
+  double kld_mean = mean_kld();
+  double kld_cov = cov_kld();
+  return std::max(kld_mean, kld_cov);
+}
+
+
+void
+Gaussian::ConstrainedEBWSolver::solve_mean_and_cov(double d)
+{
+  m_g.mean_ebw_update(m_mean0, m_m0, m_m1, d, m_new_mean);
+  m_g.cov_ebw_update(m_cov0, m_mean0, m_new_mean, m_m0, m_m2,
+                     d, m_new_cov);
+}
+
+
+double
+Gaussian::ConstrainedEBWSolver::mean_kld(void)
+{
+  // Evaluate the Mean KLD. Assumes diagonal Gaussian!
+  int dim = m_mean0.size();
+  double kld = 0;
+  for (int i = 0; i < dim; i++)
+  {
+    double d = m_new_mean(i)-m_mean0(i);
+    kld += d*d/m_cov0(i, i);
+  }
+  return kld/2.0;
+
+}
+
+
+double
+Gaussian::ConstrainedEBWSolver::cov_kld(void)
+{
+  // Evaluate the KLD constraint
+  // NOTE! This is a diagonal Gaussian version!
+  int dim = m_cov0.cols();
+  double kld = 0;
+  for (int i = 0; i < dim; i++)
+    kld += m_new_cov(i, i)/m_cov0(i, i) + log(m_cov0(i, i)/m_new_cov(i, i));
+  return (kld - dim)/2.0;
+}
+
+
+void Gaussian::ConstrainedEBWSolver::constrained_update(double min_d,
+                                                        double max_kld)
+{
+  assert( min_d > 0 );
+  double kld = evaluate_function(min_d);
+  if (kld < max_kld)
+  {
+    fprintf(stderr, "  Realized D: %g\n", min_d);
+    return;
+  }
+  // Find the initial limits by doubling the minimum d
+  double low_d = min_d;
+  double low_kld = kld;
+  double high_d = min_d;
+  double high_kld = kld;
+  while (high_kld > max_kld)
+  {
+    low_d = high_d;
+    low_kld = high_kld;
+    high_d *= 2;
+    high_kld = evaluate_function(high_d);
+  }
+  // Use binary search to find the proper D
+  fprintf(stderr, "  D-search: [%g, %g]: [%g, %g]\n", low_d, high_d,
+          low_kld, high_kld);
+  double d = util::bin_search_param_max_value(low_d, low_kld, high_d, high_kld,
+                                              max_kld, 1e-4*max_kld, 1e-4*min_d,
+                                              *this);
+  kld = evaluate_function(d);
+  fprintf(stderr, "  Realized D: %g\n", d);
+}
+
+
+void
+Gaussian::ConstrainedEBWSolver::get_parameters(Vector &new_mean,
+                                               Matrix &new_cov) const
+{
+  new_mean.copy(m_new_mean);
+  new_cov.copy(m_new_cov);
+}
+
+
+void
 Gaussian::estimate_parameters(EstimationMode mode, double minvar,
                               double covsmooth, double c1, double c2,
                               double tau, bool ml_stats_target)
@@ -506,22 +620,34 @@ Gaussian::estimate_parameters(EstimationMode mode, double minvar,
     fprintf(stderr, "num-gamma: %g  den-gamma: %g  d: %g  %s\n",
             m_accums[num_buf]->gamma(),
             m_accums[den_buf]->gamma(), d, (d>c2*min_d?"DEN":"MIN"));
-    
-    // COMPUTE NEW MEAN
-    // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
-    new_mean.copy(old_mean);
-    Blas_Scale(d, new_mean);
-    Blas_Add_Mult(new_mean, 1, mu_tilde);
-    Blas_Scale(1/(c+d), new_mean);
 
-    // COMPUTE NEW COVARIANCE
-    // new_cov=(obs_num-obs_den+D*old_cov+old_mean*old_mean')/(gamma_num-gamma_den+D)-new_mean*new_mean'
-    new_covariance.copy(old_covariance);
-    Blas_R1_Update(new_covariance, old_mean, old_mean, 1);
-    Blas_Scale(d, new_covariance);
-    Blas_Add_Mat_Mult(new_covariance, 1, sigma_tilde);
-    Blas_Scale(1/(c+d), new_covariance);
-    Blas_R1_Update(new_covariance, new_mean, new_mean, -1);
+    if (m_ebw_max_kld > 0)
+    {
+      ConstrainedEBWSolver solver(*this, c, mu_tilde, sigma_tilde);
+      solver.constrained_update(d, m_ebw_max_kld);
+      solver.get_parameters(new_mean, new_covariance);
+    }
+    else
+    {
+      // COMPUTE NEW MEAN
+      // new_mean=(obs_num-obs_den+D*old_mean)/(gamma_num-gamma_den+D)
+      mean_ebw_update(old_mean, c, mu_tilde, d, new_mean);
+      // new_mean.copy(old_mean);
+      // Blas_Scale(d, new_mean);
+      // Blas_Add_Mult(new_mean, 1, mu_tilde);
+      // Blas_Scale(1/(c+d), new_mean);
+      
+      // COMPUTE NEW COVARIANCE
+      // new_cov=(obs_num-obs_den+D*(old_cov+old_mean*old_mean'))/(gamma_num-gamma_den+D)-new_mean*new_mean'
+      cov_ebw_update(old_covariance, old_mean, new_mean, c, sigma_tilde,
+                     d, new_covariance);
+      // new_covariance.copy(old_covariance);
+      // Blas_R1_Update(new_covariance, old_mean, old_mean, 1);
+      // Blas_Scale(d, new_covariance);
+      // Blas_Add_Mat_Mult(new_covariance, 1, sigma_tilde);
+      // Blas_Scale(1/(c+d), new_covariance);
+      // Blas_R1_Update(new_covariance, new_mean, new_mean, -1);
+    }
 
     feacount = m_accums[num_buf]->feacount();
   }
@@ -2518,7 +2644,7 @@ PDFPool::precompute_likelihoods(const Vector &f)
 void
 PDFPool::set_gaussian_parameters(double minvar, double covsmooth,
                                  double c1, double c2, double ismooth,
-                                 double mmi_prior_ismooth)
+                                 double mmi_prior_ismooth, double ebw_max_kld)
 {
   m_minvar = minvar;
   m_covsmooth = covsmooth;
@@ -2526,6 +2652,7 @@ PDFPool::set_gaussian_parameters(double minvar, double covsmooth,
   m_c2 = c2;
   m_ismooth = ismooth;
   m_mmi_prior_ismooth = mmi_prior_ismooth;
+  m_ebw_max_kld = ebw_max_kld;
 }
 
 
@@ -2567,6 +2694,7 @@ PDFPool::estimate_parameters(PDF::EstimationMode mode)
       if (temp != NULL)
       {
         double tau = 0;
+        temp->set_ebw_max_kld(m_ebw_max_kld);
         if (!m_ismooth_prev_prior)
         {
           if (mode == PDF::MPE_MMI_PRIOR_EST)

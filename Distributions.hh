@@ -163,10 +163,12 @@ public:
    * \param c2        EBW C2 constant
    * \param ismooth   I-smoothing constant
    * \param mmi_prior_ismooth I-smoothing for the prior MMI-model
+   * \param ebw_max_kld Maximum KLD change in EBW update
    */
   void set_gaussian_parameters(double minvar = 0, double covsmooth = 0,
                                double c1 = 0, double c2 = 0,
-                               double ismooth = 0, double mmi_prior_ismooth = 0);
+                               double ismooth = 0, double mmi_prior_ismooth = 0,
+                               double ebw_max_kld = 0);
 
   /// Sets I-smoothing prior mode
   void set_ismooth_prev_prior(bool prev) { m_ismooth_prev_prior = prev; }
@@ -259,6 +261,7 @@ private:
   double m_ismooth;
   double m_mmi_prior_ismooth;
   bool m_ismooth_prev_prior;
+  double m_ebw_max_kld;
 
 #ifdef USE_SUBSPACE_COV
   // Subspaces
@@ -369,8 +372,37 @@ private:
 
 class Gaussian : public PDF {
 public:
+  
+  class ConstrainedEBWSolver : public util::FuncEval {
+  public:
+    ConstrainedEBWSolver(const Gaussian &g, double m0_stat,
+                         const Vector &m1_stat, const Matrix &m2_stat) :
+      m_g(g), m_m0(m0_stat), m_m1(m1_stat), m_m2(m2_stat) { g.get_mean(m_mean0); g.get_covariance(m_cov0); }
+    virtual double evaluate_function(double p); //!< Given D
+    void solve_mean_and_cov(double d);
+    double mean_kld(void); //!< Compares m_mean0 to m_new_mean
+    double cov_kld(void); //!< Compares m_cov0 to m_new_cov
+    
+    void constrained_update(double min_d, double max_kld);
 
-  Gaussian() { chol = NULL; };
+    void get_parameters(Vector &new_mean, Matrix &new_cov) const;
+
+  protected:
+    const Gaussian &m_g;
+    const double m_m0;
+    const Vector &m_m1;
+    const Matrix &m_m2;
+    
+    Vector m_mean0;
+    Matrix m_cov0;
+
+    Vector m_new_mean;
+    Matrix m_new_cov;
+  };
+  
+public:
+
+  Gaussian() { chol = NULL; m_ebw_max_kld = 0; };
   virtual ~Gaussian() { if (chol != NULL) delete chol; }
   // ABSTRACT FUNCTIONS, SHOULD BE OVERWRITTEN IN THE GAUSSIAN IMPLEMENTATIONS
   
@@ -400,25 +432,34 @@ public:
   virtual void estimate_parameters(EstimationMode mode, double minvar,
                                    double covsmooth, double c1, double c2,
                                    double tau, bool ml_stats_target);
-
   // GAUSSIAN SPECIFIC
-  
-  /* Returns the mean vector for this Gaussian */
+
+  /// EBW update of the mean parameter
+  void mean_ebw_update(const Vector &old_mean, double m0_stat,
+                       const Vector &m1_stat, double d, Vector &new_mean) const;
+  /// EBW update of the covariance parater
+  void cov_ebw_update(const Matrix &old_cov, const Vector &old_mean,
+                      const Vector &new_mean, double m0_stat,
+                      const Matrix &m2_stat, double d, Matrix &new_cov) const;
+  /// Sets the maximum KLD limit for EBW update
+  void set_ebw_max_kld(double max_kld) { m_ebw_max_kld = max_kld; }
+
+  /// Returns the mean vector for this Gaussian
   virtual void get_mean(Vector &mean) const = 0;
-  /* Returns the covariance matrix for this Gaussian */
+  /// Returns the covariance matrix for this Gaussian
   virtual void get_covariance(Matrix &covariance) const = 0;
-  /* Sets the parameters for this Gaussian */
+  /// Sets the parameters for this Gaussian
   virtual void set_parameters(const Vector &mean,
                               const Matrix &covariance)
   { set_mean(mean); set_covariance(covariance); }
-  /* Sets the mean vector for this Gaussian */
+  /// Sets the mean vector for this Gaussian
   virtual void set_mean(const Vector &mean) = 0;
-  /* Sets the covariance matrix for this Gaussian */
+  /// Sets the covariance matrix for this Gaussian
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true) = 0;
-  /* Get the diagonal of the covariance matrix */
+  /// Get the diagonal of the covariance matrix
   virtual void get_covariance(Vector &covariance) const;
-  /* Set the diagonal of the covariance matrix and off-diagonal to zero */
+  /// Set the diagonal of the covariance matrix and off-diagonal to zero
   virtual void set_covariance(const Vector &covariance,
                               bool finish_statistics = true);
   /// Returns a copy of this Gaussian object
@@ -430,11 +471,11 @@ public:
   
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
 
-  /* Splits the current Gaussian to two by disturbing the mean */
+  /// Splits the current Gaussian to two by disturbing the mean
   virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.3) const;
-  /* Splits the current Gaussian to two by disturbing the mean */
+  /// Splits the current Gaussian to two by disturbing the mean
   virtual void split(Gaussian &s2, double perturbation = 0.3);
-  /* Sets the parameters for the current Gaussian by merging m1 and m2 */
+  /// Sets the parameters for the current Gaussian by merging m1 and m2
   virtual void merge(double w1, const Gaussian &m1,
                      double w2, const Gaussian &m2,
                      bool finish_statistics = true);
@@ -443,9 +484,9 @@ public:
   virtual void merge(const std::vector<double> &weights,
                      const std::vector<const Gaussian*> &gaussians,
                      bool finish_statistics = true);
-  /* Compute the Kullback-Leibler divergence KL(current||g) */
+  /// Compute the Kullback-Leibler divergence KL(current||g)
   virtual double kullback_leibler(Gaussian &g) const;
-  /* Draw a random sample from this Gaussian */
+  /// Draw a random sample from this Gaussian
   virtual void draw_sample(Vector &sample);
 
   /** Tells if full statistics have been accumulated for this Gaussian
@@ -490,6 +531,8 @@ protected:
   std::vector<GaussianAccumulator*> m_accums;
 
   Matrix *chol;
+
+  double m_ebw_max_kld; //!< Not used if non-positive
 
   friend class HmmSet;
   friend class PDFPool;
