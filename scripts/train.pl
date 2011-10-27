@@ -7,7 +7,7 @@
 # Run this script at your desktop machine, which acts as the host
 # for the Condor batch system.
 
-use lib '/share/puhe/scripts/cluster'; # For CondorManager (or use aku/scripts path)
+use lib '/share/puhe/scripts/cluster'; # For CondorManager
 use locale;
 use strict;
 use CondorManager;
@@ -17,9 +17,9 @@ use CondorManager;
   my $BASE_ID="speecon_mfcc";
 
 ## Path settings ##
-  my $BINDIR="/home/".$ENV{"USER"}."/aku/cvs/aku";
+  my $BINDIR="/home/".$ENV{"USER"}."/aku";
   my $SCRIPTDIR="$BINDIR/scripts";
-  my $HMMDIR="/share/puhe/".$ENV{"USER"}."/aku_test/hmms";
+  my $HMMDIR="/share/puhe/".$ENV{"USER"}."/hmms";
   my $workdir="/share/work/".$ENV{"USER"}."/aku_work";
   my $lna_outdir = "/share/work/".$ENV{"USER"}."/lnas";
 
