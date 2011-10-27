@@ -1,15 +1,27 @@
 #!/usr/bin/perl
 
-# Run this script at itl-cl1, as it uses GridEngine for scheduling
-# the parallel processes.
+# This script creates the denominator hmmnets required for discriminative
+# training. Note that this will also generate the normal numerator hmmnets
+# to ensure conformity of the two hmmnets. If you want to disable the
+# writing of numerator hmmnets, remove the -n switch from create_hmmnets.pl
+# call.
+# Naturally the recipe file needs to have both hmmnet and den-hmmnet fields
+# set and those paths must exist (see scripts/make_recipe_paths.pl for
+# creating the paths).
 
-# Numerator hmmnets must be available when creating the denumerator hmmnets!
 
+# This is a TEMPLATE SCRIPT, you need to modify the paths, scripts, and
+# input files according to your needs!
+
+
+use lib '/share/puhe/scripts/cluster'; # For CondorManager
 use locale;
 use strict;
+use CondorManager;
+
 
 # Model name
-my $ID="mfcc_mmi";
+my $ID="speecon_all_den";
 
 # Path settings
 my $AKUBINDIR="/home/".$ENV{"USER"}."/aku";
@@ -17,154 +29,63 @@ my $SCRIPTDIR="/home/".$ENV{"USER"}."/aku/scripts";
 my $HMMDIR="/share/puhe/".$ENV{"USER"}."/hmms";
 my $workdir="/share/work/".$ENV{"USER"}."/aku_work";
 
-# Training file list
-my $RECIPE="/share/puhe/jpylkkon/speecon_new/speecon_new_train.recipe";
+# Training file list, writes lattices to where hmmnet and den-hmmnet keys point
+my $RECIPE="/full/path/of/your.recipe";
 
-my $LATTICERECSCRIPT="/share/puhe/jpylkkon/speecon_new/rec_lattice.py";
+# Script for generating word graphs (recognition of the recipe).
+# Has to have acoustic and language models hard-coded in the script, 
+# the script itself takes as arguments only the recipe-file and the lna-path.
+my $LATTICERECSCRIPT="/share/puhe/jpylkkon/aku_test/speecon_rec_lattice.py";
 
-my $HMMMODEL="$HMMDIR/speecon_new_final_ml";
-my $LEXICON="/share/puhe/jpylkkon/speecon_new/morph19k.lex";
-my $LMMODEL="/share/work/jpylkkon/bin_lm/morph19k_2gram.bin";
-my $VOCABULARY;
+my $HMMMODEL="$HMMDIR/speecon_ml_20";
+my $LEXICON="/share/work/jpylkkon/lm/morph19k_fillers.lex";
 
-my $USE_MORPHS = 1; # 1 for morph language models, 0 for word based LMs
+# Note that for discriminative training, it is usually beneficial to use
+# a minimal language model to rescore the lattices, e.g. a unigram model.
+my $LMMODEL="/share/work/jpylkkon/lm/morph19k_1gram.bin";
+
+# Enable morph processing by defining a morph vocabulary, or leave empty
+# for word based processing.
+my $MORPH_VOC = "/share/work/jpylkkon/lm/morph19k_fillers.voc";
+
+# TRN file for transcriptions. If not defined, reads the PHN files,
+# but that is only feasible for grapheme-based models (e.g. Finnish).
+my $TRANSCRIPT_FILE = "";
 
 # Batch settings
-my $NUM_BATCHES = 4; # Number of processes in parallel
-my $NUM_BLOCKS = 50; # In how many blocks the data is generated in one batch
+my $NUM_BATCHES = 50; # Number of processes in parallel
+my $NUM_BLOCKS = 1; # In how many blocks the data is generated in one batch
 
-my $LATTICE_THRESHOLD = 0.00001; # Lattice pruning threshold, [0, 1)
-my $LMSCALE = 32;
+my $LATTICE_THRESHOLD = 0.000000001; # Lattice pruning threshold, [0, 1)
+my $LMSCALE = 30;
 
-my $LNA_OPTIONS = "\'--clusters ${HMMMODEL}.gcl --eval-ming=0.1\'";
+my $LNA_OPTIONS = "\'--clusters ${HMMMODEL}.gcl --eval-ming=0.15\'";
+
+
+## Execution part begins here  ##
 
 my $tempdir = $workdir."/".$ID;
 mkdir $tempdir;
 chdir $tempdir || die("Could not chdir to $tempdir");
 
-$VOCABULARY=$tempdir."/vocabulary.tmp";
-binlm_to_vocabulary($LMMODEL, $VOCABULARY);
+my $morph_switch = "";
+$morph_switch = "-m" if (length($MORPH_VOC) > 0);
+system("$SCRIPTDIR/build_helper_fsts.sh $morph_switch -s $SCRIPTDIR $LEXICON $HMMMODEL.ph");
 
-my $batch_info = make_single_batch($tempdir, $ID,
-"export PERL5LIB=$SCRIPTDIR\n".
-"$SCRIPTDIR/lex2fst.pl $LEXICON > L.fst\n".
-"$SCRIPTDIR/hmms2fsm.pl ${HMMMODEL}.ph . | fst_closure -p - H.fst\n" .
-"$SCRIPTDIR/hmms2trinet.pl ${HMMMODEL}.ph . | fst_optimize -A - - > C.fst\n");
-submit_and_wait($batch_info, 10);
+my $cm = CondorManager->new;
+$cm->{"identifier"} = $ID;
+$cm->{"run_dir"} = $tempdir;
+$cm->{"log_dir"} = $tempdir;
+$cm->{"first_batch"} = 1;
+$cm->{"last_batch"} = $NUM_BATCHES;
+$cm->{"failed_batch_retry_count"} = 0;
 
-my $fh;
-
-open $fh, "> sentence_end.fst";
-print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 </s> </s>\n";
-close $fh;
-
-open $fh, "> optional_silence.fst";
-if ($USE_MORPHS) {
-  print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 __ <w>\nT 0 1\n";
-} else {
-  print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 __ __\nT 0 1\n";
+my $tr_handling = "";
+if (length($MORPH_VOC) > 0) {
+  $tr_handling = "-m $MORPH_VOC";
 }
-close $fh;
-
-open $fh, "> end_symbol.fst";
-print $fh "#FSTBasic MaxPlus\nI 0\nF 1\nT 0 1 ## ,\n";
-close $fh;
-
-my $scriptfile = $ID."_gen_den.sh";
-open $fh, "> $scriptfile" || die "Could not open $scriptfile";
-print $fh get_batch_script_pre_string($tempdir, $tempdir);
-print $fh "$SCRIPTDIR/den_hmmnet_batch_sub.pl \$SGE_TASK_ID $NUM_BATCHES $NUM_BLOCKS $USE_MORPHS $HMMMODEL $LEXICON $LMMODEL $VOCABULARY $RECIPE $AKUBINDIR $SCRIPTDIR $LNA_OPTIONS $LATTICERECSCRIPT $LATTICE_THRESHOLD $LMSCALE\n";
-close($fh);
-system("qsub -t 1-$NUM_BATCHES $scriptfile") == 0 || die "qsub failed\n";
-
-
-sub binlm_to_vocabulary {
-  my $lm = shift(@_);
-  my $vocabfile = shift(@_);
-  my $in_fh;
-  my $out_fh;
-  my $num_tokens;
-
-  open $in_fh, "< $lm";
-  open $out_fh, "> $vocabfile";
-
-  $_=<$in_fh>;
-  $_=<$in_fh>;
-  $num_tokens = <$in_fh>;
-  for (my $i = 0; $i < $num_tokens; $i++) {
-    $_=<$in_fh>;
-    print $out_fh $_;
-  }
-  close($out_fh);
-  close($in_fh);
+if (length($TRANSCRIPT_FILE) > 0) {
+    $tr_handling = $tr_handling." -t $TRANSCRIPT_FILE";
 }
 
-
-###############################
-# Generic batch functions
-###############################
-
-sub get_empty_batch_info {
-  my $batch_info = {};
-  $batch_info->{"script"} = [];
-  $batch_info->{"key"} = [];
-  $batch_info->{"qsub_options"} = "";
-  return $batch_info;
-}
-
-sub get_batch_script_pre_string {
-  my $script_dir = shift(@_);
-  my $out_dir = shift(@_);
-  return "#!/bin/sh\n#\$ -S /bin/sh\n#\$ -o ${out_dir}\n#\$ -e ${out_dir}\nset -e\ncd ${script_dir}\n"
-}
-
-sub make_single_batch {
-  my $temp_dir = shift(@_);
-  my $script_id = shift(@_);
-  my $script_cmd = shift(@_);
-  my $batch_info = get_empty_batch_info();
-  my ($scriptfile, $keyfile);
-  my $fh;
-  $scriptfile = "single_${script_id}.sh";
-  $keyfile = "${temp_dir}/single_${script_id}_ready";
-  open $fh, "> $scriptfile" || die "Could not open $scriptfile";
-  print $fh get_batch_script_pre_string($temp_dir, $temp_dir);
-  print $fh $script_cmd."\n";
-  print $fh "touch $keyfile\n";
-  close($fh);
-  push @{$batch_info->{"script"}}, $scriptfile;
-  push @{$batch_info->{"key"}}, $keyfile;
-  return $batch_info;
-}
-
-sub submit_and_wait {
-  my $batch_info = shift(@_);
-  my $batch_check_interval = shift(@_); # In seconds
-  $batch_check_interval = 100 if (!(defined $batch_check_interval));
-
-  for my $i (0..scalar @{$batch_info->{"key"}}-1) {
-    system("rm ".${$batch_info->{"key"}}[$i]) if (-e ${$batch_info->{"key"}}[$i]);
-  }
-
-  for my $i (0..scalar @{$batch_info->{"script"}}-1) {
-    my $qsub_command = "qsub ".$batch_info->{"qsub_options"}." ".${$batch_info->{"script"}}[$i];
-    system("chmod u+x ".${$batch_info->{"script"}}[$i]);
-    system("$qsub_command") && die("Error in '$qsub_command'\n");
-  }
-  my @sub_ready = ();
-  my $ready_count = 0;
-  while ($ready_count < scalar @{$batch_info->{"key"}}) {
-    sleep($batch_check_interval);
-    for my $i (0..scalar @{$batch_info->{"key"}}-1) {
-      if (!$sub_ready[$i]) {
-        if (-e ${$batch_info->{"key"}}[$i]) {
-          $sub_ready[$i] = 1;
-          $ready_count++;
-        }
-      }
-    }
-  }
-  for my $i (0..scalar @{$batch_info->{"key"}}-1) {
-    system("rm ".${$batch_info->{"key"}}[$i]);
-  }
-}
+$cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -d -r $RECIPE -B $NUM_BATCHES -I \$BATCH -F $tempdir -T $tempdir -p $LATTICE_THRESHOLD -l $LMMODEL -L $LMSCALE -b $HMMMODEL -c $HMMMODEL.cfg -D $AKUBINDIR -s $SCRIPTDIR -P $LNA_OPTIONS -R $LATTICERECSCRIPT $tr_handling", "");
