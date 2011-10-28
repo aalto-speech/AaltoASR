@@ -33,6 +33,8 @@ std::string cur_speaker;
 
 std::set<std::string> updated_speakers;
 
+int segmentation_mode;
+
 
 void calculate_transform() {
   //make transformation matrix
@@ -80,10 +82,7 @@ get_segmentator(Recipe::Info info)
     lattice->set_pruning_thresholds(config["fw-beam"].get_float(),
                                     config["bw-beam"].get_float());
 
-    if (config["vit"].specified) lattice->set_mode(
-        HmmNetBaumWelch::MODE_VITERBI);
-    if (config["mpv"].specified) lattice->set_mode(
-        HmmNetBaumWelch::MODE_MULTIPATH_VITERBI);
+    lattice->set_mode(segmentation_mode);
 
     double orig_beam = lattice->get_backward_beam();
     int counter = 1;
@@ -161,8 +160,7 @@ main(int argc, char *argv[])
       ('r', "recipe=FILE", "arg must", "", "recipe file")
       ('O', "ophn", "", "", "use output phns for adaptation")
       ('H', "hmmnet", "", "", "use HMM networks for training")
-      ('\0', "mpv", "", "", "Use Multipath Viterbi over HMM networks")
-      ('\0', "vit", "", "", "Use Viterbi over HMM networks")
+      ('\0', "segmode=MODE", "arg", "bw", "Segmentation mode: bw(default)/vit/mpv")
       ('M', "mllr=MODULE", "arg", "", "MLLR feature module name, if none given, a model transform is trained. Only for a model transform the regression tree options are used.")
       ('S', "speakers=FILE", "arg must", "", "speaker configuration input file")
       ('R', "regtree=FILE", "arg", "", "regression tree file, if ommitted, and the next tree options are given, a tree is generated. Otherwise no tree is used.")
@@ -200,9 +198,16 @@ main(int argc, char *argv[])
       throw std::string("Must give either --base or all --gk, --mc and --ph");
     }
 
-    if ((config["vit"].specified || config["extvit"].specified)
-        && !config["hmmnet"].specified) throw std::string(
-        "--vit and --extvit require --hmmnet");
+    if (config["segmode"].specified && !config["hmmnet"].specified)
+      throw std::string("Segmentation modes are supported only with --hmmnet");
+    conf::Choice segmode_choice;
+    segmode_choice("bw", HmmNetBaumWelch::MODE_BAUM_WELCH)
+      ("vit", HmmNetBaumWelch::MODE_VITERBI)
+      ("mpv", HmmNetBaumWelch::MODE_MULTIPATH_VITERBI);
+    segmentation_mode = HmmNetBaumWelch::MODE_BAUM_WELCH;
+    if (!segmode_choice.parse(config["segmode"].get_str(), segmentation_mode))
+      throw std::string("Invalid segmentation mode ") +
+        config["segmode"].get_str();
 
     // Read recipe file
     recipe.read(io::Stream(config["recipe"].get_str()),
