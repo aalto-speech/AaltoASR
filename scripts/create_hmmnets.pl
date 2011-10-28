@@ -433,6 +433,7 @@ sub numerator_hmmnets_from_phns {
   die "Acoustic model required" if (!(defined $ac_model));
 
   for my $record (@$rinfo) {
+    print STDERR "".$record->{transcript}."\n";
     if (system("$PHN2FST $ac_model.ph ".$record->{transcript}." > ".$record->{num})) {
       print STDERR "Reading from ".$record->{transcript}.", writing to ".$record->{num}."\n";
       die "Error generating HMM networks directly from PHNs";
