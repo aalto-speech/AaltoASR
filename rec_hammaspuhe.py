@@ -124,6 +124,7 @@ speech_directory = args[1]
 output_file = args[2]
 
 akupath = os.path.dirname(sys.argv[0]) + "/../aku"
+timepath = '/usr/bin/time'
 
 ac_model = model_directory + "/" + options.am
 hmms = ac_model + ".ph"
@@ -174,18 +175,28 @@ for wav_file in os.listdir(speech_directory):
 recipe_file.flush()
 
 print "Computing state probabilities."
-command = [akupath + "/phone_probs", \
-		"-b", ac_model, \
- 		"-c", ac_model + ".cfg", \
- 		"-r", recipe_file.name, \
-		"-o", speech_directory]
-#command = [akupath + "/phone_probs", \
-#		"-b", ac_model, \
-#		"-c", ac_model + ".cfg", \
-#		"-r", recipe_file.name, \
-#		"-C", ac_model + ".gcl", \
-#		"-o", speech_directory, \
-#		"--eval-ming", "0.50"]
+if False:
+	# No optimization.
+	command = [timepath, \
+			"-f", "CPU seconds used: %e", \
+			akupath + "/phone_probs", \
+			"-b", ac_model, \
+			"-c", ac_model + ".cfg", \
+			"-r", recipe_file.name, \
+			"-o", speech_directory, \
+			"-i", "1"]
+else:
+	# Approximate Gaussian by cluster centers.
+	command = [timepath, \
+			"-f", "CPU seconds used: %e", \
+			akupath + "/phone_probs", \
+			"-b", ac_model, \
+			"-c", ac_model + ".cfg", \
+			"-r", recipe_file.name, \
+			"-C", ac_model + ".gcl", \
+			"-o", speech_directory, \
+			"--eval-ming", "0.25", \
+			"-i", "1"]
 try:
 	result = subprocess.check_call(command)
 except subprocess.CalledProcessError as e:
