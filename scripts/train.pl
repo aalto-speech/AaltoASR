@@ -49,8 +49,8 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
   my $ML_ESTIMATE_MODE = "--ml";
 
 ## HMMNET options ##
-  ## These are not used by default, only needed if the alternative call of
-  ## create_hmmnets.pl is used to create alternative paths to hmmnets.
+  my $ENABLE_ALTERNATIVE_PATHS = 0;
+  ## The next options are not used by default when $ENABLE_ALTERNATIVE_PATHS = 0
   my $MORPH_HMMNETS = 1; # True (1) if HMMNETs are not based on words
   my $LEX_FILE = "$SCRIPTDIR/fin_voc.lex"; # Morph/word lexicon
   # TRN file for transcription. If empty, uses PHNs. Required if the HMMs
@@ -407,15 +407,6 @@ sub generate_hmmnet_files {
   mkdir $new_temp_dir;
   chdir $new_temp_dir || die("Could not chdir to $new_temp_dir");
 
-  # Construct helper FSTs (L.fst, C.fst, H.fst, optional_silence.fst and
-  # end_mark.fst) and vocabulary file.
-  # Assumes that the current directory is $temp_dir!
-  my $morph_switch = "";
-  if ($MORPH_HMMNETS > 0) {
-    $morph_switch = "-m";
-  }
-  system("$SCRIPTDIR/build_helper_fsts.sh $morph_switch -s $SCRIPTDIR $LEX_FILE $im.ph");
-
   my $cm = CondorManager->new;
   $cm->{"identifier"} = "hmmnets_${BASE_ID}";
   $cm->{"run_dir"} = $new_temp_dir;
@@ -427,21 +418,32 @@ sub generate_hmmnet_files {
   $cm->{"failed_batch_retry_count"} = 1;
   my $batch_options = "";
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
-  if ($MORPH_HMMNETS > 0) {
-    $morph_switch = "-m ${LEX_FILE}.voc";
-  }
-  my $trn_switch = "";
-  if (length($TRN_FILE) > 0) {
-    $trn_switch = "-t $TRN_FILE";
-  }
 
-  # The next call creates hmmnets directly from PHN files, without lexicon
-  # or alternative paths e.g. for silences:
-  $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -o -r $RECIPE -b $im -T $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
+  if ($ENABLE_ALTERNATIVE_PATHS) {
+    if ($MORPH_HMMNETS > 0) {
+      $morph_switch = "-m ${LEX_FILE}.voc";
+    }
+    my $trn_switch = "";
+    if (length($TRN_FILE) > 0) {
+      $trn_switch = "-t $TRN_FILE";
+    }
+    # Construct helper FSTs (L.fst, C.fst, H.fst, optional_silence.fst and
+    # end_mark.fst) and vocabulary file.
+    # Assumes that the current directory is $temp_dir!
+    my $morph_switch = "";
+    if ($MORPH_HMMNETS > 0) {
+      $morph_switch = "-m";
+    }
+    system("$SCRIPTDIR/build_helper_fsts.sh $morph_switch -s $SCRIPTDIR $LEX_FILE $im.ph");
 
-  # create_hmmnets.pl can also create hmmnets with alternative paths for
-  # pronunciations and silences. To achieve that, use this call instead:
-  # $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -r $RECIPE $morph_switch $trn_switch -T $new_temp_dir -F $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options\n", "");
+    # Use real FST processing in create_hmmnets.pl to create hmmnets
+    # with alternative paths for pronunciations and silences
+    $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -r $RECIPE $morph_switch $trn_switch -T $new_temp_dir -F $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options\n", "");
+  } else {
+    # Create hmmnets directly from PHN files, without lexicon
+    # or alternative paths e.g. for silences:
+    $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -o -r $RECIPE -b $im -T $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
+  }
 
   chdir($temp_dir);
 }
