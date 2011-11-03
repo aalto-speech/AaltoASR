@@ -1199,26 +1199,38 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
 			double splitalpha)
 {
   int num_splits = 0;
-  
+  double mixg_minocc=0; // Average mixture Gaussian minimum occupancy
   std::vector<int> sorted_gaussians;
   std::vector<double> emission_pdf_occ;
+  std::vector<int> mixture_gauss_occ_limit;
+
+  if (minocc < 1.0)
+    minocc = 1.0; // Prevent division by zero
 
   m_pool.get_occ_sorted_gaussians(sorted_gaussians, 0);
 
   emission_pdf_occ.resize(num_emission_pdfs());
+  mixture_gauss_occ_limit.resize(num_emission_pdfs());
   double sum_occ = 0;
   for (int p = 0; p < num_emission_pdfs(); p++)
   {
-    double g_occ_sum = 0;  
+    double g_occ_sum = 0;
+    int gauss_occ_limit = 0;
     for (int k = 0; k < m_emission_pdfs[p]->size(); k++)
-      g_occ_sum += m_emission_pdfs[p]->get_accumulated_gamma(PDF::ML_BUF, k);
+    {
+      double g_occ = m_emission_pdfs[p]->get_accumulated_gamma(PDF::ML_BUF, k);
+      g_occ_sum += g_occ;
+      gauss_occ_limit += (int)floor(g_occ/(minocc/2.0));
+    }
     emission_pdf_occ[p] = g_occ_sum;
+    // Maximum number of Gaussians based on the Gaussian occupancy limit
+    mixture_gauss_occ_limit[p] = gauss_occ_limit;
     sum_occ += g_occ_sum;
   }
 
   if (numgauss > 0)
   {
-    // Calculates the suitable value of minimum occupancy (minocc) 
+    // Calculates the suitable value of minimum occupancy (mixg_minocc) 
     // depending on the amount of Gaussian we want.
 
     if (m_pool.size() >= numgauss)
@@ -1227,21 +1239,24 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
     // Allow 0.1% overallocation of the Gaussians
     double max_rel_error = .001;
       
-    minocc = 10*dim(); // Initial minimum occupancy without power rule
-    // Compensate initial minocc when splitalpha < 1
+    mixg_minocc = 10*dim(); // Initial minimum occupancy without power rule
+    // Compensate initial mixg_minocc when splitalpha < 1
     double temp = sum_occ/(double)num_emission_pdfs(); // Avg occ per mixture
-    minocc = pow(temp, splitalpha)/(temp/minocc);
+    mixg_minocc = pow(temp, splitalpha)/(temp/mixg_minocc);
     
-    double interval = minocc;
+    double interval = mixg_minocc;
     bool growing = true;
-    for (int i = 0; i < 50; i++) // Maximum of 50 binary search iterations
+    for (int i = 0; i < 30; i++) // Maximum of 30 binary search iterations
     {
       int total_gaussians = 0;
       for (int p = 0; p < num_emission_pdfs(); p++)
       {
         // Determine the approximate number of Gaussians after all the splits.
         // Assumes the Gaussians are not shared among the mixtures.
-        int num_mix_g = (int)floor(pow(emission_pdf_occ[p], splitalpha)/minocc);
+        int num_mix_g = (int)floor(pow(emission_pdf_occ[p], splitalpha)/
+                                   mixg_minocc);
+        if (num_mix_g > mixture_gauss_occ_limit[p])
+          num_mix_g = mixture_gauss_occ_limit[p];
         total_gaussians += std::max(std::min(num_mix_g, maxg),
                                     m_emission_pdfs[p]->size());
       }
@@ -1250,16 +1265,16 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
       {
         if (growing)
         {
-          minocc *= 2;
-          interval = minocc/2.0;
+          mixg_minocc *= 2;
+          interval = mixg_minocc/2.0;
         }
         else
-          minocc += interval/2.0;
+          mixg_minocc += interval/2.0;
       }
       else if ( total_gaussians < numgauss )
       {
         growing = false;
-        minocc -= interval/2.0;
+        mixg_minocc -= interval/2.0;
       }
       else
         break;
@@ -1280,11 +1295,12 @@ HmmSet::split_gaussians(double minocc, int maxg, int numgauss,
     {
       if (m_emission_pdfs[p]->component_index(sorted_gaussians[i]) >= 0) 
       {
-        /* Can gaussian be split?
-         * Used formula is from article: EM algorithms for Gaussian mixture with 
-         * split-and-merge operation by Zhihua Zhang, Chibiao Chen, Jian Sun, Kap Luk Chan */	
-        if (pow(emission_pdf_occ[p], splitalpha)/(m_emission_pdfs[p]->size()+1)
-             < minocc || m_emission_pdfs[p]->size() >= maxg)
+        // Can this Gaussian be split?
+        if ((numgauss > 0 &&
+             pow(emission_pdf_occ[p], splitalpha)/
+             (m_emission_pdfs[p]->size()+1) < mixg_minocc) ||
+            m_emission_pdfs[p]->size() >= maxg ||
+            g->get_accumulated_gamma(PDF::ML_BUF) < minocc)
         {
           split = false;
           break;

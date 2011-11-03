@@ -695,6 +695,37 @@ void
 Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
 {
   assert(dim() != 0);
+  
+  Vector mean1; get_mean(mean1);
+  Vector mean2; get_mean(mean2);
+  Matrix cov; get_covariance(cov);
+
+  Matrix cholesky;
+  Vector perturbations(dim());
+  
+  LinearAlgebra::cholesky_factor(cov, cholesky);
+  for (int i=0; i<dim(); i++)
+    perturbations(i)=perturbation;
+
+  Blas_Mat_Vec_Mult(cholesky, perturbations, mean1, -1.0, 1.0);
+  Blas_Mat_Vec_Mult(cholesky, perturbations, mean2,  1.0, 1.0);
+
+  g1.set_mean(mean1);
+  g2.set_mean(mean2);
+  g1.set_covariance(cov);
+  g2.set_covariance(cov);
+}
+
+#if 0
+
+// Alternative split code, moving mean only to the direction of
+// first cholesky dimension (FIXME: should be largest variance),
+// and compensating covariance. Not thoroughly tested!
+
+void
+Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
+{
+  assert(dim() != 0);
 
   Vector mean1; get_mean(mean1);
   Vector mean2; get_mean(mean2);
@@ -708,12 +739,11 @@ Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
 
   Matrix cholesky;
   Vector a_l; // Vector from cholesky
-  Vector test;
 
-  LinearAlgebra::cholesky_factor(cov, cholesky);  
+  LinearAlgebra::cholesky_factor(cov, cholesky);
+
+  // FIXME: Choose the direction of maximum variance
   a_l.ref((cholesky.col(0))); // ref: Matrix --> Vector
-  test.ref(cov.col(0)); // ref muuttaa Matrix --> Vector
-  test(0) = sqrt(test(0));
 
   // Vector
   /* mean1 = mean - sqrt((1-alfa)/alfa) * u * a_l
@@ -751,6 +781,7 @@ Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
 
 }
 
+#endif
 
 void
 Gaussian::split(Gaussian &g2, double perturbation)
@@ -1235,53 +1266,75 @@ void
 DiagonalGaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
 {
   assert(dim() != 0);
+  
+  Vector mean1; get_mean(mean1);
+  Vector mean2; get_mean(mean2);
+  Matrix cov; get_covariance(cov);
+
+  // Add/Subtract standard deviations
+  double sd=0;
+  for (int i=0; i<dim(); i++) {
+    sd=perturbation*sqrt(cov(i,i));
+    mean1(i) -= sd;
+    mean2(i) += sd;
+  }
+  
+  g1.set_mean(mean1);
+  g2.set_mean(mean2);
+  g1.set_covariance(cov);
+  g2.set_covariance(cov);
+}
+
+#if 0
+
+// Alternative split code. Moving mean only to the direction of largest
+// variance and compensating the covariance. Works well with clean
+// data, might have negative impact on model robustness.
+
+void
+DiagonalGaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
+{
+  assert(dim() != 0);
 
   Vector mean1; get_mean(mean1);
   Vector mean2; get_mean(mean2);
   Matrix cov; get_covariance(cov);
   // After splitting new covariance matrix
   Matrix cov1; get_covariance(cov1);
-  Matrix cov2; get_covariance(cov2);
-  double cnst_u = perturbation;
-  double cnst_beta = 0.5; 
-  double cnst_alfa = 0.5;
 
   Vector a_l; // Vector from A, Cov = A*A'
 
-  a_l.ref(cov.col(0)); // Matrix --> Vector
-  a_l(0) = sqrt(a_l(0));
+  // Choose the dimension with the maximum variance as the perturbation direction
+  double cur_var = 0;
+  for (int i = 0; i < m_dim; i++)
+  {
+    if (m_covariance(i) > cur_var)
+    {
+      a_l.copy(cov.col(i));
+      a_l(i) = sqrt(a_l(i));
+      cur_var = m_covariance(i);
+    }
+  }
 
-
-  // Vector
-  /* mean1 = mean - sqrt((1-alfa)/alfa) * u * a_l
-   * mean2 = mean + sqrt(alfa/(1-alfa)) * u * a_l */  
-
-  double cnst_a = -1 * sqrt((1-cnst_alfa)/cnst_alfa) * cnst_u;
-  double cnst_b = sqrt(cnst_alfa/(1-cnst_alfa)) * cnst_u;
-
-  Blas_Add_Mult(mean1, cnst_a, a_l);
-  Blas_Add_Mult(mean2, cnst_b, a_l);
-  
-  // Matrix
-  // (1-alfa)/alfa * cov + (Beta-Beta*u² - 1)*(1/alfa)*a_l*(a_l)^T + a_l*(a_l)^T
-
-  double cnst_c = (cnst_beta - cnst_beta*cnst_u*cnst_u - 1)*1/cnst_alfa;
-  Blas_Scale((1-cnst_alfa)/cnst_alfa, cov1); // Scaling matrix (1-alfa)/alfa
+  // mean1 = mean - perturbation * a_l
+  // mean2 = mean + perturbation * a_l
+  Blas_Add_Mult(mean1, -perturbation, a_l);
+  Blas_Add_Mult(mean2, perturbation, a_l);
+    
+  // cov1 = cov - perturbation^2*a_l*(a_l)^T
+  double cnst_c = -perturbation*perturbation;
   Blas_R1_Update(cov1, a_l, a_l, cnst_c); // cov1 + cnst_c*a_l*a_l'
-  Blas_R1_Update(cov1, a_l, a_l, 1); // ... + a_l*a_l'
-
-  // alfa/(1-alfa)*cov + (Beta*u² - Beta - u²)*1/(1-alfa)*a_l*a_l' + a_l*a_l'
-  double cnst_d = (cnst_beta*cnst_u*cnst_u - cnst_beta - cnst_u*cnst_u)*1/(1-cnst_alfa);
-  Blas_Scale(cnst_alfa/(1-cnst_alfa), cov2); // Scaling matrix alfa/(1-alfa)
-  Blas_R1_Update(cov2, a_l, a_l, cnst_d); // cov2 + cnst_d*a_l*a_l'
-  Blas_R1_Update(cov2, a_l, a_l, 1); // ... + a_l*a_l'
-
-
+    
+  // cov2 == cov1
+    
   g1.set_mean(mean1);
   g2.set_mean(mean2);
   g1.set_covariance(cov1);
-  g2.set_covariance(cov2);
+  g2.set_covariance(cov1);
 }
+
+
+#endif
 
 
 FullCovarianceGaussian::FullCovarianceGaussian(int dim)

@@ -472,9 +472,9 @@ public:
   // THESE FUNCTIONS HAVE ALSO A COMMON IMPLEMENTATION, BUT CAN BE OVERWRITTEN
 
   /// Splits the current Gaussian to two by disturbing the mean
-  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.3) const;
+  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2) const;
   /// Splits the current Gaussian to two by disturbing the mean
-  virtual void split(Gaussian &s2, double perturbation = 0.3);
+  virtual void split(Gaussian &s2, double perturbation = 0.2);
   /// Sets the parameters for the current Gaussian by merging m1 and m2
   virtual void merge(double w1, const Gaussian &m1,
                      double w2, const Gaussian &m2,
@@ -562,7 +562,7 @@ public:
   virtual void set_covariance(const Matrix &covariance,
                               bool finish_statistics = true);
   virtual Gaussian* copy_gaussian(void) { return new DiagonalGaussian(*this); }
-  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.3) const;
+  virtual void split(Gaussian &s1, Gaussian &s2, double perturbation = 0.2) const;
   virtual double compute_likelihood_exponential(const Vector &exponential_feature) const;
   virtual double compute_log_likelihood_exponential(const Vector &exponential_feature) const;
 

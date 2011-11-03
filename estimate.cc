@@ -89,11 +89,10 @@ main(int argc, char *argv[])
     if (count != 1)
       throw std::string("Define exactly one of --ml, --mmi and --mpe!");
 
-    if ((config["minocc"].specified && config["numgauss"].specified) ||
-	(config["split"].specified && !(config["minocc"].specified ||
-					config["numgauss"].specified)))
+    if (config["split"].specified && !(config["minocc"].specified ||
+                                       config["numgauss"].specified))
     {
-      fprintf(stderr, "Give either --minocc or --numgauss with --split\n");
+      fprintf(stderr, "Either --minocc or --numgauss is required with --split\n");
       exit(1);
     }
 
