@@ -49,6 +49,8 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
   my $ML_ESTIMATE_MODE = "--ml";
 
 ## HMMNET options ##
+  ## These are not used by default, only needed if the alternative call of
+  ## create_hmmnets.pl is used to create alternative paths to hmmnets.
   my $MORPH_HMMNETS = 1; # True (1) if HMMNETs are not based on words
   my $LEX_FILE = "$SCRIPTDIR/fin_voc.lex"; # Morph/word lexicon
   # TRN file for transcription. If empty, uses PHNs. Required if the HMMs
@@ -68,16 +70,17 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
   my $TIE_MAX_LOSS = 4000;  # Maximum loglikelihood loss for merging states
 
 ## Gaussian splitting options ##
-  my $SPLIT_MIN_OCCUPANCY = 300; # Accumulated state probability
-  my $SPLIT_MAX_GAUSSIANS = 80; # Per state
+  # Minimum accumulated state probability per Gaussian to allow splitting
+  my $SPLIT_MIN_OCCUPANCY = 300;
+  my $SPLIT_MAX_GAUSSIANS = 80; # Maximum number of Gaussians in mixture/state
 
-  # If $SPLIT_TARGET_GAUSSIANS > 0, it defines the Gaussian splitting instead
-  # of $SPLIT_MIN_OCCUPANCY
+  # If $SPLIT_TARGET_GAUSSIANS > 0, it defines the Gaussian splitting.
+  # $SPLIT_MIN_OCCUPANCY is still used as a per Gaussian splitting requirement,
+  # but it can be disabled by setting it to 0.
   my $SPLIT_TARGET_GAUSSIANS = 30000; # Number of Gaussians in the final model
 
-  # Smoothing power for occupancies, 0 < alpha <= 1. Note that if not using
-  # $SPLIT_TARGET_GAUSSIANS, this drastically changes the proper range for
-  # $SPLIT_MIN_OCCUPANCY.
+  # Smoothing power for occupancies, 0 < alpha <= 1. 
+  # Valid only with $SPLIT_TARGET_GAUSSIANS
   my $SPLIT_ALPHA = 0.5;
 
   my $GAUSS_REMOVE_THRESHOLD = 0.001; # Mixture component weight threshold
@@ -90,7 +93,7 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
   my $GAUSS_EVAL_RATIO = 0.1;
 
 ## MLLT options ##
-  my $mllt_start_iter = 14; # At which iteration MLLT estimation should begin
+  my $mllt_start_iter = 13; # At which iteration MLLT estimation should begin
   my $mllt_frequency = 2; # How many EM iterations between MLLT estimation
   my $MLLT_MODULE_NAME = "transform";
 
@@ -383,6 +386,7 @@ sub estimate_model {
   if ($split_flag) {
     if ($SPLIT_TARGET_GAUSSIANS > 0) {
       $extra_options = $extra_options." --split --numgauss $SPLIT_TARGET_GAUSSIANS --maxmixgauss $SPLIT_MAX_GAUSSIANS";
+      $extra_options = $extra_options." --minocc $SPLIT_MIN_OCCUPANCY" if ($SPLIT_MIN_OCCUPANCY > 0);
     } else {
       $extra_options = $extra_options." --split --minocc $SPLIT_MIN_OCCUPANCY --maxmixgauss $SPLIT_MAX_GAUSSIANS";
     }
@@ -430,11 +434,14 @@ sub generate_hmmnet_files {
   if (length($TRN_FILE) > 0) {
     $trn_switch = "-t $TRN_FILE";
   }
-  $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -r $RECIPE $morph_switch $trn_switch -T $new_temp_dir -F $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options\n", "");
 
-  # Example of using create_hmmnets.pl with transcription directly from
-  # PHN files, i.e. without lexicon and alternative paths:
-  # $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -o -r $RECIPE -b $im -T $temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
+  # The next call creates hmmnets directly from PHN files, without lexicon
+  # or alternative paths e.g. for silences:
+  $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -o -r $RECIPE -b $im -T $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
+
+  # create_hmmnets.pl can also create hmmnets with alternative paths for
+  # pronunciations and silences. To achieve that, use this call instead:
+  # $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -r $RECIPE $morph_switch $trn_switch -T $new_temp_dir -F $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options\n", "");
 
   chdir($temp_dir);
 }
