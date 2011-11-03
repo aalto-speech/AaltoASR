@@ -81,7 +81,7 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
 
   # Smoothing power for occupancies, 0 < alpha <= 1. 
   # Valid only with $SPLIT_TARGET_GAUSSIANS
-  my $SPLIT_ALPHA = 0.5;
+  my $SPLIT_ALPHA = 0.3;
 
   my $GAUSS_REMOVE_THRESHOLD = 0.001; # Mixture component weight threshold
 
