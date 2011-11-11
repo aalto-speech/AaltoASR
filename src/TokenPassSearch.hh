@@ -268,16 +268,46 @@ public:
 	void debug_ensure_all_paths_contain_history(
 			TPLexPrefixTree::LMHistory *limit);
 
+	/// \brief Returns the logarithmic AM probability of an active token.
+	///
+	/// If \a use_best_token is true, finds the active token with the highest
+	/// probability. Otherwise finds any active token. Then returns the
+	/// logarithm of the acoustic model probability.
+	///
+	/// \return The logarithm of the AM probability.
+	///
+	float get_am_log_prob(bool use_best_token) const;
+
+	/// \brief Returns the logarithmic LM probability of an active token.
+	///
+	/// If \a use_best_token is true, finds the active token with the highest
+	/// probability. Otherwise finds any active token. Then returns the
+	/// logarithm of the language model probability.
+	///
+	/// \return The logarithm of the LM probability.
+	///
+	float get_lm_log_prob(bool use_best_token) const;
+
+	/// \brief Returns the logarithmic probability of an active token.
+	///
+	/// If \a use_best_token is true, finds the active token with the highest
+	/// probability. Otherwise finds any active token. Then returns the
+	/// logarithm of the total (acoustic and language model) probability.
+	///
+	/// \return The logarithm of the total probability.
+	///
+	float get_total_log_prob(bool use_best_token) const;
+
 private:
 	/// \brief Finds the globally best token.
 	///
 	/// \return A reference to the active token with the highest probability.
 	///
-	TPLexPrefixTree::Token & get_best_token();
+	const TPLexPrefixTree::Token & get_best_token() const;
 
 	/// \brief Returns the first token in the active token list.
 	///
-	TPLexPrefixTree::Token & get_first_token();
+	const TPLexPrefixTree::Token & get_first_token() const;
 
 	void add_sentence_end_to_hypotheses(void);
 

@@ -393,7 +393,7 @@ void TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
 		abort();
 	}
 
-	TPLexPrefixTree::Token & token = use_best_token ? get_best_token()
+	const TPLexPrefixTree::Token & token = use_best_token ? get_best_token()
 			: get_first_token();
 
 	vec.clear();
@@ -414,7 +414,7 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 	}
 
 	// Use globally best token if no best final token.
-	TPLexPrefixTree::Token & token =
+	const TPLexPrefixTree::Token & token =
 			m_best_final_token != NULL ? *m_best_final_token
 					: get_best_path ? get_best_token() : get_first_token();
 
@@ -470,7 +470,7 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 
 void TokenPassSearch::print_lm_history(FILE *file, bool get_best_path)
 {
-	TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+	const TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
 			: get_first_token();
 
 	std::vector<TPLexPrefixTree::LMHistory *> stack;
@@ -527,10 +527,31 @@ void TokenPassSearch::print_lm_history(FILE *file, bool get_best_path)
 	fflush(file);
 }
 
-TPLexPrefixTree::Token &
-TokenPassSearch::get_best_token()
+float TokenPassSearch::get_am_log_prob(bool get_best_path) const
 {
-	TPLexPrefixTree::Token * result = NULL;
+	const TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+			: get_first_token();
+	return token.am_log_prob;
+}
+
+float TokenPassSearch::get_lm_log_prob(bool get_best_path) const
+{
+	const TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+			: get_first_token();
+	return token.lm_log_prob;
+}
+
+float TokenPassSearch::get_total_log_prob(bool get_best_path) const
+{
+	const TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+			: get_first_token();
+	return token.total_log_prob;
+}
+
+const TPLexPrefixTree::Token &
+TokenPassSearch::get_best_token() const
+{
+	const TPLexPrefixTree::Token * result = NULL;
 
 	for (int i = 0; i < m_active_token_list->size(); i++) {
 		TPLexPrefixTree::Token * token = (*m_active_token_list)[i];
@@ -546,11 +567,11 @@ TokenPassSearch::get_best_token()
 	return *result;
 }
 
-TPLexPrefixTree::Token &
-TokenPassSearch::get_first_token()
+const TPLexPrefixTree::Token &
+TokenPassSearch::get_first_token() const
 {
 	for (int i = 0; i < m_active_token_list->size(); i++) {
-		TPLexPrefixTree::Token * token = (*m_active_token_list)[i];
+		const TPLexPrefixTree::Token * token = (*m_active_token_list)[i];
 
 		if (token != NULL)
 			return *token;
@@ -589,7 +610,7 @@ std::string TokenPassSearch::state_history_string()
 void TokenPassSearch::get_state_history(std::vector<
 		TPLexPrefixTree::StateHistory*> &stack)
 {
-	TPLexPrefixTree::Token & token = get_best_token();
+	const TPLexPrefixTree::Token & token = get_best_token();
 
 	// Determine the state sequence
 	stack.clear();
@@ -2034,7 +2055,7 @@ void TokenPassSearch::write_word_graph(FILE *file)
 	// FIXME: What should we do if we do not want to abort?
 	// }
 
-	TPLexPrefixTree::Token & best_token =
+	const TPLexPrefixTree::Token & best_token =
 			m_best_final_token != NULL ? *m_best_final_token : get_best_token();
 
 	if (1) {
