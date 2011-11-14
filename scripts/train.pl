@@ -420,6 +420,7 @@ sub generate_hmmnet_files {
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
 
   if ($ENABLE_ALTERNATIVE_PATHS) {
+    my $morph_switch = "";
     if ($MORPH_HMMNETS > 0) {
       $morph_switch = "-m ${LEX_FILE}.voc";
     }
@@ -430,7 +431,6 @@ sub generate_hmmnet_files {
     # Construct helper FSTs (L.fst, C.fst, H.fst, optional_silence.fst and
     # end_mark.fst) and vocabulary file.
     # Assumes that the current directory is $temp_dir!
-    my $morph_switch = "";
     if ($MORPH_HMMNETS > 0) {
       $morph_switch = "-m";
     }
