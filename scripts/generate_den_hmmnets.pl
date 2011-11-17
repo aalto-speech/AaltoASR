@@ -38,6 +38,7 @@ my $RECIPE="/full/path/of/your.recipe";
 #   1. HMM model
 #   2. Recipe
 #   3. LNA-path
+# The output lattice is written to LNAPath/LNAFile.wg
 my $LATTICERECSCRIPT="/share/puhe/jpylkkon/aku_test/speecon_rec_lattice.py";
 
 my $HMMMODEL="$HMMDIR/speecon_ml_20";
