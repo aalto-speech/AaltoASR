@@ -33,8 +33,11 @@ my $workdir="/share/work/".$ENV{"USER"}."/aku_work";
 my $RECIPE="/full/path/of/your.recipe";
 
 # Script for generating word graphs (recognition of the recipe).
-# Has to have acoustic and language models hard-coded in the script, 
-# the script itself takes as arguments only the recipe-file and the lna-path.
+# Has to have language models hard-wired in the script!
+# The script takes the following arguments (listed in order):
+#   1. HMM model
+#   2. Recipe
+#   3. LNA-path
 my $LATTICERECSCRIPT="/share/puhe/jpylkkon/aku_test/speecon_rec_lattice.py";
 
 my $HMMMODEL="$HMMDIR/speecon_ml_20";
@@ -56,7 +59,7 @@ my $TRANSCRIPT_FILE = "";
 my $NUM_BATCHES = 50; # Number of processes in parallel
 my $NUM_BLOCKS = 1; # In how many blocks the data is generated in one batch
 
-my $LATTICE_THRESHOLD = 0.000000001; # Lattice pruning threshold, [0, 1)
+my $LATTICE_THRESHOLD = 0.00000001; # Lattice pruning threshold, [0, 1)
 my $LMSCALE = 30;
 
 my $LNA_OPTIONS = "\'--clusters ${HMMMODEL}.gcl --eval-ming=0.15\'";

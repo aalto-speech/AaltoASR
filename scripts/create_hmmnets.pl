@@ -331,7 +331,7 @@ sub generate_word_graphs {
     system("${bin_dir}phone_probs -b $ac_model -c $config -r $temp_recipe -o $temp_dir $phone_probs_opts -i 1") && die "phone_probs failed\n";
 
     # Generate lattices
-    system("$rec_script $temp_dir $temp_recipe") && die "recognition failed\n";
+    system("$rec_script $ac_model $temp_recipe $temp_dir") && die "recognition failed\n";
     
     # Remove LNA files
     system("rm -f $temp_dir/*.lna");
