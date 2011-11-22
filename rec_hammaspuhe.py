@@ -135,12 +135,14 @@ if options.lm == 'free':
 	ngram = model_directory + "/FreeDictationLM.6gram.bin"
 	lookahead_ngram = model_directory + "/FreeDictationLM.2gram.bin"
 	morph_model = True
+	lm_order = 6
 	generate_word_graph = False
 elif options.lm == 'status':
 	lexicon = model_directory + "/StatusDictationLM.lex"
 	ngram = model_directory + "/StatusDictationLM.3gram.bin"
 	lookahead_ngram = model_directory + "/StatusDictationLM.2gram.bin"
 	morph_model = False
+	lm_order = 3
 	generate_word_graph = True
 else:
 	raise OptionValueError("language-model has to be either 'free' or 'status'")
@@ -263,7 +265,7 @@ t.set_word_end_beam(word_end_beam)
 t.set_token_limit(30000)
 
 # Should equal to the n-gram model order.
-t.set_prune_similar(3)
+t.set_prune_similar(lm_order)
 
 t.set_print_probs(0)
 t.set_print_indices(0)
@@ -287,6 +289,7 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 
 	lna_path = speech_directory + "/" + lna_file
 	rec_path = lna_path[:-4] + ".rec"
+	trn_path = lna_path[:-4] + ".trn"
 	txt_path = lna_path[:-4] + ".txt"
 	initial_slf = lna_path[:-4] + ".initial.slf"
 	rescored_slf = lna_path[:-4] + ".slf"
@@ -325,6 +328,10 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 	rec = open(rec_path, "w")
 	rec.write(recognition)
 	rec.close()
+	
+	trn = open(trn_path, "w")
+	trn.write(recognition + " (" + name + ")")
+	trn.close()
 
 	if not generate_word_graph:
 		n_avg_best = None
