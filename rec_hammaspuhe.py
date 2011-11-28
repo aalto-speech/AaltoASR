@@ -274,6 +274,8 @@ t.set_print_frames(0)
 t.set_duration_scale(dur_scale)
 t.set_transition_scale(trans_scale)
 t.set_lm_scale(lm_scale)
+
+# Insertion penalty hasn't been helpful in large-vocabularity recognition.
 # t.set_insertion_penalty(-0.5)
 
 print "Decoding."
