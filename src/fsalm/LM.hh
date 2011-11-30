@@ -1,6 +1,7 @@
 #ifndef LM_HH
 #define LM_HH
 
+#include <cstddef>  // NULL
 #include <float.h>
 #include "misc/types.hh"
 #include "FixedArray.hh"

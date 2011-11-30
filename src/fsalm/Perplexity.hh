@@ -1,6 +1,7 @@
 #ifndef PERPLEXITY_HH
 #define PERPLEXITY_HH
 
+#include <cstddef>  // NULL
 #include "lm/LM.hh"
 #include "misc/macros.hh"
 

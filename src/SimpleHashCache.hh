@@ -1,6 +1,7 @@
 #ifndef SIMPLEHASHCACHE_HH
 #define SIMPLEHASHCACHE_HH
 
+#include <cstddef>  // NULL
 #include <stdexcept>
 
 #define HASH_SIZE_MULTIPLIER 1.3

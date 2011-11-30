@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include <stdio.h>
 #include <algorithm>
 #include <stdexcept>

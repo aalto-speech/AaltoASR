@@ -1,6 +1,7 @@
 #ifndef ARPAREADER_HH
 #define ARPAREADER_HH
 
+#include <cstddef>  // NULL
 #include "misc/types.hh"
 
 namespace fsalm {

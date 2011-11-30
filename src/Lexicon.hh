@@ -1,6 +1,7 @@
 #ifndef LEXICON_HH
 #define LEXICON_HH
 
+#include <cstddef>  // NULL
 #include <vector>
 #include <deque>
 #include <assert.h>

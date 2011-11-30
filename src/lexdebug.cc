@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include <vector>
 #include <math.h>
 #include "Toolbox.hh"

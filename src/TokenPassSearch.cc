@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include <sstream>
 #include <stdexcept>
 #include <stdio.h>

@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include <string>
 #include <cerrno>
 #include <iostream>

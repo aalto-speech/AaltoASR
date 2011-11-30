@@ -1,6 +1,7 @@
 #ifndef NGRAM_HH
 #define NGRAM_HH
 
+#include <cstddef>  // NULL
 #include <algorithm>
 #include <vector>
 

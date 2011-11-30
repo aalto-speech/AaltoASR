@@ -1,6 +1,7 @@
 #ifndef TIMER_HH
 #define TIMER_HH
 
+#include <cstddef>  // NULL
 #include <time.h>
 #include <sys/times.h>
 

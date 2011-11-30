@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include <math.h>
 #include "fsalm/algo.hh"
 #include "fsalm/LM.hh"

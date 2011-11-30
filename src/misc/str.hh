@@ -1,6 +1,7 @@
 #ifndef STR_HH
 #define STR_HH
 
+#include <cstddef>  // NULL
 #include <limits.h>
 #include <string.h>
 #include <assert.h>

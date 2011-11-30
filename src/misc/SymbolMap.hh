@@ -1,6 +1,7 @@
 #ifndef SYMBOLMAP_HH
 #define SYMBOLMAP_HH
 
+#include <cstddef>  // NULL
 #include <sstream>
 #include <map>
 #include <string>

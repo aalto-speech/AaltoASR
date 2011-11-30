@@ -1,6 +1,7 @@
 #ifndef HASHCACHE_HH
 #define HASHCACHE_HH
 
+#include <cstddef>  // NULL
 #include <stdexcept>
 
 template <typename T>

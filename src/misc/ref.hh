@@ -1,6 +1,7 @@
 #ifndef REF_HH
 #define REF_HH
 
+#include <cstddef>  // NULL
 #include <assert.h>
 
 namespace ref {

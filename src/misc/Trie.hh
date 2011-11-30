@@ -1,6 +1,7 @@
 #ifndef TRIE_HH
 #define TRIE_HH
 
+#include <cstddef>  // NULL
 #include <algorithm>
 #include <vector>
 

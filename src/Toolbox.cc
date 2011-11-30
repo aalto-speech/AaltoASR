@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include <algorithm>
 #include <iostream>
 #include <assert.h>

@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include <iostream> // DEBUG
 #include <sstream>
 

@@ -1,6 +1,7 @@
 #ifndef SEARCH_HH
 #define SEARCH_HH
 
+#include <cstddef>  // NULL
 #include <vector>
 #include <deque>
 

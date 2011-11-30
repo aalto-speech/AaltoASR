@@ -1,5 +1,7 @@
 // Routines for reading and writing arpa format files from and to the 
 // internal prefix tree format.
+
+#include <cstddef>  // NULL
 #include <stdlib.h>
 #include <assert.h>
 

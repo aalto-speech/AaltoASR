@@ -1,6 +1,7 @@
 #ifndef TPLEXPREFIXTREE_HH
 #define TPLEXPREFIXTREE_HH
 
+#include <cstddef>  // NULL
 #include <vector>
 #include <assert.h>
 #include <cmath>

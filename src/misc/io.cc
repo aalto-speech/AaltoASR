@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include "io.hh"
 
 namespace io {

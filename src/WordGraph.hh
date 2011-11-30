@@ -1,6 +1,7 @@
 #ifndef WORDGRAPH_HH
 #define WORDGRAPH_HH
 
+#include <cstddef>  // NULL
 #include <values.h>
 #include <assert.h>
 #include <vector>

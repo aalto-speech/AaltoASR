@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include "WordGraph.hh"
 
 #define LINE_SIZE 256

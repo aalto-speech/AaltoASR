@@ -1,6 +1,7 @@
 #ifndef MORPHEUS_HH
 #define MORPHEUS_HH
 
+#include <cstddef>  // NULL
 #include "misc/macros.hh"
 #include "misc/Trie.hh"
 #include "fsalm/LM.hh"

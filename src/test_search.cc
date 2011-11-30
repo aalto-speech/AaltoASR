@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include <iomanip>
 #include <fstream>
 

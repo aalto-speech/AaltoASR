@@ -1,6 +1,8 @@
 #ifndef HISTORY_HH
 #define HISTORY_HH
 
+#include <cstddef>  // NULL
+
 namespace hist {
 
   /** Decrease the reference count of the structure and unlink the

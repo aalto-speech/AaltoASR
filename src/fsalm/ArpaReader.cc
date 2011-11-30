@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>  // NULL
 #include <assert.h>
 #include "fsalm/ArpaReader.hh"
 #include "misc/str.hh"

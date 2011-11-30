@@ -2,6 +2,7 @@
 #ifndef TREEGRAM_HH
 #define TREEGRAM_HH
 
+#include <cstddef>  // NULL
 #include "NGram.hh"
 
 class TreeGram : public NGram {

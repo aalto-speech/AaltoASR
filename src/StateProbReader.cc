@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include "StateProbReader.hh"
 
 StateProbReader::StateProbReader()

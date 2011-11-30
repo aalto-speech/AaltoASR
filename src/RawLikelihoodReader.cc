@@ -1,3 +1,4 @@
+#include <cstddef>  // NULL
 #include "RawLikelihoodReader.hh"
 
 RawLikelihoodReader::RawLikelihoodReader()

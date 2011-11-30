@@ -1,6 +1,7 @@
 #ifndef ACOUSTICS_HH
 #define ACOUSTICS_HH
 
+#include <cstddef>  // NULL
 #include <vector>
 
 class Acoustics {
