@@ -169,7 +169,13 @@ public:
   inline int words() const { return m_words; }
 
   void set_verbose(int verbose) { m_verbose = verbose; }
+
+  /// \brief Enables or disables lookahead language model.
+  ///
+  /// Has to be enabled before the lexicon is read.
+  ///
   void set_lm_lookahead(int lm_lookahead) { m_lm_lookahead = lm_lookahead; }
+
   void set_cross_word_triphones(bool cw_triphones) { m_cross_word_triphones = cw_triphones; }
   void set_silence_is_word(bool b) { m_silence_is_word = b; }
   void set_ignore_case(bool b) { m_ignore_case = b; }

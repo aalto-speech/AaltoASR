@@ -181,7 +181,13 @@ public:
   void set_tp_state_beam(float beam) { m_tp_search.set_state_beam(beam); }
   void set_max_state_duration(int duration) 
   { m_expander.set_max_state_duration(duration); }
+
+  /// \brief Enables or disables lookahead language model.
+  ///
+  /// Has to be enabled before lex_read() is called.
+  ///
   void set_lm_lookahead(int lmlh) { m_tp_lexicon.set_lm_lookahead(lmlh); m_tp_search.set_lm_lookahead(lmlh); }
+
   void set_cross_word_triphones(bool cw_triphones) { m_tp_lexicon.set_cross_word_triphones(cw_triphones); }
   void set_insertion_penalty(float ip) { m_tp_search.set_insertion_penalty(ip); }
   void set_silence_is_word(bool b) { m_tp_lexicon.set_silence_is_word(b); m_tp_lexicon_reader.set_silence_is_word(b); }
