@@ -117,7 +117,7 @@ parser.add_option('-b', '--beam',
 
 (options, args) = parser.parse_args()
 if len(args) != 3:
-	parser.error("incorrect number of arguments")
+	parser.error("Requires exactly 3 arguments, " + str(len(args)) + " given.")
 
 model_directory = args[0]
 speech_directory = args[1]
@@ -185,6 +185,7 @@ if False:
 			"-b", ac_model, \
 			"-c", ac_model + ".cfg", \
 			"-r", recipe_file.name, \
+			"--lnabytes=4", \
 			"-o", speech_directory, \
 			"-i", "1"]
 else:
@@ -196,6 +197,7 @@ else:
 			"-c", ac_model + ".cfg", \
 			"-r", recipe_file.name, \
 			"-C", ac_model + ".gcl", \
+			"--lnabytes=4", \
 			"-o", speech_directory, \
 			"--eval-ming", "0.25", \
 			"-i", "1"]
