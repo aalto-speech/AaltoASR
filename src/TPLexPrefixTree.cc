@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <algorithm>
 #include <stdexcept>
+#include <iostream>
 
 #include "TPLexPrefixTree.hh"
 
@@ -56,6 +57,15 @@ TPLexPrefixTree::~TPLexPrefixTree()
 {
 	for_each(m_nodes.begin(), m_nodes.end(), delete_node());
 	m_nodes.clear();
+}
+
+void TPLexPrefixTree::set_lm_lookahead(int lm_lookahead)
+{
+	if (m_silence_node != NULL) {
+		cerr << "WARNING: TPLexPrefixTree::set_lm_lookahead() called after reading lexicon." << endl;
+		cerr << "WARNING: Lookahead setting will not be apply to the existing lexicon." << endl;
+	}
+	m_lm_lookahead = lm_lookahead;
 }
 
 void TPLexPrefixTree::initialize_lex_tree(void)
@@ -604,7 +614,6 @@ void TPLexPrefixTree::initialize_nodes()
 	m_nodes.push_back(m_start_node);
 	m_silence_node = NULL;
 	m_last_silence_node = NULL;
-	m_final_node = NULL;
 }
 
 void TPLexPrefixTree::create_cross_word_network()
