@@ -390,7 +390,6 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 		n = len(nbest_list)
 		average_logprob = total_logprob - log(n)
 		n_avg_best = average_logprob - logprob_1 
-		print "best:", logprob_1, "total:", total_logprob, "n:", n, "average:", average_logprob, "n_avg_best:", n_avg_best 
 
 	if os.path.exists(txt_path):
 		txt = open(txt_path, "r")
