@@ -46,7 +46,7 @@ default: progs swig morpheus
 %.o: %.cc
 	$(CXX) -c $(cxxflags) $< -o $@
 
-%: %.o $(libs)
+$(progs): %: %.o $(libs)
 	$(CXX) $(cxxflags) $< -o $@ $(libs)
 
 libdecoder.a: $(libdecoder_objs)
