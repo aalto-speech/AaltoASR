@@ -367,7 +367,10 @@ for lna_file in natural_sorted(os.listdir(speech_directory)):
 
 		# Compensate for incorrect assumptions in the HMM by flattening the
 		# logprobs.
-		alpha = 1.0 / lm_scale
+		if lm_scale > 0:
+			alpha = 1.0 / lm_scale
+		else:
+			alpha = 1.0
 
 		line = nbest_list[0]
 		fields = line.split(' ')
