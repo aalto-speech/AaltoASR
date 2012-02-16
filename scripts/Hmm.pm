@@ -11,17 +11,18 @@ sub read_hmm {
 
     # Parse HMM specification: HMM STATES LABEL
     $_ = shift @$lines;
-    split(/\s+/);
-    die("invalid HMM specification: $_") if (scalar @_ != 3);
-    ($dummy, my $num_states, my $label) = @_;
+    my @fields = split(/\s+/);
+
+    die("invalid HMM specification: $_") if (scalar @fields != 3);
+    ($dummy, my $num_states, my $label) = @fields;
 
     # Parse states
     $_ = shift @$lines;
-    split(/\s+/);
+    my @fields = split(/\s+/);
     die("invalid number of states in HMM '$label': $_") 
-	if (scalar @_ != $num_states);
+	if (scalar @fields != $num_states);
     my $states = [];
-    for (@_) {
+    for (@fields) {
 	$greatest_pdf = $_ if ($_ > $greatest_pdf);
 	push(@$states, {"pdf" => $_, "arcs" => []});
     }
@@ -29,12 +30,12 @@ sub read_hmm {
     # Parse transitions
     for my $s (0..$num_states - 1) {
 	$_ = shift @$lines;
-	split(/\s+/);
+	my @fields = split(/\s+/);
 	my $bad = 0;
-	$bad = 1 if ($_[0] != $s);
-	my $num_arcs = $_[1];
+	$bad = 1 if ($fields[0] != $s);
+	my $num_arcs = $fields[1];
 	$bad = 1 if ($num_arcs < 0);
-	$bad = 1 if (($num_arcs * 2 + 2) != scalar @_);
+	$bad = 1 if (($num_arcs * 2 + 2) != scalar @fields);
 
 	die("invalid transition specification in HMM '$label': $_")
 	    if ($bad);
@@ -43,11 +44,11 @@ sub read_hmm {
           die("Assuming two arcs per state") if ($num_arcs != 2);
 
           for my $t (1..$num_arcs) {
-	    push(@{$states->[$s]->{"arcs"}}, [$_[$t * 2], $_[$t * 2 + 1], $states->[$s]->{"pdf"}*2+$t-1]);
+	    push(@{$states->[$s]->{"arcs"}}, [$fields[$t * 2], $fields[$t * 2 + 1], $states->[$s]->{"pdf"}*2+$t-1]);
           }
         } else {
           for my $t (1..$num_arcs) {
-	    push(@{$states->[$s]->{"arcs"}}, [$_[$t * 2], $_[$t * 2 + 1], -1]);
+	    push(@{$states->[$s]->{"arcs"}}, [$fields[$t * 2], $fields[$t * 2 + 1], -1]);
           }
         }
     }
