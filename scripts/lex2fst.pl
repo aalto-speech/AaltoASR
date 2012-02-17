@@ -23,7 +23,7 @@ if ($lexfile eq "-m") {
   $morphs = 1;
   $lexfile = shift @ARGV;
 }
-$lexfile = "-" if ($lexfile eq undef);
+$lexfile = "-" if (not defined $lexfile);
 
 if ($lexfile eq "-") {
   $fh = "STDIN";
