@@ -10,6 +10,7 @@ my $morphs = 0; # If true, does not generate word breaks automatically
 
 use Fsm;
 use strict;
+use warnings;
 
 
 
@@ -47,22 +48,22 @@ while (<$fh>) {
 
     s/\S+\-(\S+)\+\S+/$1/g; # Reduce context phones to monophones
 
-    split(/\s+/);
-    my $out = shift(@_);
+    my @fields = split(/\s+/);
+    my $out = shift(@fields);
     $out =~ s/\([0-9\.]+\)//;
 
     if (!$morphs && substr($out, 0, 1) eq "_") {
-      add_to_fst($wordbreak, $fsm->initial, $eps, @_);
+      add_to_fst($wordbreak, $fsm->initial, $eps, @fields);
       if ($out eq "__") {
         # Create also normal word
-        add_to_fst($fsm->initial, $fsm->initial, $out, @_);
+        add_to_fst($fsm->initial, $fsm->initial, $out, @fields);
       }
     } else {
-      if (!$morphs && scalar @_ > 0) {
-        add_to_fst($fsm->initial, $wordbreak, $out, @_);
+      if (!$morphs && scalar @fields > 0) {
+        add_to_fst($fsm->initial, $wordbreak, $out, @fields);
       } else {
         # Morphs or an empty word
-        add_to_fst($fsm->initial, $fsm->initial, $out, @_);
+        add_to_fst($fsm->initial, $fsm->initial, $out, @fields);
       }
     }
 }
