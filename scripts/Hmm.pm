@@ -1,6 +1,7 @@
 package Hmm;
 
 use strict 'vars';
+use warnings;
 
 our $verbose = 1;
 our $greatest_pdf = -1;
@@ -18,7 +19,7 @@ sub read_hmm {
 
     # Parse states
     $_ = shift @$lines;
-    my @fields = split(/\s+/);
+    @fields = split(/\s+/);
     die("invalid number of states in HMM '$label': $_") 
 	if (scalar @fields != $num_states);
     my $states = [];
@@ -30,7 +31,7 @@ sub read_hmm {
     # Parse transitions
     for my $s (0..$num_states - 1) {
 	$_ = shift @$lines;
-	my @fields = split(/\s+/);
+	@fields = split(/\s+/);
 	my $bad = 0;
 	$bad = 1 if ($fields[0] != $s);
 	my $num_arcs = $fields[1];

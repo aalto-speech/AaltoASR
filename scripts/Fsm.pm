@@ -1,6 +1,7 @@
 package Fsm;
 
 use strict;
+use warnings;
 
 sub new {
     my ($type) = @_;
@@ -51,12 +52,12 @@ sub add_node {
 sub add_arc {
     my ($self, $src, $tgt, $in, $out, $weight) = @_;
 
-    $in = $self->{"eps"} if ($in eq undef);
-    $out = $self->{"eps"} if ($out eq undef);
-    $weight = 0 if ($weight eq undef);
+    $in = $self->{"eps"} if (not defined $in);
+    $out = $self->{"eps"} if (not defined $out);
+    $weight = 0 if (not defined $weight);
 
     die("Fsm::addarc(): invalid transition: $src $tgt $in $out $weight\n")
-	if ($src eq undef || $tgt eq undef);
+	if (not defined $src || not defined $tgt);
 
     push(@{$self->{"V"}->[$src]}, [$src, $tgt, $in, $out, 
 				   sprintf("%g", $weight)]);
@@ -102,7 +103,7 @@ sub read_fst {
 
 sub print_fst {
     my ($self, $fh) = @_;
-    $fh = *STDOUT if ($fh eq undef);
+    $fh = *STDOUT if (not defined $fh);
 
     print $fh "#FSTBasic MaxPlus\n";
     print $fh "I $self->{i}\n";
