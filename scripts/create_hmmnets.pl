@@ -264,7 +264,7 @@ sub load_recipe {
           $wgfile = $temp_dir."/".$1.".wg";
           $temp_target = $1."_$cur_line";
         } else {
-          die "No valid audio field in the recipe";
+          die "No valid audio field in the recipe in the line:\n$line";
         }
       }
       if ($line =~ /hmmnet=(\S*)/) {
