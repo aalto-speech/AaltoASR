@@ -336,7 +336,7 @@ void save_clustering(const std::string &filename)
   
   std::ofstream out(filename.c_str());
   if (!out)
-    throw std::string("Could not open file ") + filename;
+    throw std::string("save_clustering: Could not open file `") + filename + std::string("'.");
 
   out << next_cluster_id << "\n";
 

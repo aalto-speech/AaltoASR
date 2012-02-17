@@ -53,7 +53,7 @@ HmmNetBaumWelch::open(std::string ref_file)
 {
   FILE *fp = fopen(ref_file.c_str(), "r");
   if (fp == NULL)
-    throw std::string("Could not open file ")+ref_file;
+    throw std::string("HmmNetBaumWelch::open: Could not open file `") + ref_file + std::string("'.");
   read_fst(fp);
   fclose(fp);
 }

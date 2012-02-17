@@ -210,10 +210,14 @@ Recipe::Info::init_hmmnet_files(HmmSet *model, bool den_hmmnet,
   }
 
   // Open the HMM network
-  if (den_hmmnet)
+  if (den_hmmnet) {
     hnbw->open(den_hmmnet_path);
-  else
+  }
+  else {
+	if (hmmnet_path.empty())
+	  throw std::string("Recipe::Info::init_hmmnet_files: hmmnet not specified in recipe.");
     hnbw->open(hmmnet_path);
+  }
 
   if (start_time > 0 || end_time > 0)
   {
