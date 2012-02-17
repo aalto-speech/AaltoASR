@@ -127,6 +127,7 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
 ######################################################################
 
 # Create own working directory
+mkdir $workdir;
 my $tempdir = $workdir."/".$BASE_ID;
 mkdir $tempdir;
 chdir $tempdir || die("Could not chdir to $tempdir");
