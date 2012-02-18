@@ -52,12 +52,12 @@ sub add_node {
 sub add_arc {
     my ($self, $src, $tgt, $in, $out, $weight) = @_;
 
-    $in = $self->{"eps"} if (not defined $in);
-    $out = $self->{"eps"} if (not defined $out);
-    $weight = 0 if (not defined $weight);
+    $in = $self->{"eps"} if ((not defined $in) || ($in eq ''));
+    $out = $self->{"eps"} if ((not defined $out) || ($out eq ''));
+    $weight = 0 if ((not defined $weight) || ($weight eq ''));
 
     die("Fsm::addarc(): invalid transition: $src $tgt $in $out $weight\n")
-	if (not defined $src || not defined $tgt);
+	if ((not defined $src) || ($src eq '') || (not defined $tgt) || ($tgt eq ''));
 
     push(@{$self->{"V"}->[$src]}, [$src, $tgt, $in, $out, 
 				   sprintf("%g", $weight)]);
