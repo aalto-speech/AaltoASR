@@ -54,14 +54,17 @@ public:
   };
 
   struct UnknownHmm : public std::exception {
-	  UnknownHmm(const std::string & phone) : m_phone(phone) {}
+	  UnknownHmm(const std::string & phone, const std::string & word) : m_phone(phone), m_word(word) {}
 	  virtual ~UnknownHmm() throw () {}
     virtual const char *what() const throw()
       { return "TPNowayLexReader: unknown hmm"; }
     const std::string & phone() const
     { return m_phone; }
+    const std::string & word() const
+    { return m_word; }
   private:
     std::string m_phone;
+    std::string m_word;
   };
 
 protected:
