@@ -5,6 +5,8 @@
 
 #include "TPNowayLexReader.hh"
 
+using namespace std;
+
 TPNowayLexReader::TPNowayLexReader(
   std::map<std::string,int> &hmm_map,
   std::vector<Hmm> &hmms,
@@ -71,7 +73,7 @@ void
 TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
 {
   int word_id;
-  std::vector<Hmm*> hmm_list;
+  vector<Hmm*> hmm_list;
   m_word.reserve(128); // The size is not necessary, just for efficiency
 
   m_vocabulary.reset();
@@ -88,6 +90,12 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
     if (feof(file) && m_word.length() == 0)
       break;
 
+    if (m_word.length() == 0) {
+        get_until(file, m_word, "\n");
+    	cerr << "Empty word on line: " << m_word << endl;
+    	continue;
+    }
+
     // Parse possible probability
     int left = m_word.find('(');
     int right = m_word.rfind(')');
@@ -95,7 +103,7 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
     if (left != -1 || right != -1) {
       if (left == -1 || right == -1)
 	throw InvalidProbability();
-      std::string tmp = m_word.substr(left + 1, right - left - 1);
+      string tmp = m_word.substr(left + 1, right - left - 1);
       char *end_ptr;
       prob = strtod(tmp.c_str(), &end_ptr);
       if (*end_ptr != '\0')
@@ -121,7 +129,7 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
       get_until(file, m_phone, " \t\n");
 
       // Find the index of the hmm
-      std::map<std::string,int>::const_iterator it = m_hmm_map.find(m_phone);
+      map<string,int>::const_iterator it = m_hmm_map.find(m_phone);
       if (it == m_hmm_map.end()) {
 	throw UnknownHmm(m_phone, m_word);
       }

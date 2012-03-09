@@ -123,6 +123,22 @@ Toolbox::lex_read(const char *filename)
   fclose(file);
 }
 
+const std::string & Toolbox::lex_word() const
+{
+	if (m_use_stack_decoder)
+		return m_lexicon_reader.word();
+	else
+		return m_tp_lexicon_reader.word();
+}
+
+const std::string & Toolbox::lex_phone() const
+{
+	if (m_use_stack_decoder)
+		return m_lexicon_reader.phone();
+	else
+		return m_tp_lexicon_reader.phone();
+}
+
 int
 Toolbox::ngram_read(const char *file, float weight, const bool binary, bool quiet)
 {

@@ -48,8 +48,8 @@ public:
   ///
   void lex_read(const char *file);
 
-  const std::string &lex_word() const { return m_lexicon_reader.word(); }
-  const std::string &lex_phone() const { return m_lexicon_reader.phone(); }
+  const std::string &lex_word() const;
+  const std::string &lex_phone() const;
   const std::string &word(int index) const 
   {
     if (m_use_stack_decoder)
