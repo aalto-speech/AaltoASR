@@ -97,7 +97,7 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
     }
 
     // Parse possible probability
-    int left = m_word.find('(');
+    int left = m_word.rfind('(');
     int right = m_word.rfind(')');
     float prob = 1;
     if (left != -1 || right != -1) {
