@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <math.h>
 
 #include "Distributions.hh"
@@ -12,6 +13,7 @@
 #include "blas2pp.h"
 #include "blas3pp.h"
 
+using namespace std;
 
 namespace aku {
 
@@ -760,14 +762,14 @@ Gaussian::split(Gaussian &g1, Gaussian &g2, double perturbation) const
   Blas_Add_Mult(mean2, cnst_b, a_l);
   
   // Matrix
-  // (1-alfa)/alfa * cov + (Beta-Beta*u² - 1)*(1/alfa)*a_l*(a_l)^T + a_l*(a_l)^T
+  // (1-alfa)/alfa * cov + (Beta-Beta*uï¿½ - 1)*(1/alfa)*a_l*(a_l)^T + a_l*(a_l)^T
 
   double cnst_c = (cnst_beta - cnst_beta*cnst_u*cnst_u - 1)*1/cnst_alfa;
   Blas_Scale((1-cnst_alfa)/cnst_alfa, cov1); // Scaling matrix (1-alfa)/alfa
   Blas_R1_Update(cov1, a_l, a_l, cnst_c); // cov1 + cnst_c*a_l*a_l'
   Blas_R1_Update(cov1, a_l, a_l, 1); // ... + a_l*a_l'
 
-  // alfa/(1-alfa)*cov + (Beta*u² - Beta - u²)*1/(1-alfa)*a_l*a_l' + a_l*a_l'
+  // alfa/(1-alfa)*cov + (Beta*uï¿½ - Beta - uï¿½)*1/(1-alfa)*a_l*a_l' + a_l*a_l'
   double cnst_d = (cnst_beta*cnst_u*cnst_u - cnst_beta - cnst_u*cnst_u)*1/(1-cnst_alfa);
   Blas_Scale(cnst_alfa/(1-cnst_alfa), cov2); // Scaling matrix alfa/(1-alfa)
   Blas_R1_Update(cov2, a_l, a_l, cnst_d); // cov2 + cnst_d*a_l*a_l'
@@ -3046,8 +3048,12 @@ PDFPool::read_clustering(const std::string &filename)
   m_cluster_to_gaussians.resize(m_number_of_clusters);
   m_cluster_centers.resize(m_number_of_clusters);
   
-  if (m_number_of_clusters > 0.3*size())
-    throw std::string("PDFPool::read_clustering(): Are you sure that this clustering makes sense?\n");
+  if (m_number_of_clusters > 0.3*size()) {
+	  ostringstream oss;
+	  oss << "PDFPool::read_clustering(): Number of clusters (" << m_number_of_clusters <<
+			  ") seems insensible compared to the number of Gaussians (" << size() << ").";
+	  throw oss.str();
+  }
 
   // Read all gaussian-cluster pairs
   while (in) {
