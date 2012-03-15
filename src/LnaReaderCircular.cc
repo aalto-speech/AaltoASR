@@ -24,8 +24,17 @@ LnaReaderCircular::read_int()
   assert(sizeof(unsigned int) == 4);
   unsigned char buf[4];
   if (fread(buf, 4, 1, m_file) != 1) {
-    fprintf(stderr, "LnaReaderCircular::open(): read error: %s\n", 
-	    strerror(errno));
+    int error = ferror(m_file);
+    if (error != 0) {
+      fprintf(stderr, "LnaReaderCircular::read_int(): read error: %s\n",
+              strerror(error));
+    }
+    else if (feof(m_file)) {
+      fprintf(stderr, "LnaReaderCircular::read_int(): End of file reached.\n");
+    }
+    else {
+      fprintf(stderr, "LnaReaderCircular::read_int(): fread() failed.\n");
+    }
     exit(1);
   }
 
@@ -41,8 +50,9 @@ LnaReaderCircular::open(const char *filename, int buf_size)
 
   m_file = fopen(filename, "r");
   if (m_file == NULL) {
+    char * error_string = strerror(errno);
     fprintf(stderr, "LnaReaderCircular::open(): could not open %s: %s\n",
-	    filename, strerror(errno));
+	    filename, error_string);
     exit(1);
   }
 
