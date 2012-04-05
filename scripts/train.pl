@@ -155,9 +155,9 @@ my $om = $ml_model;
 
 # Estimate duration model
 if ($USE_HMMNETS) {
-  align_hmmnets($tempdir, $om, $RECIPE);
+  align_hmmnets($tempdir, $om, $RECIPE, $SPKC_FILE);
 } else {
-  align($tempdir, $om, $RECIPE);
+  align($tempdir, $om, $RECIPE, $SPKC_FILE);
 }
 estimate_dur_model($om);
 
