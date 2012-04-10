@@ -275,6 +275,9 @@ HmmSet::read_legacy_ph(std::ifstream &in)
 	in >> target >> prob;
 
         assert(target > 0);
+        if (prob <= 0) {
+          throw str::fmt(128, "HmmSet::read_legacy_ph: Phone %i (%s) transition from %i to %i has nonpositive probability %f.", index, label.c_str(), source, target, prob);
+        }
         assert(prob > 0);
 
         if (source >= 0 && load_transitions[source])
