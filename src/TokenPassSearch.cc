@@ -416,8 +416,7 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 
 	// Use globally best token if no best final token.
 	const TPLexPrefixTree::Token & token =
-			m_best_final_token != NULL ? *m_best_final_token
-					: get_best_path ? get_best_token() : get_first_token();
+			get_best_path ? get_best_final_token() : get_first_token();
 
 	// Fetch the best path if requested, otherwise the common path to
 	// all tokens and not printed yet
@@ -471,7 +470,7 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 
 void TokenPassSearch::print_lm_history(FILE *file, bool get_best_path)
 {
-	const TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+	const TPLexPrefixTree::Token & token = get_best_path ? get_best_final_token()
 			: get_first_token();
 
 	std::vector<TPLexPrefixTree::LMHistory *> stack;
@@ -561,6 +560,32 @@ TokenPassSearch::get_best_token() const
 			continue;
 
 		if (result == NULL || token->total_log_prob > result->total_log_prob)
+			result = token;
+	}
+
+	assert(result != NULL);
+	return *result;
+}
+
+const TPLexPrefixTree::Token &
+TokenPassSearch::get_best_final_token() const
+{
+	if (m_best_final_token != NULL)
+		return *m_best_final_token;
+
+	const TPLexPrefixTree::Token * result = NULL;
+
+	token_list_type::const_iterator iter = m_active_token_list->begin();
+	for (; iter != m_active_token_list->end(); ++iter) {
+		TPLexPrefixTree::Token * token = *iter;
+
+		if (token == NULL)
+			continue;
+
+		if (!(token->node->flags & NODE_FINAL))
+			continue;
+
+		if (result == NULL || (token->total_log_prob > result->total_log_prob))
 			result = token;
 	}
 
@@ -2048,16 +2073,7 @@ void TokenPassSearch::write_word_graph(const std::string &file_name)
 
 void TokenPassSearch::write_word_graph(FILE *file)
 {
-	// if (m_best_final_token == NULL) {
-	//     fprintf(stderr, "ERROR: trying to write word graph before best final token"
-	//  	    "has been decided\n");
-	//     exit(1);
-	// jpylkkon 11.9.2007: Temporary fix
-	// FIXME: What should we do if we do not want to abort?
-	// }
-
-	const TPLexPrefixTree::Token & best_token =
-			m_best_final_token != NULL ? *m_best_final_token : get_best_token();
+	const TPLexPrefixTree::Token & best_token = get_best_final_token();
 
 	if (1) {
 		word_graph.reset_reachability();

@@ -305,6 +305,13 @@ private:
 	///
 	const TPLexPrefixTree::Token & get_best_token() const;
 
+	/// \brief Finds the globally best token in NODE_FINAL state.
+	///
+	/// \return A reference to the active token in NODE_FINAL state with the
+	/// highest probability.
+	///
+	const TPLexPrefixTree::Token & get_best_final_token() const;
+
 	/// \brief Returns the first token in the active token list.
 	///
 	const TPLexPrefixTree::Token & get_first_token() const;
@@ -387,12 +394,11 @@ private:
 	Vocabulary &m_vocabulary;
 	Acoustics *m_acoustics;
 
-	std::vector<TPLexPrefixTree::Token*> *m_active_token_list;
-	std::vector<TPLexPrefixTree::Token*> *m_new_token_list;
-
-	std::vector<TPLexPrefixTree::Token*> *m_word_end_token_list;
-
-	std::vector<TPLexPrefixTree::Token*> m_token_pool;
+	typedef std::vector<TPLexPrefixTree::Token *> token_list_type;
+	token_list_type * m_active_token_list;
+	token_list_type * m_new_token_list;
+	token_list_type * m_word_end_token_list;
+	token_list_type m_token_pool;
 
 	std::vector<TPLexPrefixTree::Node*> m_active_node_list;
 
