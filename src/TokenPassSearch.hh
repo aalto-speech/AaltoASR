@@ -511,9 +511,8 @@ private:
 	// FIXME: remove debug
 public:
 	void debug_print_best_lm_history();
-	void
-	debug_print_token_lm_history(FILE *file, TPLexPrefixTree::Token *token);
-
+	void debug_print_token_lm_history(FILE * file, const TPLexPrefixTree::Token & token);
+	void debug_print_token_word_history(FILE * file, const TPLexPrefixTree::Token & token);
 };
 
 #endif // TOKENPASSSEARCH_HH

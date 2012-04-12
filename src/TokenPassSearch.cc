@@ -745,7 +745,7 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 	// 	 token->am_log_prob, token->lm_log_prob,
 	// 	 token->word_history->am_log_prob,
 	// 	 token->word_history->lm_log_prob);
-	//   debug_print_token_lm_history(0, token);
+	//   debug_print_token_lm_history(0, *token);
 
 	int new_dur;
 	int depth = token->depth;
@@ -779,7 +779,7 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				"frame %d: word_history->lex_node_id (%d) != recent (%d)\n",
 				m_frame, token->word_history->lex_node_id,
 				word_graph.nodes[token->recent_word_graph_node].lex_node_id);
-		debug_print_token_lm_history(stderr, token);
+		debug_print_token_lm_history(stderr, *token);
 	}
 
 	if (node != token->node) {
@@ -1818,7 +1818,6 @@ void TokenPassSearch::save_token_statistics(int count)
 	int i, j;
 	char fname[30];
 	FILE *fp;
-	int x;
 	int val;
 
 	for (i = 0; i < MAX_TREE_DEPTH; i++) {
@@ -1830,7 +1829,6 @@ void TokenPassSearch::save_token_statistics(int count)
 				val = (int) (MAX_TREE_DEPTH - 1 - ((m_best_log_prob
 						- (*m_active_token_list)[i]->total_log_prob)
 						/ m_global_beam * (MAX_TREE_DEPTH - 2) + 0.5));
-				x = (*m_active_token_list)[i]->depth;
 				buf[val]++;
 			}
 		}
@@ -2237,23 +2235,21 @@ void TokenPassSearch::debug_print_best_lm_history()
 #endif
 }
 
-void TokenPassSearch::debug_print_token_lm_history(FILE *file,
-		TPLexPrefixTree::Token *token)
+void TokenPassSearch::debug_print_token_lm_history(FILE * file,
+		const TPLexPrefixTree::Token & token)
 {
 	if (file == NULL)
 		file = stdout;
 
-	std::vector<TPLexPrefixTree::LMHistory*> stack;
-	TPLexPrefixTree::LMHistory *lm_history;
-
 	// Determine the word sequence
-	lm_history = token->lm_history;
+	std::vector<TPLexPrefixTree::LMHistory*> stack;
+	TPLexPrefixTree::LMHistory * lm_history = token.lm_history;
 	while (lm_history != NULL) {
 		stack.push_back(lm_history);
 		lm_history = lm_history->previous;
 	}
 
-	// Print words
+	// Print the words
 	while (!stack.empty()) {
 		lm_history = stack.back();
 		stack.pop_back();
@@ -2263,6 +2259,42 @@ void TokenPassSearch::debug_print_token_lm_history(FILE *file,
 		else
 			fprintf(file, "%s ", m_vocabulary.word(lm_history->word_id).c_str());
 	}
-	fprintf(file, "%.2f %d\n", token->total_log_prob,
-			token->recent_word_graph_node);
+	fprintf(file, "%.2f %d\n", token.total_log_prob,
+			token.recent_word_graph_node);
+}
+
+void TokenPassSearch::debug_print_token_word_history(FILE * file,
+		const TPLexPrefixTree::Token & token)
+{
+	if (!m_generate_word_graph) {
+		throw WordGraphNotGenerated();
+	}
+
+	if (file == NULL)
+		file = stdout;
+
+	// Determine the word sequence
+	std::vector<TPLexPrefixTree::WordHistory*> stack;
+	TPLexPrefixTree::WordHistory * word_history = token.word_history;
+	while (word_history != NULL) {
+		stack.push_back(word_history);
+		word_history = word_history->previous;
+	}
+
+	// Print the path
+	for (int i = stack.size() - 1; i >= 0; i--) {
+		int word_id = stack[i]->word_id;
+		if (word_id > 0) {
+			std::string word(m_vocabulary.word(stack[i]->word_id));
+			fprintf(file, "%s ", word.c_str());
+		}
+
+		fprintf(file, "%d\t%d\t%.3f\t%.3f\t%.3f\n", stack[i]->end_frame,
+				stack[i]->lex_node_id, -stack[i]->am_log_prob,
+				-stack[i]->lm_log_prob, -get_token_log_prob(
+						stack[i]->cum_am_log_prob, stack[i]->cum_lm_log_prob));
+	}
+	fprintf(file, "\n");
+
+	fflush(file);
 }
