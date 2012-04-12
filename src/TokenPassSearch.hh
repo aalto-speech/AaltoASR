@@ -72,7 +72,14 @@ public:
 	///
 	bool run(void);
 
-	/// \brief Prints the best path.
+	/// \brief Prints the best path from the word_history structure, including
+	/// the probabilities.
+	///
+	/// If \a get_best_path is true, finds the active token that is in the
+	/// NODE_FINAL state i.e. at the end of a word, with the highest probability,
+	/// and writes the words and probabilities in the word_history of that token
+	/// into a file, separated by spaces. Otherwise finds the common path to all
+	/// tokens, and prints the rest that has not been printed yet.
 	///
 	/// \exception WordGraphNotGenerated If word graph has not been generated.
 	///
@@ -80,20 +87,49 @@ public:
 
 	/// \brief Writes the LM history of an active token into a file.
 	///
-	/// If \a get_best_path is true, finds the active token with the highest
-	/// probability, and writes the words in the lm_history of that token into a
-	/// file, separated by spaces. Otherwise finds the common path to all
-	/// tokens, and prints the rest that has not been printed yet.
+	/// If \a get_best_path is true, finds the active token that is in the
+	/// NODE_FINAL state i.e. at the end of a word, with the highest probability,
+	/// and writes the words in the lm_history of that token into a file,
+	/// separated by spaces. Otherwise finds the common path to all tokens, and
+	/// prints the rest that has not been printed yet.
 	///
 	void print_lm_history(FILE *file = stdout, bool get_best_path = true);
 
+	/// \brief Writes the best state history into a file.
+	///
+	/// Finds the active token that is in the NODE_FINAL state i.e. at the end
+	/// of a word, with the highest probability. Then writes its state history
+	/// into a file.
+	///
+	/// \param file The file where the result will be written, stoudt by default.
+	///
 	void print_state_history(FILE *file = stdout);
+
+	/// \brief Writes the best state history into a text string.
+	///
+	/// Finds the active token that is in the NODE_FINAL state i.e. at the end
+	/// of a word, with the highest probability. Then writes its state history
+	/// into a text string.
+	///
+	/// \return The best state history in a text string.
+	///
 	std::string state_history_string();
+
+	/// \brief Writes the best state history into a vector.
+	///
+	/// Finds the active token that is in the NODE_FINAL state i.e. at the end
+	/// of a word, with the highest probability. Then writes the
+	/// TPLexPrefixTree::StateHistory objects in the state_history of that
+	/// token into a vector.
+	///
+	/// \param stack The vector where the result will be written.
+	///
 	void get_state_history(std::vector<TPLexPrefixTree::StateHistory*> &stack);
 
 	/// \brief Writes the LM history of an active token into a vector.
 	///
-	/// If \a use_best_token is true, finds the active token with the highest
+	/// If \a use_best_token is true, finds the active token that is in the
+	/// NODE_FINAL state i.e. at the end of a word, with the highest
 	/// probability. Otherwise finds any active token. Then writes the
 	/// TPLexPrefixTree::LMHistory objects in the lm_history of that token into
 	/// a vector.
@@ -270,7 +306,8 @@ public:
 
 	/// \brief Returns the logarithmic AM probability of an active token.
 	///
-	/// If \a use_best_token is true, finds the active token with the highest
+	/// If \a use_best_token is true, finds the active token that is in the
+	/// NODE_FINAL state i.e. at the end of a word, with the highest
 	/// probability. Otherwise finds any active token. Then returns the
 	/// logarithm of the acoustic model probability.
 	///
@@ -280,7 +317,8 @@ public:
 
 	/// \brief Returns the logarithmic LM probability of an active token.
 	///
-	/// If \a use_best_token is true, finds the active token with the highest
+	/// If \a use_best_token is true, finds the active token that is in the
+	/// NODE_FINAL state i.e. at the end of a word, with the highest
 	/// probability. Otherwise finds any active token. Then returns the
 	/// logarithm of the language model probability.
 	///
@@ -290,7 +328,8 @@ public:
 
 	/// \brief Returns the logarithmic probability of an active token.
 	///
-	/// If \a use_best_token is true, finds the active token with the highest
+	/// If \a use_best_token is true, finds the active token that is in the
+	/// NODE_FINAL state i.e. at the end of a word, with the highest
 	/// probability. Otherwise finds any active token. Then returns the
 	/// logarithm of the total (acoustic and language model) probability.
 	///
@@ -299,13 +338,8 @@ public:
 	float get_total_log_prob(bool use_best_token) const;
 
 private:
-	/// \brief Finds the globally best token.
-	///
-	/// \return A reference to the active token with the highest probability.
-	///
-	const TPLexPrefixTree::Token & get_best_token() const;
-
-	/// \brief Finds the globally best token in NODE_FINAL state.
+	/// \brief Finds the globally best token that is in the NODE_FINAL state,
+	/// i.e. at the end of a word.
 	///
 	/// \return A reference to the active token in NODE_FINAL state with the
 	/// highest probability.

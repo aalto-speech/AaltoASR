@@ -394,7 +394,7 @@ void TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
 		abort();
 	}
 
-	const TPLexPrefixTree::Token & token = use_best_token ? get_best_token()
+	const TPLexPrefixTree::Token & token = use_best_token ? get_best_final_token()
 			: get_first_token();
 
 	vec.clear();
@@ -529,42 +529,23 @@ void TokenPassSearch::print_lm_history(FILE *file, bool get_best_path)
 
 float TokenPassSearch::get_am_log_prob(bool get_best_path) const
 {
-	const TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+	const TPLexPrefixTree::Token & token = get_best_path ? get_best_final_token()
 			: get_first_token();
 	return token.am_log_prob;
 }
 
 float TokenPassSearch::get_lm_log_prob(bool get_best_path) const
 {
-	const TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+	const TPLexPrefixTree::Token & token = get_best_path ? get_best_final_token()
 			: get_first_token();
 	return token.lm_log_prob;
 }
 
 float TokenPassSearch::get_total_log_prob(bool get_best_path) const
 {
-	const TPLexPrefixTree::Token & token = get_best_path ? get_best_token()
+	const TPLexPrefixTree::Token & token = get_best_path ? get_best_final_token()
 			: get_first_token();
 	return token.total_log_prob;
-}
-
-const TPLexPrefixTree::Token &
-TokenPassSearch::get_best_token() const
-{
-	const TPLexPrefixTree::Token * result = NULL;
-
-	for (int i = 0; i < m_active_token_list->size(); i++) {
-		TPLexPrefixTree::Token * token = (*m_active_token_list)[i];
-
-		if (token == NULL)
-			continue;
-
-		if (result == NULL || token->total_log_prob > result->total_log_prob)
-			result = token;
-	}
-
-	assert(result != NULL);
-	return *result;
 }
 
 const TPLexPrefixTree::Token &
@@ -636,7 +617,7 @@ std::string TokenPassSearch::state_history_string()
 void TokenPassSearch::get_state_history(std::vector<
 		TPLexPrefixTree::StateHistory*> &stack)
 {
-	const TPLexPrefixTree::Token & token = get_best_token();
+	const TPLexPrefixTree::Token & token = get_best_final_token();
 
 	// Determine the state sequence
 	stack.clear();
