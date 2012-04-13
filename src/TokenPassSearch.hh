@@ -378,6 +378,11 @@ private:
 	void move_token_to_node(TPLexPrefixTree::Token *token,
 			TPLexPrefixTree::Node *node, float transition_score);
 
+	/// \brief Updated lm_log_prob and lm_hist_code on token after advancing to
+	/// a new node.
+	///
+	void update_lm_log_prob(TPLexPrefixTree::Token & token);
+
 	/// \brief Copes new tokens from \ref m_new_token_list to
 	/// \ref m_active_token_list.
 	///
@@ -395,7 +400,7 @@ private:
 			TPLexPrefixTree::Token *token_list);
 	bool is_similar_lm_history(TPLexPrefixTree::LMHistory *wh1,
 			TPLexPrefixTree::LMHistory *wh2);
-	int compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh);
+	int compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh) const;
 	float compute_lm_log_prob(TPLexPrefixTree::LMHistory *lm_hist);
 	float get_lm_score(TPLexPrefixTree::LMHistory *lm_hist, int lm_hist_code);
 	float get_lm_lookahead_score(TPLexPrefixTree::LMHistory *lm_hist,

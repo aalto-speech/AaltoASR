@@ -728,21 +728,18 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 	// 	 token->word_history->lm_log_prob);
 	//   debug_print_token_lm_history(0, *token);
 
-	int new_dur;
-	int depth = token->depth;
-	float new_cur_am_log_prob;
-	float new_cur_lm_log_prob;
-	float new_real_am_log_prob = token->am_log_prob + m_transition_scale
-			* transition_score;
-	float new_real_lm_log_prob = token->lm_log_prob;
-	float total_token_log_prob;
-	int new_word_count = token->word_count;
-	int new_fsa_lm_node = token->fsa_lm_node;
-	int new_lm_hist_code = token->lm_hist_code;
-	TPLexPrefixTree::LMHistory *new_lm_history = token->lm_history;
-	TPLexPrefixTree::WordHistory *new_word_history = token->word_history;
-	TPLexPrefixTree::StateHistory *new_state_history = token->state_history;
-	int word_start_frame = token->word_start_frame;
+	TPLexPrefixTree::Token updated_token;
+	updated_token.node = node;
+	updated_token.depth = token->depth;
+	updated_token.am_log_prob = token->am_log_prob + m_transition_scale * transition_score;
+	updated_token.lm_log_prob = token->lm_log_prob;
+	updated_token.word_count = token->word_count;
+	updated_token.fsa_lm_node = token->fsa_lm_node;
+	updated_token.lm_hist_code = token->lm_hist_code;
+	updated_token.lm_history = token->lm_history;
+	updated_token.word_history = token->word_history;
+	updated_token.state_history = token->state_history;
+	updated_token.word_start_frame = token->word_start_frame;
 
 	// Whenever new history structures are created, they are adopted by
 	// the automatic structures below.  This ensures that the history
@@ -763,57 +760,43 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		debug_print_token_lm_history(stderr, *token);
 	}
 
-	if (node != token->node) {
+	if (updated_token.node != token->node) {
 		// Store old word id for possible word history generation
 		int old_lm_history_word_id = token->lm_history->word_id;
 
-		if (node->flags & NODE_FIRST_STATE_OF_WORD) {
-			assert(word_start_frame < 0);
-			word_start_frame = m_frame;
+		if (updated_token.node->flags & NODE_FIRST_STATE_OF_WORD) {
+			assert(updated_token.word_start_frame < 0);
+			updated_token.word_start_frame = m_frame;
 		}
 
 		// Moving to another node
-		if (!(node->flags & NODE_AFTER_WORD_ID)) {
+		if (!(updated_token.node->flags & NODE_AFTER_WORD_ID)) {
 
-			if (node->word_id != -1) // Is word ID unique?
+			if (updated_token.node->word_id != -1) // Is word ID unique?
 			{
-				if (m_lex2lm[node->word_id] < 0)
+				if (m_lex2lm[updated_token.node->word_id] < 0)
 					return;
 
 				// Prune two subsequent word boundaries
-				if (node->word_id == m_word_boundary_id
+				if (updated_token.node->word_id == m_word_boundary_id
 						&& token->lm_history->word_id == m_word_boundary_id) {
 					return;
 				}
 
-				// Add LM probability
-				assert(word_start_frame >= 0);
-				new_lm_history = new TPLexPrefixTree::LMHistory(node->word_id,
-						m_lex2lm[node->word_id], token->lm_history);
-				new_lm_history->word_start_frame = word_start_frame;
-				word_start_frame = -1;
-				auto_lm_history.adopt(new_lm_history);
+				// LANGUAGE MODEL PROBABILITIES ARE APPLIED HERE
 
-				if (m_fsa_lm) {
-					if (node->word_id != m_sentence_start_id) {
-						new_fsa_lm_node = m_fsa_lm->walk(token->fsa_lm_node,
-								new_lm_history->lm_id, &new_real_lm_log_prob);
-						new_real_lm_log_prob += m_insertion_penalty;
-					}
-				}
-				else {
-					new_lm_hist_code
-							= compute_lm_hist_hash_code(new_lm_history);
+				assert(updated_token.word_start_frame >= 0);
+				updated_token.lm_history = new TPLexPrefixTree::LMHistory(updated_token.node->word_id,
+						m_lex2lm[updated_token.node->word_id], token->lm_history);
+				updated_token.lm_history->word_start_frame = updated_token.word_start_frame;
+				updated_token.word_start_frame = -1;
+				auto_lm_history.adopt(updated_token.lm_history);
 
-					if (node->word_id != m_sentence_start_id) {
-						new_real_lm_log_prob += get_lm_score(new_lm_history,
-								new_lm_hist_code) + m_insertion_penalty;
-					}
-				}
+				update_lm_log_prob(updated_token);
 
-				new_cur_lm_log_prob = new_real_lm_log_prob;
-				new_word_count++;
-				if (m_use_sentence_boundary && node->word_id
+				updated_token.cur_lm_log_prob = updated_token.lm_log_prob;
+				updated_token.word_count++;
+				if (m_use_sentence_boundary && updated_token.node->word_id
 						== m_sentence_end_id) {
 					// Sentence boundaries not allowed in the middle of the
 					// recognition segment if we are generating a word graph.
@@ -825,136 +808,136 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 
 					// Add sentence start and word boundary to the LM history
 					// after sentence_end_id
-					new_lm_history = new TPLexPrefixTree::LMHistory(
+					updated_token.lm_history = new TPLexPrefixTree::LMHistory(
 							m_sentence_start_id, m_sentence_start_lm_id,
-							new_lm_history);
-					new_lm_history->word_start_frame = m_frame;
+							updated_token.lm_history);
+					updated_token.lm_history->word_start_frame = m_frame;
 					if (m_word_boundary_id > 0) {
-						new_lm_history = new TPLexPrefixTree::LMHistory(
+						updated_token.lm_history = new TPLexPrefixTree::LMHistory(
 								m_word_boundary_id, m_word_boundary_lm_id,
-								new_lm_history);
-						new_lm_history->word_start_frame = m_frame;
+								updated_token.lm_history);
+						updated_token.lm_history->word_start_frame = m_frame;
 					}
-					auto_lm_history.adopt(new_lm_history);
+					auto_lm_history.adopt(updated_token.lm_history);
 
 					if (m_fsa_lm) {
-						new_fsa_lm_node = m_fsa_lm->initial_node_id();
+						updated_token.fsa_lm_node = m_fsa_lm->initial_node_id();
 						if (m_word_boundary_id > 0)
-							new_fsa_lm_node = m_fsa_lm->walk(new_fsa_lm_node,
+							updated_token.fsa_lm_node = m_fsa_lm->walk(updated_token.fsa_lm_node,
 									m_word_boundary_lm_id, NULL);
 					}
 					else
-						new_lm_hist_code = compute_lm_hist_hash_code(
-								new_lm_history);
+						updated_token.lm_hist_code = compute_lm_hist_hash_code(
+								updated_token.lm_history);
 				}
 			}
 			else {
 				// LM probability not added yet, use previous LM (lookahead) value
-				new_cur_lm_log_prob = token->cur_lm_log_prob;
+				updated_token.cur_lm_log_prob = token->cur_lm_log_prob;
 
-				if (node->possible_word_id_list.size() > 0 && m_lm_lookahead) {
+				if (updated_token.node->possible_word_id_list.size() > 0 && m_lm_lookahead) {
 					// Add language model lookahead
-					new_cur_lm_log_prob = new_real_lm_log_prob
-							+ get_lm_lookahead_score(token->lm_history, node,
-									depth);
+					updated_token.cur_lm_log_prob = updated_token.lm_log_prob
+							+ get_lm_lookahead_score(token->lm_history, updated_token.node,
+									updated_token.depth);
 				}
 			}
 		}
 		else
-			new_cur_lm_log_prob = new_real_lm_log_prob;
+			updated_token.cur_lm_log_prob = updated_token.lm_log_prob;
 
-		if (m_keep_state_segmentation && node->state != NULL) {
-			new_state_history = new TPLexPrefixTree::StateHistory(
-					node->state->model, m_frame, token->state_history);
-			auto_state_history.adopt(new_state_history);
+		if (m_keep_state_segmentation && updated_token.node->state != NULL) {
+			updated_token.state_history = new TPLexPrefixTree::StateHistory(
+					updated_token.node->state->model, m_frame, token->state_history);
+			auto_state_history.adopt(updated_token.state_history);
 		}
 
 		// Update duration probability
-		new_dur = 0;
-		depth = token->depth + 1;
+		updated_token.dur = 0;
+		updated_token.depth = token->depth + 1;
 		float duration_log_prob = 0;
 		if (token->node->state != NULL) {
 			// Add duration probability
 			int temp_dur = token->dur + 1;
 			duration_log_prob = m_duration_scale
 					* token->node->state->duration.get_log_prob(temp_dur);
-			new_real_am_log_prob += duration_log_prob;
+			updated_token.am_log_prob += duration_log_prob;
 		}
 
 		// Create word history structure for word graph
-		if (m_generate_word_graph && (node->flags & NODE_FIRST_STATE_OF_WORD)) {
+		if (m_generate_word_graph && (updated_token.node->flags & NODE_FIRST_STATE_OF_WORD)) {
 			// Add symbol from the LMHistory
-			new_word_history = new TPLexPrefixTree::WordHistory(
-					old_lm_history_word_id, m_frame, new_word_history);
-			new_word_history->lex_node_id = node->node_id;
-			auto_word_history.adopt(new_word_history);
-			new_word_history->cum_am_log_prob = token->am_log_prob
+			updated_token.word_history = new TPLexPrefixTree::WordHistory(
+					old_lm_history_word_id, m_frame, updated_token.word_history);
+			updated_token.word_history->lex_node_id = updated_token.node->node_id;
+			auto_word_history.adopt(updated_token.word_history);
+			updated_token.word_history->cum_am_log_prob = token->am_log_prob
 					+ m_transition_scale * transition_score + duration_log_prob;
-			new_word_history->cum_lm_log_prob = token->lm_log_prob;
-			new_word_history->am_log_prob = new_word_history->cum_am_log_prob
-					- new_word_history->previous->cum_am_log_prob;
-			new_word_history->lm_log_prob = new_word_history->cum_lm_log_prob
-					- new_word_history->previous->cum_lm_log_prob;
-			new_word_history->end_frame = m_frame;
+			updated_token.word_history->cum_lm_log_prob = token->lm_log_prob;
+			updated_token.word_history->am_log_prob = updated_token.word_history->cum_am_log_prob
+					- updated_token.word_history->previous->cum_am_log_prob;
+			updated_token.word_history->lm_log_prob = updated_token.word_history->cum_lm_log_prob
+					- updated_token.word_history->previous->cum_lm_log_prob;
+			updated_token.word_history->end_frame = m_frame;
 		}
 
-		new_cur_am_log_prob = new_real_am_log_prob;
+		updated_token.cur_am_log_prob = updated_token.am_log_prob;
 	}
 	else {
 		// Self transition
-		new_dur = token->dur + 1;
-		if (new_dur > MAX_STATE_DURATION && token->node->state != NULL
+		updated_token.dur = token->dur + 1;
+		if (updated_token.dur > MAX_STATE_DURATION && token->node->state != NULL
 				&& token->node->state->duration.is_valid_duration_model())
 			return; // Maximum state duration exceeded, discard token
-		depth = token->depth;
-		new_cur_am_log_prob = token->cur_am_log_prob + m_transition_scale
+		updated_token.depth = token->depth;
+		updated_token.cur_am_log_prob = token->cur_am_log_prob + m_transition_scale
 				* transition_score;
-		new_cur_lm_log_prob = token->cur_lm_log_prob;
+		updated_token.cur_lm_log_prob = token->cur_lm_log_prob;
 	}
 
-	if ((node->flags & NODE_FAN_IN_FIRST) || node == m_lexicon.root()
-			|| (node->flags & NODE_SILENCE_FIRST)) {
-		depth = 0;
+	if ((updated_token.node->flags & NODE_FAN_IN_FIRST) || updated_token.node == m_lexicon.root()
+			|| (updated_token.node->flags & NODE_SILENCE_FIRST)) {
+		updated_token.depth = 0;
 	}
 
-	if (node->flags & NODE_SILENCE_FIRST
-			&& new_lm_history->word_first_silence_frame == -1) {
-		new_lm_history->word_first_silence_frame = m_frame;
+	if (updated_token.node->flags & NODE_SILENCE_FIRST
+			&& updated_token.lm_history->word_first_silence_frame == -1) {
+		updated_token.lm_history->word_first_silence_frame = m_frame;
 	}
 
-	if (node->state == NULL) {
+	if (updated_token.node->state == NULL) {
 
 		// Moving to a node without HMM state, pass through immediately.
 
 		// Try beam pruning
-		total_token_log_prob = get_token_log_prob(new_cur_am_log_prob,
-				new_cur_lm_log_prob);
-		if (((node->flags & NODE_USE_WORD_END_BEAM) && total_token_log_prob
+		updated_token.total_log_prob = get_token_log_prob(updated_token.cur_am_log_prob,
+				updated_token.cur_lm_log_prob);
+		if (((updated_token.node->flags & NODE_USE_WORD_END_BEAM) && updated_token.total_log_prob
 				< m_best_we_log_prob - m_current_we_beam)
-				|| total_token_log_prob < m_best_log_prob - m_current_glob_beam) {
+				|| updated_token.total_log_prob < m_best_log_prob - m_current_glob_beam) {
 			return;
 		}
 
 		// Create temporary token for propagation.
 		TPLexPrefixTree::Token temp_token;
-		temp_token.node = node;
+		temp_token.node = updated_token.node;
 		temp_token.next_node_token = NULL;
-		temp_token.am_log_prob = new_real_am_log_prob;
-		temp_token.lm_log_prob = new_real_lm_log_prob;
-		temp_token.cur_am_log_prob = new_cur_am_log_prob;
-		temp_token.cur_lm_log_prob = new_cur_lm_log_prob;
-		temp_token.total_log_prob = total_token_log_prob;
-		temp_token.lm_history = new_lm_history;
-		temp_token.lm_hist_code = new_lm_hist_code;
-		temp_token.fsa_lm_node = new_fsa_lm_node;
+		temp_token.am_log_prob = updated_token.am_log_prob;
+		temp_token.lm_log_prob = updated_token.lm_log_prob;
+		temp_token.cur_am_log_prob = updated_token.cur_am_log_prob;
+		temp_token.cur_lm_log_prob = updated_token.cur_lm_log_prob;
+		temp_token.total_log_prob = updated_token.total_log_prob;
+		temp_token.lm_history = updated_token.lm_history;
+		temp_token.lm_hist_code = updated_token.lm_hist_code;
+		temp_token.fsa_lm_node = updated_token.fsa_lm_node;
 		temp_token.dur = 0;
-		temp_token.word_count = new_word_count;
-		temp_token.state_history = new_state_history;
-		temp_token.word_history = new_word_history;
-		temp_token.word_start_frame = word_start_frame;
+		temp_token.word_count = updated_token.word_count;
+		temp_token.state_history = updated_token.state_history;
+		temp_token.word_history = updated_token.word_history;
+		temp_token.word_start_frame = updated_token.word_start_frame;
 		if (m_generate_word_graph) {
 			copy_word_graph_info(token, &temp_token);
-			if (node->flags & NODE_FIRST_STATE_OF_WORD)
+			if (updated_token.node->flags & NODE_FIRST_STATE_OF_WORD)
 				build_word_graph(&temp_token);
 		}
 
@@ -963,7 +946,7 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		temp_token.meas[i] = token->meas[i];
 #endif
 
-		temp_token.depth = depth;
+		temp_token.depth = updated_token.depth;
 		//temp_token.token_path = token->token_path;
 		//temp_token.token_path->link();
 
@@ -974,45 +957,45 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		// Normal propagation
 		TPLexPrefixTree::Token *new_token;
 		TPLexPrefixTree::Token *similar_lm_hist;
-		float ac_log_prob = m_acoustics->log_prob(node->state->model);
+		float ac_log_prob = m_acoustics->log_prob(updated_token.node->state->model);
 
-		new_real_am_log_prob += ac_log_prob;
-		new_cur_am_log_prob += ac_log_prob;
-		total_token_log_prob = get_token_log_prob(new_cur_am_log_prob,
-				new_cur_lm_log_prob);
+		updated_token.am_log_prob += ac_log_prob;
+		updated_token.cur_am_log_prob += ac_log_prob;
+		updated_token.total_log_prob = get_token_log_prob(updated_token.cur_am_log_prob,
+				updated_token.cur_lm_log_prob);
 
 		// Apply beam pruning
-		if (node->flags & NODE_USE_WORD_END_BEAM) {
-			if (total_token_log_prob < m_best_we_log_prob - m_current_we_beam) {
+		if (updated_token.node->flags & NODE_USE_WORD_END_BEAM) {
+			if (updated_token.total_log_prob < m_best_we_log_prob - m_current_we_beam) {
 				return;
 			}
 		}
-		if (total_token_log_prob < m_best_log_prob - m_current_glob_beam
+		if (updated_token.total_log_prob < m_best_log_prob - m_current_glob_beam
 #ifdef PRUNING_EXTENSIONS
-		|| ((node->flags&NODE_FAN_IN)?
-				(total_token_log_prob < m_fan_in_log_prob - m_fan_in_beam) :
-				((!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
-								(total_token_log_prob<m_wc_llh[new_word_count-m_min_word_count]-
+		|| ((updated_token.node->flags&NODE_FAN_IN)?
+				(updated_token.total_log_prob < m_fan_in_log_prob - m_fan_in_beam) :
+				((!(updated_token.node->flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
+								(updated_token.total_log_prob<m_wc_llh[updated_token.word_count-m_min_word_count]-
 										m_eq_wc_beam ||
-										(!(node->flags&(NODE_AFTER_WORD_ID)) &&
-												total_token_log_prob<m_depth_llh[depth/2]-m_eq_depth_beam)))))
+										(!(updated_token.node->flags&(NODE_AFTER_WORD_ID)) &&
+												updated_token.total_log_prob<m_depth_llh[updated_token.depth/2]-m_eq_depth_beam)))))
 #endif
 #ifdef FAN_IN_PRUNING
-		|| ((node->flags&NODE_FAN_IN) &&
-				total_token_log_prob < m_fan_in_log_prob - m_fan_in_beam)
+		|| ((updated_token.node->flags&NODE_FAN_IN) &&
+				updated_token.total_log_prob < m_fan_in_log_prob - m_fan_in_beam)
 #endif
 #ifdef EQ_WC_PRUNING
-		|| (!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
-				(total_token_log_prob<m_wc_llh[new_word_count-m_min_word_count]-
+		|| (!(updated_token.node->flags&(NODE_FAN_IN|NODE_FAN_OUT)) &&
+				(updated_token.total_log_prob<m_wc_llh[updated_token.word_count-m_min_word_count]-
 						m_eq_wc_beam))
 #endif
 #ifdef EQ_DEPTH_PRUNING
-		|| ((!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)) &&
-						total_token_log_prob<m_depth_llh[depth/2]-m_eq_depth_beam))
+		|| ((!(updated_token.node->flags&(NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)) &&
+						updated_token.total_log_prob<m_depth_llh[updated_token.depth/2]-m_eq_depth_beam))
 #endif
 #ifdef FAN_OUT_PRUNING
-		|| ((node->flags&NODE_FAN_OUT) &&
-				total_token_log_prob < m_fan_out_log_prob - m_fan_out_beam)
+		|| ((updated_token.node->flags&NODE_FAN_OUT) &&
+				updated_token.total_log_prob < m_fan_out_log_prob - m_fan_out_beam)
 #endif
 		)
 		{
@@ -1020,12 +1003,12 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		}
 
 #ifdef STATE_PRUNING
-		if (node->flags&(NODE_FAN_OUT|NODE_FAN_IN))
+		if (updated_token.node->flags&(NODE_FAN_OUT|NODE_FAN_IN))
 		{
-			TPLexPrefixTree::Token *cur_token = node->token_list;
+			TPLexPrefixTree::Token *cur_token = updated_token.node->token_list;
 			while (cur_token != NULL)
 			{
-				if (total_token_log_prob < cur_token->total_log_prob - m_state_beam)
+				if (updated_token.total_log_prob < cur_token->total_log_prob - m_state_beam)
 				{
 					return;
 				}
@@ -1034,44 +1017,44 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		}
 #endif
 
-		if (node->token_list == NULL) {
+		if (updated_token.node->token_list == NULL) {
 			// No tokens in the node,  create new token
-			m_active_node_list.push_back(node); // Mark the node active
+			m_active_node_list.push_back(updated_token.node); // Mark the node active
 			new_token = acquire_token();
-			new_token->node = node;
-			new_token->next_node_token = node->token_list;
-			node->token_list = new_token;
+			new_token->node = updated_token.node;
+			new_token->next_node_token = updated_token.node->token_list;
+			updated_token.node->token_list = new_token;
 			// Add to the list of propagated tokens
-			if (node->flags & NODE_USE_WORD_END_BEAM)
+			if (updated_token.node->flags & NODE_USE_WORD_END_BEAM)
 				m_word_end_token_list->push_back(new_token);
 			else
 				m_new_token_list->push_back(new_token);
 		}
 		else {
 			if (m_fsa_lm) {
-				similar_lm_hist = find_similar_fsa_token(new_fsa_lm_node,
-						node->token_list);
+				similar_lm_hist = find_similar_fsa_token(updated_token.fsa_lm_node,
+						updated_token.node->token_list);
 			}
 			else {
-				similar_lm_hist = find_similar_lm_history(new_lm_history,
-						new_lm_hist_code, node->token_list);
+				similar_lm_hist = find_similar_lm_history(updated_token.lm_history,
+						updated_token.lm_hist_code, updated_token.node->token_list);
 			}
 
 			if (similar_lm_hist == NULL) {
 				// New word history for this node, create new token
 				new_token = acquire_token();
-				new_token->node = node;
-				new_token->next_node_token = node->token_list;
-				node->token_list = new_token;
+				new_token->node = updated_token.node;
+				new_token->next_node_token = updated_token.node->token_list;
+				updated_token.node->token_list = new_token;
 				// Add to the list of propagated tokens
-				if (node->flags & NODE_USE_WORD_END_BEAM)
+				if (updated_token.node->flags & NODE_USE_WORD_END_BEAM)
 					m_word_end_token_list->push_back(new_token);
 				else
 					m_new_token_list->push_back(new_token);
 			}
 			else {
 				// Found the same word history, pick the best token.
-				if (total_token_log_prob > similar_lm_hist->total_log_prob) {
+				if (updated_token.total_log_prob > similar_lm_hist->total_log_prob) {
 					// Replace the previous token
 					new_token = similar_lm_hist;
 					hist::unlink(new_token->lm_history);
@@ -1086,90 +1069,90 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				}
 			}
 		}
-		if (node->flags & NODE_USE_WORD_END_BEAM) {
-			if (total_token_log_prob > m_best_we_log_prob)
-				m_best_we_log_prob = total_token_log_prob;
+		if (updated_token.node->flags & NODE_USE_WORD_END_BEAM) {
+			if (updated_token.total_log_prob > m_best_we_log_prob)
+				m_best_we_log_prob = updated_token.total_log_prob;
 		}
-		if (total_token_log_prob > m_best_log_prob)
-			m_best_log_prob = total_token_log_prob;
+		if (updated_token.total_log_prob > m_best_log_prob)
+			m_best_log_prob = updated_token.total_log_prob;
 
 #if (defined PRUNING_EXTENSIONS || defined PRUNING_MEASUREMENT)
-		if (node->flags&NODE_FAN_IN)
+		if (updated_token.node->flags&NODE_FAN_IN)
 		{
-			if (total_token_log_prob > m_fan_in_log_prob)
-			m_fan_in_log_prob = total_token_log_prob;
-			if (m_wc_llh[new_word_count-m_min_word_count] < -1e19)
-			m_wc_llh[new_word_count-m_min_word_count] = -1e18;
+			if (updated_token.total_log_prob > m_fan_in_log_prob)
+			m_fan_in_log_prob = updated_token.total_log_prob;
+			if (m_wc_llh[updated_token.word_count-m_min_word_count] < -1e19)
+			m_wc_llh[updated_token.word_count-m_min_word_count] = -1e18;
 		}
-		else if (!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT)))
+		else if (!(updated_token.node->flags&(NODE_FAN_IN|NODE_FAN_OUT)))
 		{
-			if (!(node->flags&NODE_AFTER_WORD_ID) &&
-					total_token_log_prob > m_depth_llh[depth/2])
-			m_depth_llh[depth/2] = total_token_log_prob;
-			if (total_token_log_prob > m_wc_llh[new_word_count-m_min_word_count])
-			m_wc_llh[new_word_count-m_min_word_count] = total_token_log_prob;
+			if (!(updated_token.node->flags&NODE_AFTER_WORD_ID) &&
+					updated_token.total_log_prob > m_depth_llh[updated_token.depth/2])
+			m_depth_llh[updated_token.depth/2] = updated_token.total_log_prob;
+			if (updated_token.total_log_prob > m_wc_llh[updated_token.word_count-m_min_word_count])
+			m_wc_llh[updated_token.word_count-m_min_word_count] = updated_token.total_log_prob;
 		}
-		else if (m_wc_llh[new_word_count-m_min_word_count] < -1e19)
-		m_wc_llh[new_word_count-m_min_word_count] = -1e18;
+		else if (m_wc_llh[updated_token.word_count-m_min_word_count] < -1e19)
+		m_wc_llh[updated_token.word_count-m_min_word_count] = -1e18;
 #endif
 #ifdef FAN_IN_PRUNING
-		if (node->flags&NODE_FAN_IN)
+		if (updated_token.node->flags&NODE_FAN_IN)
 		{
-			if (total_token_log_prob > m_fan_in_log_prob)
-			m_fan_in_log_prob = total_token_log_prob;
+			if (updated_token.total_log_prob > m_fan_in_log_prob)
+			m_fan_in_log_prob = updated_token.total_log_prob;
 		}
 #endif
 #ifdef EQ_WC_PRUNING
-		if (!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT)))
+		if (!(updated_token.node->flags&(NODE_FAN_IN|NODE_FAN_OUT)))
 		{
-			if (total_token_log_prob > m_wc_llh[new_word_count-m_min_word_count])
-			m_wc_llh[new_word_count-m_min_word_count] = total_token_log_prob;
+			if (updated_token.total_log_prob > m_wc_llh[updated_token.word_count-m_min_word_count])
+			m_wc_llh[updated_token.word_count-m_min_word_count] = updated_token.total_log_prob;
 		}
-		else if (m_wc_llh[new_word_count-m_min_word_count] < -1e19)
-		m_wc_llh[new_word_count-m_min_word_count] = -1e18;
+		else if (m_wc_llh[updated_token.word_count-m_min_word_count] < -1e19)
+		m_wc_llh[updated_token.word_count-m_min_word_count] = -1e18;
 #endif
 #ifdef EQ_DEPTH_PRUNING
-		if (!(node->flags&(NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)))
+		if (!(updated_token.node->flags&(NODE_FAN_IN|NODE_FAN_OUT|NODE_AFTER_WORD_ID)))
 		{
-			if (total_token_log_prob > m_depth_llh[depth/2])
-			m_depth_llh[depth/2] = total_token_log_prob;
+			if (updated_token.total_log_prob > m_depth_llh[updated_token.depth/2])
+			m_depth_llh[updated_token.depth/2] = updated_token.total_log_prob;
 		}
 #endif
 
 #if (defined FAN_OUT_PRUNING || defined PRUNING_MEASUREMENT)
-		if (node->flags&NODE_FAN_OUT)
+		if (updated_token.node->flags&NODE_FAN_OUT)
 		{
-			if (total_token_log_prob > m_fan_out_log_prob)
-			m_fan_out_log_prob = total_token_log_prob;
+			if (updated_token.total_log_prob > m_fan_out_log_prob)
+			m_fan_out_log_prob = updated_token.total_log_prob;
 		}
 #endif
 
-		if (total_token_log_prob < m_worst_log_prob)
-			m_worst_log_prob = total_token_log_prob;
+		if (updated_token.total_log_prob < m_worst_log_prob)
+			m_worst_log_prob = updated_token.total_log_prob;
 
-		new_token->lm_history = new_lm_history;
+		new_token->lm_history = updated_token.lm_history;
 		if (new_token->lm_history != NULL)
 			hist::link(new_token->lm_history);
-		new_token->lm_hist_code = new_lm_hist_code;
-		new_token->fsa_lm_node = new_fsa_lm_node;
-		new_token->am_log_prob = new_real_am_log_prob;
-		new_token->cur_am_log_prob = new_cur_am_log_prob;
-		new_token->lm_log_prob = new_real_lm_log_prob;
-		new_token->cur_lm_log_prob = new_cur_lm_log_prob;
-		new_token->total_log_prob = total_token_log_prob;
-		new_token->dur = new_dur;
-		new_token->word_count = new_word_count;
-		new_token->state_history = new_state_history;
-		new_token->word_history = new_word_history;
-		new_token->word_start_frame = word_start_frame;
-		if (new_word_history != NULL)
+		new_token->lm_hist_code = updated_token.lm_hist_code;
+		new_token->fsa_lm_node = updated_token.fsa_lm_node;
+		new_token->am_log_prob = updated_token.am_log_prob;
+		new_token->cur_am_log_prob = updated_token.cur_am_log_prob;
+		new_token->lm_log_prob = updated_token.lm_log_prob;
+		new_token->cur_lm_log_prob = updated_token.cur_lm_log_prob;
+		new_token->total_log_prob = updated_token.total_log_prob;
+		new_token->dur = updated_token.dur;
+		new_token->word_count = updated_token.word_count;
+		new_token->state_history = updated_token.state_history;
+		new_token->word_history = updated_token.word_history;
+		new_token->word_start_frame = updated_token.word_start_frame;
+		if (updated_token.word_history != NULL)
 			hist::link(new_token->word_history);
-		if (new_state_history != NULL)
+		if (updated_token.state_history != NULL)
 			hist::link(new_token->state_history);
 
 		if (m_generate_word_graph) {
 			copy_word_graph_info(token, new_token);
-			if ((node->flags & NODE_FIRST_STATE_OF_WORD) && node != token->node)
+			if ((updated_token.node->flags & NODE_FIRST_STATE_OF_WORD) && updated_token.node != token->node)
 				build_word_graph(new_token);
 		}
 
@@ -1178,15 +1161,34 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		new_token->meas[i] = token->meas[i];
 #endif
 
-		new_token->depth = depth;
+		new_token->depth = updated_token.depth;
 		//assert(token->token_path != NULL);
 		/*new_token->token_path = new TPLexPrefixTree::PathHistory(
-		 total_token_log_prob,
-		 token->token_path->dll + ac_log_prob, depth,
+		 updated_token.total_log_prob,
+		 token->token_path->dll + ac_log_prob, updated_token.depth,
 		 token->token_path);
 		 new_token->token_path->link();*/
 		/*new_token->token_path = token->token_path;
 		 new_token->token_path->link();*/
+	}
+}
+
+void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
+{
+	if (m_fsa_lm) {
+		if (token.node->word_id != m_sentence_start_id) {
+			token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
+					token.lm_history->lm_id, &token.lm_log_prob);
+			token.lm_log_prob += m_insertion_penalty;
+		}
+	}
+	else {
+		token.lm_hist_code = compute_lm_hist_hash_code(token.lm_history);
+
+		if (token.node->word_id != m_sentence_start_id) {
+			token.lm_log_prob += get_lm_score(token.lm_history,
+					token.lm_hist_code) + m_insertion_penalty;
+		}
 	}
 }
 
@@ -1254,7 +1256,7 @@ inline bool TokenPassSearch::is_similar_lm_history(
 	return true; // Similar word histories up to m_similar_lm_hist_span words
 }
 
-int TokenPassSearch::compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh)
+int TokenPassSearch::compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh) const
 {
 	unsigned int code = 0;
 
