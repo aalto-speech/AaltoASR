@@ -1,8 +1,11 @@
 // Conversion of words to word indices and vice versa.
-#include <errno.h>
+#include <cerrno>
+
 #include "misc/io.hh"
 #include "Vocabulary.hh"
 #include "misc/str.hh"
+
+using namespace std;
 
 Vocabulary::Vocabulary()
 {
@@ -27,6 +30,7 @@ Vocabulary::add_word(const std::string &word)
   int index = m_words.size();
   m_indices[word] = index;
   m_words.push_back(word);
+
   return index;
 }
 
