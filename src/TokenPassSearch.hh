@@ -401,7 +401,24 @@ private:
 	bool is_similar_lm_history(TPLexPrefixTree::LMHistory *wh1,
 			TPLexPrefixTree::LMHistory *wh2);
 	int compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh) const;
+
+	/// \brief Add at most \a words_needed words from \a history to m_history_ngram.
+	/// The number of words added is smaller if a word with ID -1 or a sentence start
+	/// is encountered sooner.
+	///
+	/// Starts from the final word of \a history. If it's a multiword, selects the
+	/// part with index \a index_in_multiword.
+	///
+	void add_to_history_ngram(
+			TPLexPrefixTree::LMHistory * history,
+			int index_in_multiword,
+			int words_needed);
+
+	/// \brief Collects words from the LM history into an n-gram and returns its
+	/// language model probability.
+	///
 	float compute_lm_log_prob(TPLexPrefixTree::LMHistory *lm_hist);
+
 	float get_lm_score(TPLexPrefixTree::LMHistory *lm_hist, int lm_hist_code);
 	float get_lm_lookahead_score(TPLexPrefixTree::LMHistory *lm_hist,
 			TPLexPrefixTree::Node *node, int depth);
@@ -485,12 +502,22 @@ private:
 	std::vector<WordGraphInfo> m_recent_word_graph_info;
 	TPLexPrefixTree::Token *m_best_final_token;
 
-	// Ngram
+	/// The language model.
 	TreeGram *m_ngram;
 	fsalm::LM *m_fsa_lm;
+
+	/// A mapping between word IDs in the dictionary and word IDs in the LM.
 	std::vector<int> m_lex2lm;
+
+#ifdef ENABLE_MULTIWORDS
+	/// A mapping from a multiword in the dictionary to each of its elements in the LM.
+	std::vector< std::vector<int> > m_multiword_lex2lm;
+#endif
+
+	/// A mapping between word IDs in the dictionary and word IDs in the lookahead LM.
 	std::vector<int> m_lex2lookaheadlm;
-	TreeGram::Gram m_history_lm; // Temporary variable
+
+	TreeGram::Gram m_history_ngram; // Temporary variable used by compute_lm_log_prob().
 	TreeGram *m_lookahead_ngram;
 
 	// Options

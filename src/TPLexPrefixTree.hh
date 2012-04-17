@@ -51,16 +51,54 @@ public:
   typedef std::vector<Node *> node_vector;
   typedef std::map<std::string, node_vector> string_to_nodes_map;
 
-  struct LMHistory {
-    inline LMHistory(int word_id, int lm_id, LMHistory *previous);
+  class LMHistoryWord {
+  public:
+    LMHistoryWord(int word_id, int lm_id);
 
-    int word_id;
-    int lm_id; // Word ID in LM
+    /// \brief Return the word ID in the dictionary.
+    int word_id() const { return m_word_id; }
+
+    /// \brief Return the word ID in the language model.
+    int lm_id() const { return m_lm_id; }
+
+#ifdef ENABLE_MULTIWORDS
+    /// \brief Set the language model word ID of each element of a multiword.
+    void set_element_lm_ids(const std::vector<int> & x);
+
+    /// \brief Return the number of elements in a multiword (1 for regular words).
+    int num_elements() const { return m_element_lm_ids.size(); }
+
+    /// \brief Return the word ID of element \a index in the language model.
+    int element_lm_id(int index) const { return m_element_lm_ids[index]; }
+#endif
+
+  private:
+    /// Word ID in the dictionary.
+    int m_word_id;
+
+    /// Word ID in the language model.
+    int m_lm_id;
+
+#ifdef ENABLE_MULTIWORDS
+    /// Word IDs in the language model of the individual words.
+    std::vector<int> m_element_lm_ids;
+#endif
+  };
+
+  struct LMHistory {
+    LMHistory(const LMHistoryWord & last_word, LMHistory  *previous);
+
+    const LMHistoryWord & last() const { return m_last_word; }
+
+  public:
     LMHistory *previous;
     int reference_count;
     bool printed;
     int word_start_frame;
     int word_first_silence_frame; // "end frame", initialized to -1
+
+  private:
+    LMHistoryWord m_last_word;
   };
 
   struct WordHistory {
@@ -298,15 +336,29 @@ private:
 
 //////////////////////////////////////////////////////////////////////
 
-TPLexPrefixTree::LMHistory::LMHistory(int word_id, int lm_id,
-                                          class LMHistory *previous)
-  : word_id(word_id),
-    lm_id(lm_id),
-    previous(previous),
+inline TPLexPrefixTree::LMHistoryWord::LMHistoryWord(int word_id_arg, int lm_id_arg)
+  : m_word_id(word_id_arg), m_lm_id(lm_id_arg)
+{
+#ifdef ENABLE_MULTIWORDS
+  m_element_lm_ids.push_back(lm_id_arg);
+#endif
+}
+
+#ifdef ENABLE_MULTIWORDS
+inline void TPLexPrefixTree::LMHistoryWord::set_element_lm_ids(const std::vector<int> & x)
+{
+  m_element_lm_ids = x;
+}
+#endif
+
+inline TPLexPrefixTree::LMHistory::LMHistory(const LMHistoryWord & last_word,
+                                           class LMHistory * previous)
+  : previous(previous),
     reference_count(0),
     printed(false),
     word_start_frame(0),
-    word_first_silence_frame(-1)
+    word_first_silence_frame(-1),
+    m_last_word(last_word)
 {
   if (previous)
     hist::link(previous);
