@@ -68,8 +68,12 @@ public:
   };
 
 protected:
+  /// Mapping from phones (triphones) to HMM indices.
   std::map<std::string,int> &m_hmm_map;
+
+  /// The HMMs.
   std::vector<Hmm> &m_hmms;
+
   TPLexPrefixTree &m_lexicon;
   Vocabulary &m_vocabulary;
   int m_line_no;
