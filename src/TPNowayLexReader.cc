@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <cstdio>
 
 #include <assert.h>
 #include <math.h>
@@ -99,13 +99,12 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
     // Parse possible probability
     int left = m_word.rfind('(');
     int right = m_word.rfind(')');
-    float prob = 1;
     if (left != -1 || right != -1) {
       if (left == -1 || right == -1)
 	throw InvalidProbability();
       string tmp = m_word.substr(left + 1, right - left - 1);
       char *end_ptr;
-      prob = strtod(tmp.c_str(), &end_ptr);
+      strtod(tmp.c_str(), &end_ptr);
       if (*end_ptr != '\0')
 	throw InvalidProbability();
       m_word.resize(left);
