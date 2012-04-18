@@ -1489,8 +1489,10 @@ int TokenPassSearch::set_ngram(TreeGram *ngram)
 	m_ngram = ngram;
 	m_lex2lm.clear();
 	m_lex2lm.resize(m_vocabulary.num_words());
+#ifdef ENABLE_MULTIWORDS
 	m_multiword_lex2lm.clear();
 	m_multiword_lex2lm.resize(m_vocabulary.num_words());
+#endif
 
 	for (int i = 0; i < m_vocabulary.num_words(); i++) {
 		// Create a mapping between the lexicon and the language model.
@@ -1586,7 +1588,7 @@ void TokenPassSearch::add_to_history_ngram(
 		}
 		words_needed -= words_added;
 #else
-		m_history_ngram.push_front(history->lm_id);
+		m_history_ngram.push_front(history->last().lm_id());
 		--words_needed;
 #endif
 
