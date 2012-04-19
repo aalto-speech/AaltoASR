@@ -403,15 +403,17 @@ private:
 	int compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh) const;
 
 	/// \brief Add at most \a words_needed words from \a history to m_history_ngram.
-	/// The number of words added is smaller if a word with ID -1 or a sentence start
-	/// is encountered sooner.
+	/// The number of words added is smaller if history or sentence start is
+	/// encountered sooner.
 	///
-	/// Starts from the final word of \a history. If it's a multiword, selects the
-	/// part with index \a index_in_multiword.
+	/// The last word will be the final word of \a history. If it's a multiword,
+	/// \a final_elements specifies how many of its elements will be considered.
+	/// This is needed to be able to compile a history that ends in any of the
+	/// elements of a final multiword.
 	///
 	void add_to_history_ngram(
 			TPLexPrefixTree::LMHistory * history,
-			int index_in_multiword,
+			int final_elements,
 			int words_needed);
 
 	/// \brief Collects words from the LM history into an n-gram and returns its

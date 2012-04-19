@@ -1574,19 +1574,25 @@ int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
 
 void TokenPassSearch::add_to_history_ngram(
 		TPLexPrefixTree::LMHistory * history,
-		int index_in_multiword,
+		int final_elements,
 		int words_needed)
 {
 	while (words_needed > 0) {
 		if (history->last().word_id() == -1)
-			return;
+			return;  // Reached the beginning of the history.
 
 #ifdef ENABLE_MULTIWORDS
-		int words_added = min(words_needed, history->last().num_elements());
-		for (int i = 0; i < words_added; ++i) {
+		int end = history->last().num_elements();  // One past the last index.
+		if (final_elements >= 0) {
+			end = min(end, final_elements);
+			final_elements = -1;
+		}
+		int begin = max(end - words_needed, 0);
+		// Add elements in reverse order to the beginning of the n-gram.
+		for (int i = end - 1; i > begin - 1; --i) {
 			m_history_ngram.push_front(history->last().element_lm_id(i));
 		}
-		words_needed -= words_added;
+		words_needed -= end - begin;
 #else
 		m_history_ngram.push_front(history->last().lm_id());
 		--words_needed;
@@ -1612,11 +1618,11 @@ float TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::LMHistory * history)
 #else
 		int num_elements = 1;
 #endif
-		for (int i = 0; i < num_elements; ++i) {
+		for (int final_elements = 1; final_elements <= num_elements; ++final_elements) {
 			// Create an n-gram, where n is the model order, from the LM history,
 			// ending at part i of the multiword.
 			m_history_ngram.clear();
-			add_to_history_ngram(history, i, m_ngram->order());
+			add_to_history_ngram(history, final_elements, m_ngram->order());
 			result += m_ngram->log_prob(m_history_ngram);
 		}
 	}
