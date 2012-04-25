@@ -170,7 +170,7 @@ for (my $i = 1; $i <= $sub_batches; $i++) {
     generate_numerator_hmmnets($rinfo, $full_temp_path) if ($opt_hash{'n'});
     generate_denumerator_hmmnets($rinfo, $full_temp_path) if ($opt_hash{'d'});
 
-    # Delete temporary files
+    print STDERR "Removing temporary files from $full_temp_path.\n";
     for my $record (@$rinfo) {
       system("rm -f $full_temp_path/".$record->{target}.".*");
       if (!$opt_hash{'k'}) {
@@ -466,6 +466,7 @@ sub generate_denumerator_hmmnets {
   my $rinfo = shift(@_);
   my $temp_dir = shift(@_);
 
+  print STDERR "Generating numerator HMM networks.\n";
   for my $record (@$rinfo) {
     system("fst_project e e $temp_dir/".$record->{target}.".fst - | ${script_dir}negate_fst_weights.pl | fst_optimize -A - $temp_dir/".$record->{target}.".weight.fst") && die "system error $7\n";
 
