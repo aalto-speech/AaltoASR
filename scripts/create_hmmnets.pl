@@ -372,6 +372,8 @@ sub check_wg_file {
 sub generate_transcript_fsts {
   my $rinfo = shift(@_);
   my $temp_dir = shift(@_);
+  
+  print STDERR "Converting transcriptions into FSTs.\n";
 
   my $orig_dir;
   chomp($orig_dir = `pwd`);
@@ -430,6 +432,8 @@ sub generate_transcript_fsts {
 sub numerator_hmmnets_from_phns {
   my $rinfo = shift(@_);
 
+  print STDERR "Generating numerator hmmnets from phns.\n";
+  
   die "Acoustic model required" if (!(defined $ac_model));
 
   for my $record (@$rinfo) {
