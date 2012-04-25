@@ -450,7 +450,9 @@ sub generate_numerator_hmmnets {
   my $rinfo = shift(@_);
   my $temp_dir = shift(@_);
 
+  print STDERR "Generating numerator HMM networks.\n";
   for my $record (@$rinfo) {
+    print STDERR "".$record->{num}."\n";
     if (system("fst_clear_weights $temp_dir/".$record->{target}.".fst - | $WORDS_TO_HMMNET > ".$record->{num})) {
       print STDERR "Transcription FST operations failed for ".$record->{num}."\n";
       print STDERR "(maybe OOV words in transcription?)\n";
