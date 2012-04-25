@@ -373,12 +373,11 @@ sub generate_transcript_fsts {
   my $rinfo = shift(@_);
   my $temp_dir = shift(@_);
   
-  print STDERR "Converting transcriptions into FSTs.\n";
-
   my $orig_dir;
   chomp($orig_dir = `pwd`);
   chdir($temp_dir) || die "Could not change to directory $temp_dir";
 
+  print STDERR "Converting transcriptions into lattices.\n";
   my $fh;
   open $fh, "> temp.list";
   for my $record (@$rinfo) {
@@ -409,6 +408,7 @@ sub generate_transcript_fsts {
 
   my $temp_out_dir = ".";
   if (defined $lm_model) {
+    print STDERR "Rescoring lattices.\n";
     my $cur_lm_model = $lm_model;
     $cur_lm_model = $orig_dir."/".$cur_lm_model if (!(-e $cur_lm_model));
     $temp_out_dir = "out";
@@ -417,6 +417,7 @@ sub generate_transcript_fsts {
     system("$LATTICE_RESCORE -l $cur_lm_model -I temp.list -O $temp_out_dir") && die "Transcription lattice rescoring failed\n";
   }
 
+  print STDERR "Converting lattices into FSTs.\n";
   for my $record (@$rinfo) {
     system("$HTK2FST $temp_out_dir/".$record->{target}.".tmptr | fst_nbest -t -1000 -n 1 -p - - | perl -npe \'s/<\\/s>/,/g;\' | fst_optimize -A - ".$record->{target}.".fst") && die "Transcription FST generation failed\n";
   }
@@ -432,10 +433,9 @@ sub generate_transcript_fsts {
 sub numerator_hmmnets_from_phns {
   my $rinfo = shift(@_);
 
-  print STDERR "Generating numerator hmmnets from phns.\n";
-  
   die "Acoustic model required" if (!(defined $ac_model));
 
+  print STDERR "Generating numerator HMM networks from phns.\n";
   for my $record (@$rinfo) {
     print STDERR "".$record->{transcript}."\n";
     if (system("$PHN2FST $ac_model.ph ".$record->{transcript}." > ".$record->{num})) {
