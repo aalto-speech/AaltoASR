@@ -869,7 +869,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 			updated_token.am_log_prob += duration_log_prob;
 		}
 
-		// Create word history structure for word graph
+		// When the token moves to the first state of the next word, update word_history
+		// structure (for word graph) from lm_history.
 		if (m_generate_word_graph && (updated_token.node->flags & NODE_FIRST_STATE_OF_WORD)) {
 			// Add symbol from the LMHistory
 			updated_token.word_history = new TPLexPrefixTree::WordHistory(
@@ -1506,15 +1507,15 @@ int TokenPassSearch::set_ngram(TreeGram *ngram)
 
 #ifdef ENABLE_MULTIWORDS
 		// Create a mapping from each part of a multiword to the language model.
-		string::const_iterator part_first = word.begin();
+		string::const_iterator element_first = word.begin();
 		while (true) {
-			string::const_iterator part_last = find(part_first, word.end(), '_');
-			int part_lm_id = m_ngram->word_index(string(part_first, part_last));
-			m_multiword_lex2lm[i].push_back(part_lm_id);
-			if (part_last == word.end())
+			string::const_iterator element_last = find(element_first, word.end(), '_');
+			int element_lm_id = m_ngram->word_index(string(element_first, element_last));
+			m_multiword_lex2lm[i].push_back(element_lm_id);
+			if (element_last == word.end())
 				break;
-			part_first = part_last;
-			++part_first;  // Skip the underscore we found last time.
+			element_first = element_last;
+			++element_first;  // Skip the underscore we found last time.
 		}
 #endif
 	}
@@ -2163,7 +2164,7 @@ void TokenPassSearch::write_word_graph(FILE *file)
 	int arc_count = 0;
 	for (int n = 0; n < word_graph.nodes.size(); n++) {
 
-		// Print reachable nodes
+		// Consider only reachable nodes
 		WordGraph::Node &node = word_graph.nodes[n];
 		if (!node.reachable)
 			continue;
