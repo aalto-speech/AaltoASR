@@ -171,13 +171,13 @@ for (my $i = 1; $i <= $sub_batches; $i++) {
     generate_denumerator_hmmnets($rinfo, $full_temp_path) if ($opt_hash{'d'});
 
     print STDERR "Removing temporary files from $full_temp_path.\n";
-    for my $record (@$rinfo) {
-      system("rm -f $full_temp_path/".$record->{target}.".*");
-      if (!$opt_hash{'k'}) {
-        # Remove word graph files
+    if (!$opt_hash{'k'}) {
+      # Remove word graph files
+      for my $record (@$rinfo) {
         unlink($record->{wg});
       }
     }
+    system("rm -rf $full_temp_path");
   }
 }
 
