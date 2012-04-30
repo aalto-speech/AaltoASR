@@ -3,9 +3,10 @@
 
 #include <cstddef>  // NULL
 #include <vector>
-#include <assert.h>
+#include <cassert>
 #include <cmath>
 
+#include "config.hh"
 #include "HashCache.hh"
 #include "SimpleHashCache.hh"
 

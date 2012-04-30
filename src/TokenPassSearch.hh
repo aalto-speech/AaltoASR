@@ -2,7 +2,9 @@
 #define TOKENPASSSEARCH_HH
 
 #include <stdexcept>
+#include <vector>
 
+#include "config.hh"
 #include "fsalm/LM.hh"
 #include "WordGraph.hh"
 #include "TPLexPrefixTree.hh"

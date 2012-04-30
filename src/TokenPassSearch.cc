@@ -2,8 +2,9 @@
 #include <cstddef>  // NULL
 #include <sstream>
 #include <stdexcept>
-#include <stdio.h>
-#include <math.h>
+#include <cstdio>
+#include <cmath>
+
 #include "TokenPassSearch.hh"
 
 #define NUM_HISTOGRAM_BINS 100
