@@ -127,7 +127,9 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
 
 		if (i == hmm_list.size() - 1) // Last node
 		{
-			if (m_cross_word_triphones && !silence) {
+			// Added a check that the last phone is a triphone (size == 3).
+			//   2012-05-07 / SE
+			if (m_cross_word_triphones && !silence && (hmm_list[i]->label.size() == 3)) {
 				// Link to cross word network.
 				// First, add a null node with the word ID.
 				Node *wid_node = new Node(word_id);
