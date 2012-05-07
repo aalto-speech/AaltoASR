@@ -127,9 +127,9 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
 
 		if (i == hmm_list.size() - 1) // Last node
 		{
-			// Added a check that the last phone is a triphone (size == 3).
+			// Added a check that the last phone is a triphone (label is five characters).
 			//   2012-05-07 / SE
-			if (m_cross_word_triphones && !silence && (hmm_list[i]->label.size() == 3)) {
+			if (m_cross_word_triphones && !silence && (hmm_list[i]->label.size() == 5)) {
 				// Link to cross word network.
 				// First, add a null node with the word ID.
 				Node *wid_node = new Node(word_id);
@@ -161,8 +161,10 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
 					add_single_hmm_word_for_cross_word_modeling(hmm_list[0],
 							word_id);
 				}
-				else if (i == 1) {
-					// Word has two HMM states, mark the null node as a connection
+				// Added a check that the first phone is a triphone (label is five characters).
+				//   2012-05-07 / SE
+				else if ((i == 1) && (hmm_list[0]->label.size() == 5)) {
+					// Word has two HMMs, mark the null node as a connection
 					// point for linking from cross word network
 					add_fan_in_connection_node(wid_node, hmm_list[0]->label);
 				}
@@ -192,7 +194,9 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
 			}
 		}
 
-		if (m_cross_word_triphones && i == 1 && hmm_list.size() > 2) {
+		// Added a check that the first phone is a triphone (label is five characters).
+		//   2012-05-07 / SE
+		if (m_cross_word_triphones && (i == 1) && (hmm_list.size() > 2) && (hmm_list[0]->label.size() == 5)) {
 			// Mark the state for linking cross word network back to the
 			// lexical tree.
 			add_fan_in_connection_node(hmm_state_nodes[0], hmm_list[0]->label);
