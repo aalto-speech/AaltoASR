@@ -197,6 +197,10 @@ public:
 	{
 		m_max_num_tokens = tokens;
 	}
+	void set_split_multiwords(bool value)
+	{
+		m_split_multiwords = value;
+	}
 	void set_print_probs(bool value)
 	{
 		m_print_probs = value;
@@ -404,24 +408,46 @@ private:
 			TPLexPrefixTree::LMHistory *wh2);
 	int compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh) const;
 
-	/// \brief Add at most \a words_needed words from \a history to m_history_ngram.
-	/// The number of words added is smaller if history or sentence start is
-	/// encountered sooner.
+#ifdef ENABLE_MULTIWORD_SUPPORT
+	/// \brief Creates m_history_ngram from at most \a words_needed words from
+	/// \a history. The number of words added is smaller if the beginning of
+	/// history is reached sooner, or a sentence start is encountered.
 	///
 	/// The last word will be the final word of \a history. If it's a multiword,
-	/// \a final_elements specifies how many of its elements will be considered.
-	/// This is needed to be able to compile a history that ends in any of the
-	/// elements of a final multiword.
+	/// \a final_components specifies how many of its components will be
+	/// considered. This is needed to be able to compile a history that ends in
+	/// any of the components of a final multiword.
 	///
-	void add_to_history_ngram(
+	void split_and_create_history_ngram(
 			TPLexPrefixTree::LMHistory * history,
-			int final_elements,
+			int final_components,
 			int words_needed);
 
 	/// \brief Collects words from the LM history into an n-gram and returns its
 	/// language model probability.
 	///
-	float compute_lm_log_prob(TPLexPrefixTree::LMHistory *lm_hist);
+	/// Splits multiwords into their components, and if the last word is a
+	/// multiword, sums the LM log probs of each component, since LM
+	/// probabilities are not applied until the whole multiword has been
+	/// decoded.
+	///
+	float split_and_compute_lm_log_prob(
+			TPLexPrefixTree::LMHistory * history);
+#endif
+
+	/// \brief Creates m_history_ngram from at most \a words_needed words from
+	/// \a history. The last word will be the final word of \a history. The
+	/// number of words added is smaller if the beginning of history is reached
+	/// sooner, or a sentence start is encountered.
+	///
+	void create_history_ngram(
+			TPLexPrefixTree::LMHistory * history,
+			int words_needed);
+
+	/// \brief Collects words from the LM history into an n-gram and returns its
+	/// language model probability.
+	///
+	float compute_lm_log_prob(TPLexPrefixTree::LMHistory * history);
 
 	float get_lm_score(TPLexPrefixTree::LMHistory *lm_hist, int lm_hist_code);
 	float get_lm_lookahead_score(TPLexPrefixTree::LMHistory *lm_hist,
@@ -513,9 +539,14 @@ private:
 	/// A mapping between word IDs in the dictionary and word IDs in the LM.
 	std::vector<int> m_lex2lm;
 
-#ifdef ENABLE_MULTIWORDS
-	/// A mapping from a multiword in the dictionary to each of its elements in the LM.
+#ifdef ENABLE_MULTIWORD_SUPPORT
+	/// A mapping from a multiword in the dictionary to each of its components
+	/// in the LM.
 	std::vector< std::vector<int> > m_multiword_lex2lm;
+
+	/// Should the decoder split multiwords into their components before
+	/// computing LM probabilities?
+	bool m_split_multiwords;
 #endif
 
 	/// A mapping between word IDs in the dictionary and word IDs in the lookahead LM.

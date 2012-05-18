@@ -790,8 +790,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				// Add the word to lm_history.
 				assert(updated_token.word_start_frame >= 0);
 				TPLexPrefixTree::LMHistoryWord word(word_id, m_lex2lm[word_id]);
-#ifdef ENABLE_MULTIWORDS
-				word.set_element_lm_ids(m_multiword_lex2lm[word_id]);
+#ifdef ENABLE_MULTIWORD_SUPPORT
+				word.set_component_lm_ids(m_multiword_lex2lm[word_id]);
 #endif
 				updated_token.lm_history = new TPLexPrefixTree::LMHistory(word, token->lm_history);
 				updated_token.lm_history->word_start_frame = updated_token.word_start_frame;
@@ -1491,7 +1491,7 @@ int TokenPassSearch::set_ngram(TreeGram *ngram)
 	m_ngram = ngram;
 	m_lex2lm.clear();
 	m_lex2lm.resize(m_vocabulary.num_words());
-#ifdef ENABLE_MULTIWORDS
+#ifdef ENABLE_MULTIWORD_SUPPORT
 	m_multiword_lex2lm.clear();
 	m_multiword_lex2lm.resize(m_vocabulary.num_words());
 #endif
@@ -1506,17 +1506,20 @@ int TokenPassSearch::set_ngram(TreeGram *ngram)
 			count++;
 		}
 
-#ifdef ENABLE_MULTIWORDS
-		// Create a mapping from each part of a multiword to the language model.
-		string::const_iterator element_first = word.begin();
+#ifdef ENABLE_MULTIWORD_SUPPORT
+		// Create a mapping from each component of a multiword to the language
+		// model.
+		string::const_iterator component_first = word.begin();
 		while (true) {
-			string::const_iterator element_last = find(element_first, word.end(), '_');
-			int element_lm_id = m_ngram->word_index(string(element_first, element_last));
-			m_multiword_lex2lm[i].push_back(element_lm_id);
-			if (element_last == word.end())
+			string::const_iterator component_last =
+					find(component_first, word.end(), '_');
+			int component_lm_id =
+					m_ngram->word_index(string(component_first, component_last));
+			m_multiword_lex2lm[i].push_back(component_lm_id);
+			if (component_last == word.end())
 				break;
-			element_first = element_last;
-			++element_first;  // Skip the underscore we found last time.
+			component_first = component_last;
+			++component_first;  // Skip the underscore we found last time.
 		}
 #endif
 	}
@@ -1574,31 +1577,68 @@ int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
 	return count;
 }
 
-void TokenPassSearch::add_to_history_ngram(
+#ifdef ENABLE_MULTIWORD_SUPPORT
+void TokenPassSearch::split_and_create_history_ngram(
 		TPLexPrefixTree::LMHistory * history,
-		int final_elements,
+		int final_components,
 		int words_needed)
 {
+	m_history_ngram.clear();
+
 	while (words_needed > 0) {
 		if (history->last().word_id() == -1)
 			return;  // Reached the beginning of the history.
 
-#ifdef ENABLE_MULTIWORDS
-		int end = history->last().num_elements();  // One past the last index.
-		if (final_elements >= 0) {
-			end = min(end, final_elements);
-			final_elements = -1;
+		int end = history->last().num_components();  // One past the last index.
+		if (final_components >= 0) {
+			end = min(end, final_components);
+			final_components = -1;
 		}
 		int begin = max(end - words_needed, 0);
 		// Add elements in reverse order to the beginning of the n-gram.
 		for (int i = end - 1; i > begin - 1; --i) {
-			m_history_ngram.push_front(history->last().element_lm_id(i));
+			m_history_ngram.push_front(history->last().component_lm_id(i));
 		}
 		words_needed -= end - begin;
-#else
+
+		if (history->last().word_id() == m_sentence_start_id)
+			return;
+
+		history = history->previous;
+	}
+}
+
+float TokenPassSearch::split_and_compute_lm_log_prob(TPLexPrefixTree::LMHistory * history)
+{
+	float result = 0;
+
+	int num_components = history->last().num_components();
+	int final_components = 1;
+	for (; final_components <= num_components; ++final_components) {
+		// Create an n-gram, where n is the model order, from the LM history, so
+		// that the last final_components words are components of the
+		// history->last() multiword. If history->last() is not a multiword,
+		// final_components equals to 1.
+		split_and_create_history_ngram(history, final_components, m_ngram->order());
+		result += m_ngram->log_prob(m_history_ngram);
+	}
+
+	return result;
+}
+#endif
+
+void TokenPassSearch::create_history_ngram(
+		TPLexPrefixTree::LMHistory * history,
+		int words_needed)
+{
+	m_history_ngram.clear();
+
+	while (words_needed > 0) {
+		if (history->last().word_id() == -1)
+			return;  // Reached the beginning of the history.
+
 		m_history_ngram.push_front(history->last().lm_id());
 		--words_needed;
-#endif
 
 		if (history->last().word_id() == m_sentence_start_id)
 			return;
@@ -1609,27 +1649,22 @@ void TokenPassSearch::add_to_history_ngram(
 
 float TokenPassSearch::compute_lm_log_prob(TPLexPrefixTree::LMHistory * history)
 {
-	float result = 0;
-
-	if (m_ngram->order() > 0) {
-#ifdef ENABLE_MULTIWORDS
-		// If the last word is a multiword, we need to sum the LM log probs of each
-		// word, since LM probabilities are not applied until the whole multiword has
-		// been decoded.
-		int num_elements = history->last().num_elements();
-#else
-		int num_elements = 1;
-#endif
-		for (int final_elements = 1; final_elements <= num_elements; ++final_elements) {
-			// Create an n-gram, where n is the model order, from the LM history,
-			// ending at part i of the multiword.
-			m_history_ngram.clear();
-			add_to_history_ngram(history, final_elements, m_ngram->order());
-			result += m_ngram->log_prob(m_history_ngram);
-		}
+	if (m_ngram->order() <= 0) {
+		return 0;
 	}
 
-	return result;
+#ifdef ENABLE_MULTIWORD_SUPPORT
+	if (m_split_multiwords) {
+		return split_and_compute_lm_log_prob(history);
+	}
+	else {
+		create_history_ngram(history, m_ngram->order());
+		return m_ngram->log_prob(m_history_ngram);
+	}
+#else
+	create_history_ngram(history, m_ngram->order());
+	return m_ngram->log_prob(m_history_ngram);
+#endif
 }
 
 float TokenPassSearch::get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,

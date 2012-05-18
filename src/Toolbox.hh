@@ -181,6 +181,7 @@ public:
   void set_tp_state_beam(float beam) { m_tp_search.set_state_beam(beam); }
   void set_max_state_duration(int duration) 
   { m_expander.set_max_state_duration(duration); }
+  void set_split_multiwords(bool b) { m_tp_search.set_split_multiwords(b); }
 
   /// \brief Enables or disables lookahead language model.
   ///

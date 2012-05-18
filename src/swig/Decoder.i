@@ -171,6 +171,7 @@ public:
 	void set_fan_out_beam(float beam);
 	void set_tp_state_beam(float beam);
   void set_max_state_duration(int duration);
+  void set_split_multiwords(bool b);
   void set_cross_word_triphones(bool cw_triphones);
   void set_silence_is_word(bool b);
 	void set_ignore_case(bool b);		

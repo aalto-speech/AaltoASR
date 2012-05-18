@@ -62,15 +62,18 @@ public:
     /// \brief Return the word ID in the language model.
     int lm_id() const { return m_lm_id; }
 
-#ifdef ENABLE_MULTIWORDS
-    /// \brief Set the language model word ID of each element of a multiword.
-    void set_element_lm_ids(const std::vector<int> & x);
+#ifdef ENABLE_MULTIWORD_SUPPORT
+    /// \brief Sets the language model word ID of each component of a multiword.
+    void set_component_lm_ids(const std::vector<int> & x);
 
-    /// \brief Return the number of elements in a multiword (1 for regular words).
-    int num_elements() const { return m_element_lm_ids.size(); }
+    /// \brief Returns the number of components in a multiword (1 for regular
+    /// words).
+    int num_components() const
+    { return m_component_lm_ids.size(); }
 
-    /// \brief Return the word ID of element \a index in the language model.
-    int element_lm_id(int index) const { return m_element_lm_ids[index]; }
+    /// \brief Returns the word ID of component \a index in the language model.
+    int component_lm_id(int index) const
+    { return m_component_lm_ids[index]; }
 #endif
 
   private:
@@ -80,9 +83,9 @@ public:
     /// Word ID in the language model.
     int m_lm_id;
 
-#ifdef ENABLE_MULTIWORDS
+#ifdef ENABLE_MULTIWORD_SUPPORT
     /// Word IDs in the language model of the individual words.
-    std::vector<int> m_element_lm_ids;
+    std::vector<int> m_component_lm_ids;
 #endif
   };
 
@@ -340,15 +343,16 @@ private:
 inline TPLexPrefixTree::LMHistoryWord::LMHistoryWord(int word_id_arg, int lm_id_arg)
   : m_word_id(word_id_arg), m_lm_id(lm_id_arg)
 {
-#ifdef ENABLE_MULTIWORDS
-  m_element_lm_ids.push_back(lm_id_arg);
+#ifdef ENABLE_MULTIWORD_SUPPORT
+  m_component_lm_ids.push_back(lm_id_arg);
 #endif
 }
 
-#ifdef ENABLE_MULTIWORDS
-inline void TPLexPrefixTree::LMHistoryWord::set_element_lm_ids(const std::vector<int> & x)
+#ifdef ENABLE_MULTIWORD_SUPPORT
+inline void TPLexPrefixTree::LMHistoryWord::set_component_lm_ids(
+		const std::vector<int> & x)
 {
-  m_element_lm_ids = x;
+  m_component_lm_ids = x;
 }
 #endif
 
