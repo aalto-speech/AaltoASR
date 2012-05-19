@@ -557,24 +557,37 @@ TokenPassSearch::get_best_final_token() const
 	if (m_best_final_token != NULL)
 		return *m_best_final_token;
 
-	const TPLexPrefixTree::Token * result = NULL;
+	const TPLexPrefixTree::Token * best_final_token = NULL;
+	const TPLexPrefixTree::Token * best_nonfinal_token = NULL;
 
 	token_list_type::const_iterator iter = m_active_token_list->begin();
 	for (; iter != m_active_token_list->end(); ++iter) {
 		TPLexPrefixTree::Token * token = *iter;
 
-		if (token == NULL)
+		if (token == NULL) {
 			continue;
+		}
 
-		if (!(token->node->flags & NODE_FINAL))
-			continue;
-
-		if (result == NULL || (token->total_log_prob > result->total_log_prob))
-			result = token;
+		if (token->node->flags & NODE_FINAL) {
+			if ((best_final_token == NULL) ||
+					(token->total_log_prob > best_final_token->total_log_prob)) {
+				best_final_token = token;
+			}
+		}
+		else {
+			if ((best_nonfinal_token == NULL) ||
+					(token->total_log_prob > best_nonfinal_token->total_log_prob)) {
+				best_nonfinal_token = token;
+			}
+		}
 	}
 
-	assert(result != NULL);
-	return *result;
+	if (best_final_token != NULL)
+		return *best_final_token;
+	else if (best_nonfinal_token != NULL)
+		return *best_nonfinal_token;
+	else
+		assert(false);
 }
 
 const TPLexPrefixTree::Token &

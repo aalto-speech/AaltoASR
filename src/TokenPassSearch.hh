@@ -348,7 +348,8 @@ private:
 	/// i.e. at the end of a word.
 	///
 	/// \return A reference to the active token in NODE_FINAL state with the
-	/// highest probability.
+	/// highest probability. If non is found, returns the best token not in
+	/// NODE_FINAL state.
 	///
 	const TPLexPrefixTree::Token & get_best_final_token() const;
 
