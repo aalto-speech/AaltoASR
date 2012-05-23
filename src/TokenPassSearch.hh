@@ -348,7 +348,7 @@ private:
 	/// i.e. at the end of a word.
 	///
 	/// \return A reference to the active token in NODE_FINAL state with the
-	/// highest probability. If non is found, returns the best token not in
+	/// highest probability. If none is found, returns the best token not in
 	/// NODE_FINAL state.
 	///
 	const TPLexPrefixTree::Token & get_best_final_token() const;
@@ -364,7 +364,15 @@ private:
 	///
 	void propagate_tokens(void);
 
+	/// \brief Adds the sentence end symbol to every token.
+	///
+	/// Adds sentence end to the LMHistory of every token, and to the
+	/// WordHistory of every token that is in a final node. If there are no
+	/// tokens in a final node, LMHistory will have sentence end, but
+	/// WordHistory will not.
+	///
 	void update_final_tokens();
+
 	void copy_word_graph_info(TPLexPrefixTree::Token *src_token,
 			TPLexPrefixTree::Token *tgt_token);
 	void build_word_graph_aux(TPLexPrefixTree::Token *new_token,

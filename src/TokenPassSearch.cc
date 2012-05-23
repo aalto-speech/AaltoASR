@@ -582,12 +582,16 @@ TokenPassSearch::get_best_final_token() const
 		}
 	}
 
-	if (best_final_token != NULL)
+	if (best_final_token != NULL) {
 		return *best_final_token;
-	else if (best_nonfinal_token != NULL)
+	}
+	else if (best_nonfinal_token != NULL) {
+		fprintf(stderr, "WARNING: No tokens in final nodes. The result will be incomplete. Try increasing beam.\n");
 		return *best_nonfinal_token;
-	else
+	}
+	else {
 		assert(false);
+	}
 }
 
 const TPLexPrefixTree::Token &
@@ -1974,20 +1978,20 @@ void TokenPassSearch::update_final_tokens()
 
 	// Add the sentence end symbol to the tokens in the final nodes.
 
-	// FIXME: this is quite a hack, because WordHistory is normally
-	// updated using the LMHistory, when then token moves to the first
-	// state of the next word.  Thus, the tokens in the final nodes do
-	// not have the current word in their word histories.
-
 	m_best_final_token = NULL;
 	for (int i = 0; i < m_active_token_list->size(); i++) {
 		TPLexPrefixTree::Token *token = m_active_token_list->at(i);
 		if (token == NULL)
 			continue;
 
+		// For tokens in a final node, update the last word from LMHistory to
+		// WordHistory.
+		//
+		// FIXME: this is quite a hack, because WordHistory is normally updated
+		// using LMHistory, when token moves to the first state of the next
+		// word. Thus, tokens that are in a final node do not have the current
+		// word in their word histories.
 		if (m_generate_word_graph && token->node->flags & NODE_FINAL) {
-
-			// Update the last word from the LMHistory to the word history.
 			token->word_history = new TPLexPrefixTree::WordHistory(
 					token->lm_history->last().word_id(), m_frame, token->word_history);
 			token->word_history->lex_node_id = token->node->node_id;
@@ -2003,7 +2007,7 @@ void TokenPassSearch::update_final_tokens()
 			build_word_graph(token);
 		}
 
-		// Add sentence end in LMHistory
+		// Add sentence end in LMHistory.
 		TPLexPrefixTree::LMHistoryWord sentence_end(m_sentence_end_id, m_sentence_end_lm_id);
 		token->lm_history = new TPLexPrefixTree::LMHistory(sentence_end, token->lm_history);
 		token->lm_history->word_start_frame = m_frame;
@@ -2023,12 +2027,12 @@ void TokenPassSearch::update_final_tokens()
 		token->total_log_prob = get_token_log_prob(token->am_log_prob,
 				token->lm_log_prob);
 
+		// For tokens in a final node, add sentence end also in WordHistory.
 		if (m_generate_word_graph && token->node->flags & NODE_FINAL) {
 			if (m_best_final_token == NULL || token->total_log_prob
 					> m_best_final_token->total_log_prob)
 				m_best_final_token = token;
 
-			// Add sentence end also in WordHistory
 			token->word_history = new TPLexPrefixTree::WordHistory(
 					token->lm_history->last().word_id(), m_frame, token->word_history);
 			token->word_history->lex_node_id = token->node->node_id;
@@ -2045,9 +2049,6 @@ void TokenPassSearch::update_final_tokens()
 			build_word_graph(token);
 		}
 	}
-
-	if (m_generate_word_graph && m_best_final_token == NULL)
-		fprintf(stderr, "WARNING: no tokens in final nodes!\n");
 }
 
 /*void
