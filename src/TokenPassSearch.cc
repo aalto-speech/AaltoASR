@@ -1199,19 +1199,22 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 
 void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 {
+	const TPLexPrefixTree::LMHistoryWord & word = token.lm_history->last();
+
 	if (m_fsa_lm) {
-		if (token.node->word_id != m_sentence_start_id) {
+		if (word.word_id() != m_sentence_start_id) {
 			token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
-					token.lm_history->last().lm_id(), &token.lm_log_prob);
+					word.lm_id(), &token.lm_log_prob);
 			token.lm_log_prob += m_insertion_penalty;
 		}
 	}
 	else {
 		token.lm_hist_code = compute_lm_hist_hash_code(token.lm_history);
 
-		if (token.node->word_id != m_sentence_start_id) {
+		if (word.word_id() != m_sentence_start_id) {
 			token.lm_log_prob += get_lm_score(token.lm_history,
-					token.lm_hist_code) + m_insertion_penalty;
+					token.lm_hist_code);
+			token.lm_log_prob += m_insertion_penalty;
 		}
 	}
 }

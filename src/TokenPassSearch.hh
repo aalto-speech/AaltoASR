@@ -393,8 +393,8 @@ private:
 	void move_token_to_node(TPLexPrefixTree::Token *token,
 			TPLexPrefixTree::Node *node, float transition_score);
 
-	/// \brief Updated lm_log_prob and lm_hist_code on token after advancing to
-	/// a new node.
+	/// \brief Updated lm_log_prob and lm_hist_code on token after adding a new
+	/// word to the end of its lm_history.
 	///
 	void update_lm_log_prob(TPLexPrefixTree::Token & token);
 
