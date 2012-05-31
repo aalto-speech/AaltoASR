@@ -252,6 +252,10 @@ public:
 	void
 	set_sentence_boundary(const std::string &start, const std::string &end);
 
+	void clear_hesitation_words();
+
+	void add_hesitation_word(const std::string & word);
+
 	/// \brief Sets an n-gram language model.
 	///
 	/// \return The number of vocabulary entries that were not found in the
@@ -382,6 +386,10 @@ private:
 	/// \brief Moves the token towards all the arcs leaving the token's node.
 	///
 	void propagate_token(TPLexPrefixTree::Token *token);
+
+	/// \brief Appends a word to the LMHistory of a token.
+	///
+	void append_to_word_history(TPLexPrefixTree::Token & token, const TPLexPrefixTree::LMHistoryWord & word);
 
 	/// \brief Moves token to a connected node.
 	///
@@ -588,6 +596,7 @@ private:
 	int m_sentence_start_lm_id;
 	int m_sentence_end_id;
 	int m_sentence_end_lm_id;
+	std::vector<int> m_hesitation_ids;
 	bool m_use_sentence_boundary;
 	bool m_generate_word_graph;
 	bool m_require_sentence_end;
