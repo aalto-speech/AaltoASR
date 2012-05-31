@@ -105,18 +105,18 @@ void TokenPassSearch::set_sentence_boundary(const std::string &start,
 	m_lexicon.set_sentence_boundary(m_sentence_start_id, m_sentence_end_id);
 
 	//XXX
-	/*m_hesitation_ids.push_back(m_vocabulary.word_index("ah"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("eh"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("er"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("ha"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("hee"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("huh"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("uh"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("um"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("ach"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("eee"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("mm"));
-	m_hesitation_ids.push_back(m_vocabulary.word_index("oof"));*/
+	/*add_hesitation_word("ah");
+	add_hesitation_word("eh");
+	add_hesitation_word("er");
+	add_hesitation_word("ha");
+	add_hesitation_word("hee");
+	add_hesitation_word("huh");
+	add_hesitation_word("uh");
+	add_hesitation_word("um");
+	add_hesitation_word("ach");
+	add_hesitation_word("eee");
+	add_hesitation_word("mm");
+	add_hesitation_word("oof");*/
 	//XXX
 }
 
