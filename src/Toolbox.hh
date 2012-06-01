@@ -224,14 +224,26 @@ public:
   void set_word_boundary(const std::string &word)
   { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_word_boundary = word; }
 
-  void set_sentence_boundary(const std::string &start, const std::string &end) { m_tp_search.set_sentence_boundary(start, end); }
+  void set_sentence_boundary(const std::string &start, const std::string &end)
+  { m_tp_search.set_sentence_boundary(start, end); }
+
+  void clear_hesitation_words()
+  { m_tp_search.clear_hesitation_words(); }
+
+  void add_hesitation_word(const std::string & word)
+  { m_tp_search.add_hesitation_word(word); }
+
   void set_dummy_word_boundaries(bool value)
   { m_search.set_dummy_word_boundaries(value); }
-  void set_require_sentence_end(bool s) { m_tp_search.set_require_sentence_end(s); }
 
-  void set_optional_short_silence(bool state) { m_tp_lexicon.set_optional_short_silence(state); }
+  void set_require_sentence_end(bool s)
+  { m_tp_search.set_require_sentence_end(s); }
 
-  void prune_lm_lookahead_buffers(int min_delta, int max_depth) { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
+  void set_optional_short_silence(bool state)
+  { m_tp_lexicon.set_optional_short_silence(state); }
+
+  void prune_lm_lookahead_buffers(int min_delta, int max_depth)
+  { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
 
   /// \brief If set to true, generates a word graph of the hypotheses during
   /// decoding (requires memory).

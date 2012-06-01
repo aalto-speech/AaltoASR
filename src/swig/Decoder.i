@@ -187,6 +187,8 @@ public:
   void set_multiple_endings(int multiple_endings);
   void set_word_boundary(const std::string &word);
   void set_sentence_boundary(const std::string &start, const std::string &end);
+  void clear_hesitation_words();
+  void add_hesitation_word(const std::string &word);
   void set_dummy_word_boundaries(bool value);
 	void set_generate_word_graph(bool value);
 	void set_use_lm_cache(bool value);
