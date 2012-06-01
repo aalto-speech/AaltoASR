@@ -233,10 +233,17 @@ public:
 	///
 	void set_word_boundary(const std::string &word);
 
+	/// \brief Enables or disables lookahead language model.
+	///
+	/// Can be enabled only before reading the lexicon.
+	///
+	/// \param order 0=None, 1=Only in first subtree nodes, 2=Full.
+	///
 	void set_lm_lookahead(int order)
 	{
 		m_lm_lookahead = order;
 	}
+
 	void set_insertion_penalty(float ip)
 	{
 		m_insertion_penalty = ip;
@@ -469,8 +476,13 @@ private:
 	float get_lm_score(TPLexPrefixTree::LMHistory *lm_hist, int lm_hist_code);
 	float get_lm_lookahead_score(TPLexPrefixTree::LMHistory *lm_hist,
 			TPLexPrefixTree::Node *node, int depth);
+
+	/// \brief Computes bi-gram probabilities for every word pair starting with
+	/// \a prev_word_id using the lookahead LM, and returns the maximum.
+	///
 	float get_lm_bigram_lookahead(int prev_word_id,
 			TPLexPrefixTree::Node *node, int depth);
+
 	float get_lm_trigram_lookahead(int w1, int w2, TPLexPrefixTree::Node *node,
 			int depth);
 
@@ -554,6 +566,7 @@ private:
 	fsalm::LM *m_fsa_lm;
 
 	/// A mapping between word IDs in the dictionary and word IDs in the LM.
+	/// Words that are not in the LM are mapped to 0.
 	std::vector<int> m_lex2lm;
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
@@ -566,7 +579,8 @@ private:
 	bool m_split_multiwords;
 #endif
 
-	/// A mapping between word IDs in the dictionary and word IDs in the lookahead LM.
+	/// A mapping between word IDs in the dictionary and word IDs in the
+	/// lookahead LM. Words that are not in the lookahead LM are mapped to 0.
 	std::vector<int> m_lex2lookaheadlm;
 
 	TreeGram::Gram m_history_ngram; // Temporary variable used by compute_lm_log_prob().

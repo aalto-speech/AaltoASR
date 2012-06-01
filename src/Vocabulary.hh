@@ -28,7 +28,7 @@ public:
   ///
   inline bool is_oov(int index) const { return index == 0; }
 
-  /// \brief Returns the index of the string 'word'.
+  /// \brief Returns the index of \a word, or 0 if not found.
   ///
   inline int word_index(const std::string &word) const;
 

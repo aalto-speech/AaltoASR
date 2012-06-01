@@ -185,7 +185,9 @@ public:
 
   /// \brief Enables or disables lookahead language model.
   ///
-  /// Has to be enabled before lex_read() is called.
+  /// Can be enabled only before reading the lexicon.
+  ///
+  /// \param lmlh 0=None, 1=Only in first subtree nodes, 2=Full.
   ///
   void set_lm_lookahead(int lmlh) { m_tp_lexicon.set_lm_lookahead(lmlh); m_tp_search.set_lm_lookahead(lmlh); }
 

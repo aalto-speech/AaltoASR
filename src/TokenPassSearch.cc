@@ -243,13 +243,13 @@ void TokenPassSearch::reset_search(int start_frame)
 			delete score_list;
 	}
 
-	if (!m_lm_lookahead_initialized && m_lm_lookahead) {
+	if (!m_lm_lookahead_initialized && (m_lm_lookahead > 0)) {
 		lm_lookahead_score_list.set_max_items(m_max_lookahead_score_list_size);
 		m_lexicon.set_lm_lookahead_cache_sizes(m_max_node_lookahead_buffer_size);
 		m_lm_lookahead_initialized = true;
 	}
 
-	if (m_lm_lookahead) {
+	if (m_lm_lookahead > 0) {
 		assert( m_lookahead_ngram != NULL );
 	}
 
@@ -923,14 +923,16 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				}
 			}
 			else {
-				// LM probability not added yet, use previous LM (lookahead) value
-				updated_token.cur_lm_log_prob = token->cur_lm_log_prob;
-
-				if (updated_token.node->possible_word_id_list.size() > 0 && m_lm_lookahead) {
-					// Add language model lookahead
+				// LM probability not updated yet. Use either previous LM
+				// probability or language model lookahead.
+				if ((updated_token.node->possible_word_id_list.size() > 0) &&
+						(m_lm_lookahead > 0)) {
 					updated_token.cur_lm_log_prob = updated_token.lm_log_prob
-							+ get_lm_lookahead_score(token->lm_history, updated_token.node,
-									updated_token.depth);
+							+ get_lm_lookahead_score(token->lm_history,
+									updated_token.node, updated_token.depth);
+				}
+				else {
+					updated_token.cur_lm_log_prob = token->cur_lm_log_prob;
 				}
 			}
 		}
@@ -1843,9 +1845,7 @@ float TokenPassSearch::get_lm_lookahead_score(
 		TPLexPrefixTree::LMHistory *lm_hist, TPLexPrefixTree::Node *node,
 		int depth)
 {
-	int w1, w2;
-
-	w2 = lm_hist->last().word_id();
+	int w2 = lm_hist->last().word_id();  // last word
 	if (w2 == -1 || w2 == m_sentence_end_id)
 		return 0;
 	if (m_lm_lookahead == 1)
@@ -1853,111 +1853,97 @@ float TokenPassSearch::get_lm_lookahead_score(
 
 	if (lm_hist->previous == NULL)
 		return 0;
-	w1 = lm_hist->previous->last().word_id();
+	int w1 = lm_hist->previous->last().word_id();  // the word before last word
 	if (w1 == -1 || w1 == m_sentence_end_id)
 		return 0;
 
 	return get_lm_trigram_lookahead(w1, w2, node, depth);
 }
 
-float TokenPassSearch::get_lm_bigram_lookahead(int lm_history_id,
+float TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
 		TPLexPrefixTree::Node *node, int depth)
 {
-	int i;
-	LMLookaheadScoreList *score_list = NULL;
-	LMLookaheadScoreList *old_score_list = NULL;
-	float score;
-
 #ifdef COUNT_LM_LA_CACHE_MISS
 	lm_la_cache_count[depth]++;
 #endif
 
-	if (node->lm_lookahead_buffer.find(lm_history_id, &score))
+	if (node->lm_lookahead_buffer.find(prev_word_id, &score))
 		return score;
 
 #ifdef COUNT_LM_LA_CACHE_MISS
 	lm_la_cache_miss[depth]++;
-#endif
-
-	// Not found, compute the LM bigram lookahead scores.
-	// At first, determine if the LM scores have been computed already.
-
-#ifdef COUNT_LM_LA_CACHE_MISS
 	lm_la_word_cache_count++;
 #endif
 
-	if (!lm_lookahead_score_list.find(lm_history_id, &score_list)) {
+	// Not found from cache. Compute the LM bigram lookahead score for every
+	// word pair starting with prev_word_id (unless the LM scores have been
+	// computed already.
+	LMLookaheadScoreList * score_list = NULL;
+	if (!lm_lookahead_score_list.find(prev_word_id, &score_list)) {
 #ifdef COUNT_LM_LA_CACHE_MISS
 		lm_la_word_cache_miss++;
 #endif
-		// Not found, compute the scores.
 		// FIXME! Is it necessary to compute the scores for all the words?
 		if (m_verbose > 2)
 			printf("Compute lm lookahead scores for \'%s'\n",
-					m_vocabulary.word(lm_history_id).c_str());
+					m_vocabulary.word(prev_word_id).c_str());
 		score_list = new LMLookaheadScoreList;
-		if (lm_lookahead_score_list.insert(lm_history_id, score_list,
+		LMLookaheadScoreList * old_score_list = NULL;
+		if (lm_lookahead_score_list.insert(prev_word_id, score_list,
 				&old_score_list))
 			delete old_score_list; // Old list was removed
-		score_list->index = lm_history_id;
+		score_list->index = prev_word_id;
 		score_list->lm_scores.insert(score_list->lm_scores.end(),
 				m_lexicon.words(), 0);
-		m_lookahead_ngram->fetch_bigram_list(m_lex2lookaheadlm[lm_history_id],
+		m_lookahead_ngram->fetch_bigram_list(m_lex2lookaheadlm[prev_word_id],
 				m_lex2lookaheadlm, score_list->lm_scores);
 	}
 
-	// Compute the lookahead score by selecting the maximum LM score of
-	// possible word ends.
-	score = -1e10;
-	for (i = 0; i < node->possible_word_id_list.size(); i++) {
+	// Compute the lookahead score by selecting the maximum LM score of possible
+	// word ends.
+	float score = -1e10;
+	for (int i = 0; i < node->possible_word_id_list.size(); i++) {
 		if (score_list->lm_scores[node->possible_word_id_list[i]] > score)
 			score = score_list->lm_scores[node->possible_word_id_list[i]];
 	}
+
 	// Add the score to the node's buffer
-	node->lm_lookahead_buffer.insert(lm_history_id, score, NULL);
+	node->lm_lookahead_buffer.insert(prev_word_id, score, NULL);
+
 	return score;
 }
 
 float TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 		TPLexPrefixTree::Node *node, int depth)
 {
-	int i;
-	int index;
-	LMLookaheadScoreList *score_list = NULL;
-	LMLookaheadScoreList *old_score_list = NULL;
-	float score;
-
-	index = w1 * m_lexicon.words() + w2;
-
 #ifdef COUNT_LM_LA_CACHE_MISS
 	lm_la_cache_count[depth]++;
 #endif
 
+	int index = w1 * m_lexicon.words() + w2;
 	if (node->lm_lookahead_buffer.find(index, &score))
 		return score;
 
 #ifdef COUNT_LM_LA_CACHE_MISS
 	lm_la_cache_miss[depth]++;
-#endif 
-
-	// Not found, compute the LM trigram lookahead scores.
-	// At first, determine if the LM scores have been computed already.
-
-#ifdef COUNT_LM_LA_CACHE_MISS
 	lm_la_word_cache_count++;
 #endif
 
+	// Not found from cache. Compute the LM trigram lookahead score for every
+	// word triplet starting with w1 w2 (unless the LM scores have been computed
+	// already).
+	LMLookaheadScoreList * score_list = NULL;
 	if (!lm_lookahead_score_list.find(index, &score_list)) {
 #ifdef COUNT_LM_LA_CACHE_MISS
 		lm_la_word_cache_miss++;
 #endif
-		// Not found, compute the scores.
 		// FIXME! Is it necessary to compute the scores for all the words?
 		if (m_verbose > 2)
 			printf("Compute lm lookahead scores for (%s,%s)\n",
 					m_vocabulary.word(w1).c_str(),
 					m_vocabulary.word(w2).c_str());
 		score_list = new LMLookaheadScoreList;
+		LMLookaheadScoreList * old_score_list = NULL;
 		if (lm_lookahead_score_list.insert(index, score_list, &old_score_list))
 			delete old_score_list; // Old list was removed
 		score_list->index = index;
@@ -1969,13 +1955,15 @@ float TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 
 	// Compute the lookahead score by selecting the maximum LM score of
 	// possible word ends.
-	score = -1e10;
-	for (i = 0; i < node->possible_word_id_list.size(); i++) {
+	float score = -1e10;
+	for (int i = 0; i < node->possible_word_id_list.size(); i++) {
 		if (score_list->lm_scores[node->possible_word_id_list[i]] > score)
 			score = score_list->lm_scores[node->possible_word_id_list[i]];
 	}
+
 	// Add the score to the node's buffer
 	node->lm_lookahead_buffer.insert(index, score, NULL);
+
 	return score;
 }
 

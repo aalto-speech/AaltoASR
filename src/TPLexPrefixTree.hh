@@ -214,7 +214,9 @@ public:
 
   /// \brief Enables or disables lookahead language model.
   ///
-  /// Has to be enabled before the lexicon is read.
+  /// Can be enabled only before reading the lexicon.
+  ///
+  /// \param lm_lookahead 0=None, 1=Only in first subtree nodes, 2=Full.
   ///
   void set_lm_lookahead(int lm_lookahead);
 
