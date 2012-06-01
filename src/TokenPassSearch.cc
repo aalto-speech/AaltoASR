@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <cstdio>
 #include <cmath>
+#include <iostream>
 
 #include "TokenPassSearch.hh"
 
@@ -103,21 +104,6 @@ void TokenPassSearch::set_sentence_boundary(const std::string &start,
 	}
 	m_use_sentence_boundary = true;
 	m_lexicon.set_sentence_boundary(m_sentence_start_id, m_sentence_end_id);
-
-	//XXX
-	/*add_hesitation_word("ah");
-	add_hesitation_word("eh");
-	add_hesitation_word("er");
-	add_hesitation_word("ha");
-	add_hesitation_word("hee");
-	add_hesitation_word("huh");
-	add_hesitation_word("uh");
-	add_hesitation_word("um");
-	add_hesitation_word("ach");
-	add_hesitation_word("eee");
-	add_hesitation_word("mm");
-	add_hesitation_word("oof");*/
-	//XXX
 }
 
 void TokenPassSearch::clear_hesitation_words()
@@ -148,6 +134,10 @@ void TokenPassSearch::reset_search(int start_frame)
 	if (m_use_sentence_boundary) {
 		m_sentence_start_lm_id = m_lex2lm[m_sentence_start_id];
 		m_sentence_end_lm_id = m_lex2lm[m_sentence_end_id];
+	}
+
+	if (m_verbose > 0) {
+		cout << m_hesitation_ids.size() << " hesitation words." << endl;
 	}
 
 	// Clear existing tokens and create a new token to the root
@@ -726,15 +716,24 @@ void TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
 	}
 
 	//XXX
-	for (std::vector<int>::const_iterator iter = m_hesitation_ids.begin(); iter != m_hesitation_ids.end(); ++iter) {
+	std::vector<int>::const_iterator iter = m_hesitation_ids.begin();
+	for (; iter != m_hesitation_ids.end(); ++iter) {
 		if (token->lm_history->last().word_id() == *iter) {
+			assert(!m_fsa_lm);
+			assert(!m_generate_word_graph);
+
 			// Add sentence_end and sentence_start and propagate the token with new word history
 			TPLexPrefixTree::LMHistory * temp_lm_history = token->lm_history;
 
 			TPLexPrefixTree::LMHistoryWord sentence_end(m_sentence_end_id, m_sentence_end_lm_id);
-			append_to_word_history(*token, sentence_end);
+			token->lm_history = new TPLexPrefixTree::LMHistory(sentence_end, token->lm_history);
+			hist::link(token->lm_history);
+			token->lm_history->word_start_frame = m_frame;
 			TPLexPrefixTree::LMHistoryWord sentence_start(m_sentence_start_id, m_sentence_start_lm_id);
-			append_to_word_history(*token, sentence_start);
+			token->lm_history = new TPLexPrefixTree::LMHistory(sentence_start, token->lm_history);
+			hist::link(token->lm_history);
+			token->lm_history->word_start_frame = m_frame;
+			token->lm_hist_code = compute_lm_hist_hash_code(token->lm_history);
 
 			// Iterate all the arcs leaving the token's node.
 			for (i = 0; i < source_node->arcs.size(); i++) {
@@ -756,11 +755,12 @@ void TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
 					"when word graphs are used.");
 	}
 
-	if (source_node->flags & NODE_INSERT_WORD_BOUNDARY && m_word_boundary_id
-			> 0) {
+	if ((source_node->flags & NODE_INSERT_WORD_BOUNDARY) &&
+			(m_word_boundary_id > 0)) {
 		if (token->lm_history->last().word_id() != m_word_boundary_id) {
 			assert(!m_fsa_lm);
 			assert(!m_generate_word_graph);
+
 			// Add word_boundary and propagate the token with new word history
 			TPLexPrefixTree::LMHistory * temp_lm_history = token->lm_history;
 
@@ -1867,6 +1867,7 @@ float TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
 	lm_la_cache_count[depth]++;
 #endif
 
+	float score;
 	if (node->lm_lookahead_buffer.find(prev_word_id, &score))
 		return score;
 
@@ -1901,7 +1902,7 @@ float TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
 
 	// Compute the lookahead score by selecting the maximum LM score of possible
 	// word ends.
-	float score = -1e10;
+	score = -1e10;
 	for (int i = 0; i < node->possible_word_id_list.size(); i++) {
 		if (score_list->lm_scores[node->possible_word_id_list[i]] > score)
 			score = score_list->lm_scores[node->possible_word_id_list[i]];
@@ -1921,6 +1922,7 @@ float TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 #endif
 
 	int index = w1 * m_lexicon.words() + w2;
+	float score;
 	if (node->lm_lookahead_buffer.find(index, &score))
 		return score;
 
@@ -1955,7 +1957,7 @@ float TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 
 	// Compute the lookahead score by selecting the maximum LM score of
 	// possible word ends.
-	float score = -1e10;
+	score = -1e10;
 	for (int i = 0; i < node->possible_word_id_list.size(); i++) {
 		if (score_list->lm_scores[node->possible_word_id_list[i]] > score)
 			score = score_list->lm_scores[node->possible_word_id_list[i]];
