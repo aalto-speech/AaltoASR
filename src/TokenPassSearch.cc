@@ -114,11 +114,9 @@ void TokenPassSearch::clear_hesitation_words()
 void TokenPassSearch::add_hesitation_word(const std::string & word)
 {
 	int id = m_vocabulary.word_index(word);
-	if (id == 0) {
-		// The word is not in vocabulary.
-		throw invalid_argument("TokenPassSearch::add_hesitation_word");
+	if (id != 0) {
+		m_hesitation_ids.push_back(id);
 	}
-	m_hesitation_ids.push_back(id);
 }
 
 void TokenPassSearch::reset_search(int start_frame)
