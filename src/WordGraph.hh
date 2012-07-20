@@ -43,7 +43,7 @@ struct WordGraph {
       : source_node_id(source_node_id), sibling_arc(sibling_arc), 
 	am_weight(am_weight), lm_weight(lm_weight) { }
 
-    int source_node_id; //!< The end node of the arc.
+    int source_node_id; //!< The source node of the arc.
     int sibling_arc; //!< The next arc ending to the same node. 
     float am_weight; //!< The acoustic weight of the arc.
     float lm_weight; //!< The language model weight of the arc.
@@ -96,8 +96,7 @@ struct WordGraph {
   }
 
   /** Insert a new arc to the graph.  Stores only the best path among
-   * the paths that end up in the same node and have the same symbol
-   * in the source node..
+   * the paths that start from and end up in the same node.
    *
    * \bugs Checks quite slowly if the arc exists already, but probably
    * that does not matter much.
@@ -116,28 +115,30 @@ struct WordGraph {
     float path_weight = src_node.path_weight + weight;
 
     // FIXME: this might be slow. Check that the arc does not exist already.
-    int a = tgt_node.first_arc;
-    while (a >= 0) {
+    for (int a = tgt_node.first_arc; a >= 0; a = arcs[a].sibling_arc) {
       Arc &arc = arcs[a];
       Node &old_src_node = nodes[arc.source_node_id];
-      if (arc.source_node_id == source_node_id || 
-	  (old_src_node.symbol == src_node.symbol &&
-	   old_src_node.lex_node_id == src_node.lex_node_id))
-      {
-	if (path_weight > (old_src_node.path_weight + 
-			   arc.am_weight + arc.lm_weight))
-	{
-	  unlink(arc.source_node_id);
-	  arc.am_weight = am_weight;
-	  arc.lm_weight = lm_weight;
-	  arc.source_node_id = source_node_id;
-	  if (path_weight > tgt_node.path_weight)
-	    tgt_node.path_weight = path_weight;
-	  link(arc.source_node_id);
-	}
-	return;
+      bool match = arc.source_node_id == source_node_id;
+
+      // This approximation reduces lattice size by 5 - 20 % but also increases
+      // errors when decoding the lattice, because this may remove an arc from
+      // the best path. Commented out 2012-07-19 / SE.
+      //match = match || ((old_src_node.symbol == src_node.symbol) &&
+      //                  (old_src_node.lex_node_id == src_node.lex_node_id));
+
+      if (match) {
+   	    float old_path_weight = old_src_node.path_weight + arc.am_weight + arc.lm_weight;
+        if (path_weight > old_path_weight) {
+          //unlink(arc.source_node_id);
+	      arc.am_weight = am_weight;
+	      arc.lm_weight = lm_weight;
+	      //arc.source_node_id = source_node_id;
+          if (path_weight > tgt_node.path_weight)
+            tgt_node.path_weight = path_weight;
+          //link(arc.source_node_id);
+        }
+        return;
       }
-      a = arc.sibling_arc;
     }
 
     // Insert the new arc

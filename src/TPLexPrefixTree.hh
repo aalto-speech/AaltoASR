@@ -111,6 +111,7 @@ public:
     int word_id;
     int end_frame;
     int lex_node_id; // FIXME: debug info (node where the history was created)
+    int graph_node_id; // FIXME: debug info (word graph node)
     float lm_log_prob;
     float am_log_prob;
     float cum_lm_log_prob;

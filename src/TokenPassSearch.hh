@@ -386,6 +386,18 @@ private:
 
 	void copy_word_graph_info(TPLexPrefixTree::Token *src_token,
 			TPLexPrefixTree::Token *tgt_token);
+
+	/// \brief Adds an arc to the word graph from the previous endpoint of
+	/// \a new_token to a node that represents the last word in its word
+	/// history.
+	///
+	/// If there already exists a node for the last word in the word history at
+	/// this frame with the same lex_node_id, uses the old node as the target
+	/// node of the new arc.
+	///
+	/// If there already exists an arc between the source node and the target
+	/// node, just updates the arc probability.
+	///
 	void build_word_graph_aux(TPLexPrefixTree::Token *new_token,
 			TPLexPrefixTree::WordHistory *word_history);
 	void build_word_graph(TPLexPrefixTree::Token *new_token);
@@ -558,7 +570,12 @@ private:
 		int frame;
 		std::vector<Item> items;
 	};
+
+	/// Records for each word, the frame number when it was last inserted into
+	/// the word graph, and the node ID of each occurrence of the word at this
+	/// time instance.
 	std::vector<WordGraphInfo> m_recent_word_graph_info;
+
 	TPLexPrefixTree::Token *m_best_final_token;
 
 	/// The language model.

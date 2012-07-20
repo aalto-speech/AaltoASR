@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cmath>
 #include <iostream>
+#include <string>
 
 #include "TokenPassSearch.hh"
 
@@ -470,7 +471,7 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 	// Print path
 	for (int i = stack.size() - 1; i >= 0; i--) {
 		stack[i]->printed = true;
-		std::string word(m_vocabulary.word(stack[i]->word_id));
+		string word(m_vocabulary.word(stack[i]->word_id));
 		fprintf(file, "%s ", word.c_str());
 
 		int spaces = 16 - word.length();
@@ -2182,46 +2183,51 @@ void TokenPassSearch::build_word_graph_aux(TPLexPrefixTree::Token *new_token,
 	if (word_id < 0)
 		return;
 
-	// Check if we have already created a node for (word_id, frame,
-	// node_id) triplet on this frame.  If so, use the old node.
-	// Otherwise, create a new word graph node.
-	int node_index2 = 0;
+	// Check if we have already created a node for this word at this frame with
+	// the same lex_node_id. If so, use the old node. Otherwise, create a new
+	// word graph node.
+	int target_node = 0;
 	bool create_new_node = true;
 	WordGraphInfo &info = m_recent_word_graph_info[word_id];
 	if (info.frame != m_frame) {
+		// Frame number from previous node insertion for this word differs, so
+		// we create a new node and start collecting a new list of node IDs that
+		// exist at this frame.
 		info.items.clear();
 		info.frame = m_frame;
 	}
 	for (int i = 0; i < info.items.size(); i++) {
 		if (info.items[i].lex_node_id == word_history->lex_node_id) {
-			node_index2 = info.items[i].graph_node_id;
+			// This node matches all (word_id, frame, lex_node_id).
+			target_node = info.items[i].graph_node_id;
 			create_new_node = false;
 			break;
 		}
 	}
-
 	if (create_new_node) {
-		node_index2 = word_graph.add_node(m_frame, word_id,
+		target_node = word_graph.add_node(m_frame, word_id,
 				word_history->lex_node_id);
 		WordGraphInfo::Item item;
-		item.graph_node_id = node_index2;
+		item.graph_node_id = target_node;
 		item.lex_node_id = word_history->lex_node_id;
 		info.items.push_back(item);
 	}
 
-	int node_index1 = new_token->recent_word_graph_node;
-
+	// The new arc starts from the previous end point of this path.
+	int source_node = new_token->recent_word_graph_node;
 	float am = word_history->am_log_prob;
 	float lm = word_history->lm_log_prob;
 
-	// FIXME: debug
-	//  printf("arc %6.3f %6.3f\n", am, lm);
-
-	word_graph.add_arc(node_index1, node_index2, am, lm * m_lm_scale);
+	// Multiply LM weights with LM scale so that it's easier to prune arcs in
+	// WordGraph::add_arc(). The weights will be divided by LM scale before
+	// writing the final lattice.
+	word_graph.add_arc(source_node, target_node, am, lm * m_lm_scale);
 
 	word_graph.unlink(new_token->recent_word_graph_node);
-	new_token->recent_word_graph_node = node_index2;
-	word_graph.link(node_index2);
+	new_token->recent_word_graph_node = target_node;
+	word_graph.link(target_node);
+	
+	new_token->word_history->graph_node_id = target_node;
 }
 
 void TokenPassSearch::build_word_graph(TPLexPrefixTree::Token *new_token)
@@ -2470,12 +2476,31 @@ void TokenPassSearch::debug_print_token_word_history(FILE * file,
 			fprintf(file, "%s ", word.c_str());
 		}
 
-		fprintf(file, "%d\t%d\t%.3f\t%.3f\t%.3f\n", stack[i]->end_frame,
-				stack[i]->lex_node_id, -stack[i]->am_log_prob,
-				-stack[i]->lm_log_prob, -get_token_log_prob(
-						stack[i]->cum_am_log_prob, stack[i]->cum_lm_log_prob));
+		fprintf(file, "%d\t%d\t%d\t%.3f\t%.3f\t%.3f\n", stack[i]->end_frame,
+				stack[i]->lex_node_id, stack[i]->graph_node_id,
+				stack[i]->am_log_prob, stack[i]->lm_log_prob,
+				get_token_log_prob(stack[i]->cum_am_log_prob, stack[i]->cum_lm_log_prob));
 	}
 	fprintf(file, "\n");
 
 	fflush(file);
+}
+
+void TokenPassSearch::debug_print_interesting_tokens(const TPLexPrefixTree::Token & token)
+{
+	float am_log_prob = token.word_history->am_log_prob;
+	int word_id = token.word_history->word_id;
+	if (word_id == -1)
+		return;
+	string word = m_vocabulary.word(word_id);
+	word_id = token.word_history->previous->word_id;
+	if (word_id == -1)
+		return;
+	string previous_word = m_vocabulary.word(word_id);
+	//if (token.word_history->lex_node_id == 20724) {
+	//if ((am_log_prob > -74.91) && (am_log_prob < -74.89) && (word == "a") && (previous_word == "as")) {
+	if ((am_log_prob > -40.859) && (am_log_prob < -40.857) && (word == "a") && (previous_word == "as")) {
+		cout << "at frame " << m_frame << endl;
+		debug_print_token_word_history(NULL, token);
+	}
 }
