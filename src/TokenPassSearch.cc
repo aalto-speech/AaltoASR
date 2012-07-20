@@ -2485,22 +2485,3 @@ void TokenPassSearch::debug_print_token_word_history(FILE * file,
 
 	fflush(file);
 }
-
-void TokenPassSearch::debug_print_interesting_tokens(const TPLexPrefixTree::Token & token)
-{
-	float am_log_prob = token.word_history->am_log_prob;
-	int word_id = token.word_history->word_id;
-	if (word_id == -1)
-		return;
-	string word = m_vocabulary.word(word_id);
-	word_id = token.word_history->previous->word_id;
-	if (word_id == -1)
-		return;
-	string previous_word = m_vocabulary.word(word_id);
-	//if (token.word_history->lex_node_id == 20724) {
-	//if ((am_log_prob > -74.91) && (am_log_prob < -74.89) && (word == "a") && (previous_word == "as")) {
-	if ((am_log_prob > -40.859) && (am_log_prob < -40.857) && (word == "a") && (previous_word == "as")) {
-		cout << "at frame " << m_frame << endl;
-		debug_print_token_word_history(NULL, token);
-	}
-}
