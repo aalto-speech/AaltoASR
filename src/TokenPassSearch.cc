@@ -479,10 +479,10 @@ void TokenPassSearch::write_word_history(FILE *file, bool get_best_path)
 			spaces = 1;
 		for (int j = 0; j < spaces; j++)
 			fputc(' ', file);
-		fprintf(file, "%d\t%d\t%.3f\t%.3f\t%.3f\n", stack[i]->end_frame,
-				stack[i]->lex_node_id, -stack[i]->am_log_prob,
-				-stack[i]->lm_log_prob, -get_token_log_prob(
-						stack[i]->cum_am_log_prob, stack[i]->cum_lm_log_prob));
+		fprintf(file, "%d\t%d\t%d\t%.3f\t%.3f\t%.3f\n", stack[i]->end_frame,
+				stack[i]->lex_node_id, stack[i]->graph_node_id,
+				stack[i]->am_log_prob, stack[i]->lm_log_prob,
+				get_token_log_prob(stack[i]->cum_am_log_prob, stack[i]->cum_lm_log_prob));
 	}
 	if (get_best_path)
 		fprintf(file, "\n");
