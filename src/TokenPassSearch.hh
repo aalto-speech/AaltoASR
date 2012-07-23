@@ -299,6 +299,16 @@ public:
 		return m_generate_word_graph;
 	}
 
+	/// \brief Enables or disables word pair approximation when building a word
+	/// graph.
+	///
+	/// Enabled by default.
+	///
+	void set_use_word_pair_approximation(bool value)
+	{
+		m_use_word_pair_approximation = value;
+	}
+
 	void set_use_lm_cache(bool value)
 	{
 		m_use_lm_cache = value;
@@ -631,6 +641,7 @@ private:
 	bool m_use_sentence_boundary;
 	bool m_generate_word_graph;
 	bool m_require_sentence_end;
+	bool m_use_word_pair_approximation;
 	bool m_use_lm_cache;
 
 	float m_current_glob_beam;

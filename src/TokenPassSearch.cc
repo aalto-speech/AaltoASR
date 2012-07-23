@@ -71,6 +71,7 @@ TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
 	m_sentence_start_id = -1;
 	m_sentence_end_id = -1;
 	m_generate_word_graph = false;
+	m_use_word_pair_approximation = true;
 	m_use_lm_cache = true;
 	m_best_final_token = NULL;
 	m_require_sentence_end = false;
@@ -2221,7 +2222,8 @@ void TokenPassSearch::build_word_graph_aux(TPLexPrefixTree::Token *new_token,
 	// Multiply LM weights with LM scale so that it's easier to prune arcs in
 	// WordGraph::add_arc(). The weights will be divided by LM scale before
 	// writing the final lattice.
-	word_graph.add_arc(source_node, target_node, am, lm * m_lm_scale);
+	word_graph.add_arc(source_node, target_node, am, lm * m_lm_scale,
+			m_use_word_pair_approximation);
 
 	word_graph.unlink(new_token->recent_word_graph_node);
 	new_token->recent_word_graph_node = target_node;

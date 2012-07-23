@@ -98,6 +98,10 @@ struct WordGraph {
   /** Insert a new arc to the graph.  Stores only the best path among
    * the paths that start from and end up in the same node.
    *
+   * Word pair approximation reduces lattice size by 5 - 20 % but also increases
+   * errors when decoding the lattice, because this may remove an arc from the
+   * best path.
+   *
    * \bugs Checks quite slowly if the arc exists already, but probably
    * that does not matter much.
    *
@@ -105,9 +109,11 @@ struct WordGraph {
    * \param target_node_id = the index of the target node
    * \param am_weight = the acoustic weight of the arc
    * \param lm_weight = the language model weight of the arc
+   * \param word_pair_approx If true, stores only the best path among the paths
+   * that end up in the same node and have the same symbol in the source node.
    */
   void add_arc(int source_node_id, int target_node_id, float am_weight = 0, 
-	       float lm_weight = 0)
+	       float lm_weight = 0, bool word_pair_approx = true)
   {
     float weight = am_weight + lm_weight;
     Node &src_node = nodes[source_node_id];
@@ -118,13 +124,12 @@ struct WordGraph {
     for (int a = tgt_node.first_arc; a >= 0; a = arcs[a].sibling_arc) {
       Arc &arc = arcs[a];
       Node &old_src_node = nodes[arc.source_node_id];
-      bool match = arc.source_node_id == source_node_id;
 
-      // This approximation reduces lattice size by 5 - 20 % but also increases
-      // errors when decoding the lattice, because this may remove an arc from
-      // the best path. Commented out 2012-07-19 / SE.
-      //match = match || ((old_src_node.symbol == src_node.symbol) &&
-      //                  (old_src_node.lex_node_id == src_node.lex_node_id));
+      bool match = arc.source_node_id == source_node_id;
+      if (word_pair_approx) {
+        match = match || ((old_src_node.symbol == src_node.symbol) &&
+                          (old_src_node.lex_node_id == src_node.lex_node_id));
+      }
 
       if (match) {
    	    float old_path_weight = old_src_node.path_weight + arc.am_weight + arc.lm_weight;

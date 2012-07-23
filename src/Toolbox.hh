@@ -181,6 +181,12 @@ public:
   void set_tp_state_beam(float beam) { m_tp_search.set_state_beam(beam); }
   void set_max_state_duration(int duration) 
   { m_expander.set_max_state_duration(duration); }
+
+  /// \brief Enables or disables multiword splitting in the decoder.
+  ///
+  /// This is useful for resolving multiword probabilities with a LM that does
+  /// not use multiwords.
+  ///
   void set_split_multiwords(bool b) { m_tp_search.set_split_multiwords(b); }
 
   /// \brief Enables or disables lookahead language model.
@@ -255,6 +261,14 @@ public:
   ///
   bool get_generate_word_graph() const
   { return m_tp_search.get_generate_word_graph(); }
+
+  /// \brief Enables or disables word pair approximation when building a word
+  /// graph.
+  ///
+  /// Enabled by default.
+  ///
+  void set_use_word_pair_approximation(bool b)
+  { m_tp_search.set_use_word_pair_approximation(b); }
 
   void set_use_lm_cache(bool value)
   { m_tp_search.set_use_lm_cache(value); }
