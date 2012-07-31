@@ -190,8 +190,9 @@ public:
   void clear_hesitation_words();
   void add_hesitation_word(const std::string &word);
   void set_dummy_word_boundaries(bool value);
-	void set_generate_word_graph(bool value);
-	void set_use_lm_cache(bool value);
+  void set_generate_word_graph(bool value);
+  void set_use_word_pair_approximation(bool value);
+  void set_use_lm_cache(bool value);
   void set_require_sentence_end(bool s);
 
   void set_optional_short_silence(bool state);
