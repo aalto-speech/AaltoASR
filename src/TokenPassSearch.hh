@@ -365,6 +365,14 @@ public:
 	float get_total_log_prob(bool use_best_token) const;
 
 private:
+	/// \brief Creates a mapping between word IDs in the lexicon and in the
+	/// language model.
+	///
+	/// \return The number of vocabulary entries that were not found in the
+	/// language model.
+	///
+	int create_word_id_mappings();
+
 	/// \brief Finds the globally best token that is in the NODE_FINAL state,
 	/// i.e. at the end of a word.
 	///

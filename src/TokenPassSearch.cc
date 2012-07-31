@@ -1583,10 +1583,21 @@ void TokenPassSearch::clear_active_node_token_lists(void)
 int TokenPassSearch::set_ngram(TreeGram *ngram)
 {
 	assert(!m_fsa_lm);
-
-	int count = 0;
-
 	m_ngram = ngram;
+	// Initialize LM lookahead caches again.
+	m_lm_lookahead_initialized = false;
+	return create_word_id_mappings();
+}
+
+int TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
+{
+	assert(!m_ngram);
+	m_fsa_lm = lm;
+	return create_word_id_mappings();
+}
+
+int TokenPassSearch::create_word_id_mappings()
+{
 	m_lex2lm.clear();
 	m_lex2lm.resize(m_vocabulary.num_words());
 #ifdef ENABLE_MULTIWORD_SUPPORT
@@ -1594,14 +1605,26 @@ int TokenPassSearch::set_ngram(TreeGram *ngram)
 	m_multiword_lex2lm.resize(m_vocabulary.num_words());
 #endif
 
-	for (int i = 0; i < m_vocabulary.num_words(); i++) {
+	int num_not_found = 0;
+
+	for (int i = 0; i < m_vocabulary.num_words(); ++i) {
 		// Create a mapping between the lexicon and the language model.
 		const string & word = m_vocabulary.word(i);
-		m_lex2lm[i] = m_ngram->word_index(word);
 
-		// Warn about words not in lm.
-		if (m_lex2lm[i] == 0 && i != 0) {
-			count++;
+		int lm_id;
+		bool not_found;
+		if (m_fsa_lm) {
+			lm_id = m_fsa_lm->symbol_map().index_nothrow(word);
+			not_found = m_lex2lm[i] < 0;
+		}
+		else {
+			lm_id = m_ngram->word_index(word);
+			not_found = (m_lex2lm[i] == 0) && (i != 0);
+		}
+
+		m_lex2lm[i] = lm_id;
+		if (not_found) {
+			++num_not_found;
 		}
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
@@ -1611,9 +1634,24 @@ int TokenPassSearch::set_ngram(TreeGram *ngram)
 		while (true) {
 			string::const_iterator component_last =
 					find(component_first, word.end(), '_');
-			int component_lm_id =
-					m_ngram->word_index(string(component_first, component_last));
-			m_multiword_lex2lm[i].push_back(component_lm_id);
+			string component(component_first, component_last);
+
+			int lm_id;
+			bool not_found;
+			if (m_fsa_lm) {
+				lm_id = m_fsa_lm->symbol_map().index_nothrow(component);
+				not_found = m_lex2lm[i] < 0;
+			}
+			else {
+				lm_id = m_ngram->word_index(component);
+				not_found = (m_lex2lm[i] == 0) && (i != 0);
+			}
+
+			m_multiword_lex2lm[i].push_back(lm_id);
+			if (not_found) {
+				++num_not_found;
+			}
+
 			if (component_last == word.end())
 				break;
 			component_first = component_last;
@@ -1622,32 +1660,7 @@ int TokenPassSearch::set_ngram(TreeGram *ngram)
 #endif
 	}
 
-	// Initialize LM lookahead caches again.
-	m_lm_lookahead_initialized = false;
-
-	return count;
-}
-
-int TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
-{
-	assert(!m_ngram);
-	m_fsa_lm = lm;
-
-	m_lex2lm.clear();
-	m_lex2lm.resize(m_vocabulary.num_words());
-
-	// Create a mapping between the lexicon and the model.
-	int count = 0;
-	for (int i = 0; i < m_vocabulary.num_words(); i++) {
-		m_lex2lm[i]
-				= m_fsa_lm->symbol_map().index_nothrow(m_vocabulary.word(i));
-
-		if (m_lex2lm[i] < 0) {
-			count++;
-		}
-	}
-
-	return count;
+	return num_not_found;
 }
 
 int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
