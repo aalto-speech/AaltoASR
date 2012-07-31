@@ -1367,13 +1367,6 @@ int TokenPassSearch::compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh) c
 		if (wh->last().word_id() == m_sentence_start_id)
 			break;
 
-		//XXX
-//		for (std::vector<int>::const_iterator iter = m_hesitation_ids.begin(); iter != m_hesitation_ids.end(); ++iter) {
-//			if (wh->last().word_id() == *iter)
-//				break;
-//		}
-		//XXX
-
 		wh = wh->previous;
 	}
 	code += (code << 3);
@@ -1715,13 +1708,6 @@ void TokenPassSearch::split_and_create_history_ngram(
 		if (history->last().word_id() == m_sentence_start_id)
 			return;
 
-		//XXX
-//		for (std::vector<int>::const_iterator iter = m_hesitation_ids.begin(); iter != m_hesitation_ids.end(); ++iter) {
-//			if (history->last().word_id() == *iter)
-//				return;
-//		}
-		//XXX
-
 		history = history->previous;
 	}
 }
@@ -1760,13 +1746,6 @@ void TokenPassSearch::create_history_ngram(
 
 		if (history->last().word_id() == m_sentence_start_id)
 			return;
-
-		//XXX
-//		for (std::vector<int>::const_iterator iter = m_hesitation_ids.begin(); iter != m_hesitation_ids.end(); ++iter) {
-//			if (history->last().word_id() == *iter)
-//				return;
-//		}
-		//XXX
 
 		history = history->previous;
 	}
@@ -1837,13 +1816,6 @@ float TokenPassSearch::get_lm_score(TPLexPrefixTree::LMHistory *lm_hist,
 		info->lm_hist.push_back(wh->last().word_id());
 		if (wh->last().word_id() == m_sentence_start_id)
 			break;
-
-		//XXX
-//		for (std::vector<int>::const_iterator iter = m_hesitation_ids.begin(); iter != m_hesitation_ids.end(); ++iter) {
-//			if (wh->last().word_id() == *iter)
-//				break;
-//		}
-		//XXX
 
 		wh = wh->previous;
 	}
