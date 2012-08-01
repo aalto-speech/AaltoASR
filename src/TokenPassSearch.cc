@@ -848,9 +848,14 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 			int word_id = updated_token.node->word_id;
 			if (word_id != -1) // Is word ID unique?
 			{
-				// Word exists in LM?
-				if (m_lex2lm[word_id] < 0)
-					return;
+				// TODO
+				// FSA LM uses ID -1 for words that don't exist in the LM, while
+				// n-gram LM uses 0. Thus this check whether word exists in LM
+				// worked only with FSA LMs. However, with this check multiwords
+				// don't work, so I removed it altogether. What would be the
+				// correct fix? A different ID for multiwords? // SE 2012-07-31
+				//if (m_lex2lm[word_id] < 0)
+				//	return;
 
 				// Prune two subsequent word boundaries
 				if (word_id == m_word_boundary_id
@@ -1259,8 +1264,21 @@ void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 
 	if (m_fsa_lm) {
 		if (word.word_id() != m_sentence_start_id) {
+#ifdef ENABLE_MULTIWORD_SUPPORT
+			if (m_split_multiwords) {
+				for (int i = 0; i < word.num_components(); ++i) {
+					token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
+							word.component_lm_id(i), &token.lm_log_prob);
+				}
+			}
+			else {
+				token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
+						word.lm_id(), &token.lm_log_prob);
+			}
+#else
 			token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
 					word.lm_id(), &token.lm_log_prob);
+#endif
 			token.lm_log_prob += m_insertion_penalty;
 		}
 	}
