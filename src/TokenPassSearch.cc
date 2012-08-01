@@ -787,21 +787,7 @@ void TokenPassSearch::append_to_word_history(TPLexPrefixTree::Token & token, con
 	token.lm_history = new TPLexPrefixTree::LMHistory(word, token.lm_history);
 	hist::link(token.lm_history);
 	token.lm_history->word_start_frame = m_frame;
-	if (m_ngram) {
-		token.lm_hist_code = compute_lm_hist_hash_code(token.lm_history);
-		float lm_score = get_lm_score(token.lm_history, token.lm_hist_code);
-		token.lm_log_prob += lm_score + m_insertion_penalty;
-#ifdef PRUNING_MEASUREMENT
-		if (token.meas[4] > lm_score)
-			token.meas[4] = lm_score;
-#endif
-	}
-	else {
-		m_fsa_lm->walk(token.fsa_lm_node, m_sentence_end_lm_id,
-				&token.lm_log_prob);
-		token.lm_log_prob += m_insertion_penalty;
-		token.fsa_lm_node = m_fsa_lm->initial_node_id();
-	}
+	update_lm_log_prob(token);
 }
 
 void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
@@ -1278,13 +1264,17 @@ void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 			token.lm_log_prob += m_insertion_penalty;
 		}
 	}
-	else {
+	else {  // n-gram LM
 		token.lm_hist_code = compute_lm_hist_hash_code(token.lm_history);
 
 		if (word.word_id() != m_sentence_start_id) {
-			token.lm_log_prob += get_lm_score(token.lm_history,
-					token.lm_hist_code);
+			float lm_score = get_lm_score(token.lm_history, token.lm_hist_code);
+			token.lm_log_prob += lm_score;
 			token.lm_log_prob += m_insertion_penalty;
+#ifdef PRUNING_MEASUREMENT
+			if (token.meas[4] > lm_score)
+				token.meas[4] = lm_score;
+#endif
 		}
 	}
 }
@@ -2088,15 +2078,8 @@ void TokenPassSearch::update_final_tokens()
 		token->lm_history = new TPLexPrefixTree::LMHistory(sentence_end, token->lm_history);
 		hist::link(token->lm_history);
 		token->lm_history->word_start_frame = m_frame;
-		if (m_ngram) {
-			token->lm_hist_code = compute_lm_hist_hash_code(token->lm_history);
-			token->lm_log_prob += get_lm_score(token->lm_history,
-					token->lm_hist_code) + m_insertion_penalty;
-		}
-		else {
-			m_fsa_lm->walk(token->fsa_lm_node, m_sentence_end_lm_id,
-					&token->lm_log_prob);
-			token->lm_log_prob += m_insertion_penalty;
+		update_lm_log_prob(*token);
+		if (m_fsa_lm) {
 			token->fsa_lm_node = m_fsa_lm->initial_node_id();
 		}
 		token->word_count++;
