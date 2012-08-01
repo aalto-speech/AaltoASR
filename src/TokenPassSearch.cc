@@ -852,8 +852,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				// FSA LM uses ID -1 for words that don't exist in the LM, while
 				// n-gram LM uses 0. Thus this check whether word exists in LM
 				// worked only with FSA LMs. However, with this check multiwords
-				// don't work, so I removed it altogether. What would be the
-				// correct fix? A different ID for multiwords? // SE 2012-07-31
+				// don't work, so I postponed it to update_lm_log_prob().
+				// SE 2012-07-31
 				//if (m_lex2lm[word_id] < 0)
 				//	return;
 
@@ -874,7 +874,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				updated_token.word_start_frame = -1;
 				auto_lm_history.adopt(updated_token.lm_history);
 
-				update_lm_log_prob(updated_token);
+				if (!update_lm_log_prob(updated_token))
+					return;
 
 				updated_token.cur_lm_log_prob = updated_token.lm_log_prob;
 				updated_token.word_count++;
@@ -1258,7 +1259,7 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 	}
 }
 
-void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
+bool TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 {
 	const TPLexPrefixTree::LMHistoryWord & word = token.lm_history->last();
 
@@ -1267,15 +1268,24 @@ void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 #ifdef ENABLE_MULTIWORD_SUPPORT
 			if (m_split_multiwords) {
 				for (int i = 0; i < word.num_components(); ++i) {
+					int lm_id = word.component_lm_id(i);
+					if (lm_id < 0)
+						return false;
 					token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
-							word.component_lm_id(i), &token.lm_log_prob);
+							lm_id, &token.lm_log_prob);
 				}
 			}
 			else {
+				int lm_id = word.lm_id();
+				if (lm_id < 0)
+					return false;
 				token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
 						word.lm_id(), &token.lm_log_prob);
 			}
 #else
+			int lm_id = word.lm_id();
+			if (lm_id < 0)
+				return false;
 			token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
 					word.lm_id(), &token.lm_log_prob);
 #endif
@@ -1295,6 +1305,8 @@ void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 #endif
 		}
 	}
+
+	return true;
 }
 
 TPLexPrefixTree::Token*

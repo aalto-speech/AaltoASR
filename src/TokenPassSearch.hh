@@ -441,7 +441,10 @@ private:
 	/// \brief Updated lm_log_prob and lm_hist_code on token after adding a new
 	/// word to the end of its lm_history.
 	///
-	void update_lm_log_prob(TPLexPrefixTree::Token & token);
+	/// \return false if the word (or in case a multiword, one of its
+	/// components) was not found from the language model.
+	///
+	bool update_lm_log_prob(TPLexPrefixTree::Token & token);
 
 	/// \brief Copes new tokens from \ref m_new_token_list to
 	/// \ref m_active_token_list.
@@ -601,7 +604,8 @@ private:
 	fsalm::LM *m_fsa_lm;
 
 	/// A mapping between word IDs in the dictionary and word IDs in the LM.
-	/// Words that are not in the LM are mapped to 0.
+	/// Words that are not found in an n-gram LM are mapped to 0. With FSA LMs
+	/// the unknown word ID is -1.
 	std::vector<int> m_lex2lm;
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
