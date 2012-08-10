@@ -466,7 +466,7 @@ sub generate_denumerator_hmmnets {
   my $rinfo = shift(@_);
   my $temp_dir = shift(@_);
 
-  print STDERR "Generating numerator HMM networks.\n";
+  print STDERR "Generating denumerator HMM networks.\n";
   for my $record (@$rinfo) {
     system("fst_project e e $temp_dir/".$record->{target}.".fst - | ${script_dir}negate_fst_weights.pl | fst_optimize -A - $temp_dir/".$record->{target}.".weight.fst") && die "system error $7\n";
 
