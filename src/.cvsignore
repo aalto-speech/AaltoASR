@@ -2,3 +2,4 @@ dep
 *.a
 arpa2bin
 bin2arpa
+test_class

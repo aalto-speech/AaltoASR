@@ -8,6 +8,8 @@ include Makefile.common
 
 progs = arpa2bin bin2arpa
 
+tests = test_class
+
 libdecoder_srcs = ArpaNgramReader.cc \
 	BinNgramReader.cc \
 	Expander.cc \
@@ -26,7 +28,8 @@ libdecoder_srcs = ArpaNgramReader.cc \
 	Toolbox.cc \
 	TreeGram.cc \
 	TreeGramArpaReader.cc \
-	Vocabulary.cc
+	Vocabulary.cc\
+	WordClasses.cc
 
 ##################################################
 
@@ -47,6 +50,9 @@ default: progs swig morpheus
 	$(CXX) -c $(cxxflags) $< -o $@
 
 $(progs): %: %.o $(libs)
+	$(CXX) $(cxxflags) $< -o $@ $(libs)
+
+$(tests): %: %.o $(libs)
 	$(CXX) $(cxxflags) $< -o $@ $(libs)
 
 libdecoder.a: $(libdecoder_objs)
