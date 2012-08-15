@@ -284,6 +284,10 @@ public:
 	///
 	int set_lookahead_ngram(TreeGram *ngram);
 
+	/// \brief Sets the word classes for class-based language models.
+	///
+	void set_word_classes(const WordClasses * classes);
+
 	/// \brief If set to true, generates a word graph of the hypotheses during
 	/// decoding (requires memory).
 	///
@@ -540,6 +544,9 @@ public:
 private:
 	TPLexPrefixTree &m_lexicon;
 	Vocabulary &m_vocabulary;
+#ifdef ENABLE_WORDCLASS_SUPPORT
+	const WordClasses * m_word_classes;
+#endif
 	Acoustics *m_acoustics;
 
 	typedef std::vector<TPLexPrefixTree::Token *> token_list_type;

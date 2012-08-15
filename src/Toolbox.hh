@@ -8,6 +8,7 @@
 #include "NowayHmmReader.hh"
 #include "NowayLexiconReader.hh"
 #include "TPNowayLexReader.hh"
+#include "WordClasses.hh"
 #include "LnaReaderCircular.hh"
 #include "Expander.hh"
 #include "Search.hh"
@@ -82,6 +83,25 @@ public:
   /// \param quiet If true, doesn't print warnings to stderr.
   ///
   void fsa_lm_read(const char *file, bool binary=true, bool quiet=false);
+
+  /// \brief Reads word class definitions for class-based language models.
+  ///
+  /// Reads the possible expansions of word classes and their respective
+  /// probabilities. Each expansion appears on a separate line as
+  ///
+  ///   class [p] word1 word2 ...
+  ///
+  /// where class names a word class, p gives the probability for the class
+  /// expansion, and word1 word2 ... defines the word string that the class
+  /// expands to. If p is omitted it is assumed to be 1.
+  ///
+  /// Only works with token pass decoder.
+  ///
+  /// \param file File name.
+  ///
+  /// \exception WordClasses::ParseError If unable to parse a definition.
+  ///
+  void read_word_classes(const char *file, bool quiet=false);
 
   // Lna
   void lna_open(const char *file, int size);
@@ -312,6 +332,9 @@ private:
   NowayLexiconReader m_lexicon_reader;
   Lexicon &m_lexicon;
   const Vocabulary &m_vocabulary;
+#ifdef ENABLE_WORDCLASS_SUPPORT
+  WordClasses m_word_classes;
+#endif
 
   TPLexPrefixTree m_tp_lexicon;
   TPNowayLexReader m_tp_lexicon_reader;

@@ -13,6 +13,7 @@
 #include "history.hh"
 #include "Hmm.hh"
 #include "Vocabulary.hh"
+#include "WordClasses.hh"
 
 // Constructs and maintains the lexical prefix tree.
 
@@ -54,13 +55,19 @@ public:
 
   class LMHistoryWord {
   public:
-    LMHistoryWord(int word_id, int lm_id);
+    LMHistoryWord(int word_id, int lm_id, const WordClasses * classes);
 
-    /// \brief Return the word ID in the dictionary.
+    /// \brief Returns the word ID in the dictionary.
     int word_id() const { return m_word_id; }
 
-    /// \brief Return the word ID in the language model.
+    /// \brief Returns the word ID in the language model.
     int lm_id() const { return m_lm_id; }
+
+#ifdef ENABLE_WORDCLASS_SUPPORT
+    /// \brief Returns the ID of the word class.
+    int class_id() const
+    { return m_class_id; }
+#endif
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
     /// \brief Sets the language model word ID of each component of a multiword.
@@ -83,8 +90,13 @@ public:
     /// Word ID in the language model.
     int m_lm_id;
 
+#ifdef ENABLE_WORDCLASS_SUPPORT
+    /// Word class ID.
+    int m_class_id;
+#endif
+
 #ifdef ENABLE_MULTIWORD_SUPPORT
-    /// Word IDs in the language model of the individual words.
+    /// Word IDs in the language model of the component words.
     std::vector<int> m_component_lm_ids;
 #endif
   };
@@ -343,9 +355,18 @@ private:
 
 //////////////////////////////////////////////////////////////////////
 
-inline TPLexPrefixTree::LMHistoryWord::LMHistoryWord(int word_id_arg, int lm_id_arg)
+inline TPLexPrefixTree::LMHistoryWord::LMHistoryWord(
+		int word_id_arg, int lm_id_arg, const WordClasses * classes)
   : m_word_id(word_id_arg), m_lm_id(lm_id_arg)
 {
+#ifdef ENABLE_WORDCLASS_SUPPORT
+  if (classes != NULL) {
+	  m_class_id = classes->get_membership(m_word_id).class_id;
+  }
+  else {
+    m_class_id = -1;
+  }
+#endif
 #ifdef ENABLE_MULTIWORD_SUPPORT
   m_component_lm_ids.push_back(lm_id_arg);
 #endif
@@ -359,8 +380,8 @@ inline void TPLexPrefixTree::LMHistoryWord::set_component_lm_ids(
 }
 #endif
 
-inline TPLexPrefixTree::LMHistory::LMHistory(const LMHistoryWord & last_word,
-                                           class LMHistory * previous)
+inline TPLexPrefixTree::LMHistory::LMHistory(
+		const LMHistoryWord & last_word, LMHistory * previous)
   : previous(previous),
     reference_count(0),
     printed(false),

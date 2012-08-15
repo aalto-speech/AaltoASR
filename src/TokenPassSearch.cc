@@ -156,7 +156,7 @@ void TokenPassSearch::reset_search(int start_frame)
 	t->lm_log_prob = 0;
 	t->cur_am_log_prob = 0;
 	t->cur_lm_log_prob = 0;
-	TPLexPrefixTree::LMHistoryWord word(-1, -1);
+	TPLexPrefixTree::LMHistoryWord word(-1, -1, NULL);
 	t->lm_history = new TPLexPrefixTree::LMHistory(word, NULL);
 	hist::link(t->lm_history);
 
@@ -182,7 +182,8 @@ void TokenPassSearch::reset_search(int start_frame)
 		t->fsa_lm_node = m_fsa_lm->initial_node_id();
 
 	if (m_use_sentence_boundary) {
-		TPLexPrefixTree::LMHistoryWord word(m_sentence_start_id, m_sentence_start_lm_id);
+		TPLexPrefixTree::LMHistoryWord word(
+				m_sentence_start_id, m_sentence_start_lm_id, m_word_classes);
 		TPLexPrefixTree::LMHistory * sentence_start =
 				new TPLexPrefixTree::LMHistory(word, t->lm_history);
 		hist::unlink(t->lm_history);
@@ -725,12 +726,16 @@ void TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
 			// Add sentence_end and sentence_start and propagate the token with new word history
 			TPLexPrefixTree::LMHistory * temp_lm_history = token->lm_history;
 
-			TPLexPrefixTree::LMHistoryWord sentence_end(m_sentence_end_id, m_sentence_end_lm_id);
-			token->lm_history = new TPLexPrefixTree::LMHistory(sentence_end, token->lm_history);
+			TPLexPrefixTree::LMHistoryWord sentence_end(
+					m_sentence_end_id, m_sentence_end_lm_id, m_word_classes);
+			token->lm_history = new TPLexPrefixTree::LMHistory(
+					sentence_end, token->lm_history);
 			hist::link(token->lm_history);
 			token->lm_history->word_start_frame = m_frame;
-			TPLexPrefixTree::LMHistoryWord sentence_start(m_sentence_start_id, m_sentence_start_lm_id);
-			token->lm_history = new TPLexPrefixTree::LMHistory(sentence_start, token->lm_history);
+			TPLexPrefixTree::LMHistoryWord sentence_start(
+					m_sentence_start_id, m_sentence_start_lm_id, m_word_classes);
+			token->lm_history = new TPLexPrefixTree::LMHistory(
+					sentence_start, token->lm_history);
 			hist::link(token->lm_history);
 			token->lm_history->word_start_frame = m_frame;
 			token->lm_hist_code = compute_lm_hist_hash_code(token->lm_history);
@@ -764,7 +769,8 @@ void TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
 			// Add word_boundary and propagate the token with new word history
 			TPLexPrefixTree::LMHistory * temp_lm_history = token->lm_history;
 
-			TPLexPrefixTree::LMHistoryWord word(m_word_boundary_id, m_word_boundary_lm_id);
+			TPLexPrefixTree::LMHistoryWord word(
+					m_word_boundary_id, m_word_boundary_lm_id, m_word_classes);
 			token->word_start_frame = -1; // FIXME? If m_frame, causes an assert
 			append_to_word_history(*token, word);
 			token->cur_lm_log_prob = token->lm_log_prob;
@@ -865,7 +871,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 
 				// Add the word to lm_history.
 				assert(updated_token.word_start_frame >= 0);
-				TPLexPrefixTree::LMHistoryWord word(word_id, m_lex2lm[word_id]);
+				TPLexPrefixTree::LMHistoryWord word(
+						word_id, m_lex2lm[word_id], m_word_classes);
 #ifdef ENABLE_MULTIWORD_SUPPORT
 				word.set_component_lm_ids(m_multiword_lex2lm[word_id]);
 #endif
@@ -891,12 +898,16 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 
 					// Add sentence start and word boundary to the LM history
 					// after sentence_end_id
-					TPLexPrefixTree::LMHistoryWord sentence_start(m_sentence_start_id, m_sentence_start_lm_id);
+					TPLexPrefixTree::LMHistoryWord sentence_start(
+							m_sentence_start_id, m_sentence_start_lm_id,
+							m_word_classes);
 					updated_token.lm_history = new TPLexPrefixTree::LMHistory(
 							sentence_start, updated_token.lm_history);
 					updated_token.lm_history->word_start_frame = m_frame;
 					if (m_word_boundary_id > 0) {
-						TPLexPrefixTree::LMHistoryWord word_boundary(m_word_boundary_id, m_word_boundary_lm_id);
+						TPLexPrefixTree::LMHistoryWord word_boundary(
+								m_word_boundary_id, m_word_boundary_lm_id,
+								m_word_classes);
 						updated_token.lm_history = new TPLexPrefixTree::LMHistory(
 								word_boundary, updated_token.lm_history);
 						updated_token.lm_history->word_start_frame = m_frame;
@@ -1609,6 +1620,11 @@ int TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
 	return create_word_id_mappings();
 }
 
+void TokenPassSearch::set_word_classes(const WordClasses * x)
+{
+	m_word_classes = x;
+}
+
 int TokenPassSearch::create_word_id_mappings()
 {
 	m_lex2lm.clear();
@@ -2104,8 +2120,10 @@ void TokenPassSearch::update_final_tokens()
 		}
 
 		// Add sentence end in LMHistory.
-		TPLexPrefixTree::LMHistoryWord sentence_end(m_sentence_end_id, m_sentence_end_lm_id);
-		token->lm_history = new TPLexPrefixTree::LMHistory(sentence_end, token->lm_history);
+		TPLexPrefixTree::LMHistoryWord sentence_end(
+				m_sentence_end_id, m_sentence_end_lm_id, m_word_classes);
+		token->lm_history = new TPLexPrefixTree::LMHistory(
+				sentence_end, token->lm_history);
 		hist::link(token->lm_history);
 		token->lm_history->word_start_frame = m_frame;
 		update_lm_log_prob(*token);
