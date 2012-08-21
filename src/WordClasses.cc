@@ -7,12 +7,14 @@
 
 using namespace std;
 
-WordClasses::WordClasses() : m_num_oovs(0)
+WordClasses::WordClasses()
 {
 }
 
-void WordClasses::read(std::istream & is, const Vocabulary & vocabulary)
+void WordClasses::read(std::istream & is, Vocabulary & vocabulary)
 {
+	m_memberships.resize(vocabulary.num_words());
+
 	while (is.good()) {
 		string line;
 		getline(is, line);
@@ -40,13 +42,8 @@ void WordClasses::read(std::istream & is, const Vocabulary & vocabulary)
 		string expansion;
 		getline(iss, expansion);
 
-		word_id_type word_id = vocabulary.word_index(expansion);
-		if (word_id > 0) {
-			add_class_expansion(class_name, probability, word_id);
-		}
-		else {
-			++m_num_oovs;
-		}
+		int word_id = vocabulary.add_word(expansion);
+		add_class_expansion(class_name, probability, word_id);
 	}
 }
 
@@ -56,6 +53,7 @@ void WordClasses::add_class_expansion(
 		word_id_type word_id)
 {
 	Membership membership;
+
 	class_names_type::const_iterator iter =
 			find(m_class_names.begin(), m_class_names.end(), class_name);
 	if (iter == m_class_names.end()) {
@@ -65,18 +63,19 @@ void WordClasses::add_class_expansion(
 	else {
 		membership.class_id = iter - m_class_names.begin();
 	}
+
 	membership.log_prob = log10(probability);
+
+	if (word_id >= m_memberships.size()) {
+		m_memberships.resize(word_id + 1);
+	}
 	m_memberships[word_id] = membership;
 }
 
 const WordClasses::Membership & WordClasses::get_membership(
 		word_id_type word_id) const
 {
-	memberships_type::const_iterator iter = m_memberships.find(word_id);
-	if (iter == m_memberships.end()) {
-		throw invalid_argument("WordClasses::get_membership");
-	}
-	return iter->second;
+	return m_memberships.at(word_id);
 }
 
 const std::string & WordClasses::get_class_name(

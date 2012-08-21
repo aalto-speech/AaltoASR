@@ -101,7 +101,7 @@ public:
   ///
   /// \exception WordClasses::ParseError If unable to parse a definition.
   ///
-  void read_word_classes(const char *file, bool quiet=false);
+  void read_word_classes(const char *file);
 
   // Lna
   void lna_open(const char *file, int size);

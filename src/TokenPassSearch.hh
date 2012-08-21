@@ -225,6 +225,9 @@ public:
 
 	/// \brief Sets the word that represents word boundary.
 	///
+	/// This function has to be called before calling set_ngram() or
+	/// set_fsa_lm().
+	///
 	/// \param word Word boundary. For word models, an empty string should be
 	/// given.
 	///
@@ -254,14 +257,25 @@ public:
 		m_require_sentence_end = s;
 	}
 
+	/// This function has to be called before calling set_ngram() or
+	/// set_fsa_lm().
+	///
 	/// \exception invalid_argument If \a start or \a end is not in vocabulary.
 	///
-	void
-	set_sentence_boundary(const std::string &start, const std::string &end);
+	void set_sentence_boundary(
+			const std::string & start,
+			const std::string & end);
 
 	void clear_hesitation_words();
 
 	void add_hesitation_word(const std::string & word);
+
+	/// \brief Sets the word classes for class-based language models.
+	///
+	/// This function has to be called before calling set_ngram() or
+	/// set_fsa_lm().
+	///
+	void set_word_classes(const WordClasses * classes);
 
 	/// \brief Sets an n-gram language model.
 	///
@@ -283,10 +297,6 @@ public:
 	/// language model.
 	///
 	int set_lookahead_ngram(TreeGram *ngram);
-
-	/// \brief Sets the word classes for class-based language models.
-	///
-	void set_word_classes(const WordClasses * classes);
 
 	/// \brief If set to true, generates a word graph of the hypotheses during
 	/// decoding (requires memory).
@@ -369,13 +379,34 @@ public:
 	float get_total_log_prob(bool use_best_token) const;
 
 private:
-	/// \brief Creates a mapping between word IDs in the lexicon and in the
-	/// language model.
+	/// \brief Creates a lookup table for TPLexPrefixTree::Word structures.
 	///
 	/// \return The number of vocabulary entries that were not found in the
 	/// language model.
 	///
-	int create_word_id_mappings();
+	int create_word_repository();
+
+	/// \brief Finds out the language model ID and class membership log
+	/// probability of a word.
+	///
+	/// If word classes are set using set_word_classes(), assumes that the
+	/// language model is based on classes, and gives the language model ID of
+	/// the corresponding class.
+	///
+	/// If the word does not exist in the class definitions, tries to find it
+	/// from the language model as it is, so that the language model can mix
+	/// classes and regular words.
+	///
+	/// \param lm_id Will be set to the language model ID, or -1 if the word or
+	/// class does not exist in the language model.
+	/// \param cm_log_prob Will be set to the class membership log probability,
+	/// or 0 if the word is not a class definition.
+	///
+	void find_word_from_lm(
+			int word_id,
+			std::string word,
+			int & lm_id,
+			float & cm_log_prob) const;
 
 	/// \brief Finds the globally best token that is in the NODE_FINAL state,
 	/// i.e. at the end of a word.
@@ -430,7 +461,7 @@ private:
 
 	/// \brief Appends a word to the LMHistory of a token.
 	///
-	void append_to_word_history(TPLexPrefixTree::Token & token, const TPLexPrefixTree::LMHistoryWord & word);
+	void append_to_word_history(TPLexPrefixTree::Token & token, const TPLexPrefixTree::Word & word);
 
 	/// \brief Moves token to a connected node.
 	///
@@ -441,14 +472,6 @@ private:
 	///
 	void move_token_to_node(TPLexPrefixTree::Token *token,
 			TPLexPrefixTree::Node *node, float transition_score);
-
-	/// \brief Updated lm_log_prob and lm_hist_code on token after adding a new
-	/// word to the end of its lm_history.
-	///
-	/// \return false if the word (or in case a multiword, one of its
-	/// components) was not found from the language model.
-	///
-	bool update_lm_log_prob(TPLexPrefixTree::Token & token);
 
 	/// \brief Copes new tokens from \ref m_new_token_list to
 	/// \ref m_active_token_list.
@@ -468,6 +491,8 @@ private:
 	bool is_similar_lm_history(TPLexPrefixTree::LMHistory *wh1,
 			TPLexPrefixTree::LMHistory *wh2);
 	int compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh) const;
+
+	// language model scoring
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
 	/// \brief Creates m_history_ngram from at most \a words_needed words from
@@ -492,7 +517,7 @@ private:
 	/// probabilities are not applied until the whole multiword has been
 	/// decoded.
 	///
-	float split_and_compute_lm_log_prob(
+	float split_and_compute_ngram_score(
 			TPLexPrefixTree::LMHistory * history);
 #endif
 
@@ -508,9 +533,29 @@ private:
 	/// \brief Collects words from the LM history into an n-gram and returns its
 	/// language model probability.
 	///
-	float compute_lm_log_prob(TPLexPrefixTree::LMHistory * history);
+	float compute_ngram_score(TPLexPrefixTree::LMHistory * history);
 
-	float get_lm_score(TPLexPrefixTree::LMHistory *lm_hist, int lm_hist_code);
+	/// \brief Returns the probability for the n-gram in the LM history from the
+	/// n-gram LM or its cache.
+	///
+	float get_ngram_score(TPLexPrefixTree::LMHistory *lm_hist, int lm_hist_code);
+
+	/// \brief Moves a token to the next FSA language model node, and adds the
+	/// transition probability to the LM log probability of the token.
+	///
+	/// \return false if the word (or in case a multiword, one of its
+	/// components) was not found from the language model.
+	///
+	bool advance_fsa_lm(TPLexPrefixTree::Token & token);
+
+	/// \brief Updated lm_log_prob and lm_hist_code on token after adding a new
+	/// word to the end of its lm_history.
+	///
+	/// \return false if the word (or in case a multiword, one of its
+	/// components) was not found from the language model.
+	///
+	bool update_lm_log_prob(TPLexPrefixTree::Token & token);
+
 	float get_lm_lookahead_score(TPLexPrefixTree::LMHistory *lm_hist,
 			TPLexPrefixTree::Node *node, int depth);
 
@@ -610,15 +655,17 @@ private:
 	TreeGram *m_ngram;
 	fsalm::LM *m_fsa_lm;
 
-	/// A mapping between word IDs in the dictionary and word IDs in the LM.
-	/// Words that are not found in an n-gram LM are mapped to 0. With FSA LMs
-	/// the unknown word ID is -1.
-	std::vector<int> m_lex2lm;
+	/// This is a repository of TPLexPrefixTree::Word structures, indexed by
+	/// dictionary word ID.
+	std::vector<TPLexPrefixTree::Word> m_word_repository;
+
+	/// A null word (IDs -1) starts every LM history.
+	TPLexPrefixTree::Word m_null_word;
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
 	/// A mapping from a multiword in the dictionary to each of its components
 	/// in the LM.
-	std::vector< std::vector<int> > m_multiword_lex2lm;
+	//std::vector< std::vector<int> > m_multiword_lex2lm;
 
 	/// Should the decoder split multiwords into their components before
 	/// computing LM probabilities?
@@ -629,7 +676,7 @@ private:
 	/// lookahead LM. Words that are not in the lookahead LM are mapped to 0.
 	std::vector<int> m_lex2lookaheadlm;
 
-	TreeGram::Gram m_history_ngram; // Temporary variable used by compute_lm_log_prob().
+	TreeGram::Gram m_history_ngram; // Temporary variable used by compute_ngram_score().
 	TreeGram *m_lookahead_ngram;
 
 	// Options
@@ -646,16 +693,13 @@ private:
 	int m_max_num_tokens;
 	int m_verbose;
 	int m_word_boundary_id;
-	int m_word_boundary_lm_id;
 	int m_lm_lookahead; // 0=none, 1=bigram, 2=trigram
 	int m_max_lookahead_score_list_size;
 	int m_max_node_lookahead_buffer_size;
 	float m_insertion_penalty;
 
 	int m_sentence_start_id;
-	int m_sentence_start_lm_id;
 	int m_sentence_end_id;
-	int m_sentence_end_lm_id;
 	std::vector<int> m_hesitation_ids;
 	bool m_use_sentence_boundary;
 	bool m_generate_word_graph;

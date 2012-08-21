@@ -222,18 +222,13 @@ Toolbox::read_lookahead_ngram(const char *file, const bool binary, bool quiet)
 }
 
 void
-Toolbox::read_word_classes(const char *file, bool quiet)
+Toolbox::read_word_classes(const char *file)
 {
   assert(!m_use_stack_decoder);
 
   ifstream ifs(file);
   m_word_classes.read(ifs, m_tp_vocabulary);
   m_tp_search.set_word_classes(&m_word_classes);
-
-  int num_oovs = m_word_classes.num_oovs();
-  if ((num_oovs > 0) && !quiet) {
-    cerr << num_oovs << " words in the class definitions were not found in the vocabulary." << endl;
-  }
 }
 
 void

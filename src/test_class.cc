@@ -28,7 +28,7 @@ int main(int argc, char * argv[])
 	t.select_decoder(0);
 	t.hmm_read("/share/puhe/jpylkkon/hmms/wsj_284_ml_gain4000_occ400_17.11.2010_25.ph");
 	t.lex_read("/share/puhe/jpylkkon/wsj/lm_20k.lex");
-	t.read_word_classes("/share/puhe/funesomo12/classes/myicsifshswb.classes", false);
+	t.read_word_classes("/share/puhe/funesomo12/classes/myicsifshswb.classes");
 
 	cout << "All good." << endl;
 	return EXIT_SUCCESS;

@@ -30,12 +30,6 @@ public:
 
 	WordClasses();
 
-	bool empty() const
-	{ return m_class_names.empty(); }
-
-	int num_oovs() const
-	{ return m_num_oovs; }
-
 	/// \brief Reads word class definitions from a text stream.
 	///
 	/// Reads the possible expansions of word classes and their respective
@@ -47,12 +41,18 @@ public:
 	/// expansion, and word1 word2 ... defines the word string that the class
 	/// expands to. If p is omitted it is assumed to be 1.
 	///
+	/// OOV words are added to the vocabulary. In theory it's possible that a
+	/// multiword component is not found from the vocabulary as an individual
+	/// word. In that case it doesn't have a word ID at the time the class
+	/// definitions are read. It won't prevent using them as long as they exist
+	/// in the language model.
+	///
 	/// \param is Input stream for reading the textual definitions.
 	/// \param vocabulary Vocabulary for translating words in word IDs.
 	///
 	/// \exception ParseError If unable to parse a definition.
 	///
-	void read(std::istream & is, const Vocabulary & vocabulary);
+	void read(std::istream & is, Vocabulary & vocabulary);
 
 	void add_class_expansion(
 			const std::string & class_name,
@@ -64,15 +64,12 @@ public:
 	const std::string & get_class_name(class_id_type class_id) const;
 
 private:
-	typedef std::map<word_id_type, Membership> memberships_type;
+	typedef std::vector<Membership> memberships_type;
 
 	class_names_type m_class_names;
 
 	/// A mapping from word ID to class membership.
 	memberships_type m_memberships;
-
-	/// Number of OOVs encountered in class definitions.
-	int m_num_oovs;
 };
 
 #endif
