@@ -376,6 +376,12 @@ public:
 	///
 	float get_total_log_prob(bool use_best_token) const;
 
+	/// \brief For unit testing.
+	const std::vector<LMHistory::Word> & get_word_repository() const;
+	const WordClasses * get_word_classes() const;
+	const Vocabulary & get_vocabulary() const;
+	const TreeGram * get_ngram() const;
+
 private:
 	/// \brief Creates a lookup table for LMHistory::Word structures.
 	///

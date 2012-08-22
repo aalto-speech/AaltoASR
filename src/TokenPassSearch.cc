@@ -571,6 +571,26 @@ float TokenPassSearch::get_total_log_prob(bool get_best_path) const
 	return token.total_log_prob;
 }
 
+const std::vector<LMHistory::Word> & TokenPassSearch::get_word_repository() const
+{
+	return m_word_repository;
+}
+
+const WordClasses * TokenPassSearch::get_word_classes() const
+{
+	return m_word_classes;
+}
+
+const Vocabulary & TokenPassSearch::get_vocabulary() const
+{
+	return m_vocabulary;
+}
+
+const TreeGram * TokenPassSearch::get_ngram() const
+{
+	return m_ngram;
+}
+
 const TPLexPrefixTree::Token &
 TokenPassSearch::get_best_final_token() const
 {
@@ -1605,9 +1625,7 @@ int TokenPassSearch::create_word_repository()
 		int lm_id;
 		float cm_log_prob;
 		find_word_from_lm(i, word, lm_id, cm_log_prob);
-		if ((lm_id < 0) && (i != 0)) {
-			++num_not_found;
-		}
+		bool not_found = (lm_id < 0) && (i != 0);
 		m_word_repository[i].set_ids(i, lm_id);
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
@@ -1641,7 +1659,7 @@ int TokenPassSearch::create_word_repository()
 							component_cm_log_prob);
 					m_word_repository[i].add_component(lm_id);
 					if ((lm_id < 0) && (i != 0)) {
-						++num_not_found;
+						not_found = true;
 					}
 					cm_log_prob += component_cm_log_prob;
 				}
@@ -1655,6 +1673,10 @@ int TokenPassSearch::create_word_repository()
 #endif
 
 		m_word_repository[i].set_cm_log_prob(cm_log_prob);
+
+		if (not_found) {
+			++num_not_found;
+		}
 	}
 
 	return num_not_found;
@@ -1674,11 +1696,6 @@ void TokenPassSearch::find_word_from_lm(int word_id, std::string word,
 		catch (out_of_range &) {
 			// The word does not exist in the class definitions. See if it
 			// exists in the language model as it is.
-			if (m_verbose > 0) {
-				cerr
-						<< "TokenPassSearch::find_word_from_lm: Word is not a member of any class: "
-						<< word << endl;
-			}
 			cm_log_prob = 0;
 		}
 	}
@@ -1695,12 +1712,6 @@ void TokenPassSearch::find_word_from_lm(int word_id, std::string word,
 			// Vocabulary::word_index() returns 0 for unknown words.
 			lm_id = -1;
 		}
-	}
-
-	if ((lm_id < 0) && (m_verbose > 0)) {
-		cerr
-				<< "TokenPassSearch::find_word_from_lm: Word or class does not exist in language model: "
-				<< word << endl;
 	}
 }
 

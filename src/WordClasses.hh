@@ -24,7 +24,12 @@ public:
 	};
 
 	struct Membership {
+		Membership() : class_id(-1), log_prob(0) {}
+
+		/// Index to class name table, or -1 if not found in class definitions.
 		class_id_type class_id;
+
+		/// Class membership log probability.
 		float log_prob;
 	};
 
