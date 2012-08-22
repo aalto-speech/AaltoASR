@@ -10,11 +10,12 @@
 #include "TPLexPrefixTree.hh"
 #include "TreeGram.hh"
 #include "Acoustics.hh"
+#include "LMHistory.hh"
 
 #define MAX_WC_COUNT 200
 #define MAX_LEX_TREE_DEPTH 60
 
-typedef std::vector<TPLexPrefixTree::LMHistory*> HistoryVector;
+typedef std::vector<LMHistory*> HistoryVector;
 
 class TokenPassSearch
 {
@@ -22,7 +23,7 @@ public:
 	struct CannotGenerateWordGraph: public std::runtime_error
 	{
 		CannotGenerateWordGraph(const std::string & message) :
-			std::runtime_error(message)
+				std::runtime_error(message)
 		{
 		}
 	};
@@ -30,8 +31,8 @@ public:
 	struct WordGraphNotGenerated: public std::runtime_error
 	{
 		WordGraphNotGenerated() :
-			std::runtime_error(
-					"Word graph was requested but it has not been generated.")
+				std::runtime_error(
+						"Word graph was requested but it has not been generated.")
 		{
 		}
 	};
@@ -39,7 +40,7 @@ public:
 	struct InvalidSetup: public std::runtime_error
 	{
 		InvalidSetup(const std::string & message) :
-			std::runtime_error(message)
+				std::runtime_error(message)
 		{
 		}
 	};
@@ -47,7 +48,7 @@ public:
 	struct IOError: public std::runtime_error
 	{
 		IOError(const std::string & message) :
-			std::runtime_error(message)
+				std::runtime_error(message)
 		{
 		}
 	};
@@ -133,13 +134,12 @@ public:
 	/// If \a use_best_token is true, finds the active token that is in the
 	/// NODE_FINAL state i.e. at the end of a word, with the highest
 	/// probability. Otherwise finds any active token. Then writes the
-	/// TPLexPrefixTree::LMHistory objects in the lm_history of that token into
+	/// LMHistory objects in the lm_history of that token into
 	/// a vector.
 	///
 	/// \param vec The vector where the result will be written.
 	///
-	void get_path(HistoryVector &vec, bool use_best_token,
-			TPLexPrefixTree::LMHistory *limit);
+	void get_path(HistoryVector &vec, bool use_best_token, LMHistory *limit);
 
 	// Options
 	void set_acoustics(Acoustics *acoustics)
@@ -262,8 +262,7 @@ public:
 	///
 	/// \exception invalid_argument If \a start or \a end is not in vocabulary.
 	///
-	void set_sentence_boundary(
-			const std::string & start,
+	void set_sentence_boundary(const std::string & start,
 			const std::string & end);
 
 	void clear_hesitation_words();
@@ -342,8 +341,7 @@ public:
 	void write_word_graph(const std::string &file_name);
 	void write_word_graph(FILE *file);
 
-	void debug_ensure_all_paths_contain_history(
-			TPLexPrefixTree::LMHistory *limit);
+	void debug_ensure_all_paths_contain_history(LMHistory *limit);
 
 	/// \brief Returns the logarithmic AM probability of an active token.
 	///
@@ -379,7 +377,7 @@ public:
 	float get_total_log_prob(bool use_best_token) const;
 
 private:
-	/// \brief Creates a lookup table for TPLexPrefixTree::Word structures.
+	/// \brief Creates a lookup table for LMHistory::Word structures.
 	///
 	/// \return The number of vocabulary entries that were not found in the
 	/// language model.
@@ -402,10 +400,7 @@ private:
 	/// \param cm_log_prob Will be set to the class membership log probability,
 	/// or 0 if the word is not a class definition.
 	///
-	void find_word_from_lm(
-			int word_id,
-			std::string word,
-			int & lm_id,
+	void find_word_from_lm(int word_id, std::string word, int & lm_id,
 			float & cm_log_prob) const;
 
 	/// \brief Finds the globally best token that is in the NODE_FINAL state,
@@ -461,7 +456,8 @@ private:
 
 	/// \brief Appends a word to the LMHistory of a token.
 	///
-	void append_to_word_history(TPLexPrefixTree::Token & token, const TPLexPrefixTree::Word & word);
+	void append_to_word_history(TPLexPrefixTree::Token & token,
+			const LMHistory::Word & word);
 
 	/// \brief Moves token to a connected node.
 	///
@@ -485,12 +481,10 @@ private:
 	TPLexPrefixTree::Token*
 	find_similar_fsa_token(int fsa_lm_node, TPLexPrefixTree::Token *token_list);
 
-	TPLexPrefixTree::Token* find_similar_lm_history(
-			TPLexPrefixTree::LMHistory *wh, int lm_hist_code,
-			TPLexPrefixTree::Token *token_list);
-	bool is_similar_lm_history(TPLexPrefixTree::LMHistory *wh1,
-			TPLexPrefixTree::LMHistory *wh2);
-	int compute_lm_hist_hash_code(TPLexPrefixTree::LMHistory *wh) const;
+	TPLexPrefixTree::Token* find_similar_lm_history(LMHistory *wh,
+			int lm_hist_code, TPLexPrefixTree::Token *token_list);
+	bool is_similar_lm_history(LMHistory *wh1, LMHistory *wh2);
+	int compute_lm_hist_hash_code(LMHistory *wh) const;
 
 	// language model scoring
 
@@ -504,10 +498,8 @@ private:
 	/// considered. This is needed to be able to compile a history that ends in
 	/// any of the components of a final multiword.
 	///
-	void split_and_create_history_ngram(
-			TPLexPrefixTree::LMHistory * history,
-			int final_components,
-			int words_needed);
+	void split_and_create_history_ngram(LMHistory * history,
+			int final_components, int words_needed);
 
 	/// \brief Collects words from the LM history into an n-gram and returns its
 	/// language model probability.
@@ -517,8 +509,7 @@ private:
 	/// probabilities are not applied until the whole multiword has been
 	/// decoded.
 	///
-	float split_and_compute_ngram_score(
-			TPLexPrefixTree::LMHistory * history);
+	float split_and_compute_ngram_score(LMHistory * history);
 #endif
 
 	/// \brief Creates m_history_ngram from at most \a words_needed words from
@@ -526,19 +517,17 @@ private:
 	/// number of words added is smaller if the beginning of history is reached
 	/// sooner, or a sentence start is encountered.
 	///
-	void create_history_ngram(
-			TPLexPrefixTree::LMHistory * history,
-			int words_needed);
+	void create_history_ngram(LMHistory * history, int words_needed);
 
 	/// \brief Collects words from the LM history into an n-gram and returns its
 	/// language model probability.
 	///
-	float compute_ngram_score(TPLexPrefixTree::LMHistory * history);
+	float compute_ngram_score(LMHistory * history);
 
 	/// \brief Returns the probability for the n-gram in the LM history from the
 	/// n-gram LM or its cache.
 	///
-	float get_ngram_score(TPLexPrefixTree::LMHistory *lm_hist, int lm_hist_code);
+	float get_ngram_score(LMHistory *lm_hist, int lm_hist_code);
 
 	/// \brief Moves a token to the next FSA language model node, and adds the
 	/// transition probability to the LM log probability of the token.
@@ -556,14 +545,14 @@ private:
 	///
 	bool update_lm_log_prob(TPLexPrefixTree::Token & token);
 
-	float get_lm_lookahead_score(TPLexPrefixTree::LMHistory *lm_hist,
+	float get_lm_lookahead_score(LMHistory *lm_hist,
 			TPLexPrefixTree::Node *node, int depth);
 
 	/// \brief Computes bi-gram probabilities for every word pair starting with
 	/// \a prev_word_id using the lookahead LM, and returns the maximum.
 	///
-	float get_lm_bigram_lookahead(int prev_word_id,
-			TPLexPrefixTree::Node *node, int depth);
+	float get_lm_bigram_lookahead(int prev_word_id, TPLexPrefixTree::Node *node,
+			int depth);
 
 	float get_lm_trigram_lookahead(int w1, int w2, TPLexPrefixTree::Node *node,
 			int depth);
@@ -630,14 +619,14 @@ private:
 		struct Item
 		{
 			Item() :
-				lex_node_id(-1), graph_node_id(-1)
+					lex_node_id(-1), graph_node_id(-1)
 			{
 			}
 			int lex_node_id;
 			int graph_node_id;
 		};
 		WordGraphInfo() :
-			frame(-1)
+				frame(-1)
 		{
 		}
 		int frame;
@@ -655,12 +644,12 @@ private:
 	TreeGram *m_ngram;
 	fsalm::LM *m_fsa_lm;
 
-	/// This is a repository of TPLexPrefixTree::Word structures, indexed by
+	/// This is a repository of LMHistory::Word structures, indexed by
 	/// dictionary word ID.
-	std::vector<TPLexPrefixTree::Word> m_word_repository;
+	std::vector<LMHistory::Word> m_word_repository;
 
 	/// A null word (IDs -1) starts every LM history.
-	TPLexPrefixTree::Word m_null_word;
+	LMHistory::Word m_null_word;
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
 	/// A mapping from a multiword in the dictionary to each of its components
@@ -735,8 +724,10 @@ private:
 	// FIXME: remove debug
 public:
 	void debug_print_best_lm_history();
-	void debug_print_token_lm_history(FILE * file, const TPLexPrefixTree::Token & token);
-	void debug_print_token_word_history(FILE * file, const TPLexPrefixTree::Token & token);
+	void debug_print_token_lm_history(FILE * file,
+			const TPLexPrefixTree::Token & token);
+	void debug_print_token_word_history(FILE * file,
+			const TPLexPrefixTree::Token & token);
 };
 
 #endif // TOKENPASSSEARCH_HH

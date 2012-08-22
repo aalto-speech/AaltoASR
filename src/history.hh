@@ -2,6 +2,7 @@
 #define HISTORY_HH
 
 #include <cstddef>  // NULL
+#include <cassert>
 
 namespace hist {
 

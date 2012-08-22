@@ -16,6 +16,7 @@ libdecoder_srcs = ArpaNgramReader.cc \
 	GramSorter.cc \
 	Hmm.cc \
 	Lexicon.cc \
+	LMHistory.cc \
 	LnaReaderCircular.cc \
 	Ngram.cc \
 	NowayHmmReader.cc \

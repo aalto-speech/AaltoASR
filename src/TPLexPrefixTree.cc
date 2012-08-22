@@ -30,29 +30,6 @@ int safe_toupper(int c)
 	return toupper(c);
 }
 
-TPLexPrefixTree::Word::Word() :
-		m_word_id(-1), m_lm_id(-1), m_cm_log_prob(0)
-{
-}
-
-void TPLexPrefixTree::Word::set_ids(int word_id, int lm_id)
-{
-  m_word_id = word_id;
-  m_lm_id = lm_id;
-}
-
-void TPLexPrefixTree::Word::set_cm_log_prob(float cm_log_prob)
-{
-  m_cm_log_prob = cm_log_prob;
-}
-
-#ifdef ENABLE_MULTIWORD_SUPPORT
-void TPLexPrefixTree::Word::add_component(int lm_id)
-{
-  m_component_lm_ids.push_back(lm_id);
-}
-#endif
-
 TPLexPrefixTree::TPLexPrefixTree(std::map<std::string, int> &hmm_map,
 		std::vector<Hmm> &hmms) :
 	m_words(0), m_verbose(0), m_lm_lookahead(0), m_silence_is_word(true),
