@@ -59,6 +59,12 @@ public:
 			float probability,
 			word_id_type word_id);
 
+	/// \brief Returns a reference to the class membership (we assume at most
+	/// one class per word) given a word ID.
+	///
+	/// \exception std::out_of_range If the word does not exist in the class
+	/// definitions.
+	///
 	const Membership & get_membership(word_id_type word_id) const;
 
 	const std::string & get_class_name(class_id_type class_id) const;

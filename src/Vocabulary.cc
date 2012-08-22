@@ -1,5 +1,6 @@
 // Conversion of words to word indices and vice versa.
 #include <cerrno>
+#include <iostream>
 
 #include "misc/io.hh"
 #include "Vocabulary.hh"

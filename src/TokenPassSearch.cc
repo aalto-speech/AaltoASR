@@ -1561,6 +1561,12 @@ int TokenPassSearch::create_word_repository()
 
 	for (int i = 0; i < m_vocabulary.num_words(); ++i) {
 		const string & word = m_vocabulary.word(i);
+		if (word.size() == 0) {
+			if (m_verbose > 0) {
+				cerr << "TokenPassSearch::create_word_repository: Ignoring empty word in vocabulary." << endl;
+			}
+			continue;
+		}
 
 		int lm_id;
 		float cm_log_prob;
@@ -1571,30 +1577,43 @@ int TokenPassSearch::create_word_repository()
 		m_word_repository[i].set_ids(i, lm_id);
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
-		cm_log_prob = 0;
-		string::const_iterator component_first = word.begin();
-		while (true) {
-			string::const_iterator component_last =
-					find(component_first, word.end(), '_');
-			string component(component_first, component_last);
-			// In theory it's possible that multiword components are not found
-			// from the vocabulary as individual words. It won't prevent using
-			// them as long as they exist in the language model. Just make sure
-			// we have a word ID for every component.
-			int word_id = m_vocabulary.add_word(component);
-
-			float component_cm_log_prob;
-			find_word_from_lm(word_id, component, lm_id, component_cm_log_prob);
+		if (word[0] == '_') {
+			// Don't treat silences as multiwords.
 			m_word_repository[i].add_component(lm_id);
-			if ((lm_id < 0) && (i != 0)) {
-				++num_not_found;
-			}
-			cm_log_prob += component_cm_log_prob;
+		}
+		else {
+			cm_log_prob = 0;
+			string::const_iterator component_first = word.begin();
+			while (true) {
+				string::const_iterator component_last =
+						find(component_first, word.end(), '_');
+				string component(component_first, component_last);
+				if (component.size() == 0) {
+					if (m_verbose > 0) {
+						cerr << "TokenPassSearch::create_word_repository: Ignoring empty multiword component in '" << word << "'." << endl;
+					}
+				}
+				else {
+					// In theory it's possible that multiword components are not found
+					// from the vocabulary as individual words. It won't prevent using
+					// them as long as they exist in the language model. Just make sure
+					// we have a word ID for every component.
+					int word_id = m_vocabulary.add_word(component);
 
-			if (component_last == word.end())
-				break;
-			component_first = component_last;
-			++component_first;  // Skip the underscore we found last time.
+					float component_cm_log_prob;
+					find_word_from_lm(word_id, component, lm_id, component_cm_log_prob);
+					m_word_repository[i].add_component(lm_id);
+					if ((lm_id < 0) && (i != 0)) {
+						++num_not_found;
+					}
+					cm_log_prob += component_cm_log_prob;
+				}
+
+				if (component_last == word.end())
+					break;
+				component_first = component_last;
+				++component_first;  // Skip the underscore we found last time.
+			}
 		}
 #endif
 
@@ -1615,9 +1634,12 @@ void TokenPassSearch::find_word_from_lm(
 			cm_log_prob = class_membership.log_prob;
 			word = m_word_classes->get_class_name(class_membership.class_id);
 		}
-		catch (invalid_argument &) {
+		catch (out_of_range &) {
 			// The word does not exist in the class definitions. See if it
 			// exists in the language model as it is.
+			if (m_verbose > 0) {
+				cerr << "TokenPassSearch::find_word_from_lm: Word is not a member of any class: " << word << endl;
+			}
 			cm_log_prob = 0;
 		}
 	}
@@ -1634,6 +1656,10 @@ void TokenPassSearch::find_word_from_lm(
 			// Vocabulary::word_index() returns 0 for unknown words.
 			lm_id = -1;
 		}
+	}
+
+	if ((lm_id < 0) && (m_verbose > 0)) {
+		cerr << "TokenPassSearch::find_word_from_lm: Word or class does not exist in language model: " << word << endl;
 	}
 }
 
