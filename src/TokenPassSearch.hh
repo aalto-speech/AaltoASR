@@ -538,18 +538,12 @@ private:
 	/// \brief Moves a token to the next FSA language model node, and adds the
 	/// transition probability to the LM log probability of the token.
 	///
-	/// \return false if the word (or in case a multiword, one of its
-	/// components) was not found from the language model.
-	///
-	bool advance_fsa_lm(TPLexPrefixTree::Token & token);
+	void advance_fsa_lm(TPLexPrefixTree::Token & token);
 
 	/// \brief Updated lm_log_prob and lm_hist_code on token after adding a new
 	/// word to the end of its lm_history.
 	///
-	/// \return false if the word (or in case a multiword, one of its
-	/// components) was not found from the language model.
-	///
-	bool update_lm_log_prob(TPLexPrefixTree::Token & token);
+	void update_lm_log_prob(TPLexPrefixTree::Token & token);
 
 	float get_lm_lookahead_score(LMHistory *lm_hist,
 			TPLexPrefixTree::Node *node, int depth);

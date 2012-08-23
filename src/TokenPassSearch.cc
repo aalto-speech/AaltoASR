@@ -871,26 +871,47 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 		if (!(updated_token.node->flags & NODE_AFTER_WORD_ID)) {
 
 			int word_id = updated_token.node->word_id;
-			if (word_id != -1) // Is word ID unique?
-					{
+			// Is word ID unique?
+			if (word_id != -1) {
+				const LMHistory::Word & word = m_word_repository[word_id];
+
+				// Prune words that don't exist (or whose all multiword
+				// components don't exist) in the language model.
+#ifdef ENABLE_MULTIWORD_SUPPORT
+				if (!m_split_multiwords) {
+					if (word.lm_id() < 0) {
+						return;
+					}
+				}
+				else {
+					for (int i = 0; i < word.num_components(); ++i) {
+						if (word.component_lm_id(i) < 0)
+							return;
+					}
+				}
+#else
+				if (word.lm_id() < 0) {
+					return;
+				}
+#endif
+
 				// Prune two subsequent word boundaries
-				if (word_id == m_word_boundary_id
-						&& token->lm_history->last().word_id()
-								== m_word_boundary_id) {
+				if ((word_id == m_word_boundary_id)
+						&& (token->lm_history->last().word_id()
+								== m_word_boundary_id)) {
 					return;
 				}
 
 				// Add the word to lm_history.
 				assert(updated_token.word_start_frame >= 0);
-				updated_token.lm_history = new LMHistory(
-						m_word_repository[word_id], token->lm_history);
+				updated_token.lm_history = new LMHistory(word,
+						token->lm_history);
 				updated_token.lm_history->word_start_frame =
 						updated_token.word_start_frame;
 				updated_token.word_start_frame = -1;
 				auto_lm_history.adopt(updated_token.lm_history);
 
-				if (!update_lm_log_prob(updated_token))
-					return;
+				update_lm_log_prob(updated_token);
 
 				updated_token.cur_lm_log_prob = updated_token.lm_log_prob;
 				updated_token.word_count++;
@@ -1882,45 +1903,34 @@ float TokenPassSearch::get_ngram_score(LMHistory *lm_hist, int lm_hist_code)
 	return score;
 }
 
-bool TokenPassSearch::advance_fsa_lm(TPLexPrefixTree::Token & token)
+void TokenPassSearch::advance_fsa_lm(TPLexPrefixTree::Token & token)
 {
 	const LMHistory::Word & word = token.lm_history->last();
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
 	if (m_split_multiwords) {
 		for (int i = 0; i < word.num_components(); ++i) {
-			int lm_id = word.component_lm_id(i);
-			if (lm_id < 0)
-				return false;
-			token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node, lm_id,
+			token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node, word.lm_id(),
 					&token.lm_log_prob);
 		}
 	}
 	else {
-		int lm_id = word.lm_id();
-		if (lm_id < 0)
-			return false;
 		token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node, word.lm_id(),
 				&token.lm_log_prob);
 	}
 #else
-	int lm_id = word.lm_id();
-	if (lm_id < 0)
-	return false;
 	token.fsa_lm_node = m_fsa_lm->walk(token.fsa_lm_node,
 			word.lm_id(), &token.lm_log_prob);
 #endif
-	return true;
 }
 
-bool TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
+void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 {
 	const LMHistory::Word & word = token.lm_history->last();
 
 	if (m_fsa_lm) {
 		if (word.word_id() != m_sentence_start_id) {
-			if (!advance_fsa_lm(token))
-				return false;
+			advance_fsa_lm(token);
 			token.lm_log_prob += word.cm_log_prob();
 			token.lm_log_prob += m_insertion_penalty;
 		}
@@ -1940,7 +1950,6 @@ bool TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 #endif
 		}
 	}
-	return true;
 }
 
 // Note! Doesn't work if the sentence end is the first one in the word history
