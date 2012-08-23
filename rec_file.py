@@ -7,7 +7,7 @@ import os
 import re
 
 # Set your decoder swig path in here!
-sys.path.append("/home/jpylkkon/decoder/src/swig");
+sys.path.append(os.path.dirname(sys.argv[0]) + "/src/swig");
 
 import Decoder
 
