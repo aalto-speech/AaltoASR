@@ -35,6 +35,12 @@ sys.path.append(os.path.dirname(sys.argv[0]) + "/src/swig");
 
 import Decoder
 
+def time_command(command):
+	if os.path.isfile('/usr/bin/time'):
+		return ['/usr/bin/time', '-f', 'CPU seconds used: %e'] + command
+	else:
+		return command
+
 ##################################################
 # From Wikibooks
 # http://en.wikibooks.org/wiki/Algorithm_implementation/Strings/Levenshtein_distance#Python
@@ -124,7 +130,6 @@ speech_directory = args[1]
 output_file = args[2]
 
 akupath = os.path.dirname(sys.argv[0]) + "/../aku"
-timepath = '/usr/bin/time'
 
 ac_model = model_directory + "/" + options.am
 hmms = ac_model + ".ph"
@@ -179,20 +184,16 @@ recipe_file.flush()
 print "Computing state probabilities."
 if False:
 	# No optimization.
-	command = [timepath, \
-			"-f", "CPU seconds used: %e", \
-			akupath + "/phone_probs", \
+	command = time_command([akupath + "/phone_probs", \
 			"-b", ac_model, \
 			"-c", ac_model + ".cfg", \
 			"-r", recipe_file.name, \
 			"--lnabytes=4", \
 			"-o", speech_directory, \
-			"-i", "1"]
+			"-i", "1"])
 else:
 	# Approximate Gaussian by cluster centers.
-	command = [timepath, \
-			"-f", "CPU seconds used: %e", \
-			akupath + "/phone_probs", \
+	command = time_command([akupath + "/phone_probs", \
 			"-b", ac_model, \
 			"-c", ac_model + ".cfg", \
 			"-r", recipe_file.name, \
@@ -200,7 +201,7 @@ else:
 			"--lnabytes=4", \
 			"-o", speech_directory, \
 			"--eval-ming", "0.25", \
-			"-i", "1"]
+			"-i", "1"])
 try:
 	result = subprocess.check_call(command)
 except subprocess.CalledProcessError as e:
