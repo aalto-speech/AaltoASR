@@ -14,7 +14,7 @@
 # Example:
 #   rec_hammaspuhe.py /share/puhe/hammaspuhe/models \
 #     /share/puhe/hammaspuhe/audio/free_complete output.csv \
-#     -a speechdat_gain5000_occ300_23.2.2009_22 -l free
+#     -a speecon_all_multicondition_mmi_kld0.002_6 -l free
 
 import time
 import string
