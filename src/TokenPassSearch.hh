@@ -197,10 +197,14 @@ public:
 	{
 		m_max_num_tokens = tokens;
 	}
+
+#ifdef ENABLE_MULTIWORD_SUPPORT
 	void set_split_multiwords(bool value)
 	{
 		m_split_multiwords = value;
 	}
+#endif
+
 	void set_print_probs(bool value)
 	{
 		m_print_probs = value;

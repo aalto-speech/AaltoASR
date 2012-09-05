@@ -207,7 +207,11 @@ public:
   /// This is useful for resolving multiword probabilities with a LM that does
   /// not use multiwords.
   ///
-  void set_split_multiwords(bool b) { m_tp_search.set_split_multiwords(b); }
+  void set_split_multiwords(bool b) {
+#ifdef ENABLE_MULTIWORD_SUPPORT
+	  m_tp_search.set_split_multiwords(b);
+#endif
+  }
 
   /// \brief Enables or disables lookahead language model.
   ///
