@@ -1402,10 +1402,9 @@ int TokenPassSearch::compute_lm_hist_hash_code(LMHistory *wh) const
 	return code & 0x7fffffff;
 }
 
-void TokenPassSearch::prune_tokens(void)
+void TokenPassSearch::prune_tokens()
 {
 	int i;
-	std::vector<TPLexPrefixTree::Token*> *temp;
 	int num_active_tokens;
 	float beam_limit = m_best_log_prob - m_current_glob_beam; //m_global_beam;
 	float we_beam_limit = m_best_we_log_prob - m_current_we_beam;
@@ -1420,7 +1419,7 @@ void TokenPassSearch::prune_tokens(void)
 			release_token((*m_active_token_list)[i]);
 	}
 	m_active_token_list->clear();
-	temp = m_active_token_list;
+	std::vector<TPLexPrefixTree::Token *> * temp = m_active_token_list;
 	m_active_token_list = m_new_token_list;
 	m_new_token_list = temp;
 
