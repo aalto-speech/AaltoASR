@@ -656,10 +656,6 @@ private:
 	LMHistory::Word m_null_word;
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
-	/// A mapping from a multiword in the dictionary to each of its components
-	/// in the LM.
-	//std::vector< std::vector<int> > m_multiword_lex2lm;
-
 	/// Should the decoder split multiwords into their components before
 	/// computing LM probabilities?
 	bool m_split_multiwords;
