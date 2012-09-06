@@ -35,7 +35,12 @@ using namespace std;
 
 TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
 		Acoustics *acoustics) :
-		m_lexicon(lex), m_vocabulary(vocab), m_acoustics(acoustics)
+		m_lexicon(lex),
+		m_vocabulary(vocab),
+#ifdef ENABLE_WORDCLASS_SUPPORT
+		m_word_classes(NULL),
+#endif
+		m_acoustics(acoustics)
 {
 	m_end_frame = -1;
 	m_global_beam = 1e10;
