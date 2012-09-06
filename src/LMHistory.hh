@@ -6,8 +6,10 @@
 #include "config.hh"
 #include "history.hh"
 
-struct LMHistory
+
+class LMHistory
 {
+public:
 	class Word
 	{
 	public:
@@ -122,7 +124,6 @@ struct LMHistory
 		return m_last_word;
 	}
 
-public:
 	LMHistory * previous;
 	int reference_count;
 	bool printed;
