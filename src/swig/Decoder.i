@@ -108,6 +108,7 @@ public:
   int ngram_read(const char *file, float weight);
   void fsa_lm_read(const char *file, bool binary, bool quiet);
   void fsa_lm_read(const char *file, bool binary);
+  void read_word_classes(const char *file);
   void read_lookahead_ngram(const char *file, const bool binary, bool quiet);
   void read_lookahead_ngram(const char *file, const bool binary);
   void read_lookahead_ngram(const char *file);
