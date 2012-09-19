@@ -1713,7 +1713,7 @@ void TokenPassSearch::find_word_from_lm(int word_id, std::string word,
 #ifdef ENABLE_WORDCLASS_SUPPORT
 	if (m_word_classes != NULL) {
 		try {
-			WordClasses::Membership class_membership =
+			const WordClasses::Membership & class_membership =
 					m_word_classes->get_membership(word_id);
 			cm_log_prob = class_membership.log_prob;
 			word = m_word_classes->get_class_name(class_membership.class_id);
