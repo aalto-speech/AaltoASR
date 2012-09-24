@@ -35,12 +35,11 @@ using namespace std;
 
 TokenPassSearch::TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
 		Acoustics *acoustics) :
-		m_lexicon(lex),
-		m_vocabulary(vocab),
+		m_lexicon(lex), m_vocabulary(vocab),
 #ifdef ENABLE_WORDCLASS_SUPPORT
-		m_word_classes(NULL),
+				m_word_classes(NULL),
 #endif
-		m_acoustics(acoustics)
+				m_acoustics(acoustics)
 {
 	m_end_frame = -1;
 	m_global_beam = 1e10;
@@ -1331,41 +1330,22 @@ TokenPassSearch::find_similar_fsa_token(int fsa_lm_node,
 	return token;
 }
 
-// Note! Doesn't work if the sentence end is the first one in the word history
 TPLexPrefixTree::Token*
 TokenPassSearch::find_similar_lm_history(LMHistory *wh, int lm_hist_code,
 		TPLexPrefixTree::Token *token_list)
 {
-	TPLexPrefixTree::Token *cur_token = token_list;
 	assert(!m_fsa_lm);
 
-	while (cur_token != NULL) {
-		if (lm_hist_code == cur_token->lm_hist_code) {
-			LMHistory *wh1 = wh;
-			LMHistory *wh2 = cur_token->lm_history;
-			for (int j = 0; j < m_similar_lm_hist_span; j++) {
-				if (wh1->last().word_id() == -1
-						|| wh1->last().word_id() == m_sentence_end_id) {
-					if (wh2->last().word_id() == -1
-							|| wh2->last().word_id() == m_sentence_end_id)
-						return cur_token;
-					goto find_similar_skip;
-				}
-				if (wh1->last().word_id() != wh2->last().word_id())
-					goto find_similar_skip;
-				wh1 = wh1->previous;
-				wh2 = wh2->previous;
-			}
+	TPLexPrefixTree::Token *cur_token = token_list;
+	for (; cur_token != NULL; cur_token = cur_token->next_node_token) {
+		if ((lm_hist_code == cur_token->lm_hist_code)
+				&& (is_similar_lm_history(wh, cur_token->lm_history))) {
 			return cur_token;
-			//if (is_similar_lm_history(wh, cur_token->lm_history))
-			//  break;
 		}
-		find_similar_skip: cur_token = cur_token->next_node_token;
 	}
-	return cur_token;
+	return cur_token;  // NULL
 }
 
-// Note! Doesn't work if the sentence end is the first one in the word history
 inline bool TokenPassSearch::is_similar_lm_history(LMHistory *wh1,
 		LMHistory *wh2)
 {
@@ -1373,16 +1353,30 @@ inline bool TokenPassSearch::is_similar_lm_history(LMHistory *wh1,
 		if (wh1->last().word_id() == -1
 				|| wh1->last().word_id() == m_sentence_end_id) {
 			if (wh2->last().word_id() == -1
-					|| wh2->last().word_id() == m_sentence_end_id)
+					|| wh2->last().word_id() == m_sentence_end_id) {
+				// Encountered a context reset in both histories.
 				return true;
+			}
+			else {
+				// Different histories.
+				return false;
+			}
+		}
+
+		// Use LM ID instead of word ID so that when using class-based language
+		// models, we will use the class information for recombining similar
+		// paths. SE 24.9.2012
+		if (wh1->last().lm_id() != wh2->last().lm_id()) {
+			// Different histories.
 			return false;
 		}
-		if (wh1->last().word_id() != wh2->last().word_id())
-			return false;
+
 		wh1 = wh1->previous;
 		wh2 = wh2->previous;
 	}
-	return true; // Similar word histories up to m_similar_lm_hist_span words
+
+	// Similar histories up to m_similar_lm_hist_span.
+	return true;
 }
 
 int TokenPassSearch::compute_lm_hist_hash_code(LMHistory *wh) const
@@ -1392,7 +1386,11 @@ int TokenPassSearch::compute_lm_hist_hash_code(LMHistory *wh) const
 	for (int i = 0; i < m_similar_lm_hist_span; i++) {
 		if (wh->last().word_id() == -1)
 			break;
-		code += wh->last().word_id();
+
+		// Use LM ID instead of word ID so that when using class-based language
+		// models, we will use the class information for recombining similar
+		// paths. SE 21.9.2012
+		code += wh->last().lm_id();
 		code += (code << 10);
 		code ^= (code >> 6);
 
@@ -1707,6 +1705,38 @@ int TokenPassSearch::create_word_repository()
 	return num_not_found;
 }
 
+int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
+{
+	int count = 0;
+
+	assert( m_ngram != NULL || m_fsa_lm != NULL);
+
+	m_lookahead_ngram = ngram;
+
+	// Create a mapping between the lexicon and the model.
+	for (int i = 0; i < m_vocabulary.num_words(); i++) {
+		const string & word = m_vocabulary.word(i);
+		if (word.size() == 0) {
+			if (m_verbose > 0) {
+				cerr
+						<< "TokenPassSearch::create_word_repository: Ignoring empty word in vocabulary."
+						<< endl;
+			}
+			continue;
+		}
+
+		int lookahead_lm_id = find_word_from_lookahead_lm(i, word);
+		bool not_found = (lookahead_lm_id == 0 && i != 0);
+		m_word_repository[i].set_lookahead_lm_id(lookahead_lm_id);
+
+		if (not_found) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
 void TokenPassSearch::find_word_from_lm(int word_id, std::string word,
 		int & lm_id, float & cm_log_prob) const
 {
@@ -1740,29 +1770,24 @@ void TokenPassSearch::find_word_from_lm(int word_id, std::string word,
 	}
 }
 
-int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
+int TokenPassSearch::find_word_from_lookahead_lm(int word_id,
+		std::string word) const
 {
-	int count = 0;
-
-	assert( m_ngram != NULL || m_fsa_lm != NULL);
-
-	m_lookahead_ngram = ngram;
-	m_lex2lookaheadlm.clear();
-	m_lex2lookaheadlm.resize(m_vocabulary.num_words());
-
-	// Create a mapping between the lexicon and the model.
-	for (int i = 0; i < m_vocabulary.num_words(); i++) {
-		m_lex2lookaheadlm[i] = m_lookahead_ngram->word_index(
-				m_vocabulary.word(i));
-		//if (m_lex2lm[i] != m_lookahead_ngram->word_index(m_vocabulary.word(i)))
-		//  assert( 0 );
-
-		if (m_lex2lookaheadlm[i] == 0 && i != 0) {
-			count++;
+#ifdef ENABLE_WORDCLASS_SUPPORT
+	if (m_word_classes != NULL) {
+		try {
+			const WordClasses::Membership & class_membership =
+					m_word_classes->get_membership(word_id);
+			word = m_word_classes->get_class_name(class_membership.class_id);
+		}
+		catch (out_of_range &) {
+			// The word does not exist in the class definitions. See if it
+			// exists in the language model as it is.
 		}
 	}
+#endif
 
-	return count;
+	return m_lookahead_ngram->word_index(word);
 }
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
@@ -2011,8 +2036,15 @@ float TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
 		score_list->index = prev_word_id;
 		score_list->lm_scores.insert(score_list->lm_scores.end(),
 				m_lexicon.words(), 0);
-		m_lookahead_ngram->fetch_bigram_list(m_lex2lookaheadlm[prev_word_id],
-				m_lex2lookaheadlm, score_list->lm_scores);
+
+		vector<float> extensions;
+		m_lookahead_ngram->fetch_bigram_list(
+				m_word_repository[prev_word_id].lookahead_lm_id(), extensions);
+
+		// Map lookahead LM IDs to word IDs.
+		for (int i = 0; i < m_word_repository.size(); ++i)
+			score_list->lm_scores.at(i) = extensions.at(
+					m_word_repository[i].lookahead_lm_id());
 	}
 
 	// Compute the lookahead score by selecting the maximum LM score of possible
@@ -2066,9 +2098,16 @@ float TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 		score_list->index = index;
 		score_list->lm_scores.insert(score_list->lm_scores.end(),
 				m_lexicon.words(), 0);
-		m_lookahead_ngram->fetch_trigram_list(m_lex2lookaheadlm[w1],
-				m_lex2lookaheadlm[w2], m_lex2lookaheadlm,
-				score_list->lm_scores);
+
+		vector<float> extensions;
+		m_lookahead_ngram->fetch_trigram_list(
+				m_word_repository[w1].lookahead_lm_id(),
+				m_word_repository[w2].lookahead_lm_id(), extensions);
+
+		// Map lookahead LM IDs to word IDs.
+		for (int i = 0; i < m_word_repository.size(); ++i)
+			score_list->lm_scores.at(i) = extensions.at(
+					m_word_repository[i].lookahead_lm_id());
 	}
 
 	// Compute the lookahead score by selecting the maximum LM score of

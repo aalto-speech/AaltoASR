@@ -506,8 +506,7 @@ TreeGram::fetch_gram(const Gram &gram, int first)
 }
 
 void
-TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
-                            std::vector<float> &result_buffer)
+TreeGram::fetch_bigram_list(int prev_word_id, std::vector<float> & extensions)
 {
   assert(m_type==BACKOFF);
   
@@ -516,9 +515,9 @@ TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
 
   // Fill the unigram probabilities for every word in the LM. lm_buf is indexed
   // by LM word ID.
-  float * lm_buf = new float[m_words.size()];
+  extensions.resize(m_words.size());
   for (int i = 0; i < m_words.size(); i++)
-    lm_buf[i] = back_off_w + m_nodes[i].log_prob;
+    extensions[i] = back_off_w + m_nodes[i].log_prob;
 
   // Fill the bigram probabilities when found.
   int child_index = m_nodes[prev_word_id].child_index;
@@ -526,18 +525,12 @@ TreeGram::fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
   if (child_index != -1 && next_child_index > child_index)
   {
     for (int i = child_index; i < next_child_index; i++)
-      lm_buf[m_nodes[i].word] = m_nodes[i].log_prob;
+      extensions[m_nodes[i].word] = m_nodes[i].log_prob;
   }
-
-  // Map to result_buffer.
-  for (int i = 0; i < next_word_id.size(); i++)
-    result_buffer[i] = lm_buf[next_word_id[i]];
-  delete [] lm_buf;
 }
 
 void
-TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
-                             std::vector<float> &result_buffer)
+TreeGram::fetch_trigram_list(int w1, int w2, std::vector<float> & extensions)
 {
   assert(m_type==BACKOFF);
   int bigram_index;
@@ -547,31 +540,28 @@ TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
   if (bigram_index == -1)
   {
     // No bigram (w1,w2), only condition to w2
-    fetch_bigram_list(w2, next_word_id, result_buffer);
+    fetch_bigram_list(w2, extensions);
   }
   else
   {
-    float *lm_buf = new float[m_words.size()];
-    int child_index, next_child_index;
-    float bigram_back_off_w,w2_back_off_w, temp;
-    int i;
+    extensions.resize(m_words.size());
     
     // Get backoff weights
-    bigram_back_off_w = m_nodes[bigram_index].back_off;
-    w2_back_off_w = m_nodes[w2].back_off;
+    float bigram_back_off_w = m_nodes[bigram_index].back_off;
+    float w2_back_off_w = m_nodes[w2].back_off;
     
     // Fill the unigram probabilities
-    temp = bigram_back_off_w + w2_back_off_w;
-    for (i = 0; i < m_words.size(); i++)
-      lm_buf[i] = temp + m_nodes[i].log_prob;
+    float temp = bigram_back_off_w + w2_back_off_w;
+    for (int i = 0; i < m_words.size(); i++)
+      extensions[i] = temp + m_nodes[i].log_prob;
     
     // Fill bigram (w2, next_word_id) probabilities
-    child_index = m_nodes[w2].child_index;
-    next_child_index = m_nodes[w2+1].child_index;
+    int child_index = m_nodes[w2].child_index;
+    int next_child_index = m_nodes[w2+1].child_index;
     if (child_index != -1 && next_child_index > child_index)
     {
-      for (i = child_index; i < next_child_index; i++)
-        lm_buf[m_nodes[i].word] = bigram_back_off_w + m_nodes[i].log_prob;
+      for (int i = child_index; i < next_child_index; i++)
+        extensions[m_nodes[i].word] = bigram_back_off_w + m_nodes[i].log_prob;
     }
 
     // Fill trigram probabilities
@@ -579,14 +569,9 @@ TreeGram::fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
     next_child_index = m_nodes[bigram_index+1].child_index;
     if (child_index != -1 && next_child_index > child_index)
     {
-      for (i = child_index; i < next_child_index; i++)
-        lm_buf[m_nodes[i].word] = m_nodes[i].log_prob;
+      for (int i = child_index; i < next_child_index; i++)
+        extensions[m_nodes[i].word] = m_nodes[i].log_prob;
     }
-    
-    // Map to result_buffer
-    for (i = 0; i < next_word_id.size(); i++)
-      result_buffer[i] = lm_buf[next_word_id[i]];
-    delete lm_buf;
   }
 }
 

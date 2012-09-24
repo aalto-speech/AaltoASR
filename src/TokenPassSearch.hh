@@ -413,6 +413,21 @@ private:
 	void find_word_from_lm(int word_id, std::string word, int & lm_id,
 			float & cm_log_prob) const;
 
+	/// \brief Finds out the ID of a word in the lookahead LM.
+	///
+	/// If word classes are set using set_word_classes(), assumes that the
+	/// lookahead language model is based on classes, and gives the lookahead
+	/// LM ID of the corresponding class.
+	///
+	/// If the word does not exist in the class definitions, tries to find it
+	/// from the lookahead language model as it is, so that the lookahead LM can
+	/// mix classes and regular words.
+	///
+	/// \return lookahead_lm_id Will be set to the lookahead LM ID, or 0 if the
+	/// word or class does not exist in the lookahead LM.
+	///
+	int find_word_from_lookahead_lm(int word_id, std::string word) const;
+
 	/// \brief Finds the globally best token that is in the NODE_FINAL state,
 	/// i.e. at the end of a word.
 	///
@@ -491,9 +506,27 @@ private:
 	TPLexPrefixTree::Token*
 	find_similar_fsa_token(int fsa_lm_node, TPLexPrefixTree::Token *token_list);
 
+	/// \brief Finds a token from \a token_list that has similar LMHistory to
+	/// \a wh up to m_similar_lm_hist_span words or classes.
+	///
+	/// Note: Doesn't work if the sentence end is the first one in the word
+	/// history!
+	///
 	TPLexPrefixTree::Token* find_similar_lm_history(LMHistory *wh,
 			int lm_hist_code, TPLexPrefixTree::Token *token_list);
+
+	/// \brief Checks if wh1 and wh2 are similar up to m_similar_lm_hist_span
+	/// words or classes.
+	///
+	/// Note: Doesn't work if the sentence end is the first one in the word
+	/// history!
+	///
 	bool is_similar_lm_history(LMHistory *wh1, LMHistory *wh2);
+
+	/// \brief Computes a hash code from the m_similar_lm_hist_span last words
+	/// in the LMHistory. The code will be used for recombination of similar
+	/// histories.
+	///
 	int compute_lm_hist_hash_code(LMHistory *wh) const;
 
 	// language model scoring
@@ -660,10 +693,6 @@ private:
 	/// computing LM probabilities?
 	bool m_split_multiwords;
 #endif
-
-	/// A mapping between word IDs in the dictionary and word IDs in the
-	/// lookahead LM. Words that are not in the lookahead LM are mapped to 0.
-	std::vector<int> m_lex2lookaheadlm;
 
 	TreeGram::Gram m_history_ngram; // Temporary variable used by compute_ngram_score().
 	TreeGram *m_lookahead_ngram;

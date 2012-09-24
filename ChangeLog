@@ -1,0 +1,24 @@
+2012-09-24  senarvi  <senarvi@cis.hut.fi>
+
+	* src/LMHistory.hh (LMHistory.Word): Stores also ID to lookahead LM.
+	* src/TokenPassSearch.cc (TokenPassSearch::find_similar_lm_history): Calls
+	is_similar_lm_history().
+	(TokenPassSearch::is_similar_lm_history): Compares LM IDs instead of word
+	IDs so that when using class-based language models, uses the class
+	information for recombining similar paths. 
+	(TokenPassSearch::compute_lm_hist_hash_code): Uses LM IDs instead of word
+	IDs so that when using class-based language models, uses the class
+	information for recombining similar paths. 
+	(TokenPassSearch::set_lookahead_ngram): When using class-based language
+	models, creates a mapping between the lexicon and the classes of the words,
+	in the lookahead LM.
+	(TokenPassSearch::find_word_from_lookahead_lm): Finds a word or its class
+	from the lookahead LM.
+	(TokenPassSearch::get_lm_bigram_lookahead): Performs the mapping from
+	lookahead LM IDs to word IDs.
+	(TokenPassSearch::get_lm_trigram_lookahead): Performs the mapping from
+	lookahead LM IDs to word IDs.
+	* src/TreeGram.cc (TreeGram::fetch_bigram_list): Does not perform the
+	mapping from lookahead LM IDs to word IDs.
+	(TreeGram::fetch_trigram_list): Does not perform the mapping from lookahead
+	LM IDs to word IDs.

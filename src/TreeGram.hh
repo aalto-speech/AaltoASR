@@ -138,20 +138,18 @@ public:
   ///
   /// Used for LM lookahead in the recognizer.
   ///
-  /// The result buffer will have bigram probabilities when available, unigram
+  /// \param extensions Will have bigram probabilities when available, unigram
   /// probabilities for other words, and OOVs will have logprob
   /// \a prev_word_id's backoff weight - 99.
   ///
-  void fetch_bigram_list(int prev_word_id, std::vector<int> &next_word_id,
-                         std::vector<float> &result_buffer);
+  void fetch_bigram_list(int prev_word_id, std::vector<float> & extensions);
 
   /// \brief Computes trigram probabilities for every word triplet
   /// "w1 w2 next_word_id[i]".
   ///
   /// Used for LM lookahead in the recognizer.
   ///
-  void fetch_trigram_list(int w1, int w2, std::vector<int> &next_word_id,
-                          std::vector<float> &result_buffer);
+  void fetch_trigram_list(int w1, int w2, std::vector<float> & extensions);
 
   void print_debuglist();
   void finalize();

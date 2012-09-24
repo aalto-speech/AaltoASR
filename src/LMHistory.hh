@@ -28,6 +28,15 @@ public:
 		///
 		void set_ids(int word_id, int lm_id);
 
+		/// \brief Sets the lookahead language model ID of the word.
+		///
+		/// \param lookahead_lm_id Used when computing the lookahead score. If
+		/// the language model is based on classes, this is the ID of the class
+		/// of the word in question. If the word is not found in the lookahead
+		/// LM, this is 0.
+		///
+		void set_lookahead_lm_id(int lookahead_lm_id);
+
 		/// \brief Sets the class membership log probability.
 		///
 		/// \param cm_log_prob If the language model is based on classes, this is
@@ -59,7 +68,8 @@ public:
 			return m_word_id;
 		}
 
-		/// \brief Returns the ID of the word (or class) in the language model.
+		/// \brief Returns the ID of the word (or its class) in the language
+		/// model.
 		///
 		/// Language model IDs are used when computing LM scores. If the language
 		/// model is based on classes, this is the ID of the class of the word in
@@ -68,6 +78,20 @@ public:
 		int lm_id() const
 		{
 			return m_lm_id;
+		}
+
+		/// \brief Returns the ID of the word (or its class) in the lookahead
+		/// language model.
+		///
+		/// Lookahead LM IDs are used when computing the lookahead score as the
+		/// maximum score of possible word ends in the lookahead model. If the
+		/// language model is based on classes, this is the ID of the class of
+		/// the word in question. If the word is not found in the lookahead LM,
+		/// this is 0.
+		///
+		int lookahead_lm_id() const
+		{
+			return m_lookahead_lm_id;
 		}
 
 		/// \brief Returns the log probability for the class membership, when the
@@ -104,11 +128,15 @@ public:
 		/// Word ID in the dictionary.
 		int m_word_id;
 
-		/// Word ID in the language model.
+		/// Word (or class) ID in the language model, or -1 if not available.
 		int m_lm_id;
 
-		/// The log probability for the class membership, or 0 if not using a class-
-		/// based language model.
+		/// Word (or class) ID in the lookahead language model, or 0 if not
+		/// available.
+		int m_lookahead_lm_id;
+
+		/// The log probability for the class membership, or 0 if not using a
+		/// class-based language model.
 		float m_cm_log_prob;
 
 #ifdef ENABLE_MULTIWORD_SUPPORT

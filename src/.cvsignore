@@ -3,3 +3,4 @@ dep
 arpa2bin
 bin2arpa
 test_class
+.nfs*
