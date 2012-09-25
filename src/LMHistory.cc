@@ -13,6 +13,11 @@ void LMHistory::Word::set_ids(int word_id, int lm_id)
   m_lm_id = lm_id;
 }
 
+void LMHistory::Word::set_lookahead_lm_id(int lookahead_lm_id)
+{
+  m_lookahead_lm_id = lookahead_lm_id;
+}
+
 void LMHistory::Word::set_cm_log_prob(float cm_log_prob)
 {
   m_cm_log_prob = cm_log_prob;
