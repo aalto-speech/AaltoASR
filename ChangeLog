@@ -1,3 +1,16 @@
+2012-09-25  senarvi  <senarvi@cis.hut.fi>
+
+	* src/LMHistory.hh (LMHistory.Word): Store also word ID and lookahead LM ID
+	of each component. 
+	* src/TokenPassSearch.cc (TokenPassSearch::create_word_repository): Also
+	stores word ID and lookahead LM ID of each component. When using a lookahead
+	model, the first call is redundant.
+	(TokenPassSearch::set_lookahead_ngram): Calls create_word_repository(). 
+	(TokenPassSearch::split_and_create_history_ngram): Interface changed so that
+	default parameter -1 can be given to final_components. 
+	(TokenPassSearch::get_lm_lookahead_score): When using multiwords, consider
+	the last two multiword components, instead of the last two words. 
+
 2012-09-24  senarvi  <senarvi@cis.hut.fi>
 
 	* src/LMHistory.hh (LMHistory.Word): Stores also ID to lookahead LM.

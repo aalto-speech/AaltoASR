@@ -296,6 +296,11 @@ public:
 
 	/// \brief Sets a lookahead n-gram language model.
 	///
+	/// This recreates the word repository that was created after calling
+	/// set_ngram(). This was the simplest thing I could think of, without
+	/// making changes to the class interface, since we don't know already at
+	/// set_ngram() whether the user will set a lookahead model later.
+	///
 	/// \return The number of vocabulary entries that were not found in the
 	/// language model.
 	///
@@ -537,12 +542,12 @@ private:
 	/// history is reached sooner, or a sentence start is encountered.
 	///
 	/// The last word will be the final word of \a history. If it's a multiword,
-	/// \a final_components specifies how many of its components will be
-	/// considered. This is needed to be able to compile a history that ends in
-	/// any of the components of a final multiword.
+	/// \a final_components can be used to specify how many of its components
+	/// will be considered. This is needed to be able to compile a history that
+	/// ends in any of the components of a final multiword.
 	///
-	void split_and_create_history_ngram(LMHistory * history,
-			int final_components, int words_needed);
+	void split_and_create_history_ngram(LMHistory * history, int words_needed,
+			int final_components = -1);
 
 	/// \brief Collects words from the LM history into an n-gram and returns its
 	/// language model probability.
@@ -582,15 +587,24 @@ private:
 	///
 	void update_lm_log_prob(TPLexPrefixTree::Token & token);
 
+	/// \brief Computes the lookahead score as the maximum of possible word ends
+	/// to the given LMHistory.
+	///
+	/// Note! Doesn't work if the sentence end is the first one in the word
+	/// history. Returns 0 in that case.
+	///
 	float get_lm_lookahead_score(LMHistory *lm_hist,
 			TPLexPrefixTree::Node *node, int depth);
 
 	/// \brief Computes bi-gram probabilities for every word pair starting with
-	/// \a prev_word_id using the lookahead LM, and returns the maximum.
+	/// \a prev_word_id, using the lookahead LM, and returns the maximum.
 	///
 	float get_lm_bigram_lookahead(int prev_word_id, TPLexPrefixTree::Node *node,
 			int depth);
 
+	/// \brief Computes tri-gram probabilities for every word triplet starting
+	/// with \a w1 \a w2, using the lookahead LM, and returns the maximum.
+	///
 	float get_lm_trigram_lookahead(int w1, int w2, TPLexPrefixTree::Node *node,
 			int depth);
 

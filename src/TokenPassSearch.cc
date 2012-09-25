@@ -1627,6 +1627,13 @@ int TokenPassSearch::set_fsa_lm(fsalm::LM *lm)
 	return create_word_repository();
 }
 
+int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
+{
+	assert( m_ngram != NULL || m_fsa_lm != NULL);
+	m_lookahead_ngram = ngram;
+	return create_word_repository();
+}
+
 int TokenPassSearch::create_word_repository()
 {
 	m_word_repository.clear();
@@ -1648,13 +1655,20 @@ int TokenPassSearch::create_word_repository()
 		int lm_id;
 		float cm_log_prob;
 		find_word_from_lm(i, word, lm_id, cm_log_prob);
+		int lookahead_lm_id = find_word_from_lookahead_lm(i, word);
+
 		bool not_found = (lm_id < 0) && (i != 0);
-		m_word_repository[i].set_ids(i, lm_id);
+		if ((m_lookahead_ngram != NULL)
+				&& ((lookahead_lm_id == 0) && (i != 0))) {
+			not_found = true;
+		}
+
+		m_word_repository[i].set_ids(i, lm_id, lookahead_lm_id);
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
 		if (word[0] == '_') {
 			// Don't treat silences as multiwords.
-			m_word_repository[i].add_component(lm_id);
+			m_word_repository[i].add_component(i, lm_id, lookahead_lm_id);
 		}
 		else {
 			cm_log_prob = 0;
@@ -1680,8 +1694,14 @@ int TokenPassSearch::create_word_repository()
 					float component_cm_log_prob;
 					find_word_from_lm(word_id, component, lm_id,
 							component_cm_log_prob);
-					m_word_repository[i].add_component(lm_id);
+					lookahead_lm_id = find_word_from_lookahead_lm(word_id,
+							component);
+					m_word_repository[i].add_component(word_id, lm_id, lookahead_lm_id);
 					if ((lm_id < 0) && (i != 0)) {
+						not_found = true;
+					}
+					if ((m_lookahead_ngram != NULL)
+							&& ((lookahead_lm_id == 0) && (i != 0))) {
 						not_found = true;
 					}
 					cm_log_prob += component_cm_log_prob;
@@ -1702,39 +1722,11 @@ int TokenPassSearch::create_word_repository()
 		}
 	}
 
+	// We may have added words to the vocabulary along the way but I think the
+	// new words should have been added to the word repository in the end.
+	assert(m_vocabulary.num_words() == m_word_repository.size());
+
 	return num_not_found;
-}
-
-int TokenPassSearch::set_lookahead_ngram(TreeGram *ngram)
-{
-	int count = 0;
-
-	assert( m_ngram != NULL || m_fsa_lm != NULL);
-
-	m_lookahead_ngram = ngram;
-
-	// Create a mapping between the lexicon and the model.
-	for (int i = 0; i < m_vocabulary.num_words(); i++) {
-		const string & word = m_vocabulary.word(i);
-		if (word.size() == 0) {
-			if (m_verbose > 0) {
-				cerr
-						<< "TokenPassSearch::create_word_repository: Ignoring empty word in vocabulary."
-						<< endl;
-			}
-			continue;
-		}
-
-		int lookahead_lm_id = find_word_from_lookahead_lm(i, word);
-		bool not_found = (lookahead_lm_id == 0 && i != 0);
-		m_word_repository[i].set_lookahead_lm_id(lookahead_lm_id);
-
-		if (not_found) {
-			count++;
-		}
-	}
-
-	return count;
 }
 
 void TokenPassSearch::find_word_from_lm(int word_id, std::string word,
@@ -1773,6 +1765,9 @@ void TokenPassSearch::find_word_from_lm(int word_id, std::string word,
 int TokenPassSearch::find_word_from_lookahead_lm(int word_id,
 		std::string word) const
 {
+	if (m_lookahead_ngram == NULL)
+		return 0;
+
 #ifdef ENABLE_WORDCLASS_SUPPORT
 	if (m_word_classes != NULL) {
 		try {
@@ -1792,7 +1787,7 @@ int TokenPassSearch::find_word_from_lookahead_lm(int word_id,
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
 void TokenPassSearch::split_and_create_history_ngram(LMHistory * history,
-		int final_components, int words_needed)
+		int words_needed, int final_components)
 {
 	m_history_ngram.clear();
 
@@ -1830,8 +1825,8 @@ float TokenPassSearch::split_and_compute_ngram_score(LMHistory * history)
 		// that the last final_components words are components of the
 		// history->last() multiword. If history->last() is not a multiword,
 		// final_components equals to 1.
-		split_and_create_history_ngram(history, final_components,
-				m_ngram->order());
+		split_and_create_history_ngram(history, m_ngram->order(),
+				final_components);
 		result += m_ngram->log_prob(m_history_ngram);
 	}
 
@@ -1981,23 +1976,71 @@ void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 	}
 }
 
-// Note! Doesn't work if the sentence end is the first one in the word history
 float TokenPassSearch::get_lm_lookahead_score(LMHistory *lm_hist,
 		TPLexPrefixTree::Node *node, int depth)
 {
-	int w2 = lm_hist->last().word_id();  // last word
-	if (w2 == -1 || w2 == m_sentence_end_id)
+#ifdef ENABLE_MULTIWORD_SUPPORT
+	// The last word
+	const LMHistory::Word & w2 = lm_hist->last();
+	if (w2.word_id() == -1 || w2.word_id() == m_sentence_end_id) {
+		// This is the beginning of the history or the end of a sentence.
 		return 0;
-	if (m_lm_lookahead == 1)
-		return get_lm_bigram_lookahead(w2, node, depth);
+	}
 
-	if (lm_hist->previous == NULL)
+	// The last component of the last word
+	int c2 = w2.component_word_id(w2.num_components() - 1);
+
+	if (m_lm_lookahead == 1) {
+		return get_lm_bigram_lookahead(c2, node, depth);
+	}
+
+	int c1;
+	if (w2.num_components() > 1) {
+		// The component before the last component of the last word.
+		c1 = w2.component_word_id(w2.num_components() - 2);
+	}
+	else {
+		if (lm_hist->previous == NULL) {
+			return 0;
+		}
+
+		// The word before last word
+		const LMHistory::Word & w1 = lm_hist->previous->last();
+		if (w1.word_id() == -1 || w1.word_id() == m_sentence_end_id) {
+			// This is the beginning of the history or the end of a sentence.
+			return 0;
+		}
+
+		// The last component of the word before the last word
+		c1 = w1.component_word_id(w1.num_components() - 1);
+	}
+
+	return get_lm_trigram_lookahead(c1, c2, node, depth);
+#else
+	// The last word
+	int w2 = lm_hist->last().word_id();
+	if (w2 == -1 || w2 == m_sentence_end_id) {
+		// This is the beginning of the history or the end of a sentence.
 		return 0;
-	int w1 = lm_hist->previous->last().word_id();  // the word before last word
-	if (w1 == -1 || w1 == m_sentence_end_id)
+	}
+
+	if (m_lm_lookahead == 1) {
+		return get_lm_bigram_lookahead(w2, node, depth);
+	}
+
+	if (lm_hist->previous == NULL) {
 		return 0;
+	}
+
+	// The word before last word
+	int w1 = lm_hist->previous->last().word_id();
+	if (w1 == -1 || w1 == m_sentence_end_id) {
+		// This is the beginning of the history or the end of a sentence.
+		return 0;
+	}
 
 	return get_lm_trigram_lookahead(w1, w2, node, depth);
+#endif
 }
 
 float TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,

@@ -25,23 +25,18 @@ public:
 		/// \param lm_id Used when computing LM scores. If the language model is
 		/// based on classes, this is the ID of the class of the word in question.
 		/// If the word is not found in the language model, this is -1.
-		///
-		void set_ids(int word_id, int lm_id);
-
-		/// \brief Sets the lookahead language model ID of the word.
-		///
 		/// \param lookahead_lm_id Used when computing the lookahead score. If
 		/// the language model is based on classes, this is the ID of the class
 		/// of the word in question. If the word is not found in the lookahead
 		/// LM, this is 0.
 		///
-		void set_lookahead_lm_id(int lookahead_lm_id);
+		void set_ids(int word_id, int lm_id, int lookahead_lm_id);
 
 		/// \brief Sets the class membership log probability.
 		///
 		/// \param cm_log_prob If the language model is based on classes, this is
 		/// the class membership log probability. When using multiwords, this is the
-		/// sum of the individual class membership log probabilities.
+		/// sum of the individual class membership log probabilities. Otherwise 0.
 		///
 		void set_cm_log_prob(float cm_log_prob);
 
@@ -49,13 +44,19 @@ public:
 		/// \brief Adds a component word. For regular words, the entire word has to
 		/// be added as a single component.
 		///
+		/// \param word_id Used to uniquely identify every word in the
+		/// vocabulary. We could perform the language model computations without
+		/// this information, but it's used for mostly historic reasons in the
+		/// lookahead code.
 		/// \param lm_id Used when computing LM scores. If the language model is
 		/// based on classes, this is the ID of the class of the component word.
 		/// If the word is not found in the language model, this is -1.
-		/// \param cm_log_prob If the language model is based on classes, this is
-		/// the class membership log probability of the component. Otherwise 0.
+		/// \param lookahead_lm_id Used when computing the lookahead score. If
+		/// the language model is based on classes, this is the ID of the class
+		/// of the component word. If the word is not found in the lookahead
+		/// LM, this is 0.
 		///
-		void add_component(int lm_id);
+		void add_component(int word_id, int lm_id, int lookahead_lm_id);
 #endif
 
 		/// \brief Returns the ID of the word in the dictionary.
@@ -112,7 +113,14 @@ public:
 		///
 		int num_components() const
 		{
-			return m_component_lm_ids.size();
+			return m_components.size();
+		}
+
+		/// \brief Returns the word ID for component \a index in the vocabulary.
+		///
+		int component_word_id(int index) const
+		{
+			return m_components[index].word_id;
 		}
 
 		/// \brief Returns the word ID for component \a index in the language model
@@ -120,7 +128,15 @@ public:
 		///
 		int component_lm_id(int index) const
 		{
-			return m_component_lm_ids[index];
+			return m_components[index].lm_id;
+		}
+
+		/// \brief Returns the word ID for component \a index in the lookahead
+		/// language model (or the whole word if this is not a multiword).
+		///
+		int component_lookahead_lm_id(int index) const
+		{
+			return m_components[index].lookahead_lm_id;
 		}
 #endif
 
@@ -140,8 +156,15 @@ public:
 		float m_cm_log_prob;
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
+		struct Component
+		{
+			int word_id;
+			int lm_id;
+			int lookahead_lm_id;
+		};
+
 		/// Word IDs in the language model of the component words.
-		std::vector<int> m_component_lm_ids;
+		std::vector<Component> m_components;
 #endif
 	};
 
