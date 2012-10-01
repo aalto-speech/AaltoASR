@@ -514,6 +514,9 @@ private:
 	/// \brief Finds a token from \a token_list that has similar LMHistory to
 	/// \a wh up to m_similar_lm_hist_span words or classes.
 	///
+	/// First checks the hash code and if they match, verifies using
+	/// is_similar_lm_history().
+	///
 	/// Note: Doesn't work if the sentence end is the first one in the word
 	/// history!
 	///
@@ -537,18 +540,6 @@ private:
 	// language model scoring
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
-	/// \brief Creates m_history_ngram from at most \a words_needed words from
-	/// \a history. The number of words added is smaller if the beginning of
-	/// history is reached sooner, or a sentence start is encountered.
-	///
-	/// The last word will be the final word of \a history. If it's a multiword,
-	/// \a final_components can be used to specify how many of its components
-	/// will be considered. This is needed to be able to compile a history that
-	/// ends in any of the components of a final multiword.
-	///
-	void split_and_create_history_ngram(LMHistory * history, int words_needed,
-			int final_components = -1);
-
 	/// \brief Collects words from the LM history into an n-gram and returns its
 	/// language model probability.
 	///

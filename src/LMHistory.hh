@@ -13,6 +13,19 @@ public:
 	class Word
 	{
 	public:
+		struct ID
+		{
+			/// Word ID in the dictionary.
+			int word_id;
+
+			/// Word (or class) ID in the language model, or -1 if not available.
+			int lm_id;
+
+			/// Word (or class) ID in the lookahead language model, or 0 if not
+			/// available.
+			int lookahead_lm_id;
+		};
+
 		/// \brief The default constructor creates a NULL word (word ID and LM ID
 		/// -1).
 		///
@@ -66,7 +79,7 @@ public:
 		///
 		int word_id() const
 		{
-			return m_word_id;
+			return m_id.word_id;
 		}
 
 		/// \brief Returns the ID of the word (or its class) in the language
@@ -78,7 +91,7 @@ public:
 		///
 		int lm_id() const
 		{
-			return m_lm_id;
+			return m_id.lm_id;
 		}
 
 		/// \brief Returns the ID of the word (or its class) in the lookahead
@@ -92,7 +105,12 @@ public:
 		///
 		int lookahead_lm_id() const
 		{
-			return m_lookahead_lm_id;
+			return m_id.lookahead_lm_id;
+		}
+
+		const ID & id() const
+		{
+			return m_id;
 		}
 
 		/// \brief Returns the log probability for the class membership, when the
@@ -116,56 +134,41 @@ public:
 			return m_components.size();
 		}
 
-		/// \brief Returns the word ID for component \a index in the vocabulary.
+		/// \brief Returns the ID for component \a index.
 		///
-		int component_word_id(int index) const
+		const ID & component(int index) const
 		{
-			return m_components[index].word_id;
-		}
-
-		/// \brief Returns the word ID for component \a index in the language model
-		/// (or the whole word if this is not a multiword).
-		///
-		int component_lm_id(int index) const
-		{
-			return m_components[index].lm_id;
-		}
-
-		/// \brief Returns the word ID for component \a index in the lookahead
-		/// language model (or the whole word if this is not a multiword).
-		///
-		int component_lookahead_lm_id(int index) const
-		{
-			return m_components[index].lookahead_lm_id;
+			return m_components[index];
 		}
 #endif
 
 	private:
-		/// Word ID in the dictionary.
-		int m_word_id;
-
-		/// Word (or class) ID in the language model, or -1 if not available.
-		int m_lm_id;
-
-		/// Word (or class) ID in the lookahead language model, or 0 if not
-		/// available.
-		int m_lookahead_lm_id;
+		ID m_id;
 
 		/// The log probability for the class membership, or 0 if not using a
 		/// class-based language model.
 		float m_cm_log_prob;
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
-		struct Component
-		{
-			int word_id;
-			int lm_id;
-			int lookahead_lm_id;
-		};
-
 		/// Word IDs in the language model of the component words.
-		std::vector<Component> m_components;
+		std::vector<ID> m_components;
 #endif
+	};
+
+	class ConstReverseIterator
+	{
+	public:
+		ConstReverseIterator(const LMHistory * history);
+
+		ConstReverseIterator & operator++();
+
+		const Word::ID & operator*() const;
+
+		const Word::ID * operator->() const;
+
+	private:
+		const LMHistory * m_history;
+		int m_component_index;
 	};
 
 	LMHistory(const Word & last_word, LMHistory * previous);
@@ -174,6 +177,8 @@ public:
 	{
 		return m_last_word;
 	}
+
+	ConstReverseIterator rbegin() const;
 
 	LMHistory * previous;
 	int reference_count;
@@ -192,6 +197,37 @@ inline LMHistory::LMHistory(const Word & last_word, LMHistory * previous) :
 {
 	if (previous)
 		hist::link(previous);
+}
+
+inline LMHistory::ConstReverseIterator &
+LMHistory::ConstReverseIterator::operator++()
+{
+	if (m_component_index > 0) {
+		--m_component_index;
+	}
+	else {
+		m_history = m_history->previous;
+		m_component_index = m_history->last().num_components() - 1;
+	}
+	return *this;
+}
+
+inline const LMHistory::Word::ID &
+LMHistory::ConstReverseIterator::operator*() const
+{
+	if (m_component_index < 0) {
+		// No component words.
+		return m_history->last().id();
+	}
+	else {
+		return m_history->last().component(m_component_index);
+	}
+}
+
+inline const LMHistory::Word::ID *
+LMHistory::ConstReverseIterator::operator->() const
+{
+	return &(operator*());
 }
 
 #endif

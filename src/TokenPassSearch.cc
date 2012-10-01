@@ -889,7 +889,7 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				}
 				else {
 					for (int i = 0; i < word.num_components(); ++i) {
-						if (word.component_lm_id(i) < 0)
+						if (word.component(i).lm_id < 0)
 							return;
 					}
 				}
@@ -1170,6 +1170,8 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 				m_new_token_list->push_back(new_token);
 		}
 		else {
+			// Recombination of search paths that are identical up to
+			// m_similar_lm_hist_span words.
 			if (m_fsa_lm) {
 				similar_lm_hist = find_similar_fsa_token(
 						updated_token.fsa_lm_node,
@@ -1321,6 +1323,7 @@ TokenPassSearch::find_similar_fsa_token(int fsa_lm_node,
 		TPLexPrefixTree::Token *token_list)
 {
 	assert(m_fsa_lm);
+
 	TPLexPrefixTree::Token *token = token_list;
 	while (token != NULL) {
 		if (fsa_lm_node == token->fsa_lm_node)
@@ -1786,47 +1789,26 @@ int TokenPassSearch::find_word_from_lookahead_lm(int word_id,
 }
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
-void TokenPassSearch::split_and_create_history_ngram(LMHistory * history,
-		int words_needed, int final_components)
-{
-	m_history_ngram.clear();
-
-	while (words_needed > 0) {
-		if (history->last().word_id() == -1)
-			return;  // Reached the beginning of the history.
-
-		int end = history->last().num_components();  // One past the last index.
-		if (final_components >= 0) {
-			end = min(end, final_components);
-			final_components = -1;
-		}
-		int begin = max(end - words_needed, 0);
-		// Add elements in reverse order to the beginning of the n-gram.
-		for (int i = end - 1; i > begin - 1; --i) {
-			m_history_ngram.push_front(history->last().component_lm_id(i));
-		}
-		words_needed -= end - begin;
-
-		if (history->last().word_id() == m_sentence_start_id)
-			return;
-
-		history = history->previous;
-	}
-}
-
 float TokenPassSearch::split_and_compute_ngram_score(LMHistory * history)
 {
 	float result = 0;
-
-	int num_components = history->last().num_components();
-	int final_components = 1;
-	for (; final_components <= num_components; ++final_components) {
-		// Create an n-gram, where n is the model order, from the LM history, so
-		// that the last final_components words are components of the
-		// history->last() multiword. If history->last() is not a multiword,
-		// final_components equals to 1.
-		split_and_create_history_ngram(history, m_ngram->order(),
-				final_components);
+	
+	for (int skip = 0; skip < history->last().num_components(); ++skip) {
+		// Create an n-gram, where n is the model order, from the LM history,
+		// starting from each of the components of the last multiword.
+		m_history_ngram.clear();
+		LMHistory::ConstReverseIterator iter = history->rbegin();
+		for (int i = 0; i < skip; ++i) {
+			++iter;
+		}
+		for (int words_needed = m_ngram->order(); words_needed > 0; --words_needed) {
+			if (iter->word_id == -1)
+				break;  // Reached the beginning of the history.
+			m_history_ngram.push_front(iter->lm_id);
+			if (iter->word_id == m_sentence_start_id)
+				break;  // Reached the beginning of the sentence.
+			++iter;
+		}
 		result += m_ngram->log_prob(m_history_ngram);
 	}
 
@@ -1988,7 +1970,7 @@ float TokenPassSearch::get_lm_lookahead_score(LMHistory *lm_hist,
 	}
 
 	// The last component of the last word
-	int c2 = w2.component_word_id(w2.num_components() - 1);
+	int c2 = w2.component(w2.num_components() - 1).word_id;
 
 	if (m_lm_lookahead == 1) {
 		return get_lm_bigram_lookahead(c2, node, depth);
@@ -1997,7 +1979,7 @@ float TokenPassSearch::get_lm_lookahead_score(LMHistory *lm_hist,
 	int c1;
 	if (w2.num_components() > 1) {
 		// The component before the last component of the last word.
-		c1 = w2.component_word_id(w2.num_components() - 2);
+		c1 = w2.component(w2.num_components() - 2).word_id;
 	}
 	else {
 		if (lm_hist->previous == NULL) {
@@ -2012,7 +1994,7 @@ float TokenPassSearch::get_lm_lookahead_score(LMHistory *lm_hist,
 		}
 
 		// The last component of the word before the last word
-		c1 = w1.component_word_id(w1.num_components() - 1);
+		c1 = w1.component(w1.num_components() - 1).word_id;
 	}
 
 	return get_lm_trigram_lookahead(c1, c2, node, depth);

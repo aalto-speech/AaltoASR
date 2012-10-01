@@ -1,3 +1,15 @@
+2012-10-01  senarvi  <senarvi@cis.hut.fi>
+
+	* src/LMHistory.cc (LMHistory::rbegin): Returns a reverse iterator pointing
+	to the last word or multiword component in the LMHistory.
+	* src/LMHistory.hh (LMHistory.Word): Uses ID structure to store dictionary,
+	language model, and lookahead language model IDs of a word.
+	(LMHistory.Word.component): Returns a reference to an ID structure.
+	(LMHistory.ConstReverseIterator): Iterates LMHistory words or multiword
+	components in reverse order.
+	* src/TokenPassSearch.cc (TokenPassSearch::split_and_compute_ngram_score):
+	Uses LMHistory::Word::ConstReverseIterator. 
+ 
 2012-09-25  senarvi  <senarvi@cis.hut.fi>
 
 	* src/LMHistory.hh (LMHistory.Word): Store also word ID and lookahead LM ID
