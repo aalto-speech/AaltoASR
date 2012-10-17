@@ -1,10 +1,13 @@
 #include "FeatureModules.hh"
 #include "FeatureGenerator.hh"
 
-#include <limits.h>
-#include <math.h>
+#include <climits>
+#include <cmath>
+#include <sstream>
 #include "util.hh"
 
+
+using namespace std;
 
 namespace aku {
 
@@ -246,8 +249,11 @@ AudioFileModule::set_file(FILE *fp, bool stream)
   // Check that sample rate matches that given in configuration
   if (m_reader.sample_rate() != m_sample_rate)
   {
-    throw std::string(
-      "File sample rate does not match the model configuration");
+    ostringstream oss;
+    oss << "Audio file sample rate (" << m_reader.sample_rate()
+        << " Hz) and model configuration (" << m_sample_rate
+        << " Hz) don't agree.";
+    throw oss.str();
   }
   m_eof_frame = INT_MAX; // No EOF frame encountered yet
 }
