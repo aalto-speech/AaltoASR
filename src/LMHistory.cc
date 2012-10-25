@@ -38,8 +38,20 @@ LMHistory::ConstReverseIterator LMHistory::rbegin() const
 	return ConstReverseIterator(this);
 }
 
-LMHistory::ConstReverseIterator::ConstReverseIterator(const LMHistory * history) :
-		m_history(history), m_component_index(
-				history->last().num_components() - 1)
+LMHistory::ConstReverseIterator LMHistory::rend() const
 {
+	return ConstReverseIterator(NULL);
+}
+
+LMHistory::ConstReverseIterator::ConstReverseIterator(const LMHistory * history) :
+		m_history(history)
+{
+#ifdef ENABLE_MULTIWORD_SUPPORT
+	if (history != NULL) {
+		m_component_index = history->last().num_components() - 1;
+	}
+	else {
+		m_component_index = -1;
+	}
+#endif
 }

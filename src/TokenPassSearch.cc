@@ -1352,31 +1352,52 @@ TokenPassSearch::find_similar_lm_history(LMHistory *wh, int lm_hist_code,
 inline bool TokenPassSearch::is_similar_lm_history(LMHistory *wh1,
 		LMHistory *wh2)
 {
-	for (int i = 0; i < m_similar_lm_hist_span; i++) {
-		if (wh1->last().word_id() == -1
-				|| wh1->last().word_id() == m_sentence_end_id) {
-			if (wh2->last().word_id() == -1
-					|| wh2->last().word_id() == m_sentence_end_id) {
-				// Encountered a context reset in both histories.
-				return true;
-			}
-			else {
-				// Different histories.
-				return false;
-			}
+	LMHistory::ConstReverseIterator iter1 = wh1->rbegin();
+	LMHistory::ConstReverseIterator iter2 = wh2->rbegin();
+
+	for (int i = 0; i < m_similar_lm_hist_span; ++i) {
+		if ((iter1->word_id == -1) || (iter1->word_id == m_sentence_end_id)) {
+			return (iter2->word_id == -1)
+					|| (iter2->word_id == m_sentence_end_id);
 		}
 
 		// Use LM ID instead of word ID so that when using class-based language
 		// models, we will use the class information for recombining similar
 		// paths. SE 24.9.2012
-		if (wh1->last().lm_id() != wh2->last().lm_id()) {
+		if (iter1->lm_id != iter2->lm_id) {
 			// Different histories.
 			return false;
 		}
 
-		wh1 = wh1->previous;
-		wh2 = wh2->previous;
+		++iter1;
+		++iter2;
 	}
+
+	/*	for (int i = 0; i < m_similar_lm_hist_span; i++) {
+	 if (wh1->last().word_id() == -1
+	 || wh1->last().word_id() == m_sentence_end_id) {
+	 if (wh2->last().word_id() == -1
+	 || wh2->last().word_id() == m_sentence_end_id) {
+	 // Encountered a context reset in both histories.
+	 return true;
+	 }
+	 else {
+	 // Different histories.
+	 return false;
+	 }
+	 }
+
+	 // Use LM ID instead of word ID so that when using class-based language
+	 // models, we will use the class information for recombining similar
+	 // paths. SE 24.9.2012
+	 if (wh1->last().lm_id() != wh2->last().lm_id()) {
+	 // Different histories.
+	 return false;
+	 }
+
+	 wh1 = wh1->previous;
+	 wh2 = wh2->previous;
+	 }*/
 
 	// Similar histories up to m_similar_lm_hist_span.
 	return true;
@@ -1386,22 +1407,24 @@ int TokenPassSearch::compute_lm_hist_hash_code(LMHistory *wh) const
 {
 	unsigned int code = 0;
 
-	for (int i = 0; i < m_similar_lm_hist_span; i++) {
-		if (wh->last().word_id() == -1)
+	LMHistory::ConstReverseIterator iter = wh->rbegin();
+	for (int i = 0; i < m_similar_lm_hist_span; ++i) {
+		if (iter->word_id == -1)
 			break;
 
 		// Use LM ID instead of word ID so that when using class-based language
 		// models, we will use the class information for recombining similar
-		// paths. SE 21.9.2012
-		code += wh->last().lm_id();
+		// paths.
+		code += iter->lm_id;
 		code += (code << 10);
 		code ^= (code >> 6);
 
-		if (wh->last().word_id() == m_sentence_start_id)
+		if (iter->word_id == m_sentence_start_id)
 			break;
 
-		wh = wh->previous;
+		++iter;
 	}
+
 	code += (code << 3);
 	code ^= (code >> 11);
 	code += (code << 15);
@@ -1699,7 +1722,8 @@ int TokenPassSearch::create_word_repository()
 							component_cm_log_prob);
 					lookahead_lm_id = find_word_from_lookahead_lm(word_id,
 							component);
-					m_word_repository[i].add_component(word_id, lm_id, lookahead_lm_id);
+					m_word_repository[i].add_component(word_id, lm_id,
+							lookahead_lm_id);
 					if ((lm_id < 0) && (i != 0)) {
 						not_found = true;
 					}
@@ -1792,7 +1816,7 @@ int TokenPassSearch::find_word_from_lookahead_lm(int word_id,
 float TokenPassSearch::split_and_compute_ngram_score(LMHistory * history)
 {
 	float result = 0;
-	
+
 	for (int skip = 0; skip < history->last().num_components(); ++skip) {
 		// Create an n-gram, where n is the model order, from the LM history,
 		// starting from each of the components of the last multiword.
@@ -1801,7 +1825,8 @@ float TokenPassSearch::split_and_compute_ngram_score(LMHistory * history)
 		for (int i = 0; i < skip; ++i) {
 			++iter;
 		}
-		for (int words_needed = m_ngram->order(); words_needed > 0; --words_needed) {
+		for (int words_needed = m_ngram->order(); words_needed > 0;
+				--words_needed) {
 			if (iter->word_id == -1)
 				break;  // Reached the beginning of the history.
 			m_history_ngram.push_front(iter->lm_id);
@@ -1961,46 +1986,9 @@ void TokenPassSearch::update_lm_log_prob(TPLexPrefixTree::Token & token)
 float TokenPassSearch::get_lm_lookahead_score(LMHistory *lm_hist,
 		TPLexPrefixTree::Node *node, int depth)
 {
-#ifdef ENABLE_MULTIWORD_SUPPORT
-	// The last word
-	const LMHistory::Word & w2 = lm_hist->last();
-	if (w2.word_id() == -1 || w2.word_id() == m_sentence_end_id) {
-		// This is the beginning of the history or the end of a sentence.
-		return 0;
-	}
-
-	// The last component of the last word
-	int c2 = w2.component(w2.num_components() - 1).word_id;
-
-	if (m_lm_lookahead == 1) {
-		return get_lm_bigram_lookahead(c2, node, depth);
-	}
-
-	int c1;
-	if (w2.num_components() > 1) {
-		// The component before the last component of the last word.
-		c1 = w2.component(w2.num_components() - 2).word_id;
-	}
-	else {
-		if (lm_hist->previous == NULL) {
-			return 0;
-		}
-
-		// The word before last word
-		const LMHistory::Word & w1 = lm_hist->previous->last();
-		if (w1.word_id() == -1 || w1.word_id() == m_sentence_end_id) {
-			// This is the beginning of the history or the end of a sentence.
-			return 0;
-		}
-
-		// The last component of the word before the last word
-		c1 = w1.component(w1.num_components() - 1).word_id;
-	}
-
-	return get_lm_trigram_lookahead(c1, c2, node, depth);
-#else
-	// The last word
-	int w2 = lm_hist->last().word_id();
+	// The last word or its last component.
+	LMHistory::ConstReverseIterator iter = lm_hist->rbegin();
+	int w2 = iter->word_id;
 	if (w2 == -1 || w2 == m_sentence_end_id) {
 		// This is the beginning of the history or the end of a sentence.
 		return 0;
@@ -2010,19 +1998,18 @@ float TokenPassSearch::get_lm_lookahead_score(LMHistory *lm_hist,
 		return get_lm_bigram_lookahead(w2, node, depth);
 	}
 
-	if (lm_hist->previous == NULL) {
+	// The component before the last component of the last word, or the word
+	// before the last word.
+	++iter;
+	if (iter == lm_hist->rend()) {
 		return 0;
 	}
-
-	// The word before last word
-	int w1 = lm_hist->previous->last().word_id();
+	int w1 = iter->word_id;
 	if (w1 == -1 || w1 == m_sentence_end_id) {
 		// This is the beginning of the history or the end of a sentence.
 		return 0;
 	}
-
 	return get_lm_trigram_lookahead(w1, w2, node, depth);
-#endif
 }
 
 float TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,

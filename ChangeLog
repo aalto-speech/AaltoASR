@@ -1,3 +1,20 @@
+2012-10-25  senarvi  <senarvi@cis.hut.fi>
+
+	* src/LMHistory.cc (LMHistory::rend): A NULL value represents the beginning
+	of an LMHistory, or the end of reverse iteration.
+	(LMHistory::ConstReverseIterator::ConstReverseIterator): Accepts NULL
+	parameter (end iterator). 
+	* src/LMHistory.hh (LMHistory::ConstReverseIterator): Compiles also without
+	multiword support. 
+	(LMHistory::ConstReverseIterator::operator ==): For iterating until end
+	iterator is encountered.
+	* src/TokenPassSearch.cc (TokenPassSearch::is_similar_lm_history): Use
+	LMHistory::ConstReverseIterator.
+	(TokenPassSearch::compute_lm_hist_hash_code):  Use
+	LMHistory::ConstReverseIterator.
+	(TokenPassSearch::get_lm_lookahead_score): Use
+	LMHistory::ConstReverseIterator.
+
 2012-10-01  senarvi  <senarvi@cis.hut.fi>
 
 	* src/LMHistory.cc (LMHistory::rbegin): Returns a reverse iterator pointing

@@ -6,7 +6,6 @@
 #include "config.hh"
 #include "history.hh"
 
-
 class LMHistory
 {
 public:
@@ -166,9 +165,13 @@ public:
 
 		const Word::ID * operator->() const;
 
+		bool operator==(const ConstReverseIterator & x) const;
+
 	private:
 		const LMHistory * m_history;
+#ifdef ENABLE_MULTIWORD_SUPPORT
 		int m_component_index;
+#endif
 	};
 
 	LMHistory(const Word & last_word, LMHistory * previous);
@@ -179,6 +182,8 @@ public:
 	}
 
 	ConstReverseIterator rbegin() const;
+
+	ConstReverseIterator rend() const;
 
 	LMHistory * previous;
 	int reference_count;
@@ -202,6 +207,7 @@ inline LMHistory::LMHistory(const Word & last_word, LMHistory * previous) :
 inline LMHistory::ConstReverseIterator &
 LMHistory::ConstReverseIterator::operator++()
 {
+#ifdef ENABLE_MULTIWORD_SUPPORT
 	if (m_component_index > 0) {
 		--m_component_index;
 	}
@@ -209,12 +215,16 @@ LMHistory::ConstReverseIterator::operator++()
 		m_history = m_history->previous;
 		m_component_index = m_history->last().num_components() - 1;
 	}
+#else
+	m_history = m_history->previous;
+#endif
 	return *this;
 }
 
 inline const LMHistory::Word::ID &
 LMHistory::ConstReverseIterator::operator*() const
 {
+#ifdef ENABLE_MULTIWORD_SUPPORT
 	if (m_component_index < 0) {
 		// No component words.
 		return m_history->last().id();
@@ -222,12 +232,29 @@ LMHistory::ConstReverseIterator::operator*() const
 	else {
 		return m_history->last().component(m_component_index);
 	}
+#else
+	return m_history->last().id();
+#endif
 }
 
 inline const LMHistory::Word::ID *
 LMHistory::ConstReverseIterator::operator->() const
 {
 	return &(operator*());
+}
+
+inline bool LMHistory::ConstReverseIterator::operator==(
+		const LMHistory::ConstReverseIterator & x) const
+{
+	if (m_history == NULL)
+		return x.m_history == NULL;
+	if (m_history != x.m_history)
+		return false;
+#ifdef ENABLE_MULTIWORD_SUPPORT
+	return m_component_index == x.m_component_index;
+#else
+	return true;
+#endif
 }
 
 #endif
