@@ -1,5 +1,12 @@
 2012-11-01  senarvi  <senarvi@cis.hut.fi>
 
+	* src/TokenPassSearch.cc (TokenPassSearch::create_word_repository): Ignore
+	pronunciation ID in the end of a word (colon followed by digits), so that we
+	can easily get the information of what pronunciation the decoder has
+	selected by simply adding these IDs to the dictionary.
+ 
+2012-11-01  senarvi  <senarvi@cis.hut.fi>
+
 	* src/TokenPassSearch.cc (TokenPassSearch::reset_search):
 	m_recent_word_graph_info is indexed by word ID, so size has to be
 	m_word_repository.size().

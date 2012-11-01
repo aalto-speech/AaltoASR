@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <cctype>
 
 #include "TokenPassSearch.hh"
 
@@ -1668,7 +1669,20 @@ int TokenPassSearch::create_word_repository()
 	int num_not_found = 0;
 
 	for (int i = 0; i < m_vocabulary.num_words(); ++i) {
-		const string & word = m_vocabulary.word(i);
+		string word = m_vocabulary.word(i);
+
+		// Remove :[0-9]+ from the tail (pronunciation ID).
+		string::const_reverse_iterator iter = word.rbegin();
+		if (isdigit(*iter)) {
+			++iter;
+			while (isdigit(*iter)) ++iter;
+			if (*iter == ':') {
+				++iter;
+				int tail_size = iter - word.rbegin();
+				word.resize(word.size() - tail_size);
+			}
+		}
+
 		if (word.size() == 0) {
 			if (m_verbose > 0) {
 				cerr
@@ -1698,9 +1712,9 @@ int TokenPassSearch::create_word_repository()
 		}
 		else {
 			cm_log_prob = 0;
-			string::const_iterator component_first = word.begin();
+			string::iterator component_first = word.begin();
 			while (true) {
-				string::const_iterator component_last = find(component_first,
+				string::iterator component_last = find(component_first,
 						word.end(), '_');
 				string component(component_first, component_last);
 				if (component.size() == 0) {
