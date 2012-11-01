@@ -170,7 +170,7 @@ void TokenPassSearch::reset_search(int start_frame)
 		word_graph.link(node_index);
 		t->recent_word_graph_node = node_index;
 		m_recent_word_graph_info.clear();
-		m_recent_word_graph_info.resize(m_lexicon.words());
+		m_recent_word_graph_info.resize(m_word_repository.size());
 	}
 
 	t->lm_hist_code = 0;
@@ -1689,7 +1689,7 @@ int TokenPassSearch::create_word_repository()
 			not_found = true;
 		}
 
-		m_word_repository[i].set_ids(i, lm_id, lookahead_lm_id);
+		m_word_repository.at(i).set_ids(i, lm_id, lookahead_lm_id);
 
 #ifdef ENABLE_MULTIWORD_SUPPORT
 		if (word[0] == '_') {
@@ -1716,6 +1716,7 @@ int TokenPassSearch::create_word_repository()
 					// them as long as they exist in the language model. Just make sure
 					// we have a word ID for every component.
 					int word_id = m_vocabulary.add_word(component);
+					m_word_repository.resize(m_vocabulary.num_words());
 
 					float component_cm_log_prob;
 					find_word_from_lm(word_id, component, lm_id,
@@ -2047,16 +2048,17 @@ float TokenPassSearch::get_lm_bigram_lookahead(int prev_word_id,
 			delete old_score_list; // Old list was removed
 		score_list->index = prev_word_id;
 		score_list->lm_scores.insert(score_list->lm_scores.end(),
-				m_lexicon.words(), 0);
+				m_word_repository.size(), 0);
 
 		vector<float> extensions;
 		m_lookahead_ngram->fetch_bigram_list(
 				m_word_repository[prev_word_id].lookahead_lm_id(), extensions);
 
 		// Map lookahead LM IDs to word IDs.
-		for (int i = 0; i < m_word_repository.size(); ++i)
-			score_list->lm_scores.at(i) = extensions.at(
-					m_word_repository[i].lookahead_lm_id());
+		for (int i = 0; i < m_word_repository.size(); ++i) {
+			score_list->lm_scores.at(i) =
+					extensions.at(m_word_repository[i].lookahead_lm_id());
+		}
 	}
 
 	// Compute the lookahead score by selecting the maximum LM score of possible
@@ -2080,7 +2082,7 @@ float TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 	lm_la_cache_count[depth]++;
 #endif
 
-	int index = w1 * m_lexicon.words() + w2;
+	int index = w1 * m_word_repository.size() + w2;
 	float score;
 	if (node->lm_lookahead_buffer.find(index, &score))
 		return score;
@@ -2109,7 +2111,7 @@ float TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 			delete old_score_list; // Old list was removed
 		score_list->index = index;
 		score_list->lm_scores.insert(score_list->lm_scores.end(),
-				m_lexicon.words(), 0);
+				m_word_repository.size(), 0);
 
 		vector<float> extensions;
 		m_lookahead_ngram->fetch_trigram_list(
@@ -2118,8 +2120,8 @@ float TokenPassSearch::get_lm_trigram_lookahead(int w1, int w2,
 
 		// Map lookahead LM IDs to word IDs.
 		for (int i = 0; i < m_word_repository.size(); ++i)
-			score_list->lm_scores.at(i) = extensions.at(
-					m_word_repository[i].lookahead_lm_id());
+			score_list->lm_scores.at(i) =
+					extensions.at(m_word_repository[i].lookahead_lm_id());
 	}
 
 	// Compute the lookahead score by selecting the maximum LM score of

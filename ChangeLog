@@ -1,3 +1,15 @@
+2012-11-01  senarvi  <senarvi@cis.hut.fi>
+
+	* src/TokenPassSearch.cc (TokenPassSearch::reset_search):
+	m_recent_word_graph_info is indexed by word ID, so size has to be
+	m_word_repository.size().
+	(TokenPassSearch::create_word_repository): Update m_word_repository size if
+	a word is added to vocabulary. 
+	(TokenPassSearch::get_lm_bigram_lookahead): m_word_repository.size() is the
+	number of different word IDs, not m_lexicon.words().
+	(TokenPassSearch::get_lm_trigram_lookahead): m_word_repository.size() is the
+	number of different word IDs, not m_lexicon.words().
+
 2012-10-25  senarvi  <senarvi@cis.hut.fi>
 
 	* src/LMHistory.cc (LMHistory::rend): A NULL value represents the beginning
