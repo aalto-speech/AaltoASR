@@ -945,11 +945,13 @@ void TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
 
 					if (m_fsa_lm) {
 						updated_token.fsa_lm_node = m_fsa_lm->initial_node_id();
-						if (m_word_boundary_id > 0)
+						if (m_word_boundary_id > 0) {
+							assert(m_word_repository[m_word_boundary_id].lm_id() >= 0);
 							updated_token.fsa_lm_node =
 									m_fsa_lm->walk(updated_token.fsa_lm_node,
 											m_word_repository[m_word_boundary_id].lm_id(),
 											NULL);
+						}
 					}
 					else
 						updated_token.lm_hist_code = compute_lm_hist_hash_code(
@@ -1953,6 +1955,11 @@ void TokenPassSearch::advance_fsa_lm(TPLexPrefixTree::Token & token)
 {
 	const LMHistory::Word & word = token.lm_history->last();
 
+	if (word.lm_id() < 0) {
+		cerr << "TokenPassSearch::advance_fsa_lm: Word is not found from the LM: "
+				<< m_vocabulary.word(word.word_id()) << endl;
+		exit(1);
+	}
 #ifdef ENABLE_MULTIWORD_SUPPORT
 	if (m_split_multiwords) {
 		for (int i = 0; i < word.num_components(); ++i) {
