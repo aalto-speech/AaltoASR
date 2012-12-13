@@ -47,10 +47,13 @@ use CondorManager;
 ## Extended Baum-Welch settings ##
   # Statistics collection
   # It is usually best to use segmentation mode Multipath Viterbi (-M mpv),
-  # although plain Baum-Welch (-M bw) might work well for MMI.
-  # For MMI training use --mmi
-  # For MPE, use --mpe --errmode=mpe
-  # For MPFE, the following is recommended: --mpe --errmode=mpfe --nosil
+  # although plain Baum-Welch (-M bw) might work well for MMI. With current
+  # implementation, using BW-segmentation with MPE is very slow!
+  # Examples:
+  # MMI training: -M mpv --mmi
+  # MPE training: -M mpv --mpe --errmode=mpe
+  # For MPFE, the following is recommended: -M mpv --mpe --errmode=mpfe --nosil=<w>
+  #     NOTE! Replace <w> with the proper silence label (e.g. _ in english models)
   my $STATS_MODE = "-M mpv --mmi";
 
   # Model estimation options. The discriminative criterion needs to match
@@ -64,7 +67,7 @@ use CondorManager;
   # To produce robust models, it is recommended to tweak the so called D
   # constant: --C1=0 --ismooth=D --prev-prior
   # Determine D so that the median KLD change of the Gaussians in the
-  # first EBW update (compared to the ML model) is reasonable,
+  # first EBW update (from the ML model) is reasonable,
   # e.g. 0.01 for MMI and 0.1 for MPE/MPFE. This can be computed with
   # clskld -g
   my $ESTIMATE_MODE = "--mmi --C1=0 --ismooth=300 --prev-prior";
