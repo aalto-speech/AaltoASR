@@ -238,7 +238,7 @@ RegClassTree::Node::update_covar()
   Matrix cur_covar;
   Vector cur_mean;
 
-  m_covar = Matrix::zeros(m_covar.size(1), m_covar.size(2));
+  m_covar = Matrix::zeros(m_covar.size(0), m_covar.size(1));
 
   for (unsigned int i = 0; i < m_components.size(); i++) {
     m_components[i]->get_mean(cur_mean);
