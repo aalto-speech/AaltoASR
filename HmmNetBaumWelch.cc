@@ -534,7 +534,7 @@ HmmNetBaumWelch::check_network_structure(void)
 {
   for (int i = 0; i < (int)m_nodes.size(); i++)
   {
-    bool epsilon_transitions = false;
+    //bool epsilon_transitions = false;
     int non_eps_in_transitions = 0;
     bool self_transition = false;
     
@@ -551,7 +551,7 @@ HmmNetBaumWelch::check_network_structure(void)
 //           fprintf(stderr, "At node %i:\n", i);
 //           throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
 //         }
-        epsilon_transitions = true;
+        //epsilon_transitions = true;
       }
       else if (m_arcs[arc_id].target != m_arcs[arc_id].source)
       {
