@@ -65,7 +65,7 @@ endif
 
 ##################################################
 
-PROGS = feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats regtree clsstep clskld
+PROGS = feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats regtree clsstep clskld opt_ebw_d
 ifeq ($(USE_SUBSPACE_COV),1)
 PROGS += subspace optimize
 endif
