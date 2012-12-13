@@ -18,6 +18,7 @@ public:
     MPFE_PDF, // Correct PDF index
     MPFE_CONTEXT_PHONE_STATE, // A state of the correct CP
     MPFE_HYP_CONTEXT_PHONE_STATE, // A correct state in hypothesis CP
+    MPE_SNFE // Symmetrically normalized frame error approximation
   } ErrorMode;
 
   /** Segmented lattice hierarchy used for evaluation in different modes
@@ -28,9 +29,13 @@ public:
    *  MPFE_PDF - 0
    *  MPFE_CONTEXT_PHONE_STATE - 0
    *  MPFE_HYP_CONTEXT_PHONE_STATE - 0
+   *  MPE_SNFE - 2
    */
 
 
+
+  /// Helper class to iterate over reference arcs in frame order,
+  /// starting from a particular frame
   class RefIterator {
   public:
     typedef std::forward_iterator_tag iterator_category;
@@ -102,7 +107,7 @@ public:
 
   
 public:
-  SegErrorEvaluator() { m_first_frame = -1; m_error_mode = MPE; m_model = NULL; m_ignore_silence = false; m_binary_mpfe = true; }
+  SegErrorEvaluator() { m_first_frame = -1; m_error_mode = MPE; m_model = NULL; m_ignore_silence = false; m_binary_mpfe = true; m_silence_word = "_"; }
 
   // CustomScoreQuery interface
   virtual ~SegErrorEvaluator() { }
@@ -113,8 +118,15 @@ public:
   void set_mode(ErrorMode mode) { m_error_mode = mode; }
   void set_model(HmmSet *model) { m_model = model; }
   void set_ignore_silence(bool silence) { m_ignore_silence = silence; }
+  void set_silence_word(const std::string &silence_word) { m_silence_word = silence_word; }
   void initialize_reference(HmmNetBaumWelch::SegmentedLattice const *ref_lattice);
   void reset(void);
+
+  void add_snfe_ref_arc_error(
+    int ref_arc_index, double error,
+    std::vector< std::pair<int, double> > &snfe_ref_arcs);
+  double get_minimum_snfe_error(
+    int end_frame, std::vector< std::pair<int, double> > &snfe_ref_arcs);
 
   //int non_silence_frames(void) { return m_non_silence_frames; }
   //double non_silence_occupancy(void) { return m_non_silence_occupancy; }
@@ -164,6 +176,7 @@ private:
   int m_non_silence_frames;
   double m_non_silence_occupancy;
   bool m_ignore_silence;
+  std::string m_silence_word;
   bool m_binary_mpfe;
 
 

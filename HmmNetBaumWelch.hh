@@ -36,11 +36,11 @@ namespace aku {
  *      Note that if segmentation mode MODE_MULTIPATH_VITERBI is used,
  *      then for any path segment without branches (self-transitions
  *      excluded) only a single permutation of self-transitions is used,
- *      one that maximizes the summed likelihood of the paths containing
+ *      one that maximizes the summed loglikelihood of the paths containing
  *      that particular path segment. This means that the search network
  *      affects the segmentation: If several paths pass through the same
  *      node, the segmentation up to that node is optimized with respect
- *      to the summed likelihood of the continuation paths. If instead
+ *      to the summed loglikelihood of the continuation paths. If instead
  *      the paths were presented as separate path segments, more
  *      variations in the segmentations would be possible.
  *
@@ -215,6 +215,11 @@ public:
 
     /// Log score of this arc
     double arc_score;
+
+    /** Acoustic score of the arc. At the moment only valid for frame lattices,
+     * but could be implemented for others as well
+     */
+    double arc_acoustic_score;
     
     /// Log sum of the scores of all the paths which contain this arc
     double total_score;
@@ -229,7 +234,7 @@ public:
     /// Custom path score (combined scores over the lattice) for this arc
     double custom_path_score;
 
-    SegmentedArc(int arc_id_, std::string label_, int tr_id_, int source_node_, int target_node_, double arc_score_, double total_score_) : net_arc_id(arc_id_), label(label_), transition_index(tr_id_), source_node(source_node_), target_node(target_node_), arc_score(arc_score_), total_score(total_score_) { custom_score = 0; custom_path_score = 0; }
+    SegmentedArc(int arc_id_, std::string label_, int tr_id_, int source_node_, int target_node_, double arc_score_, double acoustic_score_, double total_score_) : net_arc_id(arc_id_), label(label_), transition_index(tr_id_), source_node(source_node_), target_node(target_node_), arc_score(arc_score_), arc_acoustic_score(acoustic_score_), total_score(total_score_) { custom_score = 0; custom_path_score = 0; }
   };
 
   /** Segmented lattice node */
@@ -238,17 +243,19 @@ public:
 
     std::vector<int> in_arcs; //!< SegmentedArc ids
     std::vector<int> out_arcs; //!< SegmentedArc ids
-    
+
+    SegmentedNode() { frame = -1; }
     SegmentedNode(int frame_) : frame(frame_) { }
   };
 
   /** Segmented lattice containing the arcs and nodes */
-  struct SegmentedLattice {
+  class SegmentedLattice {
+  public:
     /** true if every arc consumes exactly one frame.
      * If false, the net_arc_id fields of SegmentedArc's refer to
      * m_logical_arcs instead of m_arcs
      */
-    bool frame_lattice; //!< true if every arc consumes exactly one frame
+    bool frame_lattice;
 
     std::vector<SegmentedNode> nodes; //!< Segmented nodes
     std::vector<SegmentedArc> arcs; //!< Segmented arcs
@@ -280,13 +287,11 @@ public:
     /** Queries the custom scores for the segmented lattice arcs and
      * applies forward-backward algorithm to compute the lattice level
      * custom path scores.
-     * \param sl  Segmented lattice to operate on. Arc custom scores must
-     *            have been filled with \ref fill_scutom_scores
      * \param combination_mode  Custom score combination mode
      *                          (CUSTOM_AVG [default], CUSTOM_SUM or
      *                           CUSTOM_MAX)
      */
-    void compute_custom_path_scores(CustomScoreQuery &callback,
+    void compute_custom_path_scores(CustomScoreQuery *callback,
                                     int combination_mode=CUSTOM_AVG);
 
     /** Copies the custom path scores of a higher hierarchy segmented lattice
@@ -304,13 +309,31 @@ public:
 
     /** Write the segmented lattice in FST format
      * \param file FILE handle opened for writing
-     * \param sl   Segmented lattice to be written to the file
      * \param arc_total_scores If set to true, the arc scores written to
      *                         the file are total scores. The default is
      *                         to write "instant" arc scores instead of
      *                         totals.
      */
-    void write_segmented_lattice(FILE *file, bool arc_total_scores = false);
+    void write_segmented_lattice_fst(FILE *file, bool arc_total_scores = false);
+
+    /** Save the segmented lattice in a custom format which can be loaded
+     * later. Only for frame level lattices!
+     * \param file FILE handle opened for writing
+     */
+    void save_segmented_lattice(FILE *file);
+
+    /** Load a saved segmented lattice.
+     * \param file FILE handle opened for writing
+     */
+    void load_segmented_lattice(FILE *file, HmmNetBaumWelch &parent);
+
+    /** Recomputes the total custom score
+     * \param combination_mode  Custom score combination mode
+     *                          (CUSTOM_AVG [default], CUSTOM_SUM or
+     *                           CUSTOM_MAX)
+     */
+    void recompute_custom_path_scores(int combination_mode=CUSTOM_AVG) { compute_custom_path_scores(NULL, combination_mode); }
+
 
 
   private:
@@ -320,11 +343,12 @@ public:
     int create_segmented_arc(int arc_id, std::string &label,
                              int transition_index,
                              int source_seg_node, int target_seg_node,
-                             double arc_score, double total_score);
+                             double arc_score, double acoustic_score,
+                             double total_score);
     
     /** Query the custom scores for all the arcs of the segmented lattice
      */
-    void fill_custom_scores(CustomScoreQuery &callback);
+    void fill_custom_scores(CustomScoreQuery *callback);
     
     /// Combines custom scores with the given combination mode
     double combine_custom_scores(double log_score, double custom_score,
@@ -372,10 +396,11 @@ private:
     int arc_id;
     int source_seg_node;
     double arc_score;     // Cumulative arc scores
+    double arc_acoustic_score; // Acoustic (and transition) score of arc_id
     double forward_score; // Includes the arc score(s)
     double total_score;
     
-    PendingArc(int arc_id_, int source_node_, double arc_score_, double forward_score_, double total_score_) : arc_id(arc_id_), source_seg_node(source_node_), arc_score(arc_score_), forward_score(forward_score_), total_score(total_score_) { }
+    PendingArc(int arc_id_, int source_node_, double arc_score_, double acoustic_score_, double forward_score_, double total_score_) : arc_id(arc_id_), source_seg_node(source_node_), arc_score(arc_score_), arc_acoustic_score(acoustic_score_), forward_score(forward_score_), total_score(total_score_) { }
   };
 
 
@@ -423,6 +448,16 @@ public:
   /** Read the network from a file in mitfst ascii format. */
   void read_fst(FILE *file);
 
+  /** Reads a segmented lattice from a file */
+  SegmentedLattice* load_segmented_lattice(std::string &file);
+
+  /** Generates features for the lattice objects. Note! Usually the
+   * features are generated automatically via \ref create_segmented_lattice,
+   * this function may be needed if loading a precomputed segmented lattice
+   * and rescoring it
+   */
+  void generate_features(void);
+  
   /** Set the pruning thresholds.
    * If the threshold is zero, the current value will not be changed.
    * \param forward       Forward beam (second pass)
@@ -458,9 +493,16 @@ public:
   SegmentedLattice* extract_segmented_lattice(SegmentedLattice *frame_sl,
                                               int level);
 
+  /** Recomputes the acoustic scores of a frame segmented lattice,
+   * updates the arc scores and finally computes new total score.
+   * \param frame_sl Pointer to frame lattice
+   */
+  void rescore_segmented_lattice(SegmentedLattice *frame_sl);
+
+
 
   /** Return the feature vector for a frame */
-  const FeatureVec get_feature(int frame) const { return m_features[frame]; }
+  const FeatureVec get_feature(int frame) const { assert( m_features_generated ); return m_features[frame]; }
   
 
   // Segmentator interface
@@ -503,7 +545,6 @@ private:
                                 int new_parent_id, bool forward,
                                 std::set<int> &processed_arcs);
 
-  void generate_features(void);
   bool fill_backward_probabilities(void);
   void generate_segmented_lattice(void);
 
@@ -600,6 +641,8 @@ private:
 
   /// true if transitions are to be collected
   bool m_collect_transitions;
+
+  friend class SegmentedLattice;
 
 };
 

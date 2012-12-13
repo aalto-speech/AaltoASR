@@ -453,16 +453,13 @@ Gaussian::ConstrainedEBWSolver::cov_kld(void)
 }
 
 
-void Gaussian::ConstrainedEBWSolver::constrained_update(double min_d,
-                                                        double max_kld)
+double Gaussian::ConstrainedEBWSolver::constrained_update(double min_d,
+                                                          double max_kld)
 {
   assert( min_d > 0 );
   double kld = evaluate_function(min_d);
   if (kld < max_kld)
-  {
-    fprintf(stderr, "  Realized D: %g\n", min_d);
-    return;
-  }
+    return min_d;
   // Find the initial limits by doubling the minimum d
   double low_d = min_d;
   double low_kld = kld;
@@ -476,13 +473,11 @@ void Gaussian::ConstrainedEBWSolver::constrained_update(double min_d,
     high_kld = evaluate_function(high_d);
   }
   // Use binary search to find the proper D
-  fprintf(stderr, "  D-search: [%g, %g]: [%g, %g]\n", low_d, high_d,
-          low_kld, high_kld);
   double d = util::bin_search_param_max_value(low_d, low_kld, high_d, high_kld,
                                               max_kld, 1e-4*max_kld, 1e-4*min_d,
                                               *this);
   kld = evaluate_function(d);
-  fprintf(stderr, "  Realized D: %g\n", d);
+  return d;
 }
 
 
@@ -500,6 +495,9 @@ Gaussian::estimate_parameters(EstimationMode mode, double minvar,
                               double covsmooth, double c1, double c2,
                               double tau, bool ml_stats_target)
 {
+  if (!m_update)
+    return;
+  
   if ((mode == ML_EST && !accumulated(ML_BUF)) ||
       (mode == MMI_EST && (!accumulated(ML_BUF) || !accumulated(MMI_BUF))) ||
       ((mode == MPE_EST || mode == MPE_MMI_PRIOR_EST) &&
@@ -617,16 +615,22 @@ Gaussian::estimate_parameters(EstimationMode mode, double minvar,
     }
 
     assert(c2>1);
-    double d=std::max(c1*m_accums[den_buf]->gamma() + tau, c2*min_d);
+    m_min_d = c2*min_d;
+    double default_d = c1*m_accums[den_buf]->gamma() + tau;
+    if (m_fixed_d >= 0)
+      default_d = m_fixed_d;
+    double d=std::max(default_d, c2*min_d);
 
     fprintf(stderr, "num-gamma: %g  den-gamma: %g  d: %g  %s\n",
             m_accums[num_buf]->gamma(),
             m_accums[den_buf]->gamma(), d, (d>c2*min_d?"DEN":"MIN"));
 
+    m_realized_d = d;
+
     if (m_ebw_max_kld > 0)
     {
       ConstrainedEBWSolver solver(*this, c, mu_tilde, sigma_tilde);
-      solver.constrained_update(d, m_ebw_max_kld);
+      m_realized_d = solver.constrained_update(d, m_ebw_max_kld);
       solver.get_parameters(new_mean, new_covariance);
     }
     else
@@ -2238,6 +2242,9 @@ Mixture::stop_accumulating()
 void
 Mixture::estimate_parameters(EstimationMode mode)
 {
+  if (!m_update)
+    return;
+  
   if ((mode == ML_EST && !accumulated(ML_BUF)) ||
       (mode == MMI_EST && (!accumulated(ML_BUF) || !accumulated(MMI_BUF))) ||
       ((mode == MPE_EST || mode == MPE_MMI_PRIOR_EST) &&

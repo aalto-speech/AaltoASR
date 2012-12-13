@@ -638,6 +638,20 @@ HmmNetBaumWelch::reset(void)
 }
 
 
+HmmNetBaumWelch::SegmentedLattice*
+HmmNetBaumWelch::load_segmented_lattice(std::string &file)
+{
+  FILE *fp;
+
+  if ((fp = fopen(file.c_str(), "r")) == NULL)
+    throw std::string("Could not open file "+file);
+  SegmentedLattice *lattice = new SegmentedLattice;
+  lattice->load_segmented_lattice(fp, *this);
+  fclose(fp);
+  return lattice;
+}
+
+
 bool
 HmmNetBaumWelch::init_utterance_segmentation(void)
 {
@@ -1230,6 +1244,7 @@ HmmNetBaumWelch::create_segmented_lattice(void)
                          pending_arcs[*it].source_seg_node,
                          loglikelihoods.times(pending_arcs[*it].arc_score,
                                               arc_score),
+                         pending_arcs[*it].arc_acoustic_score,
                          pa_forward_score, pa_total_score));
           }
         }
@@ -1315,7 +1330,8 @@ HmmNetBaumWelch::create_segmented_lattice(void)
             sl->create_segmented_arc(p.arc_id, m_arcs[p.arc_id].label,
                                      m_arcs[p.arc_id].transition_index,
                                      p.source_seg_node, target_seg_node,
-                                     p.arc_score, p.total_score);
+                                     p.arc_score, p.arc_acoustic_score,
+                                     p.total_score);
           }
           active_tokens[sbuf][i].source_seg_node = target_seg_node;
 
@@ -1333,9 +1349,13 @@ HmmNetBaumWelch::create_segmented_lattice(void)
           active_tokens[sbuf][i].pending_arcs.clear();
 
           pending_arcs_created = true;
+
         }
 
         double arc_score = get_arc_score(arc_id, get_feature(cur_frame));
+        double arc_acoustic_score = arc_score;
+        if (m_use_static_scores)
+           arc_acoustic_score -= m_arcs[arc_id].static_score;
         double forward_score = loglikelihoods.times(
           active_tokens[sbuf][i].score, arc_score);
         assert( forward_score > loglikelihoods.zero() );
@@ -1349,6 +1369,7 @@ HmmNetBaumWelch::create_segmented_lattice(void)
         temp_pending_arcs.push_back(
           PendingArc(arc_id, active_tokens[sbuf][i].source_seg_node,
                      (cur_frame == m_first_frame?forward_score:arc_score),
+                     arc_acoustic_score,
                      forward_score, arc_total_score));
       }
 
@@ -1376,7 +1397,7 @@ HmmNetBaumWelch::create_segmented_lattice(void)
       sl->create_segmented_arc(p.arc_id, m_arcs[p.arc_id].label,
                                m_arcs[p.arc_id].transition_index,
                                p.source_seg_node, sl->final_node,
-                               p.arc_score, p.total_score);
+                               p.arc_score, p.arc_acoustic_score, p.total_score);
       num_end_arcs++;
     }
 
@@ -1426,13 +1447,13 @@ int
 HmmNetBaumWelch::SegmentedLattice::create_segmented_arc(
   int arc_id, std::string &label, int transition_index,
   int source_seg_node, int target_seg_node,
-  double arc_score, double total_score)
+  double arc_score, double acoustic_score, double total_score)
 {
   nodes[source_seg_node].out_arcs.push_back(arcs.size());
   nodes[target_seg_node].in_arcs.push_back(arcs.size());
   arcs.push_back(SegmentedArc(arc_id, label, transition_index,
                               source_seg_node, target_seg_node,
-                              arc_score, total_score));
+                              arc_score, acoustic_score, total_score));
   return arcs.size()-1;
 }
 
@@ -1440,23 +1461,24 @@ HmmNetBaumWelch::SegmentedLattice::create_segmented_arc(
 
 void
 HmmNetBaumWelch::SegmentedLattice::fill_custom_scores(
-  CustomScoreQuery &callback)
+  CustomScoreQuery *callback)
 {
   for (int a = 0; a < (int)arcs.size(); a++)
-    arcs[a].custom_score = callback.custom_score(this, a);
+    arcs[a].custom_score = callback->custom_score(this, a);
 }
 
 
 void
 HmmNetBaumWelch::SegmentedLattice::compute_custom_path_scores(
-  CustomScoreQuery &callback, int combination_mode)
+  CustomScoreQuery *callback, int combination_mode)
 {
   std::vector<ScorePair> fw_scores; // Node forward scores
   typedef std::multimap<int, int> FrameNode;
   FrameNode topological_order; // Nodes sorted by frame numbers
 
   // Fill the custom scores
-  fill_custom_scores(callback);
+  if (callback != NULL)
+    fill_custom_scores(callback);
 
   // Construct the topological order of the nodes
   for (int i = 0; i < (int)nodes.size(); i++)
@@ -1479,27 +1501,30 @@ HmmNetBaumWelch::SegmentedLattice::compute_custom_path_scores(
     for (int a = 0; a < (int)cur_node.out_arcs.size(); a++)
     {
       int arc_id = cur_node.out_arcs[a];
-      int target_node_id = arcs[arc_id].target_node;
-      double new_score = loglikelihoods.times(fw_scores[(*fn).second].score,
-                                              arcs[arc_id].arc_score);
-      double new_custom_path_score = fw_scores[(*fn).second].custom_score +
-        arcs[arc_id].custom_score;
-      if (fw_scores[target_node_id].score <= loglikelihoods.zero())
+      if (arcs[arc_id].arc_score > loglikelihoods.zero())
       {
-        // Set the new score to the node
-        fw_scores[target_node_id].score = new_score;
-        fw_scores[target_node_id].custom_score = new_custom_path_score;
-      }
-      else
-      {
-        // Update the node scores
-        fw_scores[target_node_id].custom_score =
-          combine_custom_scores(new_score, new_custom_path_score,
-                                fw_scores[target_node_id].score,
-                                fw_scores[target_node_id].custom_score,
-                                combination_mode);
-        fw_scores[target_node_id].score = loglikelihoods.plus(
-          fw_scores[target_node_id].score, new_score);
+        int target_node_id = arcs[arc_id].target_node;
+        double new_score = loglikelihoods.times(fw_scores[(*fn).second].score,
+                                                arcs[arc_id].arc_score);
+        double new_custom_path_score = fw_scores[(*fn).second].custom_score +
+          arcs[arc_id].custom_score;
+        if (fw_scores[target_node_id].score <= loglikelihoods.zero())
+        {
+          // Set the new score to the node
+          fw_scores[target_node_id].score = new_score;
+          fw_scores[target_node_id].custom_score = new_custom_path_score;
+        }
+        else
+        {
+          // Update the node scores
+          fw_scores[target_node_id].custom_score =
+            combine_custom_scores(new_score, new_custom_path_score,
+                                  fw_scores[target_node_id].score,
+                                  fw_scores[target_node_id].custom_score,
+                                  combination_mode);
+          fw_scores[target_node_id].score = loglikelihoods.plus(
+            fw_scores[target_node_id].score, new_score);
+        }
       }
     }
   }
@@ -1521,31 +1546,35 @@ HmmNetBaumWelch::SegmentedLattice::compute_custom_path_scores(
     {
       int arc_id = cur_node.in_arcs[a];
       int source_node_id = arcs[arc_id].source_node;
-      double new_score = loglikelihoods.times(bw_scores[(*fn).second].score,
-                                              arcs[arc_id].arc_score);
-      double new_custom_path_score = bw_scores[(*fn).second].custom_score +
-        arcs[arc_id].custom_score;
-
-      // Fill the custom path score for this arc
-      arcs[arc_id].custom_path_score = new_custom_path_score +
-        fw_scores[source_node_id].custom_score;
-      
-      if (bw_scores[source_node_id].score <= loglikelihoods.zero())
+      if (arcs[arc_id].arc_score > loglikelihoods.zero() &&
+          fw_scores[source_node_id].score > loglikelihoods.zero())
       {
-        // Set the new score to the node
-        bw_scores[source_node_id].score = new_score;
-        bw_scores[source_node_id].custom_score = new_custom_path_score;
-      }
-      else
-      {
-        // Update the node scores
-        bw_scores[source_node_id].custom_score =
-          combine_custom_scores(new_score, new_custom_path_score,
-                                bw_scores[source_node_id].score,
-                                bw_scores[source_node_id].custom_score,
-                                combination_mode);
-        bw_scores[source_node_id].score = loglikelihoods.plus(
-          bw_scores[source_node_id].score, new_score);
+        double new_score = loglikelihoods.times(bw_scores[(*fn).second].score,
+                                                arcs[arc_id].arc_score);
+        double new_custom_path_score = bw_scores[(*fn).second].custom_score +
+          arcs[arc_id].custom_score;
+        
+        // Fill the custom path score for this arc
+        arcs[arc_id].custom_path_score = new_custom_path_score +
+          fw_scores[source_node_id].custom_score;
+        
+        if (bw_scores[source_node_id].score <= loglikelihoods.zero())
+        {
+          // Set the new score to the node
+          bw_scores[source_node_id].score = new_score;
+          bw_scores[source_node_id].custom_score = new_custom_path_score;
+        }
+        else
+        {
+          // Update the node scores
+          bw_scores[source_node_id].custom_score =
+            combine_custom_scores(new_score, new_custom_path_score,
+                                  bw_scores[source_node_id].score,
+                                  bw_scores[source_node_id].custom_score,
+                                  combination_mode);
+          bw_scores[source_node_id].score = loglikelihoods.plus(
+            bw_scores[source_node_id].score, new_score);
+        }
       }
     }
   }
@@ -1598,14 +1627,19 @@ HmmNetBaumWelch::SegmentedLattice::compute_total_scores(void)
     for (int a = 0; a < (int)cur_node.out_arcs.size(); a++)
     {
       int arc_id = cur_node.out_arcs[a];
-      int target_node_id = arcs[arc_id].target_node;
-      double new_score = loglikelihoods.times(fw_scores[(*fn).second],
-                                              arcs[arc_id].arc_score);
-      if (fw_scores[target_node_id] <= loglikelihoods.zero())
-        fw_scores[target_node_id] = new_score;
+      if (arcs[arc_id].arc_score > loglikelihoods.zero())
+      {
+        int target_node_id = arcs[arc_id].target_node;
+        double new_score = loglikelihoods.times(fw_scores[(*fn).second],
+                                                arcs[arc_id].arc_score);
+        if (fw_scores[target_node_id] <= loglikelihoods.zero())
+          fw_scores[target_node_id] = new_score;
+        else
+          fw_scores[target_node_id] = loglikelihoods.plus(
+            fw_scores[target_node_id], new_score);
+      }
       else
-        fw_scores[target_node_id] = loglikelihoods.plus(
-          fw_scores[target_node_id], new_score);
+        arcs[arc_id].total_score = loglikelihoods.zero();
     }
   }
 
@@ -1619,24 +1653,39 @@ HmmNetBaumWelch::SegmentedLattice::compute_total_scores(void)
   for (FrameNode::reverse_iterator fn = topological_order.rbegin();
        fn != topological_order.rend(); ++fn)
   {
+    bool clear_scores = false;
     if (bw_scores[(*fn).second] <= loglikelihoods.zero())
-      continue; // This node is unreachable (?)
+    {
+      // This node is unreachable, clear arc total scores
+      clear_scores = true;
+    }
     SegmentedNode &cur_node = nodes[(*fn).second];
     for (int a = 0; a < (int)cur_node.in_arcs.size(); a++)
     {
       int arc_id = cur_node.in_arcs[a];
       int source_node_id = arcs[arc_id].source_node;
-      double new_score = loglikelihoods.times(bw_scores[(*fn).second],
-                                              arcs[arc_id].arc_score);
-      // Fill the total score for this arc
-      arcs[arc_id].total_score = loglikelihoods.times(
-        fw_scores[source_node_id], new_score);
-      
-      if (bw_scores[source_node_id] <= loglikelihoods.zero())
-        bw_scores[source_node_id] = new_score;
+      if (clear_scores)
+      {
+        arcs[arc_id].total_score = loglikelihoods.zero();
+        continue;
+      }
+      if (arcs[arc_id].arc_score > loglikelihoods.zero() &&
+          fw_scores[source_node_id] > loglikelihoods.zero())
+      {
+        double new_score = loglikelihoods.times(bw_scores[(*fn).second],
+                                                arcs[arc_id].arc_score);
+        // Fill the total score for this arc
+        arcs[arc_id].total_score = loglikelihoods.times(
+          fw_scores[source_node_id], new_score);
+        
+        if (bw_scores[source_node_id] <= loglikelihoods.zero())
+          bw_scores[source_node_id] = new_score;
+        else
+          bw_scores[source_node_id] = loglikelihoods.plus(
+            bw_scores[source_node_id], new_score);
+      }
       else
-        bw_scores[source_node_id] = loglikelihoods.plus(
-          bw_scores[source_node_id], new_score);
+        arcs[arc_id].total_score = loglikelihoods.zero();
     }
   }
 }
@@ -1690,7 +1739,7 @@ HmmNetBaumWelch::SegmentedLattice::propagate_custom_scores_to_frame_segmented_la
 
 
 void
-HmmNetBaumWelch::SegmentedLattice::write_segmented_lattice(
+HmmNetBaumWelch::SegmentedLattice::write_segmented_lattice_fst(
   FILE *file, bool arc_total_scores)
 {
   fprintf(file, "#FSTBasic MaxPlus\n");
@@ -1711,6 +1760,156 @@ HmmNetBaumWelch::SegmentedLattice::write_segmented_lattice(
 }
 
 
+void
+HmmNetBaumWelch::SegmentedLattice::save_segmented_lattice(FILE *file)
+{
+  assert( frame_lattice ); // Currently available only for frame lattices
+  fprintf(file, "#SegmentedLattice......\n");
+  int itemp = nodes.size();
+  fwrite(&itemp, sizeof(int), 1, file);
+  itemp = arcs.size();
+  fwrite(&itemp, sizeof(int), 1, file);
+  itemp = initial_node;
+  fwrite(&itemp, sizeof(int), 1, file);
+  itemp = final_node;
+  fwrite(&itemp, sizeof(int), 1, file);
+  double dtemp = total_score;
+  fwrite(&dtemp, sizeof(double), 1, file);
+  dtemp = total_custom_score;
+  fwrite(&dtemp, sizeof(double), 1, file);
+  for (int i = 0; i < (int)nodes.size(); i++)
+  {
+    itemp = nodes[i].frame;
+    fwrite(&itemp, sizeof(int), 1, file);
+  }
+  if ((int)nodes.size()%4)
+  {
+    // Alignment writes
+    for (int i = 0; i < (4-((int)nodes.size()%4));i++)
+      fwrite(&itemp, sizeof(int), 1, file);
+  }
+  
+  for (int i = 0; i < (int)arcs.size(); i++)
+  {
+    itemp = arcs[i].net_arc_id;
+    fwrite(&itemp, sizeof(int), 1, file);
+    itemp = arcs[i].source_node;
+    fwrite(&itemp, sizeof(int), 1, file);
+    itemp = arcs[i].target_node;
+    fwrite(&itemp, sizeof(int), 1, file);
+    fwrite(&itemp, sizeof(int), 1, file); // Alignment int
+    dtemp = arcs[i].arc_score;
+    fwrite(&dtemp, sizeof(double), 1, file);
+    dtemp = arcs[i].arc_acoustic_score;
+    fwrite(&dtemp, sizeof(double), 1, file);
+    dtemp = arcs[i].total_score;
+    fwrite(&dtemp, sizeof(double), 1, file);
+    dtemp = arcs[i].custom_score;
+    fwrite(&dtemp, sizeof(double), 1, file);
+    dtemp = arcs[i].custom_path_score;
+    fwrite(&dtemp, sizeof(double), 1, file);
+  }
+}
+
+
+void
+HmmNetBaumWelch::SegmentedLattice::load_segmented_lattice(
+  FILE *file, HmmNetBaumWelch &parent)
+{
+  std::string line;
+  std::vector<std::string> fields;
+  int num_nodes = -1;
+  int num_arcs = -1;
+//  bool ok = true;
+
+  assert( nodes.size() == 0 );
+  assert( arcs.size() == 0 );
+  
+  str::read_line(&line, file, true);
+  if (line != "#SegmentedLattice......")
+    throw std::string("Invalid file type for segmented lattice");
+
+  int itemp;
+  if (fread(&num_nodes, sizeof(int), 1, file) != 1 ||
+      fread(&num_arcs, sizeof(int), 1, file) != 1)
+    throw std::string("Read error");
+
+  frame_lattice = true;
+
+  // Allocate nodes and arcs
+  nodes.resize(num_nodes);
+  arcs.reserve(num_arcs); // Added dynamically by create_segmented_arc()
+
+  if (fread(&initial_node, sizeof(int), 1, file) != 1 ||
+      fread(&final_node, sizeof(int), 1, file) != 1 ||
+      fread(&total_score, sizeof(double), 1, file) != 1 ||
+      fread(&total_custom_score, sizeof(double), 1, file) != 1)
+    throw std::string("Read error");
+
+  for (int i = 0; i < num_nodes; i++)
+  {
+    if (fread(&itemp, sizeof(int), 1, file) != 1)
+      throw std::string("Read error");
+    nodes[i].frame = itemp;
+  }
+
+  if (num_nodes%4)
+  {
+    // Alignment reads
+    for (int i = 0; i < (4-(num_nodes%4)); i++)
+    {
+      if (fread(&itemp, sizeof(int), 1, file) != 1)
+        throw std::string("Read error");
+    }
+  }
+
+  for (int i = 0; i < num_arcs; i++)
+  {
+    int net_arc_id = -1;
+    int source_node = -1, target_node = -1;
+    int temp;
+    double arc_score, arc_acoustic_score;
+    double arc_total_score, arc_custom_score, arc_custom_path_score;
+    if (fread(&net_arc_id, sizeof(int), 1, file) != 1 ||
+        fread(&source_node, sizeof(int), 1, file) != 1 ||
+        fread(&target_node, sizeof(int), 1, file) != 1 ||
+        fread(&temp, sizeof(int), 1, file) != 1 ||
+        fread(&arc_score, sizeof(double), 1, file) != 1 ||
+        fread(&arc_acoustic_score, sizeof(double), 1, file) != 1 ||
+        fread(&arc_total_score, sizeof(double), 1, file) != 1 ||
+        fread(&arc_custom_score, sizeof(double), 1, file) != 1 ||
+        fread(&arc_custom_path_score, sizeof(double), 1, file) != 1)
+      throw std::string("Read error");
+
+    assert( target_node == temp ); // Alignment int test
+
+    if (net_arc_id >= 0 && net_arc_id < (int)parent.m_arcs.size() &&
+        source_node >= 0 && source_node < num_nodes &&
+        target_node >= 0 && target_node < num_nodes)
+    {
+      int tr_index = parent.m_arcs[net_arc_id].transition_index;
+      std::string label = parent.m_arcs[net_arc_id].label;
+      int new_arc_id =
+        create_segmented_arc(net_arc_id, label, tr_index,
+                             source_node, target_node,
+                             arc_score, arc_acoustic_score, arc_total_score);
+      assert( new_arc_id == i );
+      arcs[i].custom_score = arc_custom_score;
+      arcs[i].custom_path_score = arc_custom_path_score;
+    }
+    else
+    {
+      fprintf(stderr, "Invalid transition\n");
+      fprintf(stderr, "net_arc_id = %d, max_arc_index = %d\n", net_arc_id,
+              (int)parent.m_arcs.size());
+      fprintf(stderr, "source_node = %d, target_node = %d, num_nodes = %d\n",
+              source_node, target_node, num_nodes);
+      exit(1);
+    }
+  }
+}
+
+
 double
 HmmNetBaumWelch::get_arc_score(int arc_id, const FeatureVec &fea_vec)
 {
@@ -1727,8 +1926,14 @@ HmmNetBaumWelch::get_arc_score(int arc_id, const FeatureVec &fea_vec)
       tr_coef = tr.prob;
     double model_likelihood = m_model.state_likelihood(tr.source_index,
                                                        fea_vec);
-    score = loglikelihoods.times(
-      score, m_acoustic_scale*(util::safe_log(model_likelihood * tr_coef)));
+    model_likelihood *= tr_coef;
+    if (model_likelihood <= util::tiny_for_log)
+      score = loglikelihoods.zero();
+    else
+    {
+      score = loglikelihoods.times(
+        score, m_acoustic_scale*(util::safe_log(model_likelihood)));
+    }
   }
   return score;
 }
@@ -1796,6 +2001,9 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
       for (int a = 0; a < (int)source_frame_node.out_arcs.size(); a++)
       {
         int frame_arc_id = source_frame_node.out_arcs[a];
+        if (frame_sl->arcs[frame_arc_id].total_score <= loglikelihoods.zero())
+          continue; // Avoid pruned paths
+        
         int net_arc_id = frame_sl->arcs[frame_arc_id].net_arc_id;
 
         // Find the parent network arc
@@ -1831,6 +2039,7 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
                                        m_logical_arcs[cur_net_arc_id].label, 
                                        -1, (*it).second.source_node,
                                        next_seg_node, (*it).second.score,
+                                       loglikelihoods.zero(), // Not implemented
                                        loglikelihoods.zero());
             sl->child_arcs.resize(seg_arc_id+1);
             esl_fill_child_arcs(sl->child_arcs[seg_arc_id],
@@ -1943,6 +2152,7 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
                                  m_logical_arcs[(*it).second.arc_id].label, 
                                  -1, (*it).second.source_node,
                                  sl->final_node, (*it).second.score,
+                                 loglikelihoods.zero(), // Not implemented
                                  loglikelihoods.zero());
       sl->child_arcs.resize(seg_arc_id+1);
       esl_fill_child_arcs(sl->child_arcs[seg_arc_id],
@@ -2010,6 +2220,50 @@ HmmNetBaumWelch::esl_fill_child_arcs(std::vector<int> &child_arcs,
   }
   child_arcs.resize(temp.size());
   std::copy(temp.rbegin(), temp.rend(), child_arcs.begin());
+}
+
+
+void
+HmmNetBaumWelch::rescore_segmented_lattice(SegmentedLattice *frame_sl)
+{
+  assert( frame_sl->frame_lattice );
+
+  int prev_frame = -1;
+  for (int i = 0; i < (int)frame_sl->nodes.size(); i++)
+  {
+    SegmentedNode &cur_node = frame_sl->nodes[i];
+    if (prev_frame != cur_node.frame)
+    {
+      m_model.reset_cache();
+      prev_frame = cur_node.frame;
+    }
+    for (int a = 0; a < (int)cur_node.out_arcs.size(); a++)
+    {
+      int segmented_arc_id = cur_node.out_arcs[a];
+      int net_arc_id = frame_sl->arcs[segmented_arc_id].net_arc_id;
+      double new_acoustic_score =
+        get_arc_score(net_arc_id, get_feature(cur_node.frame));
+      if (new_acoustic_score <= loglikelihoods.zero())
+      {
+        frame_sl->arcs[segmented_arc_id].arc_score = loglikelihoods.zero();
+        frame_sl->arcs[segmented_arc_id].arc_acoustic_score =
+          loglikelihoods.zero();
+      }
+      else
+      {
+        if (m_use_static_scores)
+          new_acoustic_score -= m_arcs[net_arc_id].static_score;
+        frame_sl->arcs[segmented_arc_id].arc_score +=
+          (new_acoustic_score -
+           frame_sl->arcs[segmented_arc_id].arc_acoustic_score);
+        frame_sl->arcs[segmented_arc_id].arc_acoustic_score =
+          new_acoustic_score;
+      }
+    }
+  }
+
+  // Compute total scores
+  frame_sl->compute_total_scores();
 }
 
 

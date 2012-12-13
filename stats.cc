@@ -43,6 +43,8 @@ bool binary_mpfe = false;
 bool compute_mpe_numerator_score = true;
 
 
+double numerator_score_mult = 1.0;
+
 conf::Config config;
 Recipe recipe;
 HmmSet model;
@@ -234,6 +236,8 @@ collect_lattice_stats(HmmSet &model, HmmNetBaumWelch &seg,
   {
     std::set<int> target_nodes;
 
+    assert( active_nodes.size() > 0 );
+
     // FIXME: Frames are not counted with --no-train and DT
     if (count_frames)
       num_frames++;
@@ -253,8 +257,12 @@ collect_lattice_stats(HmmSet &model, HmmNetBaumWelch &seg,
       {
         HmmNetBaumWelch::SegmentedArc &arc =
           lattice->arcs[lattice->nodes[*it].out_arcs[i]];
-        target_nodes.insert(arc.target_node); // Propagate
 
+        if (arc.total_score <= HmmNetBaumWelch::loglikelihoods.zero())
+          continue;
+
+        target_nodes.insert(arc.target_node); // Propagate
+        
         const FeatureVec feature = seg.get_feature(frame);
         HmmTransition &tr = model.transition(arc.transition_index);
         int pdf_index = model.emission_pdf_index(tr.source_index);
@@ -263,8 +271,9 @@ collect_lattice_stats(HmmSet &model, HmmNetBaumWelch &seg,
         
         if (mode & PDF_ML_STATS)
         {
-          model.accumulate_distribution(feature, pdf_index, arc_prob,
-                                         PDF::ML_BUF);
+          model.accumulate_distribution(feature, pdf_index,
+                                        numerator_score_mult*arc_prob,
+                                        PDF::ML_BUF);
         }
         if (mode & PDF_MMI_STATS)
         {
@@ -303,6 +312,9 @@ int main(int argc, char *argv[])
   int hmmnet_num_seg_mode = 0;
   PDF::StatisticsMode stats_mode = 0;
   bool only_ml = true;
+  bool precomputed_num_lattices = false;
+  bool precomputed_den_lattices = false;
+  bool no_train = false;
   
   std::string gkfile, mcfile, phfile;
   try {
@@ -323,6 +335,7 @@ int main(int argc, char *argv[])
       ('F', "fw-beam=FLOAT", "arg", "0", "Forward beam (for HMM networks)")
       ('W', "bw-beam=FLOAT", "arg", "0", "Backward beam (for HMM networks)")
       ('A', "ac-scale=FLOAT", "arg", "1", "Acoustic scaling (for HMM networks)")
+      ('\0', "num-mult=FLOAT", "arg", "1", "Loglikelihood multiplier for the numerator")
       ('M', "segmode=MODE", "arg", "bw", "Segmentation mode: bw/vit/mpv")
       ('\0', "numseg=MODE", "arg", "", "Numerator segmentation mode")
       ('\0', "ml", "", "", "Collect statistics for ML")
@@ -330,11 +343,13 @@ int main(int argc, char *argv[])
       ('\0', "mpe", "", "", "Collect statistics for MPE/MWE/MPFE")
       ('\0', "grad", "", "", "Prepare gradient based statistics (with --mpe)")
       ('\0', "mllt", "", "", "maximum likelihood linear transformation (for --ml)")
-      ('\0', "errmode=MODE", "arg", "", "For --mpe. Modes: mwe/mpe/mpfe/mpfe-cps/mpfe-pdf")
-      ('\0', "nosil", "", "", "Ignore silence arcs in MPE scoring")
+      ('\0', "errmode=MODE", "arg", "", "For --mpe. Modes: mwe/mpe/mpfe/mpfe-cps/mpfe-pdf/snfe")
+      ('\0', "nosil=SIL", "arg", "", "Ignore silence arcs (labeled SIL) in MPE scoring")
       ('S', "speakers=FILE", "arg", "", "speaker configuration file")
       ('U', "uttadap", "", "", "Enable utterance adaptation")
       ('n', "no-train", "", "", "Only collect summary statistics")
+      ('P', "precomplat", "", "", "Use precomputed segmented lattices (with rescoring)")
+      ('\0', "savelat", "", "", "Don't train but only save segmented lattices")
       ('a', "alignment", "", "", "save output alignments (only with ML training)")
       ('B', "batch=INT", "arg", "0", "number of batch processes with the same recipe")
       ('I', "bindex=INT", "arg", "0", "batch process index")
@@ -405,7 +420,7 @@ int main(int argc, char *argv[])
     // Read recipe file
     recipe.read(io::Stream(config["recipe"].get_str()),
                 config["batch"].get_int(), config["bindex"].get_int(),
-                true);
+                false);
     
     if (config["ml"].specified)
     {
@@ -436,7 +451,11 @@ int main(int argc, char *argv[])
       throw std::string("At least one mode (--ml, --mmi, --mpe) must be given!");
 
     if (config["nosil"].specified)
+    {
       error_evaluator.set_ignore_silence(true);
+      if (config["nosil"].get_str().length() > 0)
+        error_evaluator.set_silence_word(config["nosil"].get_str());
+    }
     else
       error_evaluator.set_ignore_silence(false);
 
@@ -473,6 +492,7 @@ int main(int argc, char *argv[])
           ("mpfe-pdf", SegErrorEvaluator::MPFE_PDF)
           ("mpfe-cps", SegErrorEvaluator::MPFE_CONTEXT_PHONE_STATE)
           ("mpfe", SegErrorEvaluator::MPFE_HYP_CONTEXT_PHONE_STATE)
+          ("snfe", SegErrorEvaluator::MPE_SNFE)
           ;
         std::string errmode_str = config["errmode"].get_str();
         int result;
@@ -480,6 +500,8 @@ int main(int argc, char *argv[])
           throw std::string("Invalid choice for --errmode: ") + errmode_str;
         errmode = (SegErrorEvaluator::ErrorMode)result;
         error_evaluator.set_mode(errmode);
+        if (errmode == SegErrorEvaluator::MPE_SNFE)
+          compute_mpe_numerator_score = false;
       }
     }
     else if (config["mpe"].specified)
@@ -500,13 +522,25 @@ int main(int argc, char *argv[])
         printf("Warning: Alignment is disabled with discriminative training\n");
     }
 
+    numerator_score_mult = config["num-mult"].get_float();
+
     if (config["mllt"].specified)
     {
       if (!only_ml)
         throw std::string("--mllt is only supported with --ml");
       stats_mode |= PDF_ML_FULL_STATS;
     }
-    if (!config["no-train"].specified)
+
+    if (config["precomplat"].specified)
+    {
+      // FIXME: Separate numerator and denomiator precomputation option
+      precomputed_num_lattices = true;
+      precomputed_den_lattices = true;
+    }
+    
+    if (config["no-train"].specified || config["savelat"].specified)
+      no_train = true;
+    if (!no_train)
       model.start_accumulating(stats_mode);
 
     // Process each recipe line
@@ -545,8 +579,7 @@ int main(int argc, char *argv[])
                                          config["ophn"].specified, &fea_gen,
                                          NULL);
         phnreader->set_collect_transition_probs(transtat);
-        simple_train(model, *phnreader, !config["no-train"].specified,
-                     alignment_out, false);
+        simple_train(model, *phnreader, !no_train, alignment_out, false);
         delete phnreader;
       }
       else
@@ -563,8 +596,8 @@ int main(int argc, char *argv[])
           num_seg->set_pruning_thresholds(config["fw-beam"].get_float(),
                                           config["bw-beam"].get_float());
           num_seg->set_acoustic_scaling(config["ac-scale"].get_float());
-          simple_train(model, *num_seg, !config["no-train"].specified,
-                       alignment_out, true);
+          // FIXME: SegmentedLattice loading not implemented
+          simple_train(model, *num_seg, !no_train, alignment_out, true);
         }
         else
         {
@@ -572,11 +605,24 @@ int main(int argc, char *argv[])
 
           HmmNetBaumWelch* den_seg  = NULL;
           HmmNetBaumWelch::SegmentedLattice *den_lattice = NULL;
-          HmmNetBaumWelch::SegmentedLattice *num_lattice =
-            create_segmented_lattice(*num_seg, config["fw-beam"].get_float(),
-                                     config["bw-beam"].get_float(),
-                                     config["ac-scale"].get_float(),
-                                     hmmnet_num_seg_mode);
+          HmmNetBaumWelch::SegmentedLattice *num_lattice = NULL;
+
+          if (precomputed_num_lattices)
+          {
+            // FIXME: hmmnet_path reused
+            std::string sl_file = recipe.infos[f].hmmnet_path + ".sl";
+            num_lattice = num_seg->load_segmented_lattice(sl_file);
+            num_seg->set_acoustic_scaling(config["ac-scale"].get_float());
+            num_seg->generate_features();
+            num_seg->rescore_segmented_lattice(num_lattice);
+          }
+          else
+          {
+            num_lattice = create_segmented_lattice(
+              *num_seg, config["fw-beam"].get_float(),
+              config["bw-beam"].get_float(), config["ac-scale"].get_float(),
+              hmmnet_num_seg_mode);
+          }
           
           bool skip = false;
           if (num_lattice == NULL)
@@ -590,10 +636,22 @@ int main(int argc, char *argv[])
             den_seg = recipe.infos[f].init_hmmnet_files(
               &model, true, &fea_gen, NULL);
             den_seg->set_collect_transition_probs(transtat);
-            den_lattice = create_segmented_lattice(
-              *den_seg, config["fw-beam"].get_float(),
-              config["bw-beam"].get_float(), config["ac-scale"].get_float(),
-              hmmnet_seg_mode);
+            if (precomputed_den_lattices)
+            {
+              // FIXME: den_hmmnet_path reused
+              std::string sl_file = recipe.infos[f].den_hmmnet_path + ".sl";
+              den_lattice = den_seg->load_segmented_lattice(sl_file);
+              den_seg->set_acoustic_scaling(config["ac-scale"].get_float());
+              den_seg->generate_features();
+              den_seg->rescore_segmented_lattice(den_lattice);
+            }
+            else
+            {
+              den_lattice = create_segmented_lattice(
+                *den_seg, config["fw-beam"].get_float(),
+                config["bw-beam"].get_float(), config["ac-scale"].get_float(),
+                hmmnet_seg_mode);
+            }
             if (den_lattice == NULL)
             {
               skip = true;
@@ -608,34 +666,36 @@ int main(int argc, char *argv[])
             // FIXME: We don't compute the number of frames here. Should
             // it be saved anyway and be compared to the frames of
             // denominator statistics?
-            if ((stats_mode&PDF_ML_STATS) &&
-                !config["no-train"].specified)
+            if ((stats_mode&PDF_ML_STATS) && !no_train)
               collect_lattice_stats(model, *num_seg, num_lattice,
                                     PDF_ML_STATS, false);
-            total_num_log_likelihood += num_lattice->total_score;
+            total_num_log_likelihood += numerator_score_mult*num_lattice->total_score;
               
             if (mpe)
             {
               if (errmode == SegErrorEvaluator::MWE ||
-                  errmode == SegErrorEvaluator::MPE)
+                  errmode == SegErrorEvaluator::MPE ||
+                  errmode == SegErrorEvaluator::MPE_SNFE)
               {
                 // Need a higher hierarchy lattice for the error evaluation
                 int level = 0;
                 if (errmode == SegErrorEvaluator::MWE)
                   level = 3; // FIXME? Only works for word-based lattices
-                else if (errmode == SegErrorEvaluator::MPE)
+                else if (errmode == SegErrorEvaluator::MPE ||
+                         errmode == SegErrorEvaluator::MPE_SNFE)
                   level = 2;
                 HmmNetBaumWelch::SegmentedLattice *num_lat_logical =
                   num_seg->extract_segmented_lattice(num_lattice, level);
                 HmmNetBaumWelch::SegmentedLattice *den_lat_logical =
                   den_seg->extract_segmented_lattice(den_lattice, level);
+                
                 error_evaluator.initialize_reference(num_lat_logical);
-                den_lat_logical->compute_custom_path_scores(error_evaluator);
+                den_lat_logical->compute_custom_path_scores(&error_evaluator);
                 den_lat_logical->propagate_custom_scores_to_frame_segmented_lattice(den_lattice);
 
                 if (compute_mpe_numerator_score)
                 {
-                  num_lat_logical->compute_custom_path_scores(error_evaluator);
+                  num_lat_logical->compute_custom_path_scores(&error_evaluator);
                   total_mpe_num_score += num_lat_logical->total_custom_score;
                 }
                 
@@ -645,10 +705,10 @@ int main(int argc, char *argv[])
               else
               {
                 error_evaluator.initialize_reference(num_lattice);
-                den_lattice->compute_custom_path_scores(error_evaluator);
+                den_lattice->compute_custom_path_scores(&error_evaluator);
                 if (compute_mpe_numerator_score)
                 {
-                  num_lattice->compute_custom_path_scores(error_evaluator);
+                  num_lattice->compute_custom_path_scores(&error_evaluator);
                   total_mpe_num_score += num_lattice->total_custom_score;
                 }
               }
@@ -658,7 +718,23 @@ int main(int argc, char *argv[])
               total_mpe_score += den_lattice->total_custom_score;
             }
 
-            if (!config["no-train"].specified)
+            if (config["savelat"].specified)
+            {
+              // FIXME: hmmnet_path and den_hmmnet_path reused
+              FILE *fp;
+              std::string sl = recipe.infos[f].hmmnet_path + ".sl";
+              if ((fp = fopen(sl.c_str(), "w")) == NULL)
+                throw std::string("Could not open file" + sl);
+              num_lattice->save_segmented_lattice(fp);
+              fclose(fp);
+              sl = recipe.infos[f].den_hmmnet_path + ".sl";
+              if ((fp = fopen(sl.c_str(), "w")) == NULL)
+                throw std::string("Could not open file" + sl);
+              den_lattice->save_segmented_lattice(fp);
+              fclose(fp);
+            }
+
+            if (!no_train)
               collect_lattice_stats(model, *den_seg, den_lattice,
                                     (stats_mode&(~PDF_ML_STATS)), true);
             total_den_log_likelihood += den_lattice->total_score;
@@ -691,31 +767,35 @@ int main(int argc, char *argv[])
     }
 
     // Write statistics to file dump and clean up
-    if (!config["no-train"].specified)
+    if (!no_train)
     {
       model.dump_statistics(out_file);
       model.stop_accumulating();
     }
-    
-    std::string lls_file_name = out_file+".lls";
-    std::ofstream lls_file(lls_file_name.c_str());
-    if (lls_file)
+
+    if (!config["savelat"].specified)
     {
-      lls_file.precision(12); 
-      lls_file << "Numerator loglikelihood: " << total_num_log_likelihood << std::endl;
+      std::string lls_file_name = out_file+".lls";
+      std::ofstream lls_file(lls_file_name.c_str());
+      if (lls_file)
+      {
+        lls_file.precision(12); 
+        lls_file << "Numerator loglikelihood: " << total_num_log_likelihood << std::endl;
 //      lls_file << "Summed numerator loglikelihood: " << summed_num_log_likelihood << std::endl;
-      if (!only_ml)
-      {
-        lls_file << "Denominator loglikelihood: " << total_den_log_likelihood << std::endl;
-        lls_file << "MMI score: " << (total_num_log_likelihood - total_den_log_likelihood) << std::endl;
+        if (!only_ml)
+        {
+          lls_file << "Denominator loglikelihood: " << total_den_log_likelihood << std::endl;
+          lls_file << "MMI score: " << (total_num_log_likelihood - total_den_log_likelihood) << std::endl;
+        }
+        if (mpe)
+        {
+          lls_file << "MPE score: " << total_mpe_score << std::endl;
+          if (compute_mpe_numerator_score)
+            lls_file << "MPE numerator score: " << total_mpe_num_score << std::endl;
+        }
+        lls_file << "Number of frames: " << num_frames << std::endl;
+        lls_file.close();
       }
-      if (mpe)
-      {
-        lls_file << "MPE score: " << total_mpe_score << std::endl;
-        lls_file << "MPE numerator score: " << total_mpe_num_score << std::endl;
-      }
-      lls_file << "Number of frames: " << num_frames << std::endl;
-      lls_file.close();
     }
     if (num_seg_model != NULL)
       delete num_seg_model;

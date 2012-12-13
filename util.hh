@@ -61,7 +61,7 @@ namespace util {
   }
 
   inline float
-  log10add(float a, float b)
+  log10addf(float a, float b)
   {
     const float LOG10TOe = M_LN10;
     const float LOGeTO10 = 1.0 / M_LN10;
@@ -76,6 +76,24 @@ namespace util {
     }
     return (b + log1pf(exp(delta))) * LOGeTO10;
   }
+
+  inline double
+  log10add(double a, double b)
+  {
+    const double LOG10TOe = M_LN10;
+    const double LOGeTO10 = 1.0 / M_LN10;
+
+    a = a * LOG10TOe;
+    b = b * LOG10TOe;
+
+    double delta = a - b;
+    if (delta > 64.0) {
+      b += 64;
+      delta = -delta;
+    }
+    return (b + log1p(exp(delta))) * LOGeTO10;
+  }
+
 
   inline float
   logaddf(float a, float b)
@@ -99,13 +117,13 @@ namespace util {
     return b + log1p(exp(delta));
   }
 
-  static const float tiny_for_log = (float)1e-30;
+  static const double tiny_for_log = (float)1e-50;
   inline double safe_log(double x)
   {
     if (x < tiny_for_log)
-      return logf(tiny_for_log);
+      return log(tiny_for_log);
     else
-      return logf(x);
+      return log(x);
   }
 
   /** Compute modulo of two values so that negative arguments are

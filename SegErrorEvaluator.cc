@@ -106,6 +106,7 @@ SegErrorEvaluator::custom_score(HmmNetBaumWelch::SegmentedLattice const *sl,
   std::string first_sublabel;
   std::string phone_sublabel;
   int cur_arc_pdf = -1;
+  std::vector< std::pair<int, double> > snfe_ref_arcs;
 
   assert( sl->frame_lattice || (m_error_mode!=MPFE_MONOPHONE_LABEL &&
                                 m_error_mode!=MPFE_MONOPHONE_STATE &&
@@ -115,7 +116,7 @@ SegErrorEvaluator::custom_score(HmmNetBaumWelch::SegmentedLattice const *sl,
                                 m_error_mode!=MPFE_HYP_CONTEXT_PHONE_STATE) );
   
   // Precompute labels for the current arc
-  if (m_error_mode == MPE)
+  if (m_error_mode == MPE || m_error_mode == MPE_SNFE)
     center_phone_label = extract_center_phone(cur_arc.label);
   else if (m_error_mode == MPFE_PDF ||
            m_error_mode == MPFE_CONTEXT_PHONE_STATE)
@@ -126,10 +127,13 @@ SegErrorEvaluator::custom_score(HmmNetBaumWelch::SegmentedLattice const *sl,
   if (m_error_mode == MPFE_CONTEXT_PHONE_STATE)
     cur_arc_pdf = atoi(first_sublabel.c_str());
 
+  if (m_error_mode == MPE_SNFE)
+    result = 0; // Computed as a sum over overlapping reference arcs
+
   if (m_ignore_silence)
   {
     std::string word_label = extract_word(cur_arc.label);
-    if (!word_label.compare("_")) // Silence label
+    if (!word_label.compare(m_silence_word)) // Silence label
       return 0;
   }
 
@@ -143,12 +147,13 @@ SegErrorEvaluator::custom_score(HmmNetBaumWelch::SegmentedLattice const *sl,
       m_ref_lattice->arcs[*ref_it];
     int ref_start_frame = m_ref_lattice->nodes[ref_arc.source_node].frame;
     int ref_end_frame = m_ref_lattice->nodes[ref_arc.target_node].frame;
-    double e = std::min(end_frame, ref_end_frame) - std::max(start_frame, ref_start_frame);
+    double e = std::min(end_frame, ref_end_frame) -
+      std::max(start_frame, ref_start_frame);
     assert( e > 0 );
-    e /= (ref_end_frame - ref_start_frame);
     
     if (m_error_mode == MWE)
     {
+      e /= (ref_end_frame - ref_start_frame);
       double new_custom = 0;
       if (cur_arc.label == ref_arc.label)
         new_custom = -1 + 2*e;
@@ -159,6 +164,7 @@ SegErrorEvaluator::custom_score(HmmNetBaumWelch::SegmentedLattice const *sl,
     }
     else if (m_error_mode == MPE)
     {
+      e /= (ref_end_frame - ref_start_frame);
       double new_custom = 0;
       std::string ref_label = extract_center_phone(ref_arc.label);
       if (center_phone_label == ref_label)
@@ -206,10 +212,23 @@ SegErrorEvaluator::custom_score(HmmNetBaumWelch::SegmentedLattice const *sl,
       }
       result = std::max(temp_result, result);
     }
+    else if (m_error_mode == MPE_SNFE)
+    {
+      // Use negative error measure to match the accuracy measures above
+      double n = std::min(end_frame - start_frame,
+                          ref_end_frame - ref_start_frame);
+      e /= -n;
+      std::string ref_label = extract_center_phone(ref_arc.label);
+      if (center_phone_label == ref_label)
+        e = 0; // No error
+      add_snfe_ref_arc_error(*ref_it, e, snfe_ref_arcs);
+    }
     else
       throw std::string("Requested error mode not implemented");
     ++ref_it;
   }
+  if (m_error_mode == MPE_SNFE)
+    result = get_minimum_snfe_error(end_frame, snfe_ref_arcs);
   return result;
 }
 
@@ -282,5 +301,55 @@ SegErrorEvaluator::initialize_reference(
               m_arcs_in_frame[i].begin());
   }
 }
+
+
+void
+SegErrorEvaluator::add_snfe_ref_arc_error(
+  int ref_arc_index, double error,
+  std::vector< std::pair<int, double> > &snfe_ref_arcs)
+{
+  int num_found_arcs = 0;
+  HmmNetBaumWelch::SegmentedArc const &ref_arc = m_ref_lattice->arcs[ref_arc_index];
+
+  // Find existing reference arcs which end at the same node from which
+  // the new arc starts from
+  int orig_num_arcs = (int)snfe_ref_arcs.size();
+  for (int i = 0; i < orig_num_arcs; i++)
+  {
+    HmmNetBaumWelch::SegmentedArc const &existing_arc =
+      m_ref_lattice->arcs[snfe_ref_arcs[i].first];
+    if (existing_arc.target_node == ref_arc.source_node)
+    {
+      num_found_arcs++;
+      // Add a new arc with cumulative error
+      double new_error = snfe_ref_arcs[i].second + error;
+      snfe_ref_arcs.push_back(std::pair<int, double>(ref_arc_index, new_error));
+    }
+  }
+  if (num_found_arcs == 0)
+  {
+    // Create a new arc
+    snfe_ref_arcs.push_back(std::pair<int, double>(ref_arc_index, error));
+  }
+}
+
+double
+SegErrorEvaluator::get_minimum_snfe_error(
+  int end_frame, std::vector< std::pair<int, double> > &snfe_ref_arcs)
+{
+  double error =-1e10; // Uninitialized
+  for (int i = 0; i < (int)snfe_ref_arcs.size(); i++)
+  {
+    int arc_end_frame = m_ref_lattice->nodes[m_ref_lattice->arcs[snfe_ref_arcs[i].first].target_node].frame;
+    if (arc_end_frame >= end_frame)
+    {
+      // Use maximum, because of negative errors
+      if (snfe_ref_arcs[i].second > error)
+        error = snfe_ref_arcs[i].second;
+    }
+  }
+  return error;
+}
+
 
 }

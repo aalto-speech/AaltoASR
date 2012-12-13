@@ -22,6 +22,87 @@ conf::Config config;
 FeatureGenerator fea_gen;
 HmmSet model;
 
+std::vector<double> min_d_values;
+std::vector<double> max_d_values;
+
+
+void set_ebw_d_from_file(const std::string &d_file_name)
+{
+  PDFPool *pool = model.get_pool();
+
+  std::ifstream d_file(d_file_name.c_str());
+  if (!d_file.is_open())
+    throw std::string("Error opening file") + d_file_name;
+
+  min_d_values.resize(pool->size());
+  max_d_values.resize(pool->size());
+  
+  for (int i = 0; i < pool->size(); i++)
+  {
+    if (!d_file.good())
+      throw std::string("Failed to read D values");
+    char buf[256];
+    std::string temp;
+    std::vector<std::string> fields;
+    d_file.getline(buf, 256);
+    temp.assign(buf);
+    str::split(&temp, " ", false, &fields, 4);
+    if (fields.size() >= 1)
+    {
+      double value = strtod(fields[0].c_str(), NULL);
+      if (value < 0)
+      {
+        // Truncate invalid values
+        value = 0;
+        //throw std::string("Invalid value in D file");
+      }
+      PDF *base_pdf = model.get_pool_pdf(i);
+      Gaussian *temp = dynamic_cast< Gaussian* > (base_pdf);
+      if (temp != NULL)
+        temp->set_ebw_fixed_d(value);
+      if (fields.size() >= 3)
+      {
+        min_d_values[i] = strtod(fields[1].c_str(), NULL);
+        max_d_values[i] = strtod(fields[2].c_str(), NULL);
+      }
+      else
+      {
+        min_d_values[i] = -1;
+        max_d_values[i] = -1;
+      }
+    }
+    else
+      throw std::string("Invalid format in D file");
+  }
+  d_file.close();
+}
+
+void write_ebw_d_file(const std::string &d_file_name)
+{
+  PDFPool *pool = model.get_pool();
+  
+  std::ofstream d_file(d_file_name.c_str(), std::ios_base::out);
+  for (int i = 0; i < pool->size(); i++)
+  {
+    PDF *base_pdf = model.get_pool_pdf(i);
+    Gaussian *temp = dynamic_cast< Gaussian* > (base_pdf);
+    if (temp != NULL)
+    {
+      double min_value = temp->get_minimum_d();
+      if ((int)min_d_values.size() > i && min_value < min_d_values[i])
+        min_value = min_d_values[i];
+      double max_value = temp->get_realized_d();
+      if ((int)max_d_values.size() > i &&
+          (max_d_values[i] <= 0 || max_value < max_d_values[i]))
+        max_value = max_d_values[i];
+      d_file << temp->get_realized_d() << " " << min_value <<
+        " " << max_value << std::endl;
+    }
+  }
+  d_file.close();
+}
+
+
 
 int
 main(int argc, char *argv[])
@@ -62,6 +143,11 @@ main(int argc, char *argv[])
       ('\0', "maxmixgauss=INT", "arg", "0", "maximum number of Gaussians per mixture for splitting")
       ('\0', "numgauss=INT", "arg", "-1", "Target number of Gaussians in the final model")
       ('\0', "splitalpha=FLOAT", "arg", "1.0", "Occupancy smoothing power for splitting")
+      ('\0', "no-silence-update", "", "", "Don't update silence state parameters")
+      ('\0', "no-mixture-update", "", "", "Do not update mixture coefficients")
+      ('\0', "silence-d=FLOAT", "arg", "0", "Set a fixed EBW D for silence Gaussians")
+      ('D', "ebwd=FILE", "arg", "", "Read Gaussian specific EBW D values (and limits)")
+      ('\0', "write-ebwd=FILE", "arg", "", "Write Gaussian specific D and minimum D values")
       ('\0', "no-write", "", "", "Don't write anything")
       ('s', "savesum=FILE", "arg", "", "save summary information")
       ('\0', "hcl-bfgs-cfg=FILE", "arg", "", "configuration file for HCL biconjugate gradient algorithm")
@@ -127,6 +213,54 @@ main(int argc, char *argv[])
     {
       throw std::string("Must give either --base or all --gk, --mc and --ph");
     }
+
+    if (config["no-silence-update"].specified)
+    {
+      for (int i = 0; i < model.num_hmms(); i++)
+      {
+        Hmm &hmm = model.hmm(i);
+        if (hmm.label[0] == '_' &&
+            hmm.label.find('-') == std::string::npos &&
+            hmm.label.find('+') == std::string::npos)
+        {
+          // Assume this is a silence state, disable updating
+          for (int j = 0; j < hmm.num_states(); j++)
+            model.set_state_update(hmm.state(j), false);
+        }
+      }
+    }
+
+    if (config["silence-d"].specified && config["ebwd"].specified)
+      throw std::string("Only one of '--silence-d' and '--ebwd' can be specified at the same time");
+
+    if (config["silence-d"].specified)
+    {
+      double fixed_d = config["silence-d"].get_float();
+      for (int i = 0; i < model.num_hmms(); i++)
+      {
+        Hmm &hmm = model.hmm(i);
+        if (hmm.label[0] == '_' &&
+            hmm.label.find('-') == std::string::npos &&
+            hmm.label.find('+') == std::string::npos)
+        {
+          // Assume this is a silence state, set a fixed EBW D
+          for (int j = 0; j < hmm.num_states(); j++)
+          {
+            int pdf_index = model.state(hmm.state(j)).emission_pdf;
+            Mixture *m = model.get_emission_pdf(pdf_index);
+            for (int k = 0; k < (int)m->size(); k++)
+            {
+              PDF *base_pdf = model.get_pool_pdf(m->get_base_pdf_index(k));
+              Gaussian *temp = dynamic_cast< Gaussian* > (base_pdf);
+              if (temp != NULL)
+                temp->set_ebw_fixed_d(fixed_d);
+            }
+          }
+        }
+      }
+    }
+    if (config["ebwd"].specified)
+      set_ebw_d_from_file(config["ebwd"].get_str());
 
     if (config["mllt"].specified)
     {
@@ -237,7 +371,7 @@ main(int argc, char *argv[])
       if (config["mllt"].specified)
         model.estimate_mllt(fea_gen, config["mllt"].get_str());
       else
-        model.estimate_parameters(mode);
+        model.estimate_parameters(mode, true, !config["no-mixture-update"].specified);
       
       // Delete Gaussians
       if (config["delete"].specified)
@@ -256,6 +390,9 @@ main(int argc, char *argv[])
       
       model.stop_accumulating();
     }
+
+    if (config["write-ebwd"].specified)
+      write_ebw_d_file(config["write-ebwd"].get_str());
     
     // Write final models
     if (!config["no-write"].specified)

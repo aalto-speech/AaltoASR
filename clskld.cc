@@ -40,6 +40,8 @@ main(int argc, char *argv[])
       ('g', "gaussians", "", "", "Print KLDs of Gaussians")
       ('m', "means", "", "", "Print KLDs of Gaussian means")
       ('c', "covs", "", "", "Print KLDs of Gaussian covariances")
+      ('\0', "only-silence", "", "", "Print KLDs only from silence states")
+      ('\0', "no-silence", "", "", "Do not print KLDs from silence states")
       ;
     config.default_parse(argc, argv);
     
@@ -79,11 +81,53 @@ main(int argc, char *argv[])
     if (model1.num_pool_pdfs() != model2.num_pool_pdfs())
       throw std::string("Both models must have the same number of Gaussians");
 
+    std::vector<bool> mixture_print_flag;
+    std::vector<bool> gaussian_print_flag;
+
+    if (config["only-silence"].specified || config["no-silence"].specified)
+    {
+      mixture_print_flag.resize(model1.num_emission_pdfs(), false);
+      gaussian_print_flag.resize(model1.num_pool_pdfs(), false);
+      for (int i = 0; i < model1.num_hmms(); i++)
+      {
+        Hmm &hmm = model1.hmm(i);
+        bool print_flag = false;
+        if (hmm.label[0] == '_' &&
+            hmm.label.find('-') == std::string::npos &&
+            hmm.label.find('+') == std::string::npos)
+        {
+          // Silence state
+          if (config["only-silence"].specified)
+            print_flag = true;
+        }
+        else if (config["no-silence"].specified)
+          print_flag = true;
+
+        if (print_flag)
+        {
+          for (int j = 0; j < hmm.num_states(); j++)
+          {
+            int pdf_index = model1.state(hmm.state(j)).emission_pdf;
+            mixture_print_flag[pdf_index] = print_flag;
+            Mixture *m = model1.get_emission_pdf(pdf_index);
+            for (int k = 0; k < (int)m->size(); k++)
+            {
+              int gaussian_index = m->get_base_pdf_index(k);
+              gaussian_print_flag[gaussian_index] = print_flag;
+            }
+          }
+        }
+      }
+    }
+    
 
     if (config["mixtures"].specified)
     {
       for (int i = 0; i < model1.num_emission_pdfs(); i++)
       {
+        if (mixture_print_flag.size() > (unsigned int)i &&
+            !mixture_print_flag[i])
+          continue;
         Mixture *m1 = model1.get_emission_pdf(i);
         Mixture *m2 = model2.get_emission_pdf(i);
         //assert( m1->size() == m2->size() );
@@ -107,6 +151,10 @@ main(int argc, char *argv[])
 
       for (int i = 0; i < pool1->size(); i++)
       {
+        if (gaussian_print_flag.size() > (unsigned int)i &&
+            !gaussian_print_flag[i])
+          continue;
+
         Gaussian *pdf1 = dynamic_cast< Gaussian* >(pool1->get_pdf(i));
         Gaussian *pdf2 = dynamic_cast< Gaussian* >(pool2->get_pdf(i));
         if (pdf1 == NULL || pdf2 == NULL)
@@ -140,6 +188,10 @@ main(int argc, char *argv[])
 
       for (int i = 0; i < pool1->size(); i++)
       {
+        if (gaussian_print_flag.size() > (unsigned int)i &&
+            !gaussian_print_flag[i])
+          continue;
+
         Gaussian *pdf1 = dynamic_cast< Gaussian* >(pool1->get_pdf(i));
         Gaussian *pdf2 = dynamic_cast< Gaussian* >(pool2->get_pdf(i));
         if (pdf1 == NULL || pdf2 == NULL)
@@ -171,6 +223,10 @@ main(int argc, char *argv[])
 
       for (int i = 0; i < pool1->size(); i++)
       {
+        if (gaussian_print_flag.size() > (unsigned int)i &&
+            !gaussian_print_flag[i])
+          continue;
+
         Gaussian *pdf1 = dynamic_cast< Gaussian* >(pool1->get_pdf(i));
         Gaussian *pdf2 = dynamic_cast< Gaussian* >(pool2->get_pdf(i));
         if (pdf1 == NULL || pdf2 == NULL)

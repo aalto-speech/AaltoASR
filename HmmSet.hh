@@ -412,13 +412,14 @@ public:
   void estimate_transition_parameters();
     
   /** Sets the parameters for Gaussian estimation
-   * \param minvar    Minimum variance
-   * \param covsmooth Smoothing value for off-diagonal covariance terms
-   * \param c1 EBW C1 constant
-   * \param c2 EBW C2 constant
-   * \param ismooth the I-smoothing constant
+   * \param minvar        Minimum variance
+   * \param covsmooth     Smoothing value for off-diagonal covariance terms
+   * \param c1            EBW C1 constant
+   * \param c2            EBW C2 constant
+   * \param ismooth       I-smoothing constant
    * \param mmi_prior_ismooth I-smoothing constant for the MMI model which
    *                          acts as a prior model
+   * \param ebw_max_kld   Maximum KLD change in EBW updates
    */
   void set_gaussian_parameters(double minvar, double covsmooth, double c1, double c2, double ismooth, double mmi_prior_ismooth, double ebw_max_kld = 0.0) { m_pool.set_gaussian_parameters(minvar, covsmooth, c1, c2, ismooth, mmi_prior_ismooth, ebw_max_kld); }
 
@@ -491,6 +492,12 @@ public:
   ///
   void set_clustering_min_evals(double min_clusters=1.0,
                                 double min_gaussians=0.0);
+
+  /// Sets the update flag for a state. If false, the state and its Gaussians
+  /// will not be updated in model estimation.
+  /// \param state_index  State index
+  /// \param update_flag  Update flag for the state
+  void set_state_update(int state_index, bool update_flag);
   
 private:
   /** Helper function for loading legacy ph-files
@@ -548,10 +555,14 @@ private:
 
   std::vector<Hmm> m_hmms;
 
-  // For accumulating transition probabilities
+  /// For accumulating transition probabilities
   std::vector<HmmTransition> m_transition_accum;
-  // For marking which transitions have been accumulated
+  
+  /// For marking which transitions have been accumulated
   std::vector<bool> m_accumulated;
+
+  /// Update flags for HMM states
+  std::vector<bool> m_state_update;
 
   PDFPool m_pool;
 

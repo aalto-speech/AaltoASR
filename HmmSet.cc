@@ -9,7 +9,6 @@
 #include "util.hh"
 #include "str.hh"
 
-#define MIN_STATE_PROB 1e-50
 
 
 namespace aku {
@@ -71,6 +70,7 @@ HmmSet::copy(const HmmSet &hmm_set)
   m_hmm_map = hmm_set.m_hmm_map;
   m_transitions = hmm_set.m_transitions;
   m_states = hmm_set.m_states;
+  m_state_update = hmm_set.m_state_update;
   // Note! Copies just the pointers, not the objects!
   m_emission_pdfs = hmm_set.m_emission_pdfs;
   m_pdf_likelihoods.resize(m_emission_pdfs.size(), -1);
@@ -137,6 +137,7 @@ HmmSet::add_state(int pdf_index)
 {
   int index = (int)m_states.size();
   m_states.push_back(HmmState(pdf_index));
+  m_state_update.push_back(true);
   return index;
 }
 
@@ -472,8 +473,8 @@ HmmSet::pdf_likelihood(const int p, const FeatureVec &feature)
     return m_pdf_likelihoods[p];
 
   m_pdf_likelihoods[p] = m_emission_pdfs[p]->compute_likelihood(*feature.get_vector());
-  if (m_pdf_likelihoods[p] < MIN_STATE_PROB)
-    m_pdf_likelihoods[p] = MIN_STATE_PROB;
+  if (m_pdf_likelihoods[p] < util::tiny_for_log)
+    m_pdf_likelihoods[p] = util::tiny_for_log;
   m_valid_pdf_likelihoods.push_back(p);
 
   return m_pdf_likelihoods[p];
@@ -493,8 +494,8 @@ HmmSet::precompute_likelihoods(const FeatureVec &f)
   // Precompute state likelihoods
   for (int i = 0; i < num_emission_pdfs(); i++) {
     m_pdf_likelihoods[i] = m_emission_pdfs[i]->compute_likelihood(*f.get_vector());
-    if (m_pdf_likelihoods[i] < MIN_STATE_PROB)
-      m_pdf_likelihoods[i] = MIN_STATE_PROB;
+    if (m_pdf_likelihoods[i] < util::tiny_for_log)
+      m_pdf_likelihoods[i] = util::tiny_for_log;
     m_valid_pdf_likelihoods.push_back(i);
   }
 }
@@ -784,29 +785,32 @@ HmmSet::estimate_transition_parameters()
   
   /* Update transition probabilities */
   for (int s = 0; s < num_states(); s++) {
-    sum = 0.0;
-    
-    std::vector<int> &state_transitions = m_states[s].transitions();
-    for (int t = 0; t < (int)state_transitions.size(); t++)
-      sum += m_transition_accum[state_transitions[t]].prob;
-    
-    // If no data, copy the old transition probabilities
-    for (int t = 0; t < (int)state_transitions.size(); t++)
+    if (m_state_update[s])
     {
-      if (sum > 0.0)
+      sum = 0.0;
+    
+      std::vector<int> &state_transitions = m_states[s].transitions();
+      for (int t = 0; t < (int)state_transitions.size(); t++)
+        sum += m_transition_accum[state_transitions[t]].prob;
+    
+      // If no data, copy the old transition probabilities
+      for (int t = 0; t < (int)state_transitions.size(); t++)
       {
-        m_transition_accum[state_transitions[t]].prob = 
-          m_transition_accum[state_transitions[t]].prob/sum;
-        if (m_transition_accum[state_transitions[t]].prob < .001)
-          m_transition_accum[state_transitions[t]].prob = .001;
+        if (sum > 0.0)
+        {
+          m_transition_accum[state_transitions[t]].prob = 
+            m_transition_accum[state_transitions[t]].prob/sum;
+          if (m_transition_accum[state_transitions[t]].prob < .001)
+            m_transition_accum[state_transitions[t]].prob = .001;
+        }
+        else
+        {
+          m_transition_accum[state_transitions[t]].prob =
+            m_transitions[state_transitions[t]].prob;
+        }
       }
-      else
-      {
-        m_transition_accum[state_transitions[t]].prob =
-          m_transitions[state_transitions[t]].prob;
-      }
+      m_transitions = m_transition_accum;
     }
-    m_transitions = m_transition_accum;
   }
 }
 
@@ -819,11 +823,14 @@ HmmSet::estimate_parameters(PDF::EstimationMode mode, bool pool, bool mixture)
 
   if (mixture) {  
     for (int s = 0; s < num_states(); s++) {
-      try {
-        m_emission_pdfs[state(s).emission_pdf]->estimate_parameters(mode);
-      } catch (std::string errstr) {
-        std::cout << "Warning: emission pdf for state " << s
-                  << ": " <<  errstr << std::endl;
+      if (m_state_update[s])
+      {
+        try {
+          m_emission_pdfs[state(s).emission_pdf]->estimate_parameters(mode);
+        } catch (std::string errstr) {
+          std::cout << "Warning: emission pdf for state " << s
+                    << ": " <<  errstr << std::endl;
+        }
       }
     }
   }
@@ -1350,6 +1357,22 @@ HmmSet::set_clustering_min_evals(double min_clusters,
   m_pool.set_evaluate_min_clusters(int(min_clusters*m_pool.number_of_clusters()));
   m_pool.set_evaluate_min_gaussians(int(min_gaussians*m_pool.size()));
   m_pool.set_use_clustering(true);
+}
+
+
+void
+HmmSet::set_state_update(int state_index, bool update_flag)
+{
+  assert( state_index >= 0 && state_index < num_states() );
+
+  m_state_update[state_index] = update_flag;
+  Mixture *m = get_emission_pdf(m_states[state_index].emission_pdf);
+  m->set_update_flag(update_flag); // Actually redundant
+  for (int i = 0; i < (int)m->size(); i++)
+  {
+    PDF *pdf = m->get_base_pdf(i);
+    pdf->set_update_flag(update_flag);
+  }
 }
 
 }

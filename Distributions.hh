@@ -31,6 +31,7 @@ public:
   
   // COMMON
 
+  PDF() { m_update = true; }
   virtual ~PDF() {}
   /* The feature dimensionality */
   int dim() const { return m_dim; }
@@ -58,6 +59,8 @@ public:
   virtual bool accumulated(int accum_pos = 0) const = 0;
   /* Use the accumulated statistics to update the current model parameters. */
   virtual void estimate_parameters(EstimationMode mode) = 0;
+  /* Set the update mode */
+  virtual void set_update_flag(bool update_flag) { m_update = update_flag; }
   
   // LIKELIHOODS
   
@@ -82,6 +85,7 @@ public:
 
 protected:
   int m_dim;
+  bool m_update; /// If false, refrain from re-estimating the parameters
 };
 
 
@@ -383,7 +387,7 @@ public:
     double mean_kld(void); //!< Compares m_mean0 to m_new_mean
     double cov_kld(void); //!< Compares m_cov0 to m_new_cov
     
-    void constrained_update(double min_d, double max_kld);
+    double constrained_update(double min_d, double max_kld);
 
     void get_parameters(Vector &new_mean, Matrix &new_cov) const;
 
@@ -402,7 +406,7 @@ public:
   
 public:
 
-  Gaussian() { chol = NULL; m_ebw_max_kld = 0; };
+  Gaussian() { chol = NULL; m_ebw_max_kld = 0; m_fixed_d = -1; m_min_d = -1; m_realized_d = -1; };
   virtual ~Gaussian() { if (chol != NULL) delete chol; }
   // ABSTRACT FUNCTIONS, SHOULD BE OVERWRITTEN IN THE GAUSSIAN IMPLEMENTATIONS
   
@@ -444,6 +448,15 @@ public:
   /// Sets the maximum KLD limit for EBW update
   void set_ebw_max_kld(double max_kld) { m_ebw_max_kld = max_kld; }
 
+  /// Sets the fixed D for EBW updates
+  void set_ebw_fixed_d(double d) { m_fixed_d = d; m_realized_d = d; }
+
+  /// Return realized EBW D value
+  double get_realized_d(void) { return m_realized_d; }
+
+  /// Return minimum EBW D value
+  double get_minimum_d(void) { return m_min_d; }
+  
   /// Returns the mean vector for this Gaussian
   virtual void get_mean(Vector &mean) const = 0;
   /// Returns the covariance matrix for this Gaussian
@@ -533,6 +546,10 @@ protected:
   Matrix *chol;
 
   double m_ebw_max_kld; //!< Not used if non-positive
+  float m_fixed_d; //!< Not used if negative
+
+  double m_min_d; //!< Filled with the minimum D after an EBW update
+  double m_realized_d; //!< Filled with the realized D after an EBW update
 
   friend class HmmSet;
   friend class PDFPool;
