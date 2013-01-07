@@ -137,7 +137,7 @@ Lattice::write(FILE *file)
 	  "base=10\n"
 	  "start=%d end=%d\n"
 	  "N=%d L=%d\n", initial_node_id, final_node_id, 
-	  m_nodes.size(), m_num_arcs);
+	  (int)m_nodes.size(), m_num_arcs);
   
   for (int n = 0; n < (int)m_nodes.size(); n++)
     fprintf(file, "I=%d\n", m_nodes[n].id);

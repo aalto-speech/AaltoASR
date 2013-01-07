@@ -73,7 +73,7 @@ TreeGram::check_order(const Gram &gram)
   {
     fprintf(stderr, "TreeGram::check_order(): "
 	    "trying to insert %d-gram after %d-gram\n",
-	    gram.size(), m_last_gram.size());
+	    (int)gram.size(), (int)m_last_gram.size());
     print_gram(stderr, gram);
     exit(1);
   }
@@ -83,7 +83,7 @@ TreeGram::check_order(const Gram &gram)
     if (gram[0] != (int)m_nodes.size()) {
       fprintf(stderr, "TreeGram::check_order(): "
 	      "trying to insert 1-gram %d to node %d\n",
-	      gram[0], m_nodes.size());
+	      gram[0], (int)m_nodes.size());
       exit(1);
     }
   }
@@ -161,7 +161,7 @@ TreeGram::find_child(int word, int node_index)
 {
   if (word < 0 || word >= (int)m_words.size()) {
     fprintf(stderr, "TreeGram::find_child(): "
-	    "index %d out of vocabulary size %d\n", word, m_words.size());
+	    "index %d out of vocabulary size %d\n", word, (int)m_words.size());
     exit(1);
   }
 
@@ -318,7 +318,7 @@ TreeGram::write(FILE *file, bool reflip)
     fprintf(file, "%s\n", word(i).c_str());
 
   // Order, number of nodes and order counts
-  fprintf(file, "%d %d\n", m_order, m_nodes.size());
+  fprintf(file, "%d %d\n", m_order, (int)m_nodes.size());
   for (int i = 0; i < m_order; i++)
     fprintf(file, "%d\n", m_order_count[i]);
 
@@ -389,13 +389,19 @@ TreeGram::read(FILE *file)
 
   // Read the order and the number of nodes
   int number_of_nodes;
-  fscanf(file, "%d %d\n", &m_order, &number_of_nodes);
+  if (fscanf(file, "%d %d\n", &m_order, &number_of_nodes) < 2)
+  {
+    fprintf(stderr, "TreeGram::read(): "
+            "Failed reading the order and number of nodes\n");
+    exit(1);
+  }
 
   // Read the counts for each order
   int sum = 0;
   m_order_count.resize(m_order);
   for (int i = 0; i < m_order; i++) {
-    fscanf(file, "%d\n", &m_order_count[i]);
+    if (fscanf(file, "%d\n", &m_order_count[i]) < 1)
+      break;
     sum += m_order_count[i];
   }
   if (sum != number_of_nodes) {
