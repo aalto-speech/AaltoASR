@@ -21,7 +21,14 @@
 
 #include <cmath>
 #include <ctime>
+
+// Visual studio doesn't have stdint.h varjokal 24.3.2010
+#ifdef _MSC_VER
+#include <boost/cstdint.hpp>
+using namespace boost;
+#else
 #include <stdint.h>
+#endif
 
 /** Namespace for Ziggurat N(0,1) random number generator. */
 namespace ziggurat {
@@ -47,7 +54,7 @@ namespace ziggurat {
     {
       hz=shr3();
       iz=hz&127;
-      return ((fabs(hz)<kn[iz]) ? hz*wn[iz] : nfix());
+      return ((fabs((float)((hz)<int(kn[iz])))) ? hz*wn[iz] : nfix());
     }
     /* Generates a random sample from the exponential distribution */
     float rexp()

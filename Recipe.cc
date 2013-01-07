@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <cstring>
 
 #include <string.h>
 #include "Recipe.hh"

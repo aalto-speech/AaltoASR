@@ -1,4 +1,4 @@
-#include <limits.h>
+#include <climits>
 #include "io.hh"
 #include "conf.hh"
 #include "FeatureGenerator.hh"

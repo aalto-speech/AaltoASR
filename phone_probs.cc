@@ -1,4 +1,4 @@
-#include <limits.h>
+#include <climits>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>

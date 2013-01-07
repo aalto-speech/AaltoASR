@@ -10,7 +10,11 @@ MllrTrainer::MllTrainerComponent::merge(PDFGroupModule *pgm)
   MllTrainerComponent *mtr = dynamic_cast<MllTrainerComponent*> (pgm);
   for (unsigned int i = 0; i < m_k.size(); ++i) {
     Blas_Add_Mult(m_k[i], 1.0, mtr->m_k[i]);
+#ifdef ORIGINAL_LAPACKPP
+    LinearAlgebra::Blas_Add_Mat_Mult(m_G[i], 1.0, mtr->m_G[i]);
+#else
     Blas_Add_Mat_Mult(m_G[i], 1.0, mtr->m_G[i]);
+#endif
   }
   m_beta += mtr->m_beta;
 }
@@ -33,7 +37,7 @@ MllrTrainer::collect_data(double prior, HmmState *state, const FeatureVec &f)
   Blas_R1_Update(feature_feature_t, feature, feature);
 
   // calculate the probability of each gaussian (total prob = prior)
-  double probs[mixture->size()];
+  double *probs = new double[mixture->size()];
   double probsum = 0;
   for (int g = 0; g < mixture->size(); ++g) {
     gaussian = dynamic_cast<Gaussian*> (mixture->get_base_pdf(g));
@@ -52,6 +56,7 @@ MllrTrainer::collect_data(double prior, HmmState *state, const FeatureVec &f)
     get_comp(mixture->get_base_pdf_index(g))->collect_data(probs[g], mean,
         covar, feature, feature_feature_t);
   }
+  delete [] probs;
 }
 
 void
@@ -148,7 +153,11 @@ MllrTrainer::MllTrainerComponent::collect_data(double prob,
   if(!(prob > 0)) return;
   for (unsigned int i = 0; i < m_k.size(); ++i) {
     Blas_Add_Mult(m_k[i], mean(i) / covar(i) * prob, feature);
-    Blas_Add_Mat_Mult(m_G[i], 1 / covar(i) * prob, feature_feature_t);
+#ifdef ORIGINAL_LAPACKPP
+    LinearAlgebra::Blas_Add_Mat_Mult(m_G[i], 1 / covar(i) * prob, feature_feature_t);
+#else
+    Blas_Add_Mat_Mult(m_G[i], 1 / covar(i) * prob, feature_feature_t);	
+#endif
   }
   m_beta += prob;
 }

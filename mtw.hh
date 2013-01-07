@@ -48,7 +48,13 @@
 #ifndef MTW_H
 #define MTW_H
 
+// Visual studio doesn't have stdint.h varjokal 24.3.2010
+#ifdef _MSC_VER
+#include <boost/cstdint.hpp>
+using namespace boost;
+#else
 #include <stdint.h>
+#endif
 
 /** Namespace for Mersenne Twister random number generator. */
 namespace mtw {

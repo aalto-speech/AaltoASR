@@ -1,4 +1,5 @@
-#include <values.h>
+#include <cfloat>
+
 #include "LinearAlgebra.hh"
 #include "util.hh"
 
@@ -140,9 +141,9 @@ namespace LinearAlgebra {
       for (int k=0; k<j; k++)
 	for (int i=j; i<B.rows(); i++)
 	  B(i,j) = B(i,j)-B(i,k)*B(j,k);
-      B(j,j) = sqrt(B(j,j));
+      B(j,j) = sqrt((double)B(j,j));
       for (int k=j+1; k<B.rows(); k++)
-	B(k,j) = B(k,j)/B(j,j);
+		B(k,j) = B(k,j)/B(j,j);
     }
   
     for (int i=0; i<B.rows(); i++)
@@ -231,7 +232,7 @@ namespace LinearAlgebra {
         if (i==j)
           v(pos)=m(i,j);
         else
-          v(pos)=sqrt(2)*m(i,j);
+          v(pos)=sqrt((double)2)*m(i,j);
         ++pos;
       }
   }
@@ -242,9 +243,9 @@ namespace LinearAlgebra {
           Matrix &m)
   {
     // Deduce the matrix dimensions; numel(v)=dim*(dim+1)/2
-    int dim=(int)(0.5*sqrt(1+8*v.size())-0.5);
+    int dim=(int)(0.5*sqrt((double)(1+8*v.size()))-0.5);
     int pos=0;
-    float a=1/sqrt(2);
+    float a=1/sqrt((double)2);
 
     assert(int(dim*(dim+1)/2)==v.size());
 
@@ -513,4 +514,23 @@ namespace LinearAlgebra {
     LaLUInverseIP(inv, pivots);
   }
 
+#ifdef ORIGINAL_LAPACKPP
+  void Blas_Add_Mat_Mult(LaGenMatDouble &A,
+                         double alpha,
+                         const LaGenMatDouble &B)
+  {
+    assert(A.rows() == B.rows());
+    assert(A.cols() == B.cols());
+    assert(A.inc(0) == B.inc(0));
+    assert(A.inc(1) == B.inc(1));
+    
+//    integer n = A.rows()*A.cols();
+//    integer inca = A.inc(0), incb = B.inc(0);
+//    F77NAME(daxpy)(&n, &alpha, &B(0,0), &incb, &A(0,0), &inca);
+
+    for (int i=0; i<A.rows(); i++)
+      for (int j=0; j<A.cols(); j++)
+        A(i,j) += alpha * B(i,j);
+  }
+#endif
 }

@@ -24,7 +24,7 @@ namespace ziggurat {
       /* initiate, try to exit for(;;) for loop*/
       hz=shr3();
       iz=hz&127;
-      if(fabs(hz)<kn[iz]) return (hz*wn[iz]);
+      if(fabs((float)((hz)<kn[iz]))) return (hz*wn[iz]);
     }
   }
 
@@ -45,7 +45,7 @@ namespace ziggurat {
   }
 
 
-  void Rnd::zigset(unsigned int jsrseed)
+  void Rnd::zigset(uint32_t jsrseed)
   {
     const double m1 = 2147483648.0, m2 = 4294967296.;
     double dn=3.442619855899,tn=dn,vn=9.91256303526217e-3, q;

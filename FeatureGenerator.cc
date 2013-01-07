@@ -1,3 +1,6 @@
+#include <fcntl.h>
+#include <stdio.h>
+
 #include <set>
 #include <errno.h>
 #include <string.h>
@@ -26,6 +29,7 @@ FeatureGenerator::~FeatureGenerator()
 void
 FeatureGenerator::open(const std::string &filename)
 {
+/* Old implementation 7.4.2010 varjokal
   if (m_file != NULL)
     close();
 
@@ -35,7 +39,31 @@ FeatureGenerator::open(const std::string &filename)
       strerror(errno);
 
   open(file, false);
+*/
+
+  if (m_file != NULL)
+    close();
+  for (int i = 0; i < (int)m_modules.size(); i++)
+    m_modules[i]->reset();
+
+  assert( m_base_module != NULL );
+  m_base_module->set_fname(filename.c_str());
 }
+
+void
+FeatureGenerator::open_fd(const int fd, bool raw_audio)
+{
+  if (m_file != NULL)
+    close();
+
+  FILE *file = fdopen(fd, "rb");
+  if (file == NULL) {
+    throw std::string("could not open fd ") + ": " +
+      strerror(errno);
+  }
+  open(file, false, false);
+}
+
 
 void
 FeatureGenerator::open(FILE *file, bool dont_fclose, bool stream)
@@ -67,7 +95,11 @@ FeatureGenerator::close(void)
 void
 FeatureGenerator::load_configuration(FILE *file)
 {
-  assert(m_modules.empty());
+  //assert(m_modules.empty());
+  if (!m_modules.empty()) {
+    fprintf(stdout, "FeatureGenerator: loading a new feature configuration\n");
+    this->close_configuration();
+  }
   std::string line;
   int lineno = 0;
   
@@ -209,6 +241,18 @@ FeatureGenerator::write_configuration(FILE *file)
   }
 }
 
+void
+FeatureGenerator::close_configuration()
+{
+  for (int i = 0; i < (int)m_modules.size(); i++)
+    delete m_modules[i];
+  m_modules.clear();
+  m_module_map.clear();
+  m_base_module = NULL;
+  m_last_module = NULL;
+}
+
+
 FeatureModule*
 FeatureGenerator::module(const std::string &name)
 {
@@ -268,7 +312,7 @@ FeatureGenerator::compute_init_buffers()
     FeatureModule *module = m_modules[i];
 
     if (!bottle_neck[i]) {
-      for (int j = 0; j < (int)module->sources().size(); j++) {                
+      for (int j = 0; j < (int)module->sources().size(); j++) {
         FeatureModule *src_module = module->sources()[j];
         src_module->update_init_offsets(*module);
       }

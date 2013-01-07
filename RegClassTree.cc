@@ -245,7 +245,12 @@ RegClassTree::Node::update_covar()
     m_components[i]->get_covar(cur_covar);
     Blas_R1_Update(cur_covar, cur_mean, cur_mean);
 
-    Blas_Add_Mat_Mult(m_covar, m_components[i]->get_occ(), cur_covar);
+
+#ifdef ORIGINAL_LAPACKPP
+  LinearAlgebra::Blas_Add_Mat_Mult(m_covar, m_components[i]->get_occ(), cur_covar);
+#else
+	Blas_Add_Mat_Mult(m_covar, m_components[i]->get_occ(), cur_covar);
+#endif
   }
   Blas_Scale(1 / m_total_occ, m_covar);
   Blas_R1_Update(m_covar, m_mean, m_mean, -1.0);
@@ -566,7 +571,11 @@ RegClassTree::UnitPhoneme::calculate_statistics(HmmSet* model)
     gaussian->get_covariance(cur_covar);
     Blas_R1_Update(cur_covar, cur_mean, cur_mean);
 
+#ifdef ORIGINAL_LAPACKPP
+    LinearAlgebra::Blas_Add_Mat_Mult(m_covar, it->second, cur_covar);
+#else
     Blas_Add_Mat_Mult(m_covar, it->second, cur_covar);
+#endif
     m_occ += it->second;
   }
 
@@ -603,7 +612,11 @@ RegClassTree::UnitMixture::calculate_statistics(HmmSet* model)
     gaussian->get_covariance(cur_covar);
     Blas_R1_Update(cur_covar, cur_mean, cur_mean);
 
+#ifdef ORIGINAL_LAPACKPP
+    LinearAlgebra::Blas_Add_Mat_Mult(m_covar, it->second, cur_covar);
+#else
     Blas_Add_Mat_Mult(m_covar, it->second, cur_covar);
+#endif
     m_occ += it->second;
   }
 
@@ -621,7 +634,7 @@ RegClassTree::UnitGaussian::calculate_statistics(HmmSet* model)
 }
 
 RegClassTree::Node*
-RegClassTree::RegClassTree::get_node(int index)
+RegClassTree::get_node(int index)
 {
 
   int targetlevel = 1;

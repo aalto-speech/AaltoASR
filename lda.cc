@@ -393,7 +393,11 @@ main(int argc, char *argv[])
         state_accumulators[i]->get_covariance_estimate(tcov);
         Blas_Add_Mult(tmean, -1, data_mean);
         Blas_R1_Update(B, tmean, tmean, std::min(state_accumulators[i]->gamma(), max_gamma));
-        Blas_Add_Mat_Mult(W, std::min(state_accumulators[i]->gamma(), max_gamma), tcov);
+#ifdef ORIGINAL_LAPACKPP
+	LinearAlgebra::Blas_Add_Mat_Mult(W, std::min(state_accumulators[i]->gamma(), max_gamma), tcov);
+#else
+	Blas_Add_Mat_Mult(W, std::min(state_accumulators[i]->gamma(), max_gamma), tcov);
+#endif
       }
     }
 

@@ -26,6 +26,7 @@ public:
    * \exception string If cannot open file.
    */
   void open(const std::string &filename);
+  void open_fd(const int fd, bool raw_audio);
 
   /** Open an audio file closing the possible previously opened file.
    *
@@ -41,8 +42,11 @@ public:
   /** Load the configuration of feature modules from a file. */
   void load_configuration(FILE *file);
 
-  /** Write the configuation of feature modules. */
+  /** Write the configuration of feature modules. */
   void write_configuration(FILE *file);
+
+  /** Close the configuration of feature modules and clear things. */
+  void close_configuration();
 
   /** Fetch a module by name. */
   FeatureModule *module(const std::string &name);

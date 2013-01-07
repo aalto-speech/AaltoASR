@@ -24,7 +24,7 @@ namespace conf {
   Option::get_float() const
   {
     char *endptr;
-    double return_value = strtof(value.c_str(), &endptr);
+    double return_value = strtod(value.c_str(), &endptr);
     if (endptr == value.c_str() || *endptr != 0) {
       fprintf(stderr, "invalid value for option %s: %s\n", name.c_str(), 
 	      value.c_str());

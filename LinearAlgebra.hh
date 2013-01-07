@@ -3,6 +3,8 @@
 
 #define LA_COMPLEX_SUPPORT
 #include "lapackpp.h"
+//#include "symd.h"
+
 #ifdef USE_SUBSPACE_COV
 # include "HCL_Rn_d.h"
 #endif
@@ -71,6 +73,13 @@ namespace LinearAlgebra {
   void force_min_eig(Matrix &m, double min_eig);
 
   void inverse(const Matrix &m, Matrix &inv);
+
+
+#ifdef ORIGINAL_LAPACKPP
+  void Blas_Add_Mat_Mult(LaGenMatDouble &A,
+                         double alpha,
+                         const LaGenMatDouble &B);
+#endif
 
   double full_matrix_determinant(const Matrix &A);
 

@@ -384,7 +384,7 @@ main(int argc, char *argv[])
       // Split Gaussians if desired
       if (config["split"].specified)
         model.split_gaussians(config["minocc"].get_double(),
-			      config["maxmixgauss"].get_int(),
+                              config["maxmixgauss"].get_int(),
                               config["numgauss"].get_int(), 
                               config["splitalpha"].get_double());
       

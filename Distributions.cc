@@ -137,7 +137,7 @@ FullStatisticsAccumulator::accumulate(int feacount, double gamma, const Vector &
   m_gamma += gamma;
   m_accumulated = true;
   Blas_Add_Mult(m_mean, gamma, f);
-  Blas_R1_Update(m_second_moment, f, gamma, 1.0, true);
+  Blas_R1_Update(m_second_moment, (LaGenMatDouble&)f, gamma, 1.0, true); // Blas_R1_Update for symmetric matrices (blas3pp.h)
 }
 
 
@@ -376,7 +376,11 @@ Gaussian::ismooth_statistics(int source, int target, double smoothing)
   LaGenMatDouble sigma_source, sigma_target;
   m_accums[source]->get_accumulated_second_moment(sigma_source);
   m_accums[target]->get_accumulated_second_moment(sigma_target);
+#ifdef ORIGINAL_LAPACKPP
+  LinearAlgebra::Blas_Add_Mat_Mult(sigma_target, smooth_factor, sigma_source);
+#else
   Blas_Add_Mat_Mult(sigma_target, smooth_factor, sigma_source);
+#endif
   m_accums[target]->set_accumulated_second_moment(sigma_target);
 }
 
@@ -399,7 +403,11 @@ Gaussian::cov_ebw_update(const Matrix &old_cov, const Vector &old_mean,
   new_cov.copy(old_cov);
   Blas_R1_Update(new_cov, old_mean, old_mean, 1);
   Blas_Scale(d, new_cov);
+#ifdef ORIGINAL_LAPACKPP
+  LinearAlgebra::Blas_Add_Mat_Mult(new_cov, 1, m2_stat);
+#else
   Blas_Add_Mat_Mult(new_cov, 1, m2_stat);
+#endif
   Blas_Scale(1/(m0_stat+d), new_cov);
   Blas_R1_Update(new_cov, new_mean, new_mean, -1);
 }
@@ -543,7 +551,11 @@ Gaussian::estimate_parameters(EstimationMode mode, double minvar,
     LaGenMatDouble temp_denominator_sigma;
     m_accums[num_buf]->get_accumulated_second_moment(sigma_tilde);
     m_accums[den_buf]->get_accumulated_second_moment(temp_denominator_sigma);
+#ifdef ORIGINAL_LAPACKPP
+    LinearAlgebra::Blas_Add_Mat_Mult(sigma_tilde, -1, temp_denominator_sigma);
+#else
     Blas_Add_Mat_Mult(sigma_tilde, -1, temp_denominator_sigma);
+#endif
 
     double min_d = 0;
     if (is_diagonal_covariance())
@@ -582,7 +594,11 @@ Gaussian::estimate_parameters(EstimationMode mode, double minvar,
       Blas_Scale(c, a1);
       Blas_R1_Update(a1, old_mean, mu_tilde, -1);
       Blas_R1_Update(a1, mu_tilde, old_mean, -1);
+#ifdef ORIGINAL_LAPACKPP
+      LinearAlgebra::Blas_Add_Mat_Mult(a1, 1, sigma_tilde);
+#else
       Blas_Add_Mat_Mult(a1, 1, sigma_tilde);
+#endif
     
       // a2
       LaGenMatDouble a2(old_covariance);
@@ -866,7 +882,11 @@ Gaussian::merge(const std::vector<double> &weights,
     gaussians[i]->get_mean(cur_mean);
     Blas_R1_Update(cur_covariance, cur_mean, cur_mean);
     //Blas_Mat_Mat_Mult(cur_covariance, eye, new_covariance, cur_weight, 1.0);
+#ifdef ORIGINAL_LAPACKPP
+    LinearAlgebra::Blas_Add_Mat_Mult(new_covariance, cur_weight, cur_covariance);
+#else
     Blas_Add_Mat_Mult(new_covariance, cur_weight, cur_covariance);
+#endif
     Blas_Add_Mult(new_mean, cur_weight, cur_mean);
   }
   Blas_Scale(1.0/weight_sum, new_mean);
@@ -2817,7 +2837,7 @@ PDFPool::read_gk(const std::string &filename)
         m_pool[i]->read(in);
       }
       else if (type_str == "full") {
-	m_pool[i]=new FullCovarianceGaussian(m_dim);
+        m_pool[i]=new FullCovarianceGaussian(m_dim);
         m_pool[i]->read(in);
       }
 #ifdef USE_SUBSPACE_COV
@@ -2838,13 +2858,13 @@ PDFPool::read_gk(const std::string &filename)
       else if (type_str == "pcgmm") {
         in >> ssid;
         assert(m_precision_subspaces[ssid] != NULL);
-	m_pool[i]=new PrecisionConstrainedGaussian(m_precision_subspaces[ssid]);
+        m_pool[i]=new PrecisionConstrainedGaussian(m_precision_subspaces[ssid]);
         m_pool[i]->read(in);
       }
       else if (type_str == "scgmm") {
         in >> ssid;
         assert(m_exponential_subspaces[ssid] != NULL);
-	m_pool[i]=new SubspaceConstrainedGaussian(m_exponential_subspaces[ssid]);
+        m_pool[i]=new SubspaceConstrainedGaussian(m_exponential_subspaces[ssid]);
         m_pool[i]->read(in);
       }
 #endif
@@ -2858,26 +2878,26 @@ PDFPool::read_gk(const std::string &filename)
     if (type_str == "diagonal_cov") {
       for (int i=0; i<pdfs; i++) {
         m_pool[i]=new DiagonalGaussian(m_dim);
-	m_pool[i]->read(in);
+        m_pool[i]->read(in);
       }
     }
     else if (type_str == "full_cov") {
       for (int i=0; i<pdfs; i++) {
-	m_pool[i]=new FullCovarianceGaussian(m_dim);
-	m_pool[i]->read(in);
+        m_pool[i]=new FullCovarianceGaussian(m_dim);
+        m_pool[i]->read(in);
       }      
     }
 #ifdef USE_SUBSPACE_COV
     else if (type_str == "pcgmm") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
-	m_pool[i]=new PrecisionConstrainedGaussian();
-	m_pool[i]->read(in);
+        m_pool[i]=new PrecisionConstrainedGaussian();
+        m_pool[i]->read(in);
       }      
     }
     else if (type_str == "scgmm") {
       for (unsigned int i=0; i<m_pool.size(); i++) {
-	m_pool[i]=new SubspaceConstrainedGaussian();
-	m_pool[i]->read(in);
+        m_pool[i]=new SubspaceConstrainedGaussian();
+        m_pool[i]->read(in);
       }            
     }
 #endif
@@ -2938,7 +2958,6 @@ PDFPool::write_gk(const std::string &filename) const
       }      
     }
 #endif
-    
     m_pool[i]->write(out);
     out << std::endl;
   }
@@ -2946,6 +2965,55 @@ PDFPool::write_gk(const std::string &filename) const
   if (!out)
     throw std::string("PDFPool::write_gk(): error writing file: ") + filename;
 }
+
+
+#ifdef BINARY_GAUSSIAN_FILES
+void
+PDFPool::read_bgk(const std::string &filename)
+{
+  std::ifstream in(filename.c_str());
+  if (!in)
+    throw str::fmt(512, "PDFPool::read_bgk(): could not open %s\n", filename.c_str());
+
+  int pdfs = 0;
+  std::string type_str;
+  in >> pdfs >> m_dim >> type_str;
+  m_pool.resize(pdfs);
+  m_likelihoods.resize(pdfs);
+  m_valid_likelihoods.clear();
+  for (int i=0; i<pdfs; i++)
+    m_likelihoods[i] = -1;
+
+  // New implementation
+  for (int i=0; i<pdfs; i++) {
+    m_pool[i]=new DiagonalGaussian(m_dim);
+    m_pool[i]->read(in);
+  }
+
+  if (!in)
+    throw std::string("PDFPool::read_bgk(): error reading file: ") + filename;
+}
+
+
+void
+PDFPool::write_bgk(const std::string &filename) const
+{
+  std::ofstream out(filename.c_str());
+  if (!out)
+    throw std::string("PDFPool::write_bgk(): could not open ") + filename;
+
+  out << m_pool.size() << " " << m_dim << " variable\n";
+
+  for (unsigned int i=0; i<m_pool.size(); i++) {
+
+    m_pool[i]->write(out);
+    out << std::endl;
+  }
+
+  if (!out)
+    throw std::string("PDFPool::write_bgk(): error writing file: ") + filename;
+}
+#endif
 
 
 #ifdef USE_SUBSPACE_COV

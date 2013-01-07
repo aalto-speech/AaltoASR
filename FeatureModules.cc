@@ -2,6 +2,10 @@
 #include "FeatureGenerator.hh"
 
 #include <climits>
+// This needs to be defined for VS and M_LN10 constant varjokal 24.3.2010
+#ifdef _MSC_VER
+#define _USE_MATH_DEFINES
+#endif
 #include <cmath>
 #include <sstream>
 #include "util.hh"
@@ -233,6 +237,28 @@ AudioFileModule::AudioFileModule(FeatureGenerator *fea_gen) :
 AudioFileModule::~AudioFileModule()
 {
   discard_file();
+}
+
+void
+AudioFileModule::set_fname(const char *fname)
+{
+  m_reader.enforce_raw(m_raw);
+  if (m_endian == 1)
+    m_reader.set_little_endian(true);
+  else if (m_endian == 2)
+    m_reader.set_little_endian(false);
+  m_reader.open(fname, m_sample_rate);
+
+  // Check that sample rate matches that given in configuration
+  if (m_reader.sample_rate() != m_sample_rate)
+  {
+    ostringstream oss;
+    oss << "Audio file sample rate (" << m_reader.sample_rate()
+        << " Hz) and model configuration (" << m_sample_rate
+        << " Hz) don't agree.";
+    throw oss.str();
+  }
+  m_eof_frame = INT_MAX; // No EOF frame encountered yet
 }
 
 
@@ -470,7 +496,7 @@ FFTModule::generate(int frame)
   int t;
   
   const FeatureVec source_fea = m_sources.back()->at(frame);
-  
+
   // Apply Hamming window
   for (t = 0; t < source_fea.dim(); t++)
   {
@@ -518,6 +544,12 @@ PreModule::PreModule() :
   m_type_str = type_str();
 }
 
+
+void
+PreModule::set_fname(const char *fname)
+{
+  throw std::string("PreModule: set_fname not implemented.");
+}
 
 void
 PreModule::set_file(FILE *fp, bool stream)
@@ -756,7 +788,7 @@ MelModule::generate(int frame)
       
     if (m_root)
     {
-      m_buffer[frame][b] = pow(val/sum, 0.1);
+      m_buffer[frame][b] = pow((double)(val/sum), 0.1);
     }
     else
     {
@@ -2047,7 +2079,7 @@ QuantEqModule::generate(int frame)
   {
     for (int k = 0; k < m_dim; k++)
     {
-      target_fea[k] = m_quant_max[k] * (m_alpha[k]*pow(source_fea[k]/m_quant_max[k], m_gamma[k]) + (1-m_alpha[k])*(source_fea[k]/m_quant_max[k]));
+      target_fea[k] = m_quant_max[k] * (m_alpha[k]*pow((double)(source_fea[k]/m_quant_max[k]), (double)(m_gamma[k]) + (1-m_alpha[k])*(source_fea[k]/m_quant_max[k])));
     }
   }
   else

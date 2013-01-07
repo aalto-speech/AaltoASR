@@ -1,5 +1,13 @@
 #include "io.hh"
 
+// pipe not defined in VS varjokal 24.3.2010
+#ifdef _MSC_VER
+#include <fcntl.h>
+#define pipe(f) _pipe(f, 2000000, O_BINARY)
+#define popen(f, m) _popen(f, m)
+#define pclose(f) _pclose(f)
+#endif
+
 namespace io {
 
   Stream::Stream()

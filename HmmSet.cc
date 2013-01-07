@@ -938,9 +938,15 @@ HmmSet::estimate_mllt(FeatureGenerator &fea_gen, const std::string &mllt_name)
         gaussian->m_accums[PDF::ML_BUF]->get_covariance_estimate(
           curr_sample_covariance);
         gaussian->get_covariance(curr_covariance);
+#ifdef ORIGINAL_LAPACKPP
+        LinearAlgebra::Blas_Add_Mat_Mult(temp_m,
+                                         gaussian->m_accums[PDF::ML_BUF]->gamma()/
+                                         curr_covariance(i,i), curr_sample_covariance);
+#else
         Blas_Add_Mat_Mult(temp_m,
                           gaussian->m_accums[PDF::ML_BUF]->gamma()/
                           curr_covariance(i,i), curr_sample_covariance);
+#endif
       }
       // Invert
       LinearAlgebra::inverse(temp_m, G[i]);

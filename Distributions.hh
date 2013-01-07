@@ -128,6 +128,13 @@ public:
   /// Write the distributions to a .gk -file
   void write_gk(const std::string &filename) const;
  
+#ifdef BINARY_GAUSSIAN_FILES
+  /// Read the distributions from a binary form .bgk -file
+  void read_bgk(const std::string &filename);
+  /// Write the distributions to a binary form .bgk -file
+  void write_bgk(const std::string &filename) const;
+#endif
+
   /// Reset the cache
   void reset_cache();
 
@@ -596,7 +603,11 @@ public:
   /// Set the diagonal of the covariance matrix
   virtual void set_covariance(const Vector &covariance,
                               bool finish_statistics = true);
-  
+#ifdef _CUDA
+  /// Get the diagonal of the precision matrix
+  virtual void get_precision(Vector &precision) const;
+#endif
+
   /// Sets the constant after the precisions have been set
   void set_constant(void);
 

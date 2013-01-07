@@ -31,10 +31,10 @@ else
 ifeq ($(ARCH),x86_64)
 CXX = g++
 OPT = -O2
-INCLUDES = -I../lapackpp/include
-#INCLUDES = -I/home/jpylkkon/local/include/lapackpp
-LDFLAGS = -L../lapackpp/src/.libs
-#LDFLAGS = -L/home/jpylkkon/local/lib
+#INCLUDES = -I../lapackpp/include
+INCLUDES = -I/home/jpylkkon/local/include/lapackpp
+#LDFLAGS = -L../lapackpp/src/.libs
+LDFLAGS = -L/home/jpylkkon/local/lib
 
 ifeq ($(USE_SUBSPACE_COV),1)
 INCLUDES += -I/share/puhe/x86_64/include/hcld/

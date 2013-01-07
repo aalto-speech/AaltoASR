@@ -3,6 +3,15 @@
 
 #include <algorithm>
 #include <vector>
+
+// Visual studio math.h doesn't have log1p and log1pf functions varjokal 24.3.2010
+// This needs to be defined for VS and M_LN10 constant varjokal 24.3.2010
+#ifdef _MSC_VER
+#include <boost/math/tr1.hpp>
+using namespace boost::math::tr1;
+#define _USE_MATH_DEFINES
+#endif
+
 #include <math.h>
 
 /** Common utility functions. */
