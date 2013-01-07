@@ -2,7 +2,7 @@
 #define WORDGRAPH_HH
 
 #include <cstddef>  // NULL
-#include <values.h>
+#include <cfloat>
 #include <assert.h>
 #include <vector>
 
@@ -37,11 +37,11 @@ struct WordGraph {
      * \param source_node_id = the source node of the arc
      * \param am_weight = the acoustic weight of the arc
      * \param lm_weight = the language model weight of the arc
-    */
+     */
     Arc(int sibling_arc, int source_node_id, float am_weight = 0,
-	float lm_weight = 0)
+        float lm_weight = 0)
       : source_node_id(source_node_id), sibling_arc(sibling_arc), 
-	am_weight(am_weight), lm_weight(lm_weight) { }
+        am_weight(am_weight), lm_weight(lm_weight) { }
 
     int source_node_id; //!< The source node of the arc.
     int sibling_arc; //!< The next arc ending to the same node. 
@@ -53,10 +53,10 @@ struct WordGraph {
   /** A node in the graph. */
   struct Node {
     Node(int frame, int symbol, int lex_node_id, 
-	 float path_weight = -MAXFLOAT) 
+         float path_weight = -FLT_MAX) 
       : first_arc(-1), reachable(true), frame(frame), symbol(symbol), 
-	lex_node_id(lex_node_id), path_weight(path_weight), 
-	reference_count(0) { }
+        lex_node_id(lex_node_id), path_weight(path_weight), 
+        reference_count(0) { }
     int first_arc; //!< The first arc coming to this node.
     bool reachable; //!< A flag for garbage collection.
     int frame; //!< The frame of the node, i.e., the ending time of the word
@@ -78,7 +78,7 @@ struct WordGraph {
    * \return the resulting node index
    */
   int add_node(int frame, int symbol, int lex_node_id, 
-	       float path_weight = -MAXFLOAT)
+               float path_weight = -FLT_MAX)
   {
     /* No reusable nodes, create a new. */
     if (m_free_node_indices.empty()) {
@@ -113,7 +113,7 @@ struct WordGraph {
    * that end up in the same node and have the same symbol in the source node.
    */
   void add_arc(int source_node_id, int target_node_id, float am_weight = 0, 
-	       float lm_weight = 0, bool word_pair_approx = true)
+               float lm_weight = 0, bool word_pair_approx = true)
   {
     float weight = am_weight + lm_weight;
     Node &src_node = nodes[source_node_id];
@@ -132,15 +132,15 @@ struct WordGraph {
       }
 
       if (match) {
-   	    float old_path_weight = old_src_node.path_weight + arc.am_weight + arc.lm_weight;
+        float old_path_weight = old_src_node.path_weight + arc.am_weight + arc.lm_weight;
         if (path_weight > old_path_weight) {
-          //unlink(arc.source_node_id);
-	      arc.am_weight = am_weight;
-	      arc.lm_weight = lm_weight;
-	      //arc.source_node_id = source_node_id;
+          unlink(arc.source_node_id);
+          arc.am_weight = am_weight;
+          arc.lm_weight = lm_weight;
+          arc.source_node_id = source_node_id;
           if (path_weight > tgt_node.path_weight)
             tgt_node.path_weight = path_weight;
-          //link(arc.source_node_id);
+          link(arc.source_node_id);
         }
         return;
       }
@@ -151,13 +151,13 @@ struct WordGraph {
     if (m_free_arc_indices.empty()) {
       arc_index = arcs.size();
       arcs.push_back(Arc(tgt_node.first_arc, source_node_id, 
-			 am_weight, lm_weight));
+                         am_weight, lm_weight));
     }
     else {
       arc_index = m_free_arc_indices.back();
       m_free_arc_indices.pop_back();
       arcs[arc_index] = Arc(tgt_node.first_arc, source_node_id, 
-			    am_weight, lm_weight);
+                            am_weight, lm_weight);
     }
     tgt_node.first_arc = arc_index;
     if (path_weight > tgt_node.path_weight)
@@ -196,10 +196,10 @@ struct WordGraph {
       nodes[node].reachable = true;
       int a = nodes[node].first_arc;
       while (a >= 0) {
-	Arc &arc = arcs[a];
-	if (!nodes[arc.source_node_id].reachable)
-	  stack.push_back(arc.source_node_id);
-	a = arc.sibling_arc;
+        Arc &arc = arcs[a];
+        if (!nodes[arc.source_node_id].reachable)
+          stack.push_back(arc.source_node_id);
+        a = arc.sibling_arc;
       }
     }
   }
@@ -225,13 +225,13 @@ struct WordGraph {
 
       /* Reference count zero?  Unlink all arcs and target nodes. */
       if (node.reference_count == 0) {
-	while (node.first_arc >= 0) {
-	  m_free_arc_indices.push_back(node.first_arc);
-	  Arc &arc = arcs[node.first_arc];
-	  m_unlink_stack.push_back(arc.source_node_id);
-	  node.first_arc = arc.sibling_arc;
-	}
-	m_free_node_indices.push_back(node_index);
+        while (node.first_arc >= 0) {
+          m_free_arc_indices.push_back(node.first_arc);
+          Arc &arc = arcs[node.first_arc];
+          m_unlink_stack.push_back(arc.source_node_id);
+          node.first_arc = arc.sibling_arc;
+        }
+        m_free_node_indices.push_back(node_index);
       }
     }
   }

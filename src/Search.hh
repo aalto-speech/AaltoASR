@@ -137,7 +137,6 @@ public:
   inline HypoStack() : m_best_log_prob(-1e10) { }
 
   // Inherited from vector
-
   Hypo &operator[](int index) { return std::vector<Hypo>::operator[](index); }
   Hypo &at(int index) { return std::vector<Hypo>::operator[](index); }
   Hypo &front() { return std::vector<Hypo>::front(); }
@@ -175,7 +174,7 @@ public:
   void print_sure();
 
   // Operate
-  int add_ngram(TreeGram *ngram, float weight);
+  int add_ngram(NGram *ngram, float weight);
   void reset_search(int start_frame);
   void init_search(int expand_window);
   bool expand_stack(int frame);
@@ -248,7 +247,8 @@ private:
 
   struct LanguageModel {
     LanguageModel() : ngram(NULL), weight(0) {}
-    TreeGram *ngram;
+    NGram *ngram;
+    //TreeGram *ngram;
     float weight;
     std::vector<int> lex2lm;
   };
@@ -318,8 +318,8 @@ private:
   int m_similar_prunings;
 
   // Temporary variables
-  TreeGram::Gram m_history_lex;
-  TreeGram::Gram m_history_lm;
+  NGram::Gram m_history_lex;
+  NGram::Gram m_history_lm;
 };
 
 #endif /* SEARCH_HH */

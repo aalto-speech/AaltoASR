@@ -1,9 +1,18 @@
 #ifndef DEF_HH
 #define DEF_HH
 
-#include <math.h>
+// This needs to be defined for VS and M_LN10 constant varjokal 18.3.2010
+#ifdef _MSC_VER
+#define _USE_MATH_DEFINES
+#endif
+#include <cmath>
 #include <vector>
 #include <deque>
+
+// Visual studio 2010 problem? varjokal 15.4.2010
+#ifndef M_LN10
+#define M_LN10 2.30258509299404568402
+#endif
 
 const int MAX_WLEN=1000;
 const double MINLOGPROB=-60;

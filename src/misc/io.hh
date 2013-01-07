@@ -1,7 +1,7 @@
 #ifndef IO_HH
 #define IO_HH
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <string>
 #include <stdio.h>
 

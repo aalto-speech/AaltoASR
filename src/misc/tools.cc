@@ -1,4 +1,4 @@
-#include <string.h>
+#include <cstring>
 #include <assert.h>
 #include "tools.hh"
 

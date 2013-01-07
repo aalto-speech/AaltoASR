@@ -2,7 +2,7 @@
 #ifndef VOCABULARY_HH
 #define VOCABULARY_HH
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <string>
 #include <vector>
 #include <exception>

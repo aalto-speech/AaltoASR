@@ -1,6 +1,8 @@
+#include <limits.h>
 #include <math.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <assert.h>
 #include "str.hh"
 

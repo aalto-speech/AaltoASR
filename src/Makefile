@@ -10,15 +10,13 @@ progs = arpa2bin bin2arpa
 
 tests = test_class
 
-libdecoder_srcs = ArpaNgramReader.cc \
-	BinNgramReader.cc \
-	Expander.cc \
+libdecoder_srcs = Expander.cc \
 	GramSorter.cc \
 	Hmm.cc \
+	HTKLatticeGrammar.cc \
 	Lexicon.cc \
 	LMHistory.cc \
 	LnaReaderCircular.cc \
-	Ngram.cc \
 	NowayHmmReader.cc \
 	NowayLexiconReader.cc \
 	OneFrameAcoustics.cc \
@@ -29,7 +27,9 @@ libdecoder_srcs = ArpaNgramReader.cc \
 	Toolbox.cc \
 	TreeGram.cc \
 	TreeGramArpaReader.cc \
-	Vocabulary.cc\
+	Vocabulary.cc \
+	ArpaReader.cc \
+	InterTreeGram.cc \
 	WordClasses.cc
 
 ##################################################

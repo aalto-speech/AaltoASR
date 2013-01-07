@@ -1,9 +1,10 @@
 #ifndef STR_HH
 #define STR_HH
 
-#include <cstddef>  // NULL
-#include <limits.h>
-#include <string.h>
+#include <cstddef> // NULL
+#include <cstring>
+#include <climits>
+#include <cfloat>
 #include <assert.h>
 #include <sstream>
 #include <string>
@@ -14,6 +15,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <math.h>
+
 
 /** Functions for handling strings of the Standard Template Library.
  * \bug We assume that the newline is '\n', which can cause problems
@@ -254,7 +256,7 @@ namespace str {
   }
 
   /** Convert a string to float.  Arbitrary amount of white space is
-   * accepted before the float as explained on strtof(3) manual page.
+   * accepted before the float as explained on strtod(3) manual page.
    * Anything after the number is considered as an conversion error.
    *
    * \param str = the string to convert
@@ -266,11 +268,14 @@ namespace str {
     char *endptr;
     const char *c_str = str.c_str();
 
-    float value = strtof(c_str, &endptr);
-    if (value == -HUGE_VALF || value == HUGE_VALF)
-      throw std::out_of_range("str::str2float: argument out of range");
+    double dbl_value = strtod(c_str, &endptr);
+
     if (*c_str == '\0' || *endptr != '\0')
       throw std::invalid_argument("str::str2float: invalid string");
+    if (dbl_value == -HUGE_VAL || dbl_value == HUGE_VAL ||
+        dbl_value < -FLT_MAX || dbl_value > FLT_MAX)
+      throw std::out_of_range("str::str2float: argument out of range");
+    float value = (float)dbl_value;
 
     return value;
   }
@@ -308,7 +313,7 @@ namespace str {
   }
 
   /** Return a strin with the possible trailing newline removed
-   * \param str = string to �homp
+   * \param str = string to chomp
    * \param chars = characters to remove
    * \return the string without trailing newline
    */
@@ -320,7 +325,7 @@ namespace str {
   }
 
   /** Remove the possible trailing newline from a string
-   * \param str = string to �homp
+   * \param str = string to chomp
    * \param chars = characters to remove
    * \return reference to modified \c str 
    */

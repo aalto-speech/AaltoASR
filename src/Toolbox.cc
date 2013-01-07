@@ -4,9 +4,12 @@
 #include <assert.h>
 #include <errno.h>
 
+#include "InterTreeGram.hh"
 #include "Toolbox.hh"
 #include "TreeGramArpaReader.hh"
 #include "io.hh"
+#include "misc/str.hh"
+#include "HTKLatticeGrammar.hh"
 
 using namespace std;
 
@@ -28,9 +31,11 @@ Toolbox::Toolbox()
     m_lna_reader(),
     m_one_frame_acoustics(),
     m_fsa_lm(NULL),
+    m_lookahead_ngram(NULL),
 
     m_expander(m_hmms, m_lexicon, m_lna_reader),
-    m_search(m_expander, m_vocabulary)
+    m_search(m_expander, m_vocabulary),
+    m_last_guaranteed_history(NULL)
 {
 }
 
@@ -39,6 +44,13 @@ Toolbox::~Toolbox()
   while (!m_ngrams.empty()) {
     delete m_ngrams.back();
     m_ngrams.pop_back();
+  }
+  if (m_lookahead_ngram) {
+    delete m_lookahead_ngram;
+  }
+
+  if (m_fsa_lm) {
+    delete m_fsa_lm;
   }
 }
 
@@ -71,10 +83,10 @@ Toolbox::print_words(int words)
 
   for (int i = 0; i < words; i++) {
     std::cout << m_vocabulary.word(sorted_words[i]->word_id) << " "
-	      << sorted_words[i]->best_length << " "
-	      << sorted_words[i]->best_log_prob() << " "
-	      << sorted_words[i]->best_avg_log_prob << " "
-	      << std::endl;
+              << sorted_words[i]->best_length << " "
+              << sorted_words[i]->best_log_prob() << " "
+              << sorted_words[i]->best_avg_log_prob << " "
+              << std::endl;
   }
 }
 
@@ -114,7 +126,9 @@ Toolbox::lex_read(const char *filename)
   if (!file)
     throw OpenError();
   if (m_use_stack_decoder)
+  {
     m_lexicon_reader.read(file);
+  }
   else
   {
     m_tp_lexicon_reader.read(file, m_word_boundary);
@@ -125,22 +139,34 @@ Toolbox::lex_read(const char *filename)
 
 const std::string & Toolbox::lex_word() const
 {
-	if (m_use_stack_decoder)
-		return m_lexicon_reader.word();
-	else
-		return m_tp_lexicon_reader.word();
+  if (m_use_stack_decoder)
+    return m_lexicon_reader.word();
+  else
+    return m_tp_lexicon_reader.word();
 }
 
 const std::string & Toolbox::lex_phone() const
 {
-	if (m_use_stack_decoder)
-		return m_lexicon_reader.phone();
-	else
-		return m_tp_lexicon_reader.phone();
+  if (m_use_stack_decoder)
+    return m_lexicon_reader.phone();
+  else
+    return m_tp_lexicon_reader.phone();
 }
 
+
+void
+Toolbox::interpolated_ngram_read(const std::vector<std::string> lmnames, 
+                                 const std::vector<float> weights) {
+
+  // Loading binary models doesn't work yet !
+  InterTreeGram *itg = new InterTreeGram(lmnames, weights);
+  if (m_use_stack_decoder) m_search.add_ngram(itg, 1.0);
+  else m_tp_search.set_ngram(itg);
+}
+
+
 int
-Toolbox::ngram_read(const char *file, float weight, const bool binary, bool quiet)
+Toolbox::ngram_read(const char *file, const bool binary, bool quiet)
 {
   io::Stream in(file,"r");
   
@@ -148,9 +174,9 @@ Toolbox::ngram_read(const char *file, float weight, const bool binary, bool quie
     throw OpenError();
   }
 
-  if (!m_use_stack_decoder && (m_ngrams.size() > 0)) {
-    delete m_ngrams[0];
-    m_ngrams.clear();
+  if (!m_use_stack_decoder && m_ngrams.size() > 0) {
+    fprintf(stderr, "Trying to load more than one ngram. You need to use interploated_ngram_read() instead of ngram_read(). Exit.\n");
+    exit(-1);
   }
 
   m_ngrams.push_back(new TreeGram());
@@ -158,7 +184,10 @@ Toolbox::ngram_read(const char *file, float weight, const bool binary, bool quie
 
   int num_oolm = 0;
   if (m_use_stack_decoder) {
-    num_oolm = m_search.add_ngram(m_ngrams.back(), weight);
+    // LM weights removed from interface, but it is only
+    // supported in the old stack decoder. Hence hard-wired
+    // LM weight 1.0
+    num_oolm = m_search.add_ngram(m_ngrams.back(), 1.0);
   }
   else {
     num_oolm = m_tp_search.set_ngram(m_ngrams.back());
@@ -169,6 +198,40 @@ Toolbox::ngram_read(const char *file, float weight, const bool binary, bool quie
   }
 
   return m_ngrams.back()->order();
+}
+
+int
+Toolbox::htk_lattice_grammar_read(const char *file, bool quiet)
+{
+  io::Stream in(file,"r");
+  
+  if (!in.file) {
+    //throw OpenError(); // FIXME
+    fprintf(stderr, "htk_lattice_grammar_read(): could not open %s: %s\n", 
+            file, strerror(errno));
+    exit(1);
+  }
+  if (m_ngrams.size() > 0) {
+    if (!quiet)
+      fprintf(stderr, "Replacing old grammar.\n");
+    delete m_ngrams[0];
+    m_ngrams.clear();
+  }
+
+  m_ngrams.push_back(new HTKLatticeGrammar());
+  m_ngrams.back()->read(in.file, false);
+
+  int num_oolm = 0;
+  if (m_use_stack_decoder) {
+    num_oolm = m_search.add_ngram(m_ngrams.back(), 1.0);
+  }
+  else {
+    num_oolm = m_tp_search.set_ngram(m_ngrams.back());
+  }
+
+  if ((num_oolm > 0) && !quiet) {
+    cerr << num_oolm << " words in the vocabulary were not found in the LM." << endl;
+  }
 }
 
 void
@@ -221,20 +284,35 @@ Toolbox::read_lookahead_ngram(const char *file, const bool binary, bool quiet)
   }
 }
 
+void Toolbox::interpolated_lookahead_ngram_read(const std::vector<std::string> lmnames, const std::vector<float> weights) {
+  //FIXME: Not checking that the type is BACKOFF
+  m_lookahead_ngram = new InterTreeGram(lmnames, weights);
+  m_tp_search.set_lookahead_ngram(m_lookahead_ngram);;
+}
+
 void
 Toolbox::read_word_classes(const char *file)
 {
   assert(!m_use_stack_decoder);
 
+#ifdef ENABLE_WORDCLASS_SUPPORT
   ifstream ifs(file);
   m_word_classes.read(ifs, m_tp_vocabulary);
   m_tp_search.set_word_classes(&m_word_classes);
+#endif
 }
 
 void
 Toolbox::lna_open(const char *file, int size)
 {
-  m_lna_reader.open(file, size);
+  m_lna_reader.open_file(file, size);
+  m_acoustics = &m_lna_reader;
+}
+
+void
+Toolbox::lna_open_fd(const int fd, int size)
+{
+  m_lna_reader.open_fd(fd, size);
   m_acoustics = &m_lna_reader;
 }
 
@@ -300,4 +378,37 @@ Toolbox::init(int expand_window)
   }
 
   m_search.init_search(expand_window);
+}
+
+const bytestype& Toolbox::best_hypo_string(bool print_all, bool output_time) {
+  HistoryVector hist_vec;
+  static std::string retval;
+  retval.clear();
+
+  m_tp_search.get_path(hist_vec, print_all, print_all ? NULL : m_last_guaranteed_history);
+  bool all_guaranteed = true;
+
+  for (int i = hist_vec.size() - 1; i >= 0; i--) {
+    LMHistory *hist = hist_vec[i];
+    assert(hist->reference_count > 0);
+    if (hist->previous->reference_count == 1) {
+      if (all_guaranteed)
+        m_last_guaranteed_history = hist;
+    }
+    else {
+      if (all_guaranteed)
+        retval += "* ";
+      all_guaranteed = false;
+    }
+
+    if (! output_time)
+      retval += word(hist->last().word_id()) + " ";
+    else
+      retval += (str::fmt(256, "<time=%d> ", hist->word_start_frame) +
+                 word(hist->last().word_id()) + " ");
+  }
+  // Last of the timing information
+  //if (output_time) 
+  //  retval = retval + str::fmt(256, "%d", frame());
+  return retval;
 }

@@ -43,16 +43,20 @@ LnaReaderCircular::read_int()
 }
 
 void
-LnaReaderCircular::open(const char *filename, int buf_size)
+LnaReaderCircular::open_fd(const int fd, int buf_size)
 {
   if (m_file != NULL)
     close();
 
-  m_file = fopen(filename, "r");
+#ifdef _MSC_VER
+  m_file = _fdopen(fd, "rb");
+#else
+  m_file = fdopen(fd, "rb");
+#endif
+
   if (m_file == NULL) {
-    char * error_string = strerror(errno);
-    fprintf(stderr, "LnaReaderCircular::open(): could not open %s: %s\n",
-	    filename, error_string);
+    fprintf(stderr, "LnaReaderCircular::open(): could not open fd: %s\n",
+	    strerror(errno));
     exit(1);
   }
 

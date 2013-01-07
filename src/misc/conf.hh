@@ -1,11 +1,11 @@
 #ifndef CONF_HH
 #define CONF_HH
 
+#include <cstdio>
 #include <vector>
 #include <deque>
 #include <string>
 #include <map>
-#include <stdio.h>
 
 /** Configuration options, command line parameters and config files. 
  *

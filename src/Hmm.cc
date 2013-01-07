@@ -1,4 +1,9 @@
+#ifdef _MSC_VER
+#include <boost/math/tr1.hpp>
+using namespace boost::math::tr1;
+#else
 #include <math.h>
+#endif
 
 #include "Hmm.hh"
 

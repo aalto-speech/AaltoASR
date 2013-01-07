@@ -3,193 +3,68 @@
 
 #include <cstddef>  // NULL
 #include <stdlib.h>
-#include <assert.h>
+#include <cassert>
 
 #include "GramSorter.hh"
 #include "TreeGramArpaReader.hh"
 #include "misc/str.hh"
-
-TreeGramArpaReader::TreeGramArpaReader()
-  : m_lineno(0)
-{
-}
+#include "ArpaReader.hh"
+#include "def.hh"
 
 void
-TreeGramArpaReader::read_error()
-{
-  fprintf(stderr, "TreeGramArpaReader::read(): error on line %d\n", m_lineno);
-  exit(1);
-}
-
-void
-TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram)
+TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram, bool add_missing_unigrams)
 {
   std::string line;
-  std::vector<std::string> vec;
-
-  // Just for efficiency
-  line.reserve(128); 
-  vec.reserve(16);
-
+  ArpaReader areader(tree_gram);
   bool ok = true;
+  bool interpolated;
 
-  m_lineno = 0;
-
-  // Find header
-  while (1) {
-    ok = str::read_line(line, file, true);
-    m_lineno++;
-
-    if (!ok) {
-      fprintf(stderr, "TreeGramArpaReader::read(): "
-	      "error on line %d while waiting \\data\\", m_lineno);
-      exit(1);
-    }
-
-    if (line == "\\interpolated")
-      tree_gram->set_type(TreeGram::INTERPOLATED);
-
-    if (line == "\\data\\")
-      break;
+  areader.read_header(file, interpolated, line);
+  if (interpolated) {
+    tree_gram->set_type(TreeGram::INTERPOLATED);
   }
 
-  // Read header
-  int order = 1;
   int number_of_nodes = 0;
-  int max_order_count = 0;
-  while (1) {
-    ok = str::read_line(line, file, true);
-    m_lineno++;
-
-    if (!ok) {
-      fprintf(stderr, "TreeGramArpaReader::read(): "
-	      "error on line %d while reading counts", m_lineno);
-      exit(1);
-    }
-    
-    // Header ends in a \-command
-    if (line[0] == '\\')
-      break;
-
-    // Skip empty lines
-    if (line.find_first_not_of(" \t\n") == line.npos)
-      continue;
-
-    // All non-empty header lines must be ngram counts
-    if (line.substr(0, 6) != "ngram ")
-      read_error();
-    {
-      std::string tmp(line.substr(6));
-      vec = str::split(tmp, "=", false);
-    }
-    if (vec.size() != 2)
-      read_error();
-
-    int count = atoi(vec[1].c_str());
-    if (count > max_order_count)
-      max_order_count = count;
-    number_of_nodes += count;
-    m_counts.push_back(count);
-    
-    if (atoi(vec[0].c_str()) != order || m_counts.back() < 0)
-      read_error();
-    order++;
-  }
+  for(std::vector<int>::iterator j=areader.counts.begin();j!=areader.counts.end();++j)
+    number_of_nodes += *j;
 
   tree_gram->reserve_nodes(number_of_nodes);
+  std::vector<int> tmp_gram;
 
-  // Read ngrams order by order
-  for (order = 1; order <= m_counts.size(); order++) {
+  float log_prob, back_off;
+  int prev_order = 1;
+  
+  GramSorter *sorter = new GramSorter(1, areader.counts[0]);
+  while ( areader.next_gram(file, line, tmp_gram, log_prob, back_off)) {
+    int cur_order = tmp_gram.size();
+    TreeGram::Gram gram(tmp_gram.begin(), tmp_gram.end());
 
-    // We must always have the correct header line at this point
-    if (line[0] != '\\') {
-      fprintf(stderr, "TreeGramArpaReader::read(): "
-	      "\\%d-grams expected on line %d\n", order, m_lineno);
-      exit(1);
-    }
-    str::clean(line, " \t");
-    vec = str::split(line, "-", false);
-
-    if (atoi(vec[0].substr(1).c_str()) != order || vec[1] != "grams:") {
-      fprintf(stderr, "TreeGramArpaReader::read(): "
-	      "unexpected command on line %d: %s\n", m_lineno, line.c_str());
-      exit(1);
-    }
-
-    // Read the grams of each order into the sorter
-    GramSorter sorter(order, m_counts[order - 1]);
-    TreeGram::Gram gram;
-    gram.resize(order);
-    for (int w = 0; w < m_counts[order-1]; w++) {
-
-      // Read and split the line
-      if (!str::read_line(line, file))
-	read_error();
-      str::clean(line, " \t\n");
-      m_lineno++;
-
-      // Ignore empty lines
-      if (line.find_first_not_of(" \t\n") == line.npos) {
-	w--;
-	continue;
+    if (cur_order > prev_order) {
+      // Sort all grams read above and add them to the tree gram.
+      sorter->sort();
+      assert(sorter->num_grams() == areader.counts[prev_order - 1]);
+      for (int i = 0; i < sorter->num_grams(); i++) {
+        GramSorter::Data data = sorter->data(i);
+        TreeGram::Gram gram = sorter->gram(i);
+        tree_gram->add_gram(gram, data.log_prob, data.back_off, add_missing_unigrams);
       }
-
-      vec = str::split(line, " \t", true);
-
-      // Check the number of columns on the line
-      if (vec.size() < order + 1 || vec.size() > order + 2) {
-	fprintf(stderr, "TreeGramArpaReader::read(): "
-		"%d columns on line %d\n", (int) vec.size(), m_lineno);
-	exit(1);
-      }
-      if (order == m_counts.size() && vec.size() != order + 1)
-	fprintf(stderr, "WARNING: %d columns on line %d\n", (int) vec.size(), 
-		m_lineno);
-
-      // FIXME: should we deny new words in higher order ngrams?
-
-      // Parse log-probability, back-off weight and word indices
-      // FIXME: check the conversion of floats
-      float log_prob = strtod(vec[0].c_str(), NULL);
-      float back_off = 0;
-      if (vec.size() == order + 2)
-	back_off = strtod(vec[order + 1].c_str(), NULL);
-
-      // Add the gram to sorter
-      //fprintf(stderr,"add gram [");
-      for (int i = 0; i < order; i++) {
-	gram[i] = tree_gram->add_word(vec[i + 1]);
-	//fprintf(stderr," %d", gram[i]);
-      }
-      sorter.add_gram(gram, log_prob, back_off);
-      //fprintf(stderr,"] = [%f %f]\n",log_prob,back_off);
+      delete sorter;
+      sorter = new GramSorter(cur_order, areader.counts[cur_order-1]);
+      prev_order=cur_order;
     }
-
-    // Sort all grams read above and add them to the tree gram.
-    sorter.sort();
-    assert(sorter.num_grams() == m_counts[order - 1]);
-    for (int i = 0; i < sorter.num_grams(); i++) {
-      GramSorter::Data data = sorter.data(i);
-      gram = sorter.gram(i);
-
-      tree_gram->add_gram(gram, data.log_prob, data.back_off);
-    }
-
-    // Skip empty lines before the next order.
-    while (1) {
-      if (!str::read_line(line, file, true)) {
-	if (ferror(file))
-	  read_error();
-	if (feof(file))
-	  break;
-      }
-      m_lineno++;
-
-      if (line.find_first_not_of(" \t\n") != line.npos)
-	break;
-    }
+    sorter->add_gram(gram, log_prob, back_off);
   }
-  tree_gram->finalize();
+  // FIXME: Repeating the same code
+  // Finally, sort and add the highest order
+  assert(sorter->num_grams() == areader.counts.back());
+  sorter->sort();
+  for (int i = 0; i < sorter->num_grams(); i++) {
+    GramSorter::Data data = sorter->data(i);
+    TreeGram::Gram gram = sorter->gram(i);
+    tree_gram->add_gram(gram, data.log_prob, data.back_off, add_missing_unigrams);
+  }
+  delete sorter;
+  tree_gram->finalize(add_missing_unigrams);
 }
 
 void
@@ -217,8 +92,9 @@ TreeGramArpaReader::write(FILE *out, TreeGram *tree_gram)
       fprintf(out, "%g", iter.node().log_prob);
 
       // Word indices in the ngram
-      for (int j = 1; j <= order; j++)
-	fprintf(out, " %s", tree_gram->word(iter.node(j).word).c_str());
+      for (int j = 1; j <= order; j++) {
+	    fprintf(out, " %s", tree_gram->word(iter.node(j).word).c_str());
+      }
 
       // Possible backoff
       if (iter.has_children())
@@ -249,30 +125,31 @@ TreeGramArpaReader::write_interpolated(FILE *out, TreeGram *tree_gram)
     fprintf(out, "\n\\%d-grams:\n",order);
     while (iter.next_order(order)) {
       for (int j = 1; j <= order; j++) {
-	indices[j-1]=iter.node(j).word;
+        indices[j-1]=iter.node(j).word;
       }
-      
+
       // Log-probability
       float lp=tree_gram->log_prob_i(indices); // This bypasses Clustermap->wg2cg()
 
       if (lp>0) {
-	fprintf(stderr,"warning, n-gram [");
-	for (int j=1;j<=order;j++) 
-	  fprintf(stderr," %s", tree_gram->word(indices[j-1]).c_str());
-	fprintf(stderr,"] had logprob >0 (%e), corrected\n",lp);
-	lp=0;
+        fprintf(stderr,"warning, n-gram [");
+        for (int j=1;j<=order;j++)
+          fprintf(stderr," %s", tree_gram->word(indices[j-1]).c_str());
+        fprintf(stderr,"] had logprob >0 (%e), corrected\n",lp);
+	    lp=0;
       }
       fprintf(out, "%g", lp);
 
       // Word indices in the ngram
-      for (int j = 1; j <= order; j++)
-	fprintf(out, " %s", tree_gram->word(indices[j-1]).c_str());
+      for (int j = 1; j <= order; j++) {
+        fprintf(out, " %s", tree_gram->word(indices[j-1]).c_str());
+      }
 
       // Possible backoff
       if (iter.has_children()) 
-	fprintf(out, " %g\n", iter.node().back_off);
+        fprintf(out, " %g\n", iter.node().back_off);
       else
-	fprintf(out, "\n");
+        fprintf(out, "\n");
     }
   }
   fprintf(out, "\n\\end\\\n");

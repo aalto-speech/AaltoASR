@@ -4,13 +4,44 @@
 #include <iostream>
 #include <fstream>
 #include <stdio.h>
+#include <fcntl.h>
+#include <string.h>
+
+// Use io.h in Visual Studio varjokal 17.3.2010
+#ifdef _MSC_VER
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
+#include <errno.h>
 
 #include "Acoustics.hh"
+
+// O_BINARY is only defined in Windows
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
 
 class LnaReaderCircular : public Acoustics {
 public:
   LnaReaderCircular();
-  void open(const char *filename, int buf_size);
+  inline void open_file(const char *filename, int buf_size) {
+
+#ifdef _MSC_VER
+  int fd = _open(filename, _O_RDONLY|_O_BINARY);
+#else
+  int fd = open(filename, O_RDONLY|O_BINARY);
+#endif
+
+  if (fd < 0) {
+      fprintf(stderr, "LnaReaderCircular::open(): could not open %s: %s\n",
+	      filename, strerror(errno));
+      exit(1);
+    }
+    open_fd(fd, buf_size);
+  }
+  void open_fd(const int fd, int buf_size);
   void close();
   void seek(int frame);
   

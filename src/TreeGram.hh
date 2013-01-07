@@ -18,6 +18,11 @@ public:
     int child_index;
   };
 
+  struct ReadError : public std::exception {
+    virtual const char *what() const throw()
+      { return "TreeGram: read error"; }
+  };
+
   class Iterator {
   public:
     Iterator(TreeGram *gram = NULL);
@@ -53,15 +58,13 @@ public:
   };
 
   void reserve_nodes(int nodes); 
-  void set_interpolation(const std::vector<float> &interpolation);
 
   /// \brief Adds a new gram to the language model.
   ///
   /// The grams must be inserted in sorted order.  The only exception
   /// is the OOV 1-gram, which can be updated any time.  It exists by
   /// default with very small log-prob and zero back-off.
-  ///
-  void add_gram(const Gram &gram, float log_prob, float back_off);
+  void add_gram(const Gram &gram, float log_prob, float back_off, bool add_missing_unigrams=false);
 
   /// \brief Reads a language model file.
   ///
@@ -134,37 +137,38 @@ public:
   Iterator iterator(const Gram &gram);
 
   /// \brief Computes bigram probabilities for every word pair
-  /// "prev_word_id next_word_id[i]".
+  /// with context "prev_word_id".
   ///
   /// Used for LM lookahead in the recognizer.
   ///
-  /// \param extensions Will have bigram probabilities when available, unigram
+  /// \param result_buffer Will have bigram probabilities when available, unigram
   /// probabilities for other words, and OOVs will have logprob
   /// \a prev_word_id's backoff weight - 99.
   ///
-  void fetch_bigram_list(int prev_word_id, std::vector<float> & extensions);
+  void fetch_bigram_list(int prev_word_id,
+                         std::vector<float> &result_buffer);
 
   /// \brief Computes trigram probabilities for every word triplet
-  /// "w1 w2 next_word_id[i]".
+  /// with context "w1 w2".
   ///
   /// Used for LM lookahead in the recognizer.
   ///
-  void fetch_trigram_list(int w1, int w2, std::vector<float> & extensions);
+  void fetch_trigram_list(int w1, int w2,
+                          std::vector<float> &result_buffer);
 
   void print_debuglist();
-  void finalize();
+  void finalize(bool add_missing_unigrams=false);
   void convert_to_backoff();
 
 private:
   int binary_search(int word, int first, int last);
   void print_gram(FILE *file, const Gram &gram);
   void find_path(const Gram &gram);
-  void check_order(const Gram &gram);
+  void check_order(const Gram &gram, bool add_missing_unigrams=false);
   void flip_endian();
   void fetch_gram(const Gram &gram, int first);
 
   std::vector<int> m_order_count;	// number of grams in each order
-  std::vector<float> m_interpolation;	// FIXME: remove this, unused
   std::vector<Node> m_nodes;		// storage for the nodes
   std::vector<int> m_fetch_stack;	// indices of the gram requested
   //int m_last_order;			// order of the last hit

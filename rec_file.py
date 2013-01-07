@@ -31,8 +31,8 @@ def rec(start, end):
 # Initialize
 #
 
-akupath = "/home/jpylkkon/aku/aku"
-akumodel = "/share/puhe/jpylkkon/discriminative/hmms/speechdat_mfcc_gain4000_occ350_21.2.2008_20";
+akupath = "/home/jpylkkon/aku/cvs/aku"
+akumodel = "/share/puhe/models/speecon_mfcc_gain3500_occ225_1.11.2007_20"
 hmms = akumodel+".ph"
 dur = akumodel+".dur"
 temppath = "/share/work/jpylkkon/temp"
@@ -83,7 +83,7 @@ sys.stderr.write("loading lexicon\n")
 try:
     t.lex_read(lexicon)
 except:
-    print "phone:", t.lex_phone()
+    print("phone:", t.lex_phone())
     sys.exit(-1)
 t.set_sentence_boundary("<s>", "</s>")
 
@@ -110,11 +110,11 @@ t.set_duration_scale(dur_scale)
 t.set_transition_scale(trans_scale)
 t.set_lm_scale(lm_scale)
 
-print "BEAM: ", global_beam
-print "WORD_END_BEAM: ", word_end_beam
-print "LMSCALE: ", lm_scale
-print "DURSCALE: ", dur_scale
+print("BEAM: %.1f" % global_beam)
+print("WORD_END_BEAM: %.1f" % word_end_beam)
+print("LMSCALE: %.1f" % lm_scale)
+print("DURSCALE: %.1f" % dur_scale)
 
 t.lna_open(temppath+"/temp.lna", 1024)
-print "REC: ",
+sys.stdout.write("REC: ")
 rec(0,-1)

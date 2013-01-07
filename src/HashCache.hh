@@ -59,8 +59,10 @@ HashCache<T>::rehash(int new_max)
 template<typename T>
 inline int HashCache<T>::get_hash_index(int key)
 {
+#ifndef NDEBUG
 	if (hash_table.empty())
 		throw std::runtime_error("HashCache::get_hash_index");
+#endif
 	return key % hash_table.size();
 }
 

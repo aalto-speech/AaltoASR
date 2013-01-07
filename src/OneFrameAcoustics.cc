@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <assert.h>
 #include "OneFrameAcoustics.hh"
 

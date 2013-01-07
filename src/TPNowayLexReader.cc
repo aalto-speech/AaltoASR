@@ -57,8 +57,8 @@ TPNowayLexReader::get_until(FILE *file, std::string &str, const char *delims)
     // Check delimiters
     for (int i = 0; delims[i] != 0; i++) {
       if (c == delims[i]) {
-	ungetc(c, file);
-	return;
+        ungetc(c, file);
+        return;
       }
     }
     
@@ -78,7 +78,7 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
 
   m_vocabulary.reset();
   m_lexicon.initialize_lex_tree();
-  
+
   while (1) {
     // Read first word
     skip_while(file, " \t\n");
@@ -99,42 +99,52 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
     // Parse possible probability
     int left = m_word.rfind('(');
     int right = m_word.rfind(')');
+    float prob = 1;
     if (left != -1 || right != -1) {
       if (left == -1 || right == -1)
-	throw InvalidProbability();
+        throw InvalidProbability();
       string tmp = m_word.substr(left + 1, right - left - 1);
       char *end_ptr;
-      strtod(tmp.c_str(), &end_ptr);
+      prob = strtod(tmp.c_str(), &end_ptr);
       if (*end_ptr != '\0')
-	throw InvalidProbability();
+        throw InvalidProbability();
       m_word.resize(left);
     }
 
     // Read phones and find the corresponding HMMs
     hmm_list.clear();
-    
+
+    bool unknown_phonemes = false;
     while (1) {
       // Skip whitespace and read phone
       skip_while(file, " \t");
       if (ferror(file))
-	throw ReadError();
+        throw ReadError();
       if (feof(file))
-	break;
-      
+        break;
+
       int peek = fgetc(file);
       ungetc(peek, file);
       if (peek == '\n')
-	break;
+        break;
       get_until(file, m_phone, " \t\n");
 
       // Find the index of the hmm
       map<string,int>::const_iterator it = m_hmm_map.find(m_phone);
       if (it == m_hmm_map.end()) {
-	throw UnknownHmm(m_phone, m_word);
+        // throw UnknownHmm(m_phone, m_word);
+        fprintf(stderr, "TPNowayLexReader::read(): unknown hmm %s in word '%s'\n",
+                m_phone.c_str(), m_word.c_str());
+        hmm_list.clear();
+        unknown_phonemes = true;
+        break; //exit(1);
       }
       int hmm_id = (*it).second;
       hmm_list.push_back(&m_hmms[hmm_id]);
     }
+
+    if (unknown_phonemes) // Don't add word if it contains unknown HMMs
+      continue;
 
     // Add word to lexicon
 

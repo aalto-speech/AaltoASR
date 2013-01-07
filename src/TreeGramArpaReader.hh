@@ -5,20 +5,12 @@
 
 #include <stdio.h>
 #include "TreeGram.hh"
-#include <map>
 
 class TreeGramArpaReader {
 public:
-  TreeGramArpaReader();
-  void read(FILE *file, TreeGram *tree_gram);
+  void read(FILE *file, TreeGram *tree_gram, bool add_missing_unigrams=false);
   void write(FILE *file, TreeGram *tree_gram);
   void write_interpolated(FILE *file, TreeGram *treegram);
-
-private:
-  void read_error();
-
-  std::vector<int> m_counts;
-  int m_lineno;
 };
 
 #endif /* TREEGRAMARPAREADER_HH */

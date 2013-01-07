@@ -1,6 +1,6 @@
-#include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <cstdlib>
 
 #include "NowayHmmReader.hh"
 

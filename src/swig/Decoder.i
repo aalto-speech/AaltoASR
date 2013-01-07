@@ -20,23 +20,26 @@ using namespace fsalm;
 }
 
 #ifdef SWIGPYTHON
-%typemap(in) std::string& {
-  if (!PyString_Check($input)) {
-    PyErr_SetString(PyExc_TypeError, "not a string");
-    return NULL;
-  }
-  $1 = new std::string(PyString_AsString($input),
-           PyString_Size($input));
+
+
+%include "std_string.i"
+%include "std_vector.i"
+
+typedef std::string bytestype;
+%typemap(out) bytestype& {
+	// This is for modern pythons (>=2.7)
+  $result = PyBytes_FromStringAndSize(static_cast<const char*>($1->c_str()),$1->size());
+	// This is for python <= 2.4
+  //$result = Py_BuildValue("s#",$1->c_str(),$1->size());
 }
 
-%typemap(freearg) std::string& {
-  delete $1;
-}
+// Instantiate templates used 
+%template(StringVector) std::vector<std::string>;
+%template(FloatVector) std::vector<float>;
 
-%typemap(out) std::string& {
-  $result = Py_BuildValue("s#",$1->c_str(),$1->size());
-}
 
+#if !defined(PY3)
+// This is disabled, since doesn't exists for py3 any more
 %typemap(in) FILE* {
 	if (!(PyFile_Check($input))) {
 		PyErr_SetString(PyExc_TypeError, "not a file pointer");
@@ -44,6 +47,7 @@ using namespace fsalm;
 	}
 	$1=PyFile_AsFile($input);
 }
+#endif
 #endif
 
 class Hypo {
@@ -96,16 +100,22 @@ class Expander {
 class Toolbox {
 public:
   Toolbox();
-  
+  ~Toolbox();
+
   void hmm_read(const char *hmm_file);
   void duration_read(const char *dur_file);
   const std::vector<Hmm> &hmms();
   void lex_read(const char *file);
   const std::string &lex_word();
   const std::string &lex_phone();
-  int ngram_read(const char *file, float weight, const bool binary, bool quiet);
-  int ngram_read(const char *file, float weight, const bool binary);
-  int ngram_read(const char *file, float weight);
+
+  void interpolated_ngram_read(const std::vector<std::string>, const std::vector<float>);
+  void interpolated_lookahead_ngram_read(const std::vector<std::string>, const std::vector<float>);
+
+  int ngram_read(const char *file, const bool binary, const bool quiet);
+  int ngram_read(const char *file, const bool binary);
+  int ngram_read(const char *file);
+  int htk_lattice_grammar_read(const char *file, bool quiet);
   void fsa_lm_read(const char *file, bool binary, bool quiet);
   void fsa_lm_read(const char *file, bool binary);
   void read_word_classes(const char *file);
@@ -115,6 +125,7 @@ public:
 
   // Lna
   void lna_open(const char *file, int size);
+  void lna_open_fd(const int fd, int size);
   void lna_close();
   void lna_seek(int frame);
   Acoustics &acoustics();
@@ -144,11 +155,12 @@ public:
   HypoStack &stack(int frame);
   int paths();
 
-	void write_word_graph(const std::string &file_name);
-	void print_best_lm_history();
-	void print_best_lm_history_to_file(FILE *out);
-	void select_decoder(int stack_dec);
-	void write_state_segmentation(const std::string &file);
+  void write_word_graph(const std::string &file_name);
+  void print_best_lm_history();
+  void print_best_lm_history_to_file(FILE *out);
+  const bytestype &best_hypo_string(bool print_all, bool output_time);
+  void select_decoder(int stack_dec);
+  void write_state_segmentation(const std::string &file);
 
   void set_forced_end(bool forced_end);
   void set_hypo_limit(int hypo_limit);
@@ -195,6 +207,7 @@ public:
   void set_use_word_pair_approximation(bool value);
   void set_use_lm_cache(bool value);
   void set_require_sentence_end(bool s);
+  void set_remove_pronunciation_id(bool remove);
 
   void set_optional_short_silence(bool state);
 

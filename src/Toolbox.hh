@@ -15,6 +15,8 @@
 #include "TokenPassSearch.hh"
 #include "OneFrameAcoustics.hh"
 
+typedef std::string bytestype;
+
 class Toolbox {
 public:
   Toolbox();
@@ -25,7 +27,7 @@ public:
   
   // HMM models
 
-  /// \brief Reads the acoustic models of triphones from a file.
+  /// \brief Reads the acoustic model from a file.
   ///
   /// \exception OpenError If unable to open the file.
   ///
@@ -60,13 +62,19 @@ public:
 
   // Ngram
 
+  /// \brief Reads several n-gram models for interpolation
+  void interpolated_ngram_read(const std::vector<std::string>, const std::vector<float>);
+
   /// \brief Reads an n-gram language model.
   ///
   /// \param binary If false, the file is expected to be in ARPA file format.
   /// \param quiet If true, doesn't print warnings to stderr.
   /// \return The order of the language model.
   ///
-  int ngram_read(const char *file, float weight, bool binary=true, bool quiet=false);
+  int ngram_read(const char *file, bool binary=true, bool quiet=false);
+
+  /// \brief Reads a language model in HTK lattice format
+  int htk_lattice_grammar_read(const char *file, bool quiet);
 
   /// \brief Reads a lookahead n-gram language model.
   ///
@@ -74,6 +82,9 @@ public:
   /// \param quiet If true, doesn't print warnings to stderr.
   ///
   void read_lookahead_ngram(const char *file, bool binary=true, bool quiet=false);
+
+  /// \brief Reads several lookahead n-gram models for interpolation
+  void interpolated_lookahead_ngram_read(const std::vector<std::string>, const std::vector<float>);
 
   /// \brief Reads a finite-state automaton language model.
   ///
@@ -105,6 +116,7 @@ public:
 
   // Lna
   void lna_open(const char *file, int size);
+  void lna_open_fd(const int fd, int size);
   void lna_close();
   void lna_seek(int frame) { m_lna_reader.seek(frame); }
   Acoustics &acoustics() { return *m_acoustics; }
@@ -136,7 +148,7 @@ public:
   bool recognize_segment(int start_frame, int end_frame);
 
   // Both searches
-  void reset(int frame) { if (m_use_stack_decoder) m_search.reset_search(frame);  else m_tp_search.reset_search(frame);}
+  void reset(int frame) { if (m_use_stack_decoder) m_search.reset_search(frame);  else m_tp_search.reset_search(frame); m_last_guaranteed_history=NULL;}
   void set_end(int frame) { if (m_use_stack_decoder) m_search.set_end_frame(frame); else m_tp_search.set_end_frame(frame); }
 
   /// \brief Proceeds decoding one frame.
@@ -167,9 +179,10 @@ public:
   void prune(int frame, int top);
   int paths() const { return HypoPath::g_count; }
 
+  const bytestype &best_hypo_string(bool print_all, bool output_time);
+
   // Options
-  void set_forced_end(bool forced_end) 
-  { m_expander.set_forced_end(forced_end); }
+  void set_forced_end(bool forced_end) { m_expander.set_forced_end(forced_end); }
   void set_hypo_limit(int hypo_limit) { m_search.set_hypo_limit(hypo_limit); } 
 
   /// \brief Sets how many words in the word histories of two hypotheses have to
@@ -251,29 +264,22 @@ public:
   /// \exception invalid_argument If \a word is non-empty, but not in
   /// vocabulary.
   ///
-  void set_word_boundary(const std::string &word)
-  { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_word_boundary = word; }
+  void set_word_boundary(const std::string &word) { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_word_boundary = word; }
 
-  void set_sentence_boundary(const std::string &start, const std::string &end)
-  { m_tp_search.set_sentence_boundary(start, end); }
+  void set_sentence_boundary(const std::string &start, const std::string &end) { m_tp_search.set_sentence_boundary(start, end); }
 
-  void clear_hesitation_words()
-  { m_tp_search.clear_hesitation_words(); }
+  void clear_hesitation_words() { m_tp_search.clear_hesitation_words(); }
 
-  void add_hesitation_word(const std::string & word)
-  { m_tp_search.add_hesitation_word(word); }
+  void add_hesitation_word(const std::string & word) { m_tp_search.add_hesitation_word(word); }
 
-  void set_dummy_word_boundaries(bool value)
-  { m_search.set_dummy_word_boundaries(value); }
+  void set_dummy_word_boundaries(bool value) { m_search.set_dummy_word_boundaries(value); }
+  void set_require_sentence_end(bool s) { m_tp_search.set_require_sentence_end(s); }
 
-  void set_require_sentence_end(bool s)
-  { m_tp_search.set_require_sentence_end(s); }
+  void set_optional_short_silence(bool state) { m_tp_lexicon.set_optional_short_silence(state); }
 
-  void set_optional_short_silence(bool state)
-  { m_tp_lexicon.set_optional_short_silence(state); }
+  void set_remove_pronunciation_id(bool remove) { m_tp_search.set_remove_pronunciation_id(remove); }
 
-  void prune_lm_lookahead_buffers(int min_delta, int max_depth)
-  { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
+  void prune_lm_lookahead_buffers(int min_delta, int max_depth) { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
 
   /// \brief If set to true, generates a word graph of the hypotheses during
   /// decoding (requires memory).
@@ -351,14 +357,16 @@ private:
 
   std::string m_word_boundary;
 
-  std::vector<TreeGram*> m_ngrams;
+  std::vector<NGram*> m_ngrams;
   fsalm::LM *m_fsa_lm;
   std::deque<int> m_history;
-  TreeGram *m_lookahead_ngram;
+  NGram *m_lookahead_ngram;
 
   Expander m_expander;
 
   Search m_search;
+
+  LMHistory *m_last_guaranteed_history;
 };
 
 #endif /* TOOLBOX_HH */

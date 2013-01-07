@@ -13,7 +13,7 @@ template <typename KT> class ClusterMap;
 class NGram : public Vocabulary {
 public:
   typedef std::deque<int> Gram; //Compability with old treegram
-  enum Type { BACKOFF=0, INTERPOLATED=1 };
+  enum Type { BACKOFF=0, INTERPOLATED=1, HTK_LATTICE_GRAMMAR=2 };
 
   NGram(): m_last_order(0), m_order(0), m_type(BACKOFF) {}
   virtual ~NGram() {};
@@ -24,11 +24,29 @@ public:
   Type get_type() { return(m_type); }
   virtual void read(FILE *in, bool binary=false)=0;
   virtual void write(FILE *out, bool binary=false)=0;
-
-  inline float log_prob(std::vector<int> &gram) {
+  virtual void fetch_bigram_list(int prev_word_id,
+                                 std::vector<float> &result_buffer)=0;
+  virtual void fetch_trigram_list(int w1, int w2,
+                                  std::vector<float> &result_buffer)=0;
+  inline float log_prob(const std::vector<int> &gram) {
     assert(gram.size() > 0);
     switch (m_type) {
     case BACKOFF:
+    case HTK_LATTICE_GRAMMAR:
+    return(log_prob_bo(gram));
+    case INTERPOLATED:
+      return(log_prob_i(gram));
+    default:
+      assert(false);
+    }
+    return(0);
+  }
+
+  inline float log_prob(const Gram &gram) {
+    assert(gram.size() > 0);
+    switch (m_type) {
+    case BACKOFF:
+    case HTK_LATTICE_GRAMMAR:
       return(log_prob_bo(gram));
     case INTERPOLATED:
       return(log_prob_i(gram));
@@ -38,23 +56,11 @@ public:
     return(0);
   }
 
-  inline float log_prob(Gram &gram) {
+  inline float log_prob(const std::vector<unsigned short> &gram) {
     assert(gram.size() > 0);
     switch (m_type) {
     case BACKOFF:
-      return(log_prob_bo(gram));
-    case INTERPOLATED:
-      return(log_prob_i(gram));
-    default:
-      assert(false);
-    }
-    return(0);
-  }
-
-  inline float log_prob(std::vector<unsigned short> &gram) {
-    assert(gram.size() > 0);
-    switch (m_type) {
-    case BACKOFF:
+    case HTK_LATTICE_GRAMMAR:
       return(log_prob_bo(gram));
     case INTERPOLATED:
       return(log_prob_i(gram));
@@ -75,7 +81,6 @@ public:
 
 protected:
   int m_last_order;
-  std::vector<int> m_counts;
   int m_order;
   Type m_type;
 };
