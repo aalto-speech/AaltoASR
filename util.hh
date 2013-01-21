@@ -126,7 +126,7 @@ namespace util {
     return b + log1p(exp(delta));
   }
 
-  static const double tiny_for_log = (float)1e-50;
+  static const double tiny_for_log = 1e-50;
   inline double safe_log(double x)
   {
     if (x < tiny_for_log)
