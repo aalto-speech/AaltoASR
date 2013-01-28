@@ -11,6 +11,10 @@
 #include "ArpaReader.hh"
 #include "def.hh"
 
+TreeGramArpaReader::TreeGramArpaReader()
+{
+}
+
 void
 TreeGramArpaReader::read(FILE *file, TreeGram *tree_gram, bool add_missing_unigrams)
 {
