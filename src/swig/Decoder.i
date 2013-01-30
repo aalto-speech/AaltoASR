@@ -115,7 +115,7 @@ public:
   int ngram_read(const char *file, const bool binary, const bool quiet);
   int ngram_read(const char *file, const bool binary);
   int ngram_read(const char *file);
-  int htk_lattice_grammar_read(const char *file, bool quiet);
+  void htk_lattice_grammar_read(const char *file, bool quiet);
   void fsa_lm_read(const char *file, bool binary, bool quiet);
   void fsa_lm_read(const char *file, bool binary);
   void read_word_classes(const char *file);

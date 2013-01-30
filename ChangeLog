@@ -1,3 +1,16 @@
+2013-01-30  senarvi  <senarvi@cis.hut.fi>
+
+	* src/swig/Decoder.i: Toolbox::htk_lattice_grammar_read() doesn't return a
+	value.
+	* src/test_class.cc (test_search): Fixed Toolbox::ngram_read() call. 
+	* src/test_token_pass.cc (main): Replaced the models and LNA files with
+	something that exists currently. Toolbox::set_word_boundary() call before
+	reading lexicon and language model.
+	* src/Toolbox.cc (Toolbox): Check that set_word_boundary() is not called
+	after reading language model or lexicon.
+	* src/Toolbox.hh (Toolbox): Check that set_word_boundary() is not called
+	after reading language model or lexicon.
+
 2012-11-01  senarvi  <senarvi@cis.hut.fi>
 
 	* src/TokenPassSearch.cc (TokenPassSearch::create_word_repository): Ignore

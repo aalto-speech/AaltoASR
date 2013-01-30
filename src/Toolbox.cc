@@ -25,6 +25,7 @@ Toolbox::Toolbox()
     m_vocabulary(m_lexicon_reader.vocabulary()),
     m_tp_lexicon(m_hmm_map, m_hmms),
     m_tp_lexicon_reader(m_hmm_map, m_hmms, m_tp_lexicon, m_tp_vocabulary),
+    m_lexicon_read(false),
     m_tp_search(m_tp_lexicon, m_tp_vocabulary, &m_lna_reader),
 
     m_acoustics(NULL),
@@ -135,6 +136,7 @@ Toolbox::lex_read(const char *filename)
     m_tp_search.set_word_boundary(m_word_boundary);
   }
   fclose(file);
+  m_lexicon_read = true;
 }
 
 const std::string & Toolbox::lex_word() const
@@ -415,16 +417,14 @@ const bytestype& Toolbox::best_hypo_string(bool print_all, bool output_time) {
 
 void Toolbox::set_word_boundary(const std::string & word)
 {
-  cout << "Called Toolbox::set_word_boundary" << endl;
   if (m_use_stack_decoder) {
     m_search.set_word_boundary(word);
   }
   else {
-    cout << "set_word_boundary m_ngrams.size=" << m_ngrams.size() << endl;
     // set_word_boundary() has no effect after the language model has been read.
     // Calling them in wrong order will result in confusing errors later.
-    if (m_ngrams.size() > 0) {
-      cerr << "set_word_boundary() has to be called before reading language model." << endl;
+    if ((m_ngrams.size() > 0) || m_lexicon_read) {
+      cerr << "set_word_boundary() has to be called before reading language model or lexicon." << endl;
       exit(-1);
     }
     m_word_boundary = word;

@@ -8,7 +8,7 @@ include Makefile.common
 
 progs = arpa2bin bin2arpa
 
-tests = test_class
+tests = test_class test_token_pass
 
 libdecoder_srcs = Expander.cc \
 	GramSorter.cc \

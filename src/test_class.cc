@@ -29,7 +29,7 @@ void test_search()
 			"/share/puhe/funesomo12/models/icsifsh-pPMWF-stg120k_13.7.2012_25.ph");
 	t.lex_read("/share/puhe/funesomo12/dictionaries/cmu-cmups.lex");
 	t.read_word_classes("/share/puhe/funesomo12/models/myicsifshswb.classes");
-	t.ngram_read("/share/puhe/funesomo12/models/myicsifshswb-c.4bo.bin", 1);
+	t.ngram_read("/share/puhe/funesomo12/models/myicsifshswb-c.4bo.bin", true);
 
 	t.set_global_beam(300);
 	t.set_word_end_beam(2*300/3);
@@ -48,7 +48,7 @@ void test_search()
 	assert(t.tp_search().get_word_classes() != NULL);
 	const WordClasses & classes = *t.tp_search().get_word_classes();
 	assert(t.tp_search().get_ngram() != NULL);
-	const TreeGram & lm = *t.tp_search().get_ngram();
+	const NGram & lm = *t.tp_search().get_ngram();
 
 	int costa_id = voc.word_index("costa");
 	LMHistory::Word costa_word;
@@ -62,7 +62,7 @@ void test_search()
 	assert(costa_word.lm_id() == costa_lm_id);
 #ifdef ENABLE_MULTIWORD_SUPPORT
 	assert(costa_word.num_components() == 1);
-	assert(costa_word.component_lm_id(0) == costa_lm_id);
+	assert(costa_word.component(0).lm_id == costa_lm_id);
 #endif
 
 	int rica_id = voc.word_index("rica");
@@ -75,7 +75,7 @@ void test_search()
 	assert(rica_word.lm_id() == rica_lm_id);
 #ifdef ENABLE_MULTIWORD_SUPPORT
 	assert(rica_word.num_components() == 1);
-	assert(rica_word.component_lm_id(0) == rica_lm_id);
+	assert(rica_word.component(0).lm_id == rica_lm_id);
 #endif
 
 	int costa_rica_id = voc.word_index("costa_rica");
@@ -86,8 +86,8 @@ void test_search()
 	assert(costa_rica_word.lm_id() == -1);
 #ifdef ENABLE_MULTIWORD_SUPPORT
 	assert(costa_rica_word.num_components() == 2);
-	assert(costa_rica_word.component_lm_id(0) == costa_lm_id);
-	assert(costa_rica_word.component_lm_id(1) == rica_lm_id);
+	assert(costa_rica_word.component(0).lm_id == costa_lm_id);
+	assert(costa_rica_word.component(1).lm_id == rica_lm_id);
 #endif
 
 	t.lna_open(

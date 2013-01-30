@@ -348,6 +348,7 @@ private:
 
   TPLexPrefixTree m_tp_lexicon;
   TPNowayLexReader m_tp_lexicon_reader;
+  bool m_lexicon_read;
   Vocabulary m_tp_vocabulary;
   TokenPassSearch m_tp_search;
   
