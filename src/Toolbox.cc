@@ -200,7 +200,7 @@ Toolbox::ngram_read(const char *file, const bool binary, bool quiet)
   return m_ngrams.back()->order();
 }
 
-int
+void
 Toolbox::htk_lattice_grammar_read(const char *file, bool quiet)
 {
   io::Stream in(file,"r");
@@ -411,4 +411,22 @@ const bytestype& Toolbox::best_hypo_string(bool print_all, bool output_time) {
   //if (output_time) 
   //  retval = retval + str::fmt(256, "%d", frame());
   return retval;
+}
+
+void Toolbox::set_word_boundary(const std::string & word)
+{
+  cout << "Called Toolbox::set_word_boundary" << endl;
+  if (m_use_stack_decoder) {
+    m_search.set_word_boundary(word);
+  }
+  else {
+    cout << "set_word_boundary m_ngrams.size=" << m_ngrams.size() << endl;
+    // set_word_boundary() has no effect after the language model has been read.
+    // Calling them in wrong order will result in confusing errors later.
+    if (m_ngrams.size() > 0) {
+      cerr << "set_word_boundary() has to be called before reading language model." << endl;
+      exit(-1);
+    }
+    m_word_boundary = word;
+  }
 }

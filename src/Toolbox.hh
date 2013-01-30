@@ -74,7 +74,7 @@ public:
   int ngram_read(const char *file, bool binary=true, bool quiet=false);
 
   /// \brief Reads a language model in HTK lattice format
-  int htk_lattice_grammar_read(const char *file, bool quiet);
+  void htk_lattice_grammar_read(const char *file, bool quiet);
 
   /// \brief Reads a lookahead n-gram language model.
   ///
@@ -264,7 +264,7 @@ public:
   /// \exception invalid_argument If \a word is non-empty, but not in
   /// vocabulary.
   ///
-  void set_word_boundary(const std::string &word) { if (m_use_stack_decoder) m_search.set_word_boundary(word); else m_word_boundary = word; }
+  void set_word_boundary(const std::string &word);
 
   void set_sentence_boundary(const std::string &start, const std::string &end) { m_tp_search.set_sentence_boundary(start, end); }
 
