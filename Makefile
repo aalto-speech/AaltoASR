@@ -8,10 +8,11 @@ endif
 #############################
 # Triton cluster
 ifeq ($(shell hostname),triton.aalto.fi)
-CXX = g++44
+CXX = g++
 OPT = -O3 -march=native
-INCLUDES = -I/wrk/htkallas/support/include -I/wrk/htkallas/support/include/lapackpp -I/opt/fftw-3.2.2-gcc44-mpi/include
-LDFLAGS = -L/wrk/htkallas/support/lib -L/share/apps/lib
+INCLUDES = -I/triton/ics/project/puhe/lapackpp/include
+LDFLAGS = -L/triton/ics/project/puhe/lapackpp/src/.libs -L/share/apps/lib
+LDFLAGS += -lgfortran -lm
 WARNINGS = -Wall -Wno-deprecated
 DEPFLAG = -MM
 else
