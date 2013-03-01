@@ -1,5 +1,6 @@
 #include <cstddef>  // NULL
-#include <stdio.h>
+#include <cstdio>
+#include <cmath>
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
@@ -29,7 +30,6 @@ int safe_toupper(int c)
     return 'Ö';
   return toupper(c);
 }
-
 
 TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
                                  std::vector<Hmm> &hmms)
@@ -91,15 +91,11 @@ void TPLexPrefixTree::initialize_lex_tree(void)
     create_cross_word_network();
 }
 
-void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
+void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id, double prob)
 {
-  int i, j, k;
   node_vector hmm_state_nodes;
-  node_vector source_nodes, sink_nodes;
   std::vector<float> source_trans_log_probs;
   std::vector<float> sink_trans_log_probs;
-  int word_end;
-  Arc end_arc;
   bool silence = false;
 
   // NOTE! HMM states are indexed with respect to their mixture model.
@@ -125,48 +121,84 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
   if (hmm_list.size() == 1 && hmm_list[0]->label == "__")
     silence = true;
 
+  bool link_to_cross_word_network = false;
+
+  double word_log_prob = log10(prob);
+
+  node_vector source_nodes, sink_nodes;
   source_nodes.push_back(m_root_node);
   source_trans_log_probs.push_back(0);
-  word_end = -1;
-  for (i = 0; i < hmm_list.size(); i++)
+  int word_end = -1;
+  for (int i = 0; i < hmm_list.size(); i++)
   {
     assert( source_nodes.size() > 0 );
 
-    if (i == hmm_list.size() - 1) // Last node
+    if (i == hmm_list.size() - 1)
     {
+      // At the last triphone. If doing cross word modeling, link the second
+      // last triphone to the cross word network and skip the last triphone.
+
       // Added a check that the last phone is a triphone (label is five characters).
       //   2012-05-07 / SE
-      if (m_cross_word_triphones && !silence && (hmm_list[i]->label.size() == 5)) {
-        // Link to cross word network.
-        // First, add a null node with the word ID.
+      link_to_cross_word_network =
+          m_cross_word_triphones && !silence && (hmm_list[i]->label.size() == 5);
+
+      if (link_to_cross_word_network) {
+        // First, add a dummy node with a word identity. This is where the word
+        // is inserted into word history in decoding.
         Node *wid_node = new Node(word_id);
-        Arc temp_arc;
-        std::vector<Arc> new_arcs;
         wid_node->node_id = m_nodes.size();
         wid_node->flags = NODE_USE_WORD_END_BEAM;
         if (i == 0)
           wid_node->flags |= NODE_FIRST_STATE_OF_WORD;
         m_nodes.push_back(wid_node);
+        Arc temp_arc;
         temp_arc.next = wid_node;
-        if (i == 0)
+
+        // FIXME: Can be removed?
+        if (i == 0) {
+          unsigned short flags_before = wid_node->flags;
           wid_node->flags |= NODE_FIRST_STATE_OF_WORD;
-        for (j = 0; j < source_nodes.size(); j++) {
-          temp_arc.log_prob = source_trans_log_probs[j];
-          source_nodes[j]->arcs.push_back(temp_arc);
+          assert(wid_node->flags == flags_before);
         }
 
-        // Link null node to cross word network
+        for (int source_id = 0; source_id < source_nodes.size(); ++source_id) {
+          // Transition from to the dummy node that links to cross word network.
+          temp_arc.log_prob = source_trans_log_probs[source_id];
+
+          // Added pronunciation log prob.
+          //   2013-02-28 / SE
+          temp_arc.log_prob += word_log_prob;
+
+          source_nodes[source_id]->arcs.push_back(temp_arc);
+        }
+
+        // Link the dummy node to cross word network. The fan entry nodes are
+        // organized so that triphones belonging to the same phoneme and the
+        // having the smae left context are grouped together and are allowed to
+        // share their common states. The dummy node is linked to every entry
+        // node of the corresponding group.
         std::string temp1(hmm_list[i]->label, 0, 1);
         std::string temp2(hmm_list[i]->label, 2, 1);
         std::string key = temp1 + temp2;
+        std::vector<Arc> new_arcs;
         link_node_to_fan_network(key, new_arcs, true, false, 0);
-        for (j = 0; j < new_arcs.size(); j++)
+        for (int j = 0; j < new_arcs.size(); j++)
           wid_node->arcs.push_back(new_arcs[j]);
+
+        // Single phoneme words must be handled separately. The only node linked
+        // to the root node is the dummy node with the word identity. This is
+        // linked to the fan-out triphones above. However, for single phoneme
+        // words also another implementation of the word has to be added inside
+        // the cross-word network. This is done by adding a dummy node with the
+        // word identity after every fan-in triphone whose central phoneme
+        // corresponds to the given word. This dummy node is then linked back to
+        // the fan-in triphones, determined by the right context of the
+        // originating fan-in triphone.
         if (i == 0) {
-          // If word has only one HMM, make another instance of the word
-          // inside the cross word network.
           add_single_hmm_word_for_cross_word_modeling(hmm_list[0],
-                                                      word_id);
+                                                      word_id,
+                                                      prob);
         }
         // Added a check that the first phone is a triphone (label is five characters).
         //   2012-05-07 / SE
@@ -183,49 +215,56 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
         word_end = word_id;
     }
 
-    // Set up a table for storing the nodes corresponding to the HMM states
+    // Set up a table for storing the nodes corresponding to the HMM states.
     hmm_state_nodes.clear();
     hmm_state_nodes.insert(hmm_state_nodes.end(),
                            hmm_list[i]->states.size() - 2, NULL);
     sink_nodes.clear();
     sink_trans_log_probs.clear();
 
-    // Expand previous sink nodes with new source transitions
-    for (j = 0; j < source_nodes.size(); j++) // Iterate previous sink nodes
+    // Expand previous sink nodes with new source transitions.
+    for (int source_id = 0; source_id < source_nodes.size(); ++source_id)
     {
-      for (k = 0; k < hmm_list[i]->state(0).transitions.size(); k++) {
-        expand_lexical_tree(source_nodes[j], hmm_list[i],
-                            hmm_list[i]->state(0).transitions[k],
-                            source_trans_log_probs[j],
+      HmmState & state = hmm_list[i]->state(0);
+      for (int trans_id = 0; trans_id < state.transitions.size(); ++trans_id) {
+        expand_lexical_tree(source_nodes[source_id], hmm_list[i],
+                            state.transitions[trans_id],
+                            source_trans_log_probs[source_id],
                             word_end,
                             hmm_state_nodes,
                             sink_nodes, sink_trans_log_probs, 0);
       }
     }
 
-    // Added a check that the first phone is a triphone (label is five characters).
-    //   2012-05-07 / SE
-    if (m_cross_word_triphones && (i == 1) && (hmm_list.size() > 2) && (hmm_list[0]->label.size() == 5)) {
-      // Mark the state for linking cross word network back to the
-      // lexical tree.
-      add_fan_in_connection_node(hmm_state_nodes[0], hmm_list[0]->label);
+    if (i == 0) {
+      if (silence) {
+        m_silence_node = hmm_state_nodes[0];
+        m_silence_node->flags |= NODE_SILENCE_FIRST;
+        if (m_silence_is_word)
+          m_silence_node->flags |= NODE_FIRST_STATE_OF_WORD;
+      }
+      else {
+        hmm_state_nodes[0]->flags |= NODE_FIRST_STATE_OF_WORD;
+      }
     }
-    if (silence && i == 0)
-    {
-      m_silence_node = hmm_state_nodes[0];
-      m_silence_node->flags |= NODE_SILENCE_FIRST;
-      if (m_silence_is_word)
-        m_silence_node->flags |= NODE_FIRST_STATE_OF_WORD;
+    else if (i == 1) {
+      // Mark the state for linking cross word network back to the lexical tree.
+      // The cross word network is linked to the second triphones of the words.
+
+      // Added a check that the first phone is a triphone (label is five characters).
+      //   2012-05-07 / SE
+      if (m_cross_word_triphones && (hmm_list.size() > 2) && (hmm_list[0]->label.size() == 5)) {
+        add_fan_in_connection_node(hmm_state_nodes[0], hmm_list[0]->label);
+      }
     }
-    else if (i == 0)
-      hmm_state_nodes[0]->flags |= NODE_FIRST_STATE_OF_WORD;
 
     // Expand other states, from left to right
-    for (j = 2; j < hmm_list[i]->states.size(); j++) {
-      assert( hmm_state_nodes[j-2] != NULL );
-      for (k = 0; k < hmm_list[i]->state(j).transitions.size(); k++) {
-        expand_lexical_tree(hmm_state_nodes[j - 2], hmm_list[i],
-                            hmm_list[i]->state(j).transitions[k],
+    for (int state_id = 2; state_id < hmm_list[i]->states.size(); ++state_id) {
+      assert( hmm_state_nodes[state_id-2] != NULL );
+      HmmState & state = hmm_list[i]->state(state_id);
+      for (int trans_id = 0; trans_id < state.transitions.size(); ++trans_id) {
+        expand_lexical_tree(hmm_state_nodes[state_id - 2], hmm_list[i],
+                            state.transitions[trans_id],
                             0, word_end,
                             hmm_state_nodes,
                             sink_nodes, sink_trans_log_probs, 0);
@@ -235,14 +274,22 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id)
     source_trans_log_probs = sink_trans_log_probs;
   }
 
-  // Mark end of the word node (sink state), add to the word end list
+  // Special case for words that were not linked to the cross word network:
+  // Mark the end of the word node (sink state), add to the word end list,
   // and link to the end node.
-  if (!m_cross_word_triphones || silence)
+  if (!link_to_cross_word_network)
   {
     assert( source_nodes.size() == 1 ); // The sink state
+
+    Arc end_arc;
     end_arc.next = (silence && m_cross_word_triphones ? m_root_node
                     : m_end_node);
     end_arc.log_prob = get_out_transition_log_prob(source_nodes.front());
+
+    // Added pronunciation log prob.
+    //   2013-02-28 / SE
+    end_arc.log_prob += word_log_prob;
+
     source_nodes.front()->arcs.push_back(end_arc);
     if (silence)
     {
@@ -271,7 +318,7 @@ TPLexPrefixTree::expand_lexical_tree(Node *source, Hmm *hmm,
 {
   int i;
 
-  // Check if we are going to sink state
+  // Check if we are going to a sink state.
   if (hmm->is_sink(t.target))
   {
     if (word_end == -1)
@@ -302,15 +349,16 @@ TPLexPrefixTree::expand_lexical_tree(Node *source, Hmm *hmm,
   // Find out if the node is already linked
   for (i = 0; i < source->arcs.size(); i++)
   {
-    if (source->arcs[i].next->state != NULL &&
-        source->arcs[i].next->state->model == hmm->state(t.target).model)
+    Node & target = *source->arcs[i].next;
+    if (target.state != NULL &&
+        target.state->model == hmm->state(t.target).model)
     {
       // Already linked to something, check the link is correct
       if (hmm_state_nodes[t.target-2] == NULL ||
-          hmm_state_nodes[t.target-2] == source->arcs[i].next)
+          hmm_state_nodes[t.target-2] == &target)
       {
         // Link ok, assume the transition is OK so nothing to be done
-        hmm_state_nodes[t.target - 2] = source->arcs[i].next;
+        hmm_state_nodes[t.target - 2] = &target;
         return;
       }
     }
@@ -677,7 +725,7 @@ void TPLexPrefixTree::create_cross_word_network()
   it = m_hmm_map.begin();
   while (it != m_hmm_map.end())
   {
-    if ((*it).first.size() == 5) // a-b+c
+    if ((*it).first.size() == 5) // b-c+e
     {
       std::string b((*it).first, 0, 1);
       std::string e((*it).first, 4, 1);
@@ -688,21 +736,14 @@ void TPLexPrefixTree::create_cross_word_network()
   }
 }
 
-// FIXME: Only works with strict left to right HMMs with one source and
-// sink state.
 void TPLexPrefixTree::add_hmm_to_fan_network(int hmm_id, bool fan_out)
 {
-  Hmm *hmm = &m_hmms[hmm_id];
-  Node *last_node;
-  int j, k;
   node_vector hmm_state_nodes;
-  node_vector sink_nodes;
-  std::vector<float> sink_trans_log_probs;
-  unsigned short flags;
-
+  Hmm *hmm = &m_hmms[hmm_id];
   hmm_state_nodes.insert(hmm_state_nodes.end(), hmm->states.size() - 2, NULL);
+  unsigned short flags;
   if (fan_out)
-{
+  {
     flags = NODE_FAN_OUT | NODE_AFTER_WORD_ID | NODE_USE_WORD_END_BEAM;
     hmm_state_nodes[0] = get_fan_out_entry_node(&hmm->state(2), hmm->label);
     hmm_state_nodes[0]->flags |= NODE_FAN_OUT_FIRST;
@@ -720,20 +761,22 @@ void TPLexPrefixTree::add_hmm_to_fan_network(int hmm_id, bool fan_out)
   }
 
   // Expand the nodes
-  for (j = 2; j < hmm->states.size(); j++)
+  node_vector sink_nodes;
+  std::vector<float> sink_trans_log_probs;
+  for (int j = 2; j < hmm->states.size(); j++)
   {
     assert( hmm_state_nodes[j-2] != NULL );
-    for (k = 0; k < hmm->state(j).transitions.size(); k++) {
+    for (int k = 0; k < hmm->state(j).transitions.size(); k++) {
       expand_lexical_tree(hmm_state_nodes[j - 2], hmm,
                           hmm->state(j).transitions[k], 0, -1, hmm_state_nodes,
                           sink_nodes, sink_trans_log_probs, flags);
     }
   }
   assert(sink_nodes.size() == 1);
-  last_node = sink_nodes.front();
+  Node * last_node = sink_nodes.front();
   assert( last_node == hmm_state_nodes[hmm->states.size()-3] );
-  if (!m_optional_short_silence && ((m_lm_lookahead && fan_out)
-                                    || (!m_lm_lookahead && !fan_out)))
+  if (!m_optional_short_silence &&
+      ((m_lm_lookahead && fan_out) || (!m_lm_lookahead && !fan_out)))
     last_node->flags |= NODE_INSERT_WORD_BOUNDARY;
 }
 
@@ -863,7 +906,7 @@ TPLexPrefixTree::link_node_to_fan_network(const std::string &key,
 
 void
 TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
-  Hmm *hmm, int word_id)
+  Hmm *hmm, int word_id, double prob)
 {
   // Create another instance of a null node after the fan_in network and
   // link it back to fan in.
@@ -892,10 +935,15 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
       m_nodes.push_back(wid_node);
       temp_arc.next = wid_node;
       const node_vector & nlist = it->second;
+
+      // Pronunciation log prob added to all out transition log probs.
+      //   2013-02-28 / SE
+      double word_log_prob = log10(prob);
       for (i = 0; i < nlist.size(); i++) {
-        temp_arc.log_prob = get_out_transition_log_prob(nlist[i]);
+        temp_arc.log_prob = get_out_transition_log_prob(nlist[i]) + word_log_prob;
         nlist[i]->arcs.push_back(temp_arc);
       }
+
       if (right == "_")
       {
         temp_arc.next = NULL;

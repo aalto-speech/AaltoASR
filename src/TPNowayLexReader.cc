@@ -1,7 +1,6 @@
 #include <cstdio>
-
-#include <assert.h>
-#include <math.h>
+#include <cassert>
+#include <cmath>
 
 #include "TPNowayLexReader.hh"
 
@@ -97,15 +96,17 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
     }
 
     // Parse possible probability
-    int left = m_word.rfind('(');
-    int right = m_word.rfind(')');
-    float prob = 1;
-    if (left != -1 || right != -1) {
-      if (left == -1 || right == -1)
+    string::size_type left = m_word.rfind('(');
+    string::size_type right = m_word.rfind(')');
+    double prob = 1;
+    if (left != string::npos || right != string::npos) {
+      if (left == string::npos || right == string::npos)
         throw InvalidProbability();
-      string tmp = m_word.substr(left + 1, right - left - 1);
+      string::size_type prob_begin = left + 1;
+      string::size_type prob_end = right;
+      string prob_str = m_word.substr(prob_begin, prob_end - prob_begin);
       char *end_ptr;
-      prob = strtod(tmp.c_str(), &end_ptr);
+      prob = strtod(prob_str.c_str(), &end_ptr);
       if (*end_ptr != '\0')
         throw InvalidProbability();
       m_word.resize(left);
@@ -148,7 +149,7 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
 
     // Add word to lexicon
 
-    // FIXME! Deal with duplicate word ends? Pronunciation probabilities?
+    // FIXME! Deal with duplicate word ends?
     if (m_word != "_" && (m_word[0] != '_' || m_silence_is_word))
     {
       word_id = m_vocabulary.add_word(m_word);
@@ -161,7 +162,7 @@ TPNowayLexReader::read(FILE *file, const std::string &word_boundary)
       word_id = 0;
 
     if (hmm_list.size() > 0)
-      m_lexicon.add_word(hmm_list, word_id);
+      m_lexicon.add_word(hmm_list, word_id, prob);
   }
   m_lexicon.finish_tree();
 }

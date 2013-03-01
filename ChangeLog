@@ -1,3 +1,12 @@
+2013-02-28  senarvi  <senarvi@cis.hut.fi>
+
+	* src/TPLexPrefixTree.cc (TPLexPrefixTree::add_word): Supports pronunciation
+	probabilities.
+	(TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling): Supports
+	pronunciation probabilities.
+	* src/TPNowayLexReader.cc (TPNowayLexReader::read): Handles pronunciation
+	probabilities. 
+
 2013-01-30  senarvi  <senarvi@cis.hut.fi>
 
 	* src/swig/Decoder.i: Toolbox::htk_lattice_grammar_read() doesn't return a

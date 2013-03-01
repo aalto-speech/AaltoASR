@@ -42,10 +42,31 @@
 #define NODE_SILENCE_FIRST        0x0200
 #define NODE_FIRST_STATE_OF_WORD  0x0400
 #define NODE_FINAL                0x0800
-#define NODE_DEBUG_PRUNED	  0x4000
-#define NODE_DEBUG_PRINTED	  0x8000
+#define NODE_DEBUG_PRUNED         0x4000
+#define NODE_DEBUG_PRINTED        0x8000
 
 
+/// The search network is built around a popular idea of a lexical prefix tree.
+/// As suggested by Demuynck et al. (2000), the traditional phone-level tree can
+/// be made even more efficient by utilizing the HMM level state tying, which
+/// has been implemented here. Cross-word triphone contexts are handled by
+/// building a separate network, to which the lexical prefix tree is linked.
+///
+/// The search network is built of nodes (TPLexPrefixTree::Node), which are
+/// linked to each other with arcs (TPLexPrefixTree::Arc). Nodes can either
+/// correspond to one HMM state, or be dummy nodes without any acoustic
+/// probabilities associated with them. In decoding, these dummy nodes are
+/// passed immediately, they merely mediate the tokens (TPLexPrefixTree::Token)
+/// used to represent the active search network. A node can also have a word
+/// identity (word_id) associated with it, which leads to insertion of the word
+/// into the word history of the token passing that node.
+///
+/// Every triphone is defined in the acoustic models, and they are not tied at
+/// the triphone level. Instead, each triphone has a set of HMM states
+/// (currently three states in a left-to-right topology), and these states are
+/// shared among all triphones. The state tying has been performed using a
+/// decision tree.
+///
 class TPLexPrefixTree {
 public:
   class Node;
@@ -120,7 +141,7 @@ public:
     inline Node() : word_id(-1), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
     inline Node(int wid) : word_id(wid), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
     inline Node(int wid, HmmState *s) : word_id(wid), state(s), token_list(NULL), flags(NODE_NORMAL) { }
-    int word_id; // -1 if none
+    int word_id; // -1 for nodes without word identity.
     int node_id;
     HmmState *state;
     Token *token_list;
@@ -174,7 +195,29 @@ public:
   void set_ignore_case(bool b) { m_ignore_case = b; }
 
   void initialize_lex_tree(void);
-  void add_word(std::vector<Hmm*> &hmm_list, int word_id);
+
+  /// \brief Adds a word to the lexical prefix tree.
+  ///
+  /// The tree is constructed by adding words to the tree one at a time.
+  /// Currently the construction procedure assumes triphone models.
+  ///
+  /// The construction algorithm starts from the (dummy) root node, and find the
+  /// path in the tree which is common to the given state sequence. When a node
+  /// is reached from which the path can not be continued, the rest of the
+  /// states are inserted as tree nodes starting from the last common node.
+  ///
+  /// For the first phoneme of a word, the left context is silence, so in
+  /// decoding the root node is accessed only after silence. Other contexts are
+  /// handled by fan-in triphones, which are linked to the second phonemes of
+  /// the words.
+  ///
+  /// The states are added up to the second last phoneme of the word. From
+  /// there an arc is made to a dummy node containing the word identity of the
+  /// new word. This node is then linked to proper fan-out triphones, which are
+  /// created on demand.
+  ///
+  void add_word(std::vector<Hmm*> &hmm_list, int word_id, double prob);
+
   void finish_tree(void);
   
   void prune_lookahead_buffers(int min_delta, int max_depth);
@@ -193,6 +236,8 @@ public:
   
   
 private:
+  /// \brief Creates a transition from source node, if it doesn't exist already.
+  ///
   void expand_lexical_tree(Node *source, Hmm *hmm, HmmTransition &t,
                            float cur_trans_log_prob,
                            int word_end,
@@ -200,6 +245,7 @@ private:
                            node_vector &sink_nodes,
                            std::vector<float> &sink_trans_log_probs,
                            unsigned short flags);
+
   void post_process_lex_branch(Node *node, std::vector<int> *lm_la_list);
   bool post_process_fan_triphone(Node *node, std::vector<int> *lm_la_list,
                                  bool fan_in);
@@ -211,19 +257,35 @@ private:
 
   /// \brief Creates fan in HMMs
   ///
+  /// The construction of the search network starts by creating the fan-in
+  /// triphones. This means that the HMM state sequences of every triphone are
+  /// inserted into the search network.
+  ///
   /// Assumes triphone models. Labels must be of form a-b+c.
   ///
   void create_cross_word_network(void);
 
+  /// \brief Adds the HMM state sequences of a triphone into the search network.
+  ///
+  /// The triphones are organized by their central phoneme and the left context,
+  /// so that if these are equal, the fan-in triphones are allowed to share
+  /// their first nodes. The last nodes, however, are grouped differently, now
+  /// according to the central phoneme and the right context. This way the
+  /// number of arcs are minimized when linking other nodes to or from the
+  /// fan-in triphones.
+  ///
+  /// Only works with strict left to right HMMs with one source and sink state.
+  ///
   void add_hmm_to_fan_network(int hmm_id,
                               bool fan_out);
+
   void link_fan_out_node_to_fan_in(Node *node, const std::string &key);
   void link_node_to_fan_network(const std::string &key,
                                 std::vector<Arc> &source_arcs,
                                 bool fan_out,
                                 bool ignore_length,
                                 float out_transition_log_prob);
-  void add_single_hmm_word_for_cross_word_modeling(Hmm *hmm, int word_id);
+  void add_single_hmm_word_for_cross_word_modeling(Hmm *hmm, int word_id, double prob);
   void link_fan_in_nodes(void);
   void create_lex_tree_links_from_fan_in(Node *fan_in_node,
                                          const std::string &key);

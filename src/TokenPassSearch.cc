@@ -888,8 +888,9 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
     // Moving to another node
     if (!(updated_token.node->flags & NODE_AFTER_WORD_ID)) {
 
+      // If the node has a word identity, add the word into the word history of
+      // the token.
       int word_id = updated_token.node->word_id;
-      // Is word ID unique?
       if (word_id != -1) {
         const LMHistory::Word & word = m_word_repository[word_id];
 
