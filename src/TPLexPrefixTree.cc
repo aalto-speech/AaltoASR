@@ -31,6 +31,14 @@ int safe_toupper(int c)
   return toupper(c);
 }
 
+inline double safe_log(double x)
+{
+  if (x < 1e-99)
+    return -99;
+  else
+    return log10(x);
+}
+
 TPLexPrefixTree::TPLexPrefixTree(std::map<std::string,int> &hmm_map,
                                  std::vector<Hmm> &hmms)
   : m_words(0),
@@ -73,6 +81,15 @@ void TPLexPrefixTree::set_lm_lookahead(int lm_lookahead)
   m_lm_lookahead = lm_lookahead;
 }
 
+void TPLexPrefixTree::set_lm_scale(double lm_scale)
+{
+  if (m_words > 0) {
+    cerr << "WARNING: TPLexPrefixTree::set_lm_scale() called after reading words." << endl;
+    cerr << "WARNING: LM scale will not be apply to already read pronunciations." << endl;
+  }
+  m_lm_scale = lm_scale;
+}
+
 void TPLexPrefixTree::initialize_lex_tree(void)
 {
   m_words = 0;
@@ -93,6 +110,11 @@ void TPLexPrefixTree::initialize_lex_tree(void)
 
 void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id, double prob)
 {
+  double word_log_prob = safe_log(prob);
+  if (word_log_prob <= -99)
+    return;
+  word_log_prob *= m_lm_scale;
+
   node_vector hmm_state_nodes;
   std::vector<float> source_trans_log_probs;
   std::vector<float> sink_trans_log_probs;
@@ -122,8 +144,6 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id, double 
     silence = true;
 
   bool link_to_cross_word_network = false;
-
-  double word_log_prob = log10(prob);
 
   node_vector source_nodes, sink_nodes;
   source_nodes.push_back(m_root_node);
@@ -908,6 +928,11 @@ void
 TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
   Hmm *hmm, int word_id, double prob)
 {
+  double word_log_prob = safe_log(prob);
+  if (word_log_prob <= -99)
+    return;
+  word_log_prob *= m_lm_scale;
+
   // Create another instance of a null node after the fan_in network and
   // link it back to fan in.
   string_to_nodes_map::const_iterator it;
@@ -938,7 +963,6 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
 
       // Pronunciation log prob added to all out transition log probs.
       //   2013-02-28 / SE
-      double word_log_prob = log10(prob);
       for (i = 0; i < nlist.size(); i++) {
         temp_arc.log_prob = get_out_transition_log_prob(nlist[i]) + word_log_prob;
         nlist[i]->arcs.push_back(temp_arc);

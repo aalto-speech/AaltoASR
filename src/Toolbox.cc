@@ -415,6 +415,13 @@ const bytestype& Toolbox::best_hypo_string(bool print_all, bool output_time) {
   return retval;
 }
 
+void Toolbox::set_lm_scale(float lm_scale)
+{
+  m_search.set_lm_scale(lm_scale);
+  m_tp_search.set_lm_scale(lm_scale);
+  m_tp_lexicon.set_lm_scale(lm_scale);
+}
+
 void Toolbox::set_word_boundary(const std::string & word)
 {
   if (m_use_stack_decoder) {

@@ -190,6 +190,11 @@ public:
   ///
   void set_lm_lookahead(int lm_lookahead);
 
+  /// \brief Sets the language model scale factor, to be used
+  /// for scaling the pronunciation log probabilities.
+  ///
+  void set_lm_scale(double lm_scale);
+
   void set_cross_word_triphones(bool cw_triphones) { m_cross_word_triphones = cw_triphones; }
   void set_silence_is_word(bool b) { m_silence_is_word = b; }
   void set_ignore_case(bool b) { m_ignore_case = b; }
@@ -331,6 +336,7 @@ private:
   int m_verbose;
   int m_lm_lookahead; // 0=None, 1=Only in first subtree nodes,
                       // 2=Full
+  double m_lm_scale;
   bool m_cross_word_triphones;
   int m_lm_buf_count;
 

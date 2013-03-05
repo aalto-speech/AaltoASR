@@ -195,7 +195,14 @@ public:
 
   void set_word_limit(int word_limit) { m_search.set_word_limit(word_limit); }
   void set_word_beam(float word_beam) { m_search.set_word_beam(word_beam); }
-  void set_lm_scale(float lm_scale) { m_search.set_lm_scale(lm_scale); m_tp_search.set_lm_scale(lm_scale); }
+
+  /// \brief Sets a scaling factor for the language model log probabilities.
+  ///
+  /// The same factor is used to scale the pronunciation probabilities in the
+  /// dictionary, so this should be called before lex_read().
+  ///
+  void set_lm_scale(float lm_scale);
+
   void set_lm_offset(float lm_offset) { m_search.set_lm_offset(lm_offset); }
   void set_unk_offset(float unk_offset) { m_search.set_unk_offset(unk_offset); }
   void set_token_limit(int limit) { m_expander.set_token_limit(limit); m_tp_search.set_max_num_tokens(limit); }
