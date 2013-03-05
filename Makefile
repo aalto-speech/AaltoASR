@@ -32,10 +32,12 @@ else
 ifeq ($(ARCH),x86_64)
 CXX = g++
 OPT = -O2
-#INCLUDES = -I../lapackpp/include
-INCLUDES = -I/home/jpylkkon/local/include/lapackpp
-#LDFLAGS = -L../lapackpp/src/.libs
-LDFLAGS = -L/home/jpylkkon/local/lib
+
+# lapackpp project needs to be checked out from the repository to the same
+# directory where aku project is. Do not use the old /home/jpylkkon
+# dependencies, since they're not available in every system.
+INCLUDES = -I../lapackpp/include
+LDFLAGS = -L../lapackpp/src/.libs
 
 ifeq ($(USE_SUBSPACE_COV),1)
 INCLUDES += -I/share/puhe/x86_64/include/hcld/
