@@ -183,7 +183,7 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id, double 
         }
 
         for (int source_id = 0; source_id < source_nodes.size(); ++source_id) {
-          // Transition from to the dummy node that links to cross word network.
+          // Transition to the dummy node that links to cross word network.
           temp_arc.log_prob = source_trans_log_probs[source_id];
 
           // Added pronunciation log prob.
