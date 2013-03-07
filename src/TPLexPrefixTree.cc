@@ -195,7 +195,7 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id, double 
 
         // Link the dummy node to cross word network. The fan entry nodes are
         // organized so that triphones belonging to the same phoneme and the
-        // having the smae left context are grouped together and are allowed to
+        // having the same left context are grouped together and are allowed to
         // share their common states. The dummy node is linked to every entry
         // node of the corresponding group.
         std::string temp1(hmm_list[i]->label, 0, 1);
