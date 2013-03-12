@@ -336,7 +336,7 @@ public:
     { return "Toolbox: open error"; }
   };
 
-  void print_tp_lex_node(int node) { m_tp_lexicon.print_node_info(node); }
+  void print_tp_lex_node(int node) { m_tp_lexicon.print_node_info(node, m_tp_vocabulary); }
   void print_tp_lex_lookahead(int node) {m_tp_lexicon.print_lookahead_info(node, m_tp_vocabulary); }
 
 private:
