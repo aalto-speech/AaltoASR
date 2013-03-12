@@ -175,13 +175,6 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id, double 
         Arc temp_arc;
         temp_arc.next = wid_node;
 
-        // FIXME: Can be removed?
-        if (i == 0) {
-          unsigned short flags_before = wid_node->flags;
-          wid_node->flags |= NODE_FIRST_STATE_OF_WORD;
-          assert(wid_node->flags == flags_before);
-        }
-
         for (int source_id = 0; source_id < source_nodes.size(); ++source_id) {
           // Transition to the dummy node that links to cross word network.
           temp_arc.log_prob = source_trans_log_probs[source_id];
@@ -193,11 +186,12 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id, double 
           source_nodes[source_id]->arcs.push_back(temp_arc);
         }
 
-        // Link the dummy node to cross word network. The fan entry nodes are
-        // organized so that triphones belonging to the same phoneme and the
-        // having the same left context are grouped together and are allowed to
-        // share their common states. The dummy node is linked to every entry
-        // node of the corresponding group.
+        // Link the dummy node to fan-out triphones in the cross word network.
+        // The fan-out triphones are created on demand, and organized so that
+        // triphones belonging to the same phoneme and having the same left
+        // context are grouped together and are allowed to share their common
+        // states. The dummy node is linked to every entry node of the
+        // corresponding group.
         std::string temp1(hmm_list[i]->label, 0, 1);
         std::string temp2(hmm_list[i]->label, 2, 1);
         std::string key = temp1 + temp2;
@@ -210,11 +204,7 @@ void TPLexPrefixTree::add_word(std::vector<Hmm*> &hmm_list, int word_id, double 
         // to the root node is the dummy node with the word identity. This is
         // linked to the fan-out triphones above. However, for single phoneme
         // words also another implementation of the word has to be added inside
-        // the cross-word network. This is done by adding a dummy node with the
-        // word identity after every fan-in triphone whose central phoneme
-        // corresponds to the given word. This dummy node is then linked back to
-        // the fan-in triphones, determined by the right context of the
-        // originating fan-in triphone.
+        // the cross-word network.
         if (i == 0) {
           add_single_hmm_word_for_cross_word_modeling(hmm_list[0],
                                                       word_id,
@@ -745,7 +735,7 @@ void TPLexPrefixTree::create_cross_word_network()
   it = m_hmm_map.begin();
   while (it != m_hmm_map.end())
   {
-    if ((*it).first.size() == 5) // b-c+e
+    if ((*it).first.size() == 5) // b-m+e
     {
       std::string b((*it).first, 0, 1);
       std::string e((*it).first, 4, 1);
@@ -933,8 +923,6 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
     return;
   word_log_prob *= m_lm_scale;
 
-  // Create another instance of a null node after the fan_in network and
-  // link it back to fan in.
   string_to_nodes_map::const_iterator it;
   std::string middle(hmm->label, 2, 1);
   Node *wid_node;
@@ -1001,10 +989,6 @@ TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling(
 
 void TPLexPrefixTree::link_fan_in_nodes(void)
 {
-  // At this point, cross word network is ready and words have been linked
-  // to the fan_out layer. Also single HMM words have been linked back
-  // to the fan_in layer. What is left is to link the last states of
-  // the fan_in layer back to the beginning of the lexical prefix tree.
   string_to_nodes_map::const_iterator it;
   int i;
   it = m_fan_in_last_nodes.begin();
@@ -1023,9 +1007,15 @@ void TPLexPrefixTree::create_lex_tree_links_from_fan_in(Node *fan_in_node,
   int j, k;
 
   std::string out_right(key, 1, 1);
-  // Skip silences, as this node has either already been linked to
-  // silence while adding a one-HMM word, or it is unused.
-  if (out_right != "_")
+  // Skip silences, as this node has either already been linked to silence when
+  // adding a one-HMM word, or it is unused.
+  // - Removed this check in order to be able to have long silence as the second
+  // triphone of a word (and silence as the right context in the second
+  // triphone). Looks like as a consequence there are now some unreachable links
+  // created.
+  //   2013-03-11 / SE
+//  if (out_right != "_")
+  if (true)
   {
     string_to_nodes_map::const_iterator it =
       m_fan_in_connection_nodes.find(key);
@@ -1325,9 +1315,16 @@ void TPLexPrefixTree::clear_node_token_lists(void)
   }
 }
 
-void TPLexPrefixTree::print_node_info(int node)
+void TPLexPrefixTree::print_node_info(int node, const Vocabulary &voc)
 {
-  printf("word_id = %d\n", m_nodes[node]->word_id);
+  int word_id = m_nodes[node]->word_id;
+  if (word_id < 0) {
+    printf("word_id = %d\n", word_id);
+  }
+  else {
+    printf("word = %s\n", voc.word(word_id).c_str());
+  }
+
   printf("model = %d\n", (m_nodes[node]->state == NULL ? -1
                           : m_nodes[node]->state->model));
   printf("flags: %04x\n", m_nodes[node]->flags);

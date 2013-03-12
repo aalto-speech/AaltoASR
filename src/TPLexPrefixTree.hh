@@ -234,7 +234,7 @@ public:
 
   void clear_node_token_lists(void);
 
-  void print_node_info(int node);
+  void print_node_info(int node, const Vocabulary &voc);
   void print_lookahead_info(int node, const Vocabulary &voc);
   void debug_prune_dead_ends(Node *node);
   void debug_add_silence_loop();
@@ -285,13 +285,47 @@ private:
                               bool fan_out);
 
   void link_fan_out_node_to_fan_in(Node *node, const std::string &key);
+
+  /// \brief If \a fan_out is true, creates an arc to every fan-out entry
+  /// node in the group specified by \a key, creating the entry nodes if
+  /// necessary. Otherwise creates an arc to every fan-in entry node.
+  ///
+  /// The entry triphones are organized so that triphones belonging to
+  /// the same phoneme and having the same left context are grouped
+  /// together and are allowed to share their common states.
+  ///
   void link_node_to_fan_network(const std::string &key,
                                 std::vector<Arc> &source_arcs,
                                 bool fan_out,
                                 bool ignore_length,
                                 float out_transition_log_prob);
+
+  /// \brief Create another instance of a null node with word identity after the
+  /// fan-in network, and link it back to fan-in.
+  ///
+  /// When linking a word to the cross word network, single phoneme words must
+  /// be handled separately. Another implementation of the word has to be added
+  /// inside the cross-word network. This is done by adding a dummy node with
+  /// the word identity after every fan-in triphone whose central phoneme
+  /// corresponds to the given word. This dummy node is then linked back to the
+  /// fan-in triphones, determined by the right context of the originating
+  /// fan-in triphone.
+  ///
   void add_single_hmm_word_for_cross_word_modeling(Hmm *hmm, int word_id, double prob);
-  void link_fan_in_nodes(void);
+
+  /// \brief Creates arcs from the last states of the fan-in triphones to
+  /// the second triphone of each word.
+  ///
+  /// At this point, cross word network is ready and words have been linked
+  /// to the fan-out layer. Also single HMM words have been linked back
+  /// to the fan-in layer. What is left is to link the last states of
+  /// the fan-in layer back to the beginning of the lexical prefix tree.
+  ///
+  void link_fan_in_nodes();
+
+  /// \brief Creates arcs from a final fan-in node in the cross word network, to
+  /// the second triphones of each word.
+  ///
   void create_lex_tree_links_from_fan_in(Node *fan_in_node,
                                          const std::string &key);
 
@@ -306,6 +340,11 @@ private:
   Node* get_fan_out_entry_node(HmmState *state, const std::string &label);
   Node* get_fan_out_last_node(HmmState *state, const std::string &label);
   Node* get_fan_in_entry_node(HmmState *state, const std::string &label);
+
+  /// \brief Returns a node for the last HMM state of a fan-in triphone.
+  ///
+  /// If the node doesn't exist, creates it, and saves in m_fan_in_last_nodes.
+  ///
   Node* get_fan_in_last_node(HmmState *state, const std::string &label);
 
   /// \brief Finds the node with given state model, creating a new node if
@@ -320,8 +359,13 @@ private:
     const std::string &key,
     string_to_nodes_map &nmap);
 
+  /// \brief Marks a node as a connection point for linking back to the
+  /// beginning (second triphone) of a word from the cross word network.
+  ///
   void add_fan_in_connection_node(Node *node, const std::string &prev_label);
+
   float get_out_transition_log_prob(Node *node);
+
   void prune_lm_la_buffer(int delta_thr, int depth_thr,
                           Node *node, int last_size, int cur_depth);
 
