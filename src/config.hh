@@ -1,0 +1,7 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define ENABLE_WORDCLASS_SUPPORT
+#define ENABLE_MULTIWORD_SUPPORT
+
+#endif

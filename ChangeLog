@@ -1,0 +1,107 @@
+2013-02-28  senarvi  <senarvi@cis.hut.fi>
+
+	* src/TPLexPrefixTree.cc (TPLexPrefixTree::add_word): Supports pronunciation
+	probabilities.
+	(TPLexPrefixTree::add_single_hmm_word_for_cross_word_modeling): Supports
+	pronunciation probabilities.
+	* src/TPNowayLexReader.cc (TPNowayLexReader::read): Handles pronunciation
+	probabilities. 
+
+2013-01-30  senarvi  <senarvi@cis.hut.fi>
+
+	* src/swig/Decoder.i: Toolbox::htk_lattice_grammar_read() doesn't return a
+	value.
+	* src/test_class.cc (test_search): Fixed Toolbox::ngram_read() call. 
+	* src/test_token_pass.cc (main): Replaced the models and LNA files with
+	something that exists currently. Toolbox::set_word_boundary() call before
+	reading lexicon and language model.
+	* src/Toolbox.cc (Toolbox): Check that set_word_boundary() is not called
+	after reading language model or lexicon.
+	* src/Toolbox.hh (Toolbox): Check that set_word_boundary() is not called
+	after reading language model or lexicon.
+
+2012-11-01  senarvi  <senarvi@cis.hut.fi>
+
+	* src/TokenPassSearch.cc (TokenPassSearch::create_word_repository): Ignore
+	pronunciation ID in the end of a word (colon followed by digits), so that we
+	can easily get the information of what pronunciation the decoder has
+	selected by simply adding these IDs to the dictionary.
+ 
+2012-11-01  senarvi  <senarvi@cis.hut.fi>
+
+	* src/TokenPassSearch.cc (TokenPassSearch::reset_search):
+	m_recent_word_graph_info is indexed by word ID, so size has to be
+	m_word_repository.size().
+	(TokenPassSearch::create_word_repository): Update m_word_repository size if
+	a word is added to vocabulary. 
+	(TokenPassSearch::get_lm_bigram_lookahead): m_word_repository.size() is the
+	number of different word IDs, not m_lexicon.words().
+	(TokenPassSearch::get_lm_trigram_lookahead): m_word_repository.size() is the
+	number of different word IDs, not m_lexicon.words().
+
+2012-10-25  senarvi  <senarvi@cis.hut.fi>
+
+	* src/LMHistory.cc (LMHistory::rend): A NULL value represents the beginning
+	of an LMHistory, or the end of reverse iteration.
+	(LMHistory::ConstReverseIterator::ConstReverseIterator): Accepts NULL
+	parameter (end iterator). 
+	* src/LMHistory.hh (LMHistory::ConstReverseIterator): Compiles also without
+	multiword support. 
+	(LMHistory::ConstReverseIterator::operator ==): For iterating until end
+	iterator is encountered.
+	* src/TokenPassSearch.cc (TokenPassSearch::is_similar_lm_history): Use
+	LMHistory::ConstReverseIterator.
+	(TokenPassSearch::compute_lm_hist_hash_code):  Use
+	LMHistory::ConstReverseIterator.
+	(TokenPassSearch::get_lm_lookahead_score): Use
+	LMHistory::ConstReverseIterator.
+
+2012-10-01  senarvi  <senarvi@cis.hut.fi>
+
+	* src/LMHistory.cc (LMHistory::rbegin): Returns a reverse iterator pointing
+	to the last word or multiword component in the LMHistory.
+	* src/LMHistory.hh (LMHistory.Word): Uses ID structure to store dictionary,
+	language model, and lookahead language model IDs of a word.
+	(LMHistory.Word.component): Returns a reference to an ID structure.
+	(LMHistory.ConstReverseIterator): Iterates LMHistory words or multiword
+	components in reverse order.
+	* src/TokenPassSearch.cc (TokenPassSearch::split_and_compute_ngram_score):
+	Uses LMHistory::Word::ConstReverseIterator. 
+ 
+2012-09-25  senarvi  <senarvi@cis.hut.fi>
+
+	* src/LMHistory.hh (LMHistory.Word): Store also word ID and lookahead LM ID
+	of each component. 
+	* src/TokenPassSearch.cc (TokenPassSearch::create_word_repository): Also
+	stores word ID and lookahead LM ID of each component. When using a lookahead
+	model, the first call is redundant.
+	(TokenPassSearch::set_lookahead_ngram): Calls create_word_repository(). 
+	(TokenPassSearch::split_and_create_history_ngram): Interface changed so that
+	default parameter -1 can be given to final_components. 
+	(TokenPassSearch::get_lm_lookahead_score): When using multiwords, consider
+	the last two multiword components, instead of the last two words. 
+
+2012-09-24  senarvi  <senarvi@cis.hut.fi>
+
+	* src/LMHistory.hh (LMHistory.Word): Stores also ID to lookahead LM.
+	* src/TokenPassSearch.cc (TokenPassSearch::find_similar_lm_history): Calls
+	is_similar_lm_history().
+	(TokenPassSearch::is_similar_lm_history): Compares LM IDs instead of word
+	IDs so that when using class-based language models, uses the class
+	information for recombining similar paths. 
+	(TokenPassSearch::compute_lm_hist_hash_code): Uses LM IDs instead of word
+	IDs so that when using class-based language models, uses the class
+	information for recombining similar paths. 
+	(TokenPassSearch::set_lookahead_ngram): When using class-based language
+	models, creates a mapping between the lexicon and the classes of the words,
+	in the lookahead LM.
+	(TokenPassSearch::find_word_from_lookahead_lm): Finds a word or its class
+	from the lookahead LM.
+	(TokenPassSearch::get_lm_bigram_lookahead): Performs the mapping from
+	lookahead LM IDs to word IDs.
+	(TokenPassSearch::get_lm_trigram_lookahead): Performs the mapping from
+	lookahead LM IDs to word IDs.
+	* src/TreeGram.cc (TreeGram::fetch_bigram_list): Does not perform the
+	mapping from lookahead LM IDs to word IDs.
+	(TreeGram::fetch_trigram_list): Does not perform the mapping from lookahead
+	LM IDs to word IDs.

@@ -1,0 +1,25 @@
+\data\
+
+ngram 1=10
+ngram 2=3
+
+\1-grams:
+
+-99	<s>
+-1	</s>
+-2	<w>
+-3	a
+-4	u
+-5	t
+-6	o
+-2	au
+-3	to
+-4	auto
+
+\2-grams:
+
+-0.1	<s> <w>
+-0.1	<w> </s>
+-0.3	au to
+
+\end\
