@@ -1,6 +1,8 @@
 #include <string>
 #include <vector>
 #include <stdio.h>
+#include <stdlib.h>
+#include <values.h>
 
 /** Functions for handling strings of the Standard Template Library. */
 namespace str {

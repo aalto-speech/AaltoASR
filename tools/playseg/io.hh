@@ -3,6 +3,7 @@
 
 #include <string>
 #include <stdio.h>
+#include <stdlib.h>
 
 /** Function and classes for opening files, compressed files, or
  * process pipes transparently. 
