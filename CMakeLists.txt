@@ -11,7 +11,22 @@ IF(UNIX AND NOT WIN32)
   ENDIF(CMAKE_UNAME)
 ENDIF(UNIX AND NOT WIN32)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 add_subdirectory( decoder )
 add_subdirectory( tools )
 
+
+
+include(ExternalProject)
+ExternalProject_Add(lapackpp
+   PREFIX "vendor/lapackpp"
+   URL http://downloads.sourceforge.net/project/lapackpp/lapackpp-2.5.4.tar.gz
+   URL_MD5 9ad74fb73fbcbf378c36a19a5dccbda7
+  # SOURCE_DIR vendor/lapackpp-2.5.4
+   PATCH_COMMAND patch -p1 < ${CMAKE_CURRENT_LIST_DIR}/vendor/lapackpp-2.5.4.ics.patch
+   CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+   BUILD_COMMAND make
+   BUILD_IN_SOURCE 1
+   INSTALL_COMMAND make install
+)

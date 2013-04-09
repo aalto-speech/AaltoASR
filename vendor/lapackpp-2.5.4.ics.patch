@@ -1,0 +1,38 @@
+diff --git a/blaspp/src/blas3pp.cc b/blaspp/src/blas3pp.cc
+index 7794340..c5c3d16 100644
+--- a/blaspp/src/blas3pp.cc
++++ b/blaspp/src/blas3pp.cc
+@@ -31,6 +31,16 @@
+ #include "laindex.h"
+ 
+ 
++void Blas_Add_Mat_Mult(LaGenMatDouble &A,
++                       double alpha,
++                       const LaGenMatDouble &B)
++{
++    integer n = A.rows()*A.cols();
++    integer inca = A.inc(0), incb = B.inc(0);
++
++    F77NAME(daxpy)(&n, &alpha, &B(0,0), &incb, &A(0,0), &inca);
++}
++
+ void Blas_Mat_Mat_Mult(const LaGenMatDouble &A,
+                        const LaGenMatDouble &B, LaGenMatDouble &C,
+                        bool transpose_A, bool transpose_B,
+diff --git a/include/blas3pp.h b/include/blas3pp.h
+index 11ce431..ce0da3c 100644
+--- a/include/blas3pp.h
++++ b/include/blas3pp.h
+@@ -50,6 +50,12 @@ class LaSymmTridiagMatDouble;
+ class LaTridiagMatDouble;
+ #endif // DOXYGEN_IGNORE
+ 
++/** Perform the matrix operation B := alpha*A + B */
++DLLIMPORT
++void Blas_Add_Mat_Mult(LaGenMatDouble &A,
++                       double alpha,
++                       const LaGenMatDouble &B);
++
+ /** @name Real-valued general matrices */
+ //@{
+ /** Perform the matrix-matrix operation C := alpha*A*B + beta*C
