@@ -18,5 +18,10 @@ summary of tools
 
 Installation
 ============
+See INSTALLATION.md
 
-cmake
+
+License
+=======
+All the code in the AaltoASR package is licensed with the Modified BSD license (see also LICENSE). 
+
