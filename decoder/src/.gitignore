@@ -1,0 +1,10 @@
+arpa2bin
+bin2arpa
+fsalm/libfsalm.a
+libdecoder.a
+misc/libmisc.a
+morpheus/morpheus
+swig/Decoder.py
+swig/DecoderPYTHON_wrap.cxx
+swig/_Decodermodule.so
+
