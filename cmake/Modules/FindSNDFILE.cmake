@@ -1,0 +1,22 @@
+#  SNDFILE_INCLUDE_DIRS   - where to find sndfile.h
+#  SNDFILE_LIBRARIES      - List of libraries when using sndfile
+#  SNDFILE_FOUND          - True if sndfile found
+
+
+FIND_PATH(SNDFILE_INCLUDE_DIR NAMES sndfile.h)
+MARK_AS_ADVANCED(SNDFILE_INCLUDE_DIR)
+
+# Look for the library.
+FIND_LIBRARY(SNDFILE_LIBRARY NAMES sndfile)
+MARK_AS_ADVANCED(SNDFILE_LIBRARY)
+
+# handle the QUIETLY and REQUIRED arguments and set SNDFILE_FOUND to 
+# TRUE if all listed variables are TRUE
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(SNDFILE
+                                  REQUIRED_VARS SNDFILE_LIBRARY
+                                  SNDFILE_INCLUDE_DIR )
+
+IF(SNDFILE_FOUND)
+  SET(SNDFILE_LIBRARIES ${SNDFILE_LIBRARY})
+  SET(SNDFILE_INCLUDE_DIRS ${SNDFILE_INCLUDE_DIR})
+ENDIF(SNDFILE_FOUND)

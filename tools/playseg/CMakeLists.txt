@@ -1,12 +1,12 @@
 Find_Package ( SDL REQUIRED )
-
-# Workaround for the non-working REQUIRED flag
-if ( NOT SDL_FOUND )
-   message ( FATAL_ERROR "SDL not found!" )
-endif ( NOT SDL_FOUND )
+Find_Package ( SNDFILE REQUIRED )
 
 link_libraries (
     ${SDL_LIBRARY}
+)
+
+include_directories (
+    ${SNDFILE_INCLUDE_DIRS}
 )
 
 add_executable (playseg AudioPlayer.cc conf.cc io.cc playseg.cc str.cc AudioPlayer.hh str.hh util.hh conf.hh io.hh)
