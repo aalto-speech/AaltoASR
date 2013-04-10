@@ -55,7 +55,7 @@ set(AKU_CMDS feadot feanorm phone_probs segfea vtln quanteq stats estimate align
 foreach(AKU_CMD ${AKU_CMDS})
     add_executable ( ${AKU_CMD} ${AKU_CMD}.cc )
     target_link_libraries ( ${AKU_CMD} aku )
+    install(TARGETS ${AKU_CMD} DESTINATION bin)
 endforeach(AKU_CMD)
-
 
 

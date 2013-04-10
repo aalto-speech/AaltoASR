@@ -33,3 +33,5 @@ add_executable ( arpa2bin arpa2bin.cc )
 add_executable ( bin2arpa bin2arpa.cc )
 target_link_libraries ( arpa2bin decoder fsalm misc )
 target_link_libraries ( bin2arpa decoder fsalm misc )
+
+install(TARGETS arpa2bin bin2arpa DESTINATION bin)
