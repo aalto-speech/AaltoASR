@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
+PROJECT(AaltoASR)
 
 # with -fPIC
 IF(UNIX AND NOT WIN32)
