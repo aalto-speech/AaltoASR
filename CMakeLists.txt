@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+
 # with -fPIC
 IF(UNIX AND NOT WIN32)
   FIND_PROGRAM(CMAKE_UNAME uname /bin /usr/bin /usr/local/bin )
