@@ -4,7 +4,6 @@ Find_Package ( BLAS REQUIRED )
 Find_Package ( LAPACK REQUIRED )
 
 link_libraries (
-    ${FFTW_LIBRARIES}
     ${LapackPP_LIBRARIES}
     ${SNDFILE_LIBRARIES}
     ${BLAS_LIBRARIES}
@@ -12,7 +11,6 @@ link_libraries (
 )
 
 include_directories (
-    ${FFTW_INCLUDE_DIRS}
     ${LapackPP_INCLUDE_DIRS}
     ${SNDFILE_INCLUDE_DIRS}
 )
@@ -46,6 +44,19 @@ set(AKUSOURCES
     util.cc
     ${LapackPP_HEADER}
 )
+
+IF(FFTWLIB)
+  link_libraries(
+      ${FFTW_LIBRARIES}
+  )
+  include_directories(
+      ${FFTW_INCLUDE_DIRS}
+  )
+ELSE(FFTWLIB)
+  add_definitions(-DKISS_FFT)
+  include_directories( kiss_fft )
+  set( AKUSOURCES "${AKUSOURCES}" kiss_fft/kiss_fft.c kiss_fft/kiss_fftr.c ) 
+ENDIF(FFTWLIB)
 
 add_library( aku ${AKUSOURCES} )
 add_dependencies(aku lapackpp_ext)
