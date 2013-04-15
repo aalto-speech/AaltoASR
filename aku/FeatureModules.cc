@@ -450,8 +450,15 @@ FFTModule::FFTModule()
 
 FFTModule::~FFTModule()
 {
-  if (m_coeffs)
+  if (m_coeffs) {
+#ifdef KISS_FFT
+    kiss_fftr_free(m_coeffs);
+    delete [] m_kiss_fft_datain;
+    delete [] m_kiss_fft_dataout;
+#else // Use FFTW
     fftw_destroy_plan(m_coeffs);
+#endif
+  }
   m_coeffs = NULL;
 }
 
@@ -480,14 +487,32 @@ FFTModule::set_module_config(const ModuleConfig &config)
   for (int i = 0; i < source_dim; i++)
     m_hamming_window[i] = .54 - .46*cosf(2 * M_PI * i/(source_dim-1.0));
 
-  if (m_coeffs)
+  if (m_coeffs) {
+#ifdef KISS_FFT
+    kiss_fftr_free(m_coeffs);
+    delete [] m_kiss_fft_datain;
+    delete [] m_kiss_fft_dataout;
+#else // Use FFTW
     fftw_destroy_plan(m_coeffs);
+#endif
+  }
 
+#ifdef KISS_FFT
+  m_kiss_fft_datain = new kiss_fft_scalar[source_dim];
+  m_kiss_fft_dataout = new kiss_fft_cpx[m_dim];
+  m_coeffs = kiss_fftr_alloc(source_dim, 0, NULL, NULL);
+  if (m_coeffs == NULL)
+  {
+    fprintf(stderr, "Kiss FFT initialization failed\n");
+    exit(1);
+  }
+#else // FFTW
   m_fftw_datain.resize(source_dim);
   m_fftw_dataout.resize(source_dim + 1);
   m_fftw_dataout.back() = 0;
   m_coeffs = fftw_plan_r2r_1d(source_dim, &m_fftw_datain[0],
                               &m_fftw_dataout[0], FFTW_R2HC, FFTW_ESTIMATE);
+#endif
 }
 
 void
@@ -496,7 +521,20 @@ FFTModule::generate(int frame)
   int t;
   
   const FeatureVec source_fea = m_sources.back()->at(frame);
+  FeatureVec target = m_buffer[frame];
 
+#ifdef KISS_FFT
+  // Apply Hamming window
+  for (t = 0; t < source_fea.dim(); t++)
+    m_kiss_fft_datain[t] = m_hamming_window[t] * source_fea[t];
+  kiss_fftr(m_coeffs, m_kiss_fft_datain, m_kiss_fft_dataout);
+  for (t = 0; t < m_dim; t++)
+  {
+    target[t] = m_kiss_fft_dataout[t].r*m_kiss_fft_dataout[t].r +
+      m_kiss_fft_dataout[t].i * m_kiss_fft_dataout[t].i;
+  }
+  
+#else // FFTW
   // Apply Hamming window
   for (t = 0; t < source_fea.dim(); t++)
   {
@@ -506,7 +544,6 @@ FFTModule::generate(int frame)
   fftw_execute(m_coeffs);
 
   // NOTE: fftw returns the imaginary parts in funny order
-  FeatureVec target = m_buffer[frame];
   for (t = 0; t < source_fea.dim() / 2; t++)
   {
     target[t] = m_fftw_dataout[t] * m_fftw_dataout[t] + 
@@ -519,6 +556,8 @@ FFTModule::generate(int frame)
 
   // The highest frequency component has zero imaginary part
   target[t] = m_fftw_dataout[t] * m_fftw_dataout[t];
+#endif
+
   if (m_magnitude)
     target[t] = sqrtf(target[t]);
 
