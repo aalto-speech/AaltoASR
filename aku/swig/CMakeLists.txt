@@ -5,20 +5,6 @@ include(${SWIG_USE_FILE})
 
 find_package(PythonLibs)
 
-# Start Vesa 20130415 modifications
-set(PYTHON_INCLUDE_PATH /opt/python3/include/python3.3m)
-set(PYTHON_LIBRARIES /opt/python3/lib/libpython3.so)
-set(PYTHON_EXECUTABLE /opt/python3/bin/python3)
-set(PYTHON_VERSION ${CMAKE_USE_PYTHON_VERSION})
-
-message(STATUS "detecting Python")
-message(STATUS "\t PYTHON_INCLUDE_PATH= ${PYTHON_INCLUDE_PATH}")
-message(STATUS "\t PYTHON_LIBRARIES= ${PYTHON_LIBRARIES}")
-message(STATUS "\t PYTHON_EXECUTABLE= ${PYTHON_EXECUTABLE}")
-message(STATUS "\t Swig ${SWIG_VERSION}")    
-
-# End Vesa 20130415 modifications
-
 include_directories(${PYTHON_INCLUDE_PATH})
 
 set_source_files_properties(PPToolbox.i PROPERTIES CPLUSPLUS ON)
