@@ -23,10 +23,11 @@ ExternalProject_Add(lapackpp_ext
    URL_MD5 9ad74fb73fbcbf378c36a19a5dccbda7
   # SOURCE_DIR vendor/lapackpp-2.5.4
    PATCH_COMMAND patch -p1 < ${CMAKE_CURRENT_LIST_DIR}/vendor/lapackpp-2.5.4.ics.patch
-   CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-static=yes --enable-shared=no --prefix=<INSTALL_DIR>
+   CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-static=yes --enable-shared=no --prefix=<INSTALL_DIR> CXXFLAGS=-fPIC
    BUILD_COMMAND make
    BUILD_IN_SOURCE 1
    INSTALL_COMMAND make install
+   CXXFLAGS=-fPIC
 )
 
 add_library( LapackPP UNKNOWN IMPORTED )
