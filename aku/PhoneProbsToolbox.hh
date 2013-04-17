@@ -2,6 +2,7 @@
 #define PHONEPROBSTOOLBOX_HH
 
 #include <string>
+#include <cstring>
 #include "conf.hh"
 #include "FeatureGenerator.hh"
 #include "HmmSet.hh"
