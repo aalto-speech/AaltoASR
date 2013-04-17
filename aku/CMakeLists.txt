@@ -1,3 +1,4 @@
+Find_Package ( FFTW REQUIRED )
 Find_Package ( SNDFILE REQUIRED )
 Find_Package ( BLAS REQUIRED )
 Find_Package ( LAPACK REQUIRED )
