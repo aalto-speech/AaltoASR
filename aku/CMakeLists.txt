@@ -42,10 +42,11 @@ set(AKUSOURCES
     MllrTrainer.cc 
     ziggurat.cc 
     mtw.cc 
-    LmbfgsOptimize.cc 
+    LmbfgsOptimize.cc
     RegClassTree.cc
     SegErrorEvaluator.cc 
     util.cc
+    PhoneProbsToolbox.cc
     ${LapackPP_HEADER}
 )
 
@@ -60,4 +61,4 @@ foreach(AKU_CMD ${AKU_CMDS})
     install(TARGETS ${AKU_CMD} DESTINATION bin)
 endforeach(AKU_CMD)
 
-
+add_subdirectory( swig )
