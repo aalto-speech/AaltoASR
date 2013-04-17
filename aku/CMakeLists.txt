@@ -48,21 +48,25 @@ set(AKUSOURCES
 SET(KISS_FFT 0 CACHE BOOL "Use KissFFT instead of FFTW")
 
 IF(NOT KISS_FFT)
-Find_Package ( FFTW )
+  Find_Package ( FFTW )
+  IF(NOT FFTW_FOUND)
+    MESSAGE("FFTW not Found, using KissFFT instead")
+  ENDIF(NOT FFTW_FOUND)
 ENDIF(NOT KISS_FFT)
 
-IF(FFTWFOUND AND NOT KISS_FFT)
+IF(FFTW_FOUND AND NOT KISS_FFT)
   link_libraries(
       ${FFTW_LIBRARIES}
   )
   include_directories(
       ${FFTW_INCLUDE_DIRS}
   )
-ELSE(FFTWFOUND AND NOT KISS_FFT)
+  MESSAGE("FFTW is used")
+ELSE(FFTW_FOUND AND NOT KISS_FFT)
   add_definitions(-DKISS_FFT)
   include_directories( ../vendor/kiss_fft )
   set( AKUSOURCES "${AKUSOURCES}" ../vendor/kiss_fft/kiss_fft.c ../vendor/kiss_fft/kiss_fftr.c ) 
-ENDIF(FFTWFOUND AND NOT KISS_FFT)
+ENDIF(FFTW_FOUND AND NOT KISS_FFT)
 
 add_library( aku ${AKUSOURCES} )
 add_dependencies(aku lapackpp_ext)
