@@ -9,6 +9,6 @@ include_directories(${PYTHON_INCLUDE_PATH})
 
 set_source_files_properties(Decoder.i PROPERTIES CPLUSPLUS ON)
 
-swig_add_module(Decodermodule python Decoder.i)
+swig_add_module(Decoder python Decoder.i)
 
-swig_link_libraries(Decodermodule ${PYTHON_LIBRARIES} decoder fsalm misc)
+swig_link_libraries(Decoder ${PYTHON_LIBRARIES} decoder fsalm misc)
