@@ -39,6 +39,19 @@ Make sure the requirements are met, see REQUIREMENTS above
     cmake ..
     make
 
+Instead of make all, also only a subproject or executable can be build, e.g.:
+   
+    make aku
+
+or 
+    make playseg
+
+After this all a 
+
+    make install
+
+will install the binaries and libraries on the correct places. This location can be changed with the option -D CMAKE_INSTALL_PREFIX=/path to the cmake command.
+
 For a debug build, add -D CMAKE_BUILD_TYPE=Debug to the cmake command (before the path).
 
 
