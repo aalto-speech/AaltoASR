@@ -1,7 +1,11 @@
 #ifndef FEATUREMODULES_HH
 #define FEATUREMODULES_HH
 
+#ifdef KISS_FFT
+#include "kiss_fftr.h"
+#else // Use FFTW
 #include <fftw3.h>
+#endif
 #include <vector>
 
 #include "FeatureBuffer.hh"
@@ -246,9 +250,15 @@ private:
   int m_log; //!< If nonzero, take logarithms of the output
 
   std::vector<float> m_hamming_window;
+#ifdef KISS_FFT
+  kiss_fftr_cfg m_coeffs;
+  kiss_fft_scalar *m_kiss_fft_datain;
+  kiss_fft_cpx *m_kiss_fft_dataout;
+#else
   fftw_plan m_coeffs;
   std::vector<double> m_fftw_datain;
   std::vector<double> m_fftw_dataout;
+#endif
 };
 
 

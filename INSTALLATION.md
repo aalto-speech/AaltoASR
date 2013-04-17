@@ -10,11 +10,11 @@ The Aalto ASR tools are build with the cmake build system.
     swig
     libsndfile1-dev
     libsdl1.2-dev
-    libfftw3-dev
     liblapack-dev
     python2.7-dev
     gfortran
 
+    libfftw3-dev (optional. If not provided KissFFT is used)
 
 ### Required packages for Scientific Linux (and other Redhat-based distributions)
 
@@ -54,6 +54,7 @@ will install the binaries and libraries on the correct places. This location can
 
 For a debug build, add -D CMAKE_BUILD_TYPE=Debug to the cmake command (before the path).
 
+Normally, if available, the FFTW library is used, otherwise the KissFFT library is used. To force the KissFFT library, add -D KISS_FFT=1 to the cmake command.
 
 ## Creating an Eclipse project
 

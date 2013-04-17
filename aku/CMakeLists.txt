@@ -1,12 +1,10 @@
 PROJECT (aku)
 
-Find_Package ( FFTW REQUIRED )
 Find_Package ( SNDFILE REQUIRED )
 Find_Package ( BLAS REQUIRED )
 Find_Package ( LAPACK REQUIRED )
 
 link_libraries (
-    ${FFTW_LIBRARIES}
     ${LapackPP_LIBRARIES}
     ${SNDFILE_LIBRARIES}
     ${BLAS_LIBRARIES}
@@ -14,7 +12,6 @@ link_libraries (
 )
 
 include_directories (
-    ${FFTW_INCLUDE_DIRS}
     ${LapackPP_INCLUDE_DIRS}
     ${SNDFILE_INCLUDE_DIRS}
 )
@@ -49,6 +46,29 @@ set(AKUSOURCES
     PhoneProbsToolbox.cc
     ${LapackPP_HEADER}
 )
+
+SET(KISS_FFT 0 CACHE BOOL "Use KissFFT instead of FFTW")
+
+IF(NOT KISS_FFT)
+  Find_Package ( FFTW )
+  IF(NOT FFTW_FOUND)
+    MESSAGE("FFTW not Found, using KissFFT instead")
+  ENDIF(NOT FFTW_FOUND)
+ENDIF(NOT KISS_FFT)
+
+IF(FFTW_FOUND AND NOT KISS_FFT)
+  link_libraries(
+      ${FFTW_LIBRARIES}
+  )
+  include_directories(
+      ${FFTW_INCLUDE_DIRS}
+  )
+  MESSAGE("FFTW is used")
+ELSE(FFTW_FOUND AND NOT KISS_FFT)
+  add_definitions(-DKISS_FFT)
+  include_directories( ../vendor/kiss_fft )
+  set( AKUSOURCES "${AKUSOURCES}" ../vendor/kiss_fft/kiss_fft.c ../vendor/kiss_fft/kiss_fftr.c ) 
+ENDIF(FFTW_FOUND AND NOT KISS_FFT)
 
 add_library( aku ${AKUSOURCES} )
 add_dependencies(aku lapackpp_ext)
