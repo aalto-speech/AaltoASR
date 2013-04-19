@@ -548,21 +548,19 @@ FFTModule::generate(int frame)
   {
     target[t] = m_fftw_dataout[t] * m_fftw_dataout[t] + 
       m_fftw_dataout[source_fea.dim()-t] * m_fftw_dataout[source_fea.dim()-t];
-    if (m_magnitude)
-      target[t] = sqrtf(target[t]);
-    if (m_log)
-      target[t] = logf(target[t]);
   }
 
   // The highest frequency component has zero imaginary part
   target[t] = m_fftw_dataout[t] * m_fftw_dataout[t];
 #endif
 
-  if (m_magnitude)
-    target[t] = sqrtf(target[t]);
+  for (t = 0; t < m_dim; t++) {
+    if (m_magnitude)
+      target[t] = sqrtf(target[t]);
 
-  if (m_log)
-    target[t] = logf(target[t]);
+    if (m_log)
+      target[t] = logf(target[t]);
+  }
 }
 
 
