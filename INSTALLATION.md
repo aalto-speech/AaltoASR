@@ -24,8 +24,9 @@ The Aalto ASR tools are build with the cmake build system.
     SDL-devel
     python-devel
     lapack-devel
-    fftw-devel
     libsndfile-devel
+    
+    fftw-devel (optional. If not provided KissFFT is used)
 
 
 ## Standard build procedure
@@ -52,9 +53,9 @@ After this all a
 
 will install the binaries and libraries on the correct places. This location can be changed with the option -D CMAKE_INSTALL_PREFIX=/path to the cmake command.
 
-For a debug build, add -D CMAKE_BUILD_TYPE=Debug to the cmake command (before the path).
+For a debug build, add -DCMAKE_BUILD_TYPE=Debug to the cmake command. For an optimized build add -DCMAKE_BUILD_TYPE=Release.
 
-Normally, if available, the FFTW library is used, otherwise the KissFFT library is used. To force the KissFFT library, add -D KISS_FFT=1 to the cmake command.
+Normally, if available, the FFTW library is used, otherwise the KissFFT library is used. To force the KissFFT library, add -DKISS_FFT=1 to the cmake command.
 
 ## Creating an Eclipse project
 
@@ -64,6 +65,6 @@ In short
 
     git clone https://github.com/aalto-speech/AaltoASR.git
     cd AaltoASR
-    cmake -G"Eclipse CDT4 - Unix Makefiles" -D CMAKE_BUILD_TYPE=Debug .
+    cmake -G"Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug .
 
 And import the resulting project in eclipse.
