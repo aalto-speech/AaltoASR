@@ -3,3 +3,4 @@ PPToolbox_wrap.cc
 PPToolbox_wrap_tmp.cc
 _PPToolbox.so
 __pycache__
+*.cxx
