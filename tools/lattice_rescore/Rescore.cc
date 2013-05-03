@@ -127,21 +127,21 @@ Rescore::rescore(Lattice *src_lattice, TreeGram *tree_gram, bool quiet)
 	  tgt_context.gram.push_back(word_id);
 	  lm_log_prob = tree_gram->log_prob(tgt_context.gram);
 
-	  while ((int)tgt_context.gram.size() > 
-		 tree_gram->last_history_length())
+	  while (((int)tgt_context.gram.size() > tree_gram->last_history_length())
+	          && (tgt_context.gram.size() > 0))
 	    tgt_context.gram.pop_front();
 	}
 
 	// Create the resulting lattice (final state has </s> context)
 	bool final_node = false;
-	if (tgt_context.gram.back() == m_sentence_end_id) {
-	  tgt_context.gram.erase(tgt_context.gram.begin(), 
+	if ((tgt_context.gram.size() > 0) && (tgt_context.gram.back() == m_sentence_end_id)) {
+	  tgt_context.gram.erase(tgt_context.gram.begin(),
 				 tgt_context.gram.end() - 1);
 	  final_node = true;
 	}
 	Lattice::Node &new_tgt_node = find_or_create_node(tgt_id, tgt_context);
 	m_rescored_lattice.final_node_id = new_tgt_node.id;
-	Lattice::Node &new_src_node = 
+	Lattice::Node &new_src_node =
 	  m_rescored_lattice.node(src_context.node_id);
 	m_rescored_lattice.new_arc(new_src_node.id, new_tgt_node.id,
 				   arc.label, arc.ac_log_prob, lm_log_prob);
