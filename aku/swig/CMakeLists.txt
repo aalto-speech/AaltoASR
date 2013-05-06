@@ -19,3 +19,11 @@ add_custom_target(FixDefs python ${CMAKE_CURRENT_SOURCE_DIR}/add_undefs.py < tmp
   COMMENT "Fixing defs for conflicting symbols in lapack and python")
 add_dependencies(${SWIG_MODULE_PPToolbox_REAL_NAME} FixDefs) 
 
+install(
+TARGETS ${SWIG_MODULE_PPToolbox_REAL_NAME}
+DESTINATION lib/site-packages)
+
+install(
+FILES ${CMAKE_BINARY_DIR}/aku/swig/PPToolbox.py
+DESTINATION lib/site-packages)
+
