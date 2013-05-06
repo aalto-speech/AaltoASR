@@ -3,6 +3,7 @@ Find_Package ( SNDFILE REQUIRED )
 
 link_libraries (
     ${SDL_LIBRARY}
+    ${SNDFILE_LIBRARIES}
 )
 
 include_directories (
