@@ -13,3 +13,5 @@ add_executable (
     str.hh
     util.hh
 )
+
+install(TARGETS morph_lattice DESTINATION bin)

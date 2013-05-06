@@ -11,3 +11,5 @@ include_directories (
 )
 
 add_executable (playseg AudioPlayer.cc conf.cc io.cc playseg.cc str.cc AudioPlayer.hh str.hh util.hh conf.hh io.hh)
+
+install(TARGETS playseg DESTINATION bin)

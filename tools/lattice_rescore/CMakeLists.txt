@@ -19,3 +19,5 @@ add_executable (
     Vocabulary.cc
     Vocabulary.hh
 )
+
+install(TARGETS lattice_rescore DESTINATION bin)
