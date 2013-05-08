@@ -2251,6 +2251,10 @@ TokenPassSearch::acquire_lmhist(const LMHistory::Word * last_word, LMHistory * p
   m_lmh_pool.pop_back();
   lmh->last_word = last_word;
   lmh->previous = previous;
+  lmh->reference_count = 0;
+  lmh->printed = false;
+  lmh->word_start_frame = 0;
+  lmh->word_first_silence_frame=-1;
   if (previous) hist::link(lmh->previous);
   return lmh;
 }
@@ -2270,10 +2274,6 @@ void TokenPassSearch::release_token(TPLexPrefixTree::Token *token)
 void TokenPassSearch::release_lmhist(LMHistory *lmhist) {
   lmhist->last_word=NULL;
   lmhist->previous=NULL;
-  lmhist->reference_count = 0;
-  lmhist->printed = false;
-  lmhist->word_start_frame = 0;
-  lmhist->word_first_silence_frame=-1;
   m_lmh_pool.push_back(lmhist);
 }
 
