@@ -49,8 +49,7 @@
 /// The search network is built around a popular idea of a lexical prefix tree.
 /// As suggested by Demuynck et al. (2000), the traditional phone-level tree can
 /// be made even more efficient by utilizing the HMM level state tying, which
-/// has been implemented here. Cross-word triphone contexts are handled by
-/// building a separate network, to which the lexical prefix tree is linked.
+/// has been implemented here.
 ///
 /// The search network is built of nodes (TPLexPrefixTree::Node), which are
 /// linked to each other with arcs (TPLexPrefixTree::Arc). Nodes can either
@@ -60,6 +59,15 @@
 /// used to represent the active search network. A node can also have a word
 /// identity (word_id) associated with it, which leads to insertion of the word
 /// into the word history of the token passing that node.
+///
+/// Cross-word triphone contexts are handled by building a separate network, to
+/// which the lexical prefix tree is linked. The left context of the first
+/// triphone of a word, and the right context of the last triphone of a word, is
+/// silence, so the cross word network is linked to the second triphone and the
+/// second to last triphone of every word. The part of the cross word network
+/// linked to the beginning (second triphone) of a word is called fan-in. The
+/// part where the end (second to last triphone) of a word is linked to, is
+/// called fan-out.
 ///
 /// Every triphone is defined in the acoustic models, and they are not tied at
 /// the triphone level. Instead, each triphone has a set of HMM states
