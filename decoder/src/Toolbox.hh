@@ -284,6 +284,10 @@ public:
 
   void set_optional_short_silence(bool state) { m_tp_lexicon.set_optional_short_silence(state); }
 
+  /// \brief Should decoder remove :[0-9]+ from the end of each word? This
+  /// allows the dictionary to have pronunciation IDs that do not affect
+  /// decoding.
+  ///
   void set_remove_pronunciation_id(bool remove) { m_tp_search.set_remove_pronunciation_id(remove); }
 
   void prune_lm_lookahead_buffers(int min_delta, int max_depth) { m_tp_lexicon.prune_lookahead_buffers(min_delta, max_depth); }
