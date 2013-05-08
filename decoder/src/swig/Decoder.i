@@ -17,6 +17,9 @@ using namespace fsalm;
     std::cerr << e.what() << std::endl;
     SWIG_exception(SWIG_RuntimeError, "Exception");
   }
+  catch (...){
+    SWIG_exception(SWIG_RuntimeError, "Unknown exception received by swig");
+  }
 }
 
 #ifdef SWIGPYTHON
@@ -148,6 +151,7 @@ public:
   bool run();
   bool runto(int frame);
 	bool recognize_segment(int start_frame, int end_frame);
+  void reinitialize_search();
 
   int frame();
   int first_frame();

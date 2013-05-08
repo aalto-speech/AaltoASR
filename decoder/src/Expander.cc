@@ -16,10 +16,10 @@ struct TokenCompare {
 };
 
 
-Expander::Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
+Expander::Expander(const std::vector<Hmm> &hmms,
 		   Acoustics &acoustics)
   : m_hmms(hmms),
-    m_lexicon(lexicon),
+    m_lexicon(NULL),
     m_acoustics(acoustics),
 
     m_forced_end(false),
@@ -476,7 +476,7 @@ Expander::clear_tokens()
 void
 Expander::create_initial_tokens(int start_frame)
 {
-  Lexicon::Node *node = m_lexicon.root();
+  Lexicon::Node *node = m_lexicon->root();
   Lexicon::Token *token;
   
   for (int next_id = 0; next_id < node->next.size(); next_id++) {
@@ -562,12 +562,12 @@ Expander::debug_print_tokens()
 void
 Expander::expand(int start_frame, int frames)
 {
-  if (m_words.size() != m_lexicon.words()) {
+  if (m_words.size() != m_lexicon->words()) {
     // Changing lexicon size is not supported at the moment
     assert(m_words.size() == 0);
     m_active_words.clear();
-    m_active_words.reserve(m_lexicon.words());
-    m_words.resize(m_lexicon.words());
+    m_active_words.reserve(m_lexicon->words());
+    m_words.resize(m_lexicon->words());
     for (int i = 0; i < m_words.size(); i++)
       m_words[i].word_id = i;
   }

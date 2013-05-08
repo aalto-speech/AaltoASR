@@ -62,15 +62,17 @@ os.system(akupath + "/phone_probs -b "+akumodel+" -c "+akumodel+".cfg -r "+tempp
 t = Decoder.Toolbox()
 
 t.select_decoder(0)
+sys.stderr.write("loading models\n")
+t.hmm_read(hmms)
+t.duration_read(dur)
+t.reinitialize_search()
+
 t.set_optional_short_silence(1)
 
 t.set_cross_word_triphones(1)
 
 t.set_require_sentence_end(1)
 
-sys.stderr.write("loading models\n")
-t.hmm_read(hmms)
-t.duration_read(dur)
 
 t.set_verbose(1)
 t.set_print_text_result(1)
