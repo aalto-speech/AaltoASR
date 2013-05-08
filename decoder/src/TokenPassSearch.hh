@@ -205,6 +205,9 @@ public:
 
   void set_require_sentence_end(bool s) { m_require_sentence_end = s; }
 
+  /// \brief Remove :[0-9]+ from the end of each word? This allows the
+  /// dictionary to have pronunciation IDs that do not affect decoding.
+  ///
   void set_remove_pronunciation_id(bool remove) { m_remove_pronunciation_id = remove; }
 
   /// This function has to be called before calling set_ngram() or
