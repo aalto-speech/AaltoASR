@@ -136,17 +136,43 @@ public:
 
     unsigned char depth;
     unsigned char dur;
+
+    Token():
+      node(NULL),
+      next_node_token(NULL),
+      am_log_prob(0.0f),
+      lm_log_prob(0.0f),
+      cur_am_log_prob(0.0f),
+      cur_lm_log_prob(0.0f),
+      total_log_prob(0.0f),
+      lm_history(NULL),
+      lm_hist_code(0),
+      fsa_lm_node(0),
+      recent_word_graph_node(0),
+      word_history(NULL),
+      word_start_frame(0),
+      word_count(0),
+      state_history(NULL),
+      depth(0),
+      dur(0)
+    { }
   };
+
 
   class Arc {
   public:
     float log_prob;
     Node *next;
+
+    Arc():
+      log_prob(0.0f),
+      next(NULL)
+    {}
   };
 
   class Node {
   public:
-    inline Node() : word_id(-1), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
+    inline Node() : word_id(-1), node_id(0), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
     inline Node(int wid) : word_id(wid), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
     inline Node(int wid, HmmState *s) : word_id(wid), state(s), token_list(NULL), flags(NODE_NORMAL) { }
     int word_id; // -1 for nodes without word identity.
@@ -164,6 +190,10 @@ public:
   struct NodeArcId {
     Node *node;
     int arc_index;
+    NodeArcId() :
+      node(NULL),
+      arc_index(0)
+    {}
   };
 
   TPLexPrefixTree(std::map<std::string,int> &hmm_map, std::vector<Hmm> &hmms);
@@ -414,7 +444,7 @@ private:
 TPLexPrefixTree::WordHistory::WordHistory(int word_id, int end_frame, 
 					  WordHistory *previous)
   : word_id(word_id), end_frame(end_frame), 
-    lm_log_prob(0), am_log_prob(0), cum_lm_log_prob(0), cum_am_log_prob(0),
+    lex_node_id(0), graph_node_id(0), lm_log_prob(0), am_log_prob(0), cum_lm_log_prob(0), cum_am_log_prob(0),
     printed(false), previous(previous), reference_count(0)
 {
   if (previous) {
