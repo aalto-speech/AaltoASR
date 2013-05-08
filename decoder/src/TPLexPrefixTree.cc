@@ -661,7 +661,7 @@ TPLexPrefixTree::post_process_fan_triphone(Node *node,
       else
       {
         // Node was removed
-        node->arcs.erase(arc_it);
+        arc_it = node->arcs.erase(arc_it);
       }
     }
     else
