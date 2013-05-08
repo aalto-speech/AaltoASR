@@ -19,25 +19,17 @@ typedef std::string bytestype;
 
 class Toolbox {
 public:
-  Toolbox();
+  /// \brief Loads the acoustic model. It cannot be changed at a later time.
+  ///
+  /// \param hmm_path The HMM acoustic model path (.ph file).
+  /// \param dur_path The duration model path (.dur file), or NULL for no
+  /// explicit duration modeling.
+  /// \param decoder 0=token pass, 1=stack
+  ///
+  /// \exception OpenError If unable to open the file.
+  ///
+  Toolbox(int decoder, const char * hmm_path, const char * dur_path = NULL);
   ~Toolbox();
-
-  // Decoder selection: 0=token pass, 1 = stack
-  void select_decoder(int stack_dec) { m_use_stack_decoder = stack_dec; }
-  
-  // HMM models
-
-  /// \brief Reads the acoustic model from a file.
-  ///
-  /// \exception OpenError If unable to open the file.
-  ///
-  void hmm_read(const char *file);
-
-  /// \brief Reads an HMM duration file.
-  ///
-  /// \exception OpenError If unable to open the file.
-  ///
-  void duration_read(const char *dur_file);
 
   const std::vector<Hmm> &hmms() const { return *m_hmms; }
 
@@ -343,8 +335,6 @@ public:
   void print_tp_lex_node(int node) { m_tp_lexicon->print_node_info(node, *m_tp_vocabulary); }
   void print_tp_lex_lookahead(int node) {m_tp_lexicon->print_lookahead_info(node, *m_tp_vocabulary); }
 
-  void reinitialize_search();
-
 private:
   int m_use_stack_decoder;
   
@@ -381,6 +371,19 @@ private:
   Search *m_search;
 
   LMHistory *m_last_guaranteed_history;
+
+  /// \brief Reads the acoustic model from a file.
+  ///
+  void hmm_read(const char *file);
+
+  /// \brief Reads an HMM duration file.
+  ///
+  /// \exception OpenError If unable to open the file.
+  ///
+  void duration_read(const char *dur_file);
+
+  /// \brief Has to be called after reading acoustic model.
+  void reinitialize_search();
 };
 
 #endif /* TOOLBOX_HH */

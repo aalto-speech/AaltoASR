@@ -215,13 +215,8 @@ recipe_file.close()
 # Recognize
 #
 
-t = Decoder.Toolbox()
-
-t.select_decoder(0)
 print "Loading acoustic model."
-t.hmm_read(hmms)
-t.duration_read(dur)
-t.reinitialize_search()
+t = Decoder.Toolbox(0, hmms, dur)
 
 if morph_model:
 	t.set_silence_is_word(1)

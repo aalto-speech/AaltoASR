@@ -102,11 +102,9 @@ class Expander {
 
 class Toolbox {
 public:
-  Toolbox();
+  Toolbox(int decoder, const char * hmm_path, const char * dur_path);
   ~Toolbox();
 
-  void hmm_read(const char *hmm_file);
-  void duration_read(const char *dur_file);
   const std::vector<Hmm> &hmms();
   void lex_read(const char *file);
   const std::string &lex_word();
@@ -151,7 +149,6 @@ public:
   bool run();
   bool runto(int frame);
 	bool recognize_segment(int start_frame, int end_frame);
-  void reinitialize_search();
 
   int frame();
   int first_frame();
@@ -163,7 +160,6 @@ public:
   void print_best_lm_history();
   void print_best_lm_history_to_file(FILE *out);
   const bytestype &best_hypo_string(bool print_all, bool output_time);
-  void select_decoder(int stack_dec);
   void write_state_segmentation(const std::string &file);
 
   void set_forced_end(bool forced_end);

@@ -89,14 +89,8 @@ if lna_path[-1] != '/':
 # Recognize
 #
 
-t = Decoder.Toolbox()
-
-t.select_decoder(0)
 sys.stderr.write("loading models\n")
-t.hmm_read(hmms)
-t.duration_read(dur)
-#t.sr_read(sr_model)
-t.reinitialize_search()
+t = Decoder.Toolbox(0, hmms, dur)
 
 t.set_optional_short_silence(1)
 

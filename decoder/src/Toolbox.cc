@@ -13,8 +13,8 @@
 
 using namespace std;
 
-Toolbox::Toolbox()
-  : m_use_stack_decoder(0),
+Toolbox::Toolbox(int decoder, const char * hmm_path, const char * dur_path)
+  : m_use_stack_decoder(decoder),
 
     m_hmm_reader(NULL),
     m_hmm_map(NULL),
@@ -39,6 +39,11 @@ Toolbox::Toolbox()
     m_search(NULL),
     m_last_guaranteed_history(NULL)
 {
+    hmm_read(hmm_path);
+    if (dur_path != NULL) {
+	duration_read(dur_path);
+    }
+    reinitialize_search();
 }
 
 Toolbox::~Toolbox()
