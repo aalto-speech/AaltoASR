@@ -8,12 +8,14 @@ template <typename T>
 class HashCache {
 public:
   HashCache(void);
+  ~HashCache();
   inline bool insert(int key, T item, T *removed);
   inline bool find(int key, T *result);
   void set_max_items(int max);
   int get_num_items(void) { return num_items; }
   bool remove_last_item(T *removed);
   bool remove_item(int key, T *removed);
+  void clear_cache();
 
 private:
   void rehash(int new_max);
@@ -46,9 +48,29 @@ HashCache<T>::HashCache(void)
 }
 
 template<typename T>
+void HashCache<T>::clear_cache(void) {
+  for (int i=0; i<max_num_items; i++) {
+    StoreType *cur = hash_table[i];
+    while(cur) {
+      StoreType *prev = cur;
+      cur = cur->hash_list_next;
+      delete prev->value;
+      delete prev;
+    }
+  }
+}
+
+template<typename T>
+HashCache<T>::~HashCache(void)
+{
+  clear_cache();
+}
+
+template<typename T>
 void
 HashCache<T>::rehash(int new_max)
 {
+  clear_cache();
   hash_table.resize(new_max);
   for (int i = 0; i < new_max; i++)
     hash_table[i] = NULL;
