@@ -3,6 +3,9 @@
 
 #include <stdio.h>
 #include "NGram.hh"
+#include <set>
+
+#define IMPOSSIBLE_LOGPROB -10000
 
 /* We inherit the interface to NGram for simplicity. Internally,
    this class has nothing to do with n-grams.
@@ -25,7 +28,7 @@ public:
     for (int i=0; i<gram.size();i++) 
       g.push_back(gram[i]);
     if (match_begin(g)) return 0;
-    return -60;
+    return IMPOSSIBLE_LOGPROB;
   };
 
   inline float log_prob_i(const std::vector<int> &gram) {assert(false);return 0;};
@@ -35,14 +38,14 @@ public:
     for (int i=0; i<gram.size();i++) 
       g.push_back(gram[i]);
     if (match_begin(g)) return 0;
-    return -60;
+    return IMPOSSIBLE_LOGPROB;
   };
 
   float log_prob_i(const std::vector<unsigned short> &gram){assert(false);return 0;};
 
   float log_prob_bo(const Gram &gram){
     if (match_begin(gram)) return 0;
-    return -60;
+    return IMPOSSIBLE_LOGPROB;
   }; 
   float log_prob_i(const Gram &gram){assert(false);return 0;};
 
@@ -50,9 +53,7 @@ public:
 
   /* These are for lookaheads, not implemented */
   void fetch_bigram_list(int prev_word_id, 
-			 std::vector<float> &result_buffer) {
-    assert(false);
-  }
+			 std::vector<float> &result_buffer);
   void fetch_trigram_list(int w1, int w2, 
 			  std::vector<float> &result_buffer) {
     assert(false);
@@ -81,5 +82,9 @@ private:
   int m_start_node_idx, m_end_node_idx, m_null_idx;
   
   bool match_begin(const Gram &g);
+
+  // This table is for LM lookahead and lists all allowable bigrams
+  std::vector<std::set<int> > m_bigram_idxlist;
+  void pregenerate_bigram_idxlist();
 };
 #endif

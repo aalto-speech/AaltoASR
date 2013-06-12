@@ -90,6 +90,7 @@ void InterTreeGram::fetch_bigram_list(int prev_word_id,
   /* This may be too slow for real use */
 
   // Zero the result buffer
+  result_buffer.resize(m_words.size());
   for (std::vector<float>::iterator it=result_buffer.begin(); it!=result_buffer.end(); ++it) {
     *it = 0.0f;
   }
