@@ -28,10 +28,12 @@ set(DECODERSOURCES
   WordClasses.cc
 )
 
+ADD_DEFINITIONS(-std=gnu++0x)
 add_library( decoder ${DECODERSOURCES} )
 add_executable ( arpa2bin arpa2bin.cc )
 add_executable ( bin2arpa bin2arpa.cc )
 target_link_libraries ( arpa2bin decoder fsalm misc )
 target_link_libraries ( bin2arpa decoder fsalm misc )
+target_link_libraries ( hmm2fsm decoder )
 
 install(TARGETS arpa2bin bin2arpa DESTINATION bin)
