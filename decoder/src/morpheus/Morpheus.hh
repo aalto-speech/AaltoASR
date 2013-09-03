@@ -125,7 +125,7 @@ public:
         for (int s = 0; s < syms.size(); s++) {
             string morph = syms.at(s);
             int n = m_trie.root();
-            for (char& c : morph) n = m_trie.insert(n, c);
+            for (int i=0; i<morph.size(); i++) n = m_trie.insert(n, morph[i]);
             m_trie.node(n).value = s;
         }
 
