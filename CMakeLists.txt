@@ -16,6 +16,8 @@ ENDIF(UNIX AND NOT WIN32)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
+ADD_DEFINITIONS(-std=gnu++0x)
+
 include(ExternalProject)
 ExternalProject_Add(lapackpp_ext
    PREFIX ${CMAKE_BINARY_DIR}/vendor/lapackpp
