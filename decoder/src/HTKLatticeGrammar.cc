@@ -218,6 +218,22 @@ bool HTKLatticeGrammar::match_begin(const std::string &string_in) {
   return match_begin(g);
 }
 
+void HTKLatticeGrammar::follow_and_insert_bigram(Arc *sourceA, int null_idx, std::set<int> &bigram_targetset) {
+  std::vector<int> &target_arclist = m_nodes[sourceA->target].arcs_out;
+  for (std::vector<int>::iterator atarget=target_arclist.begin();
+       atarget!=target_arclist.end(); ++atarget) {
+    Arc *target = &m_arcs[*atarget];
+    if (target->widx == null_idx) {
+      follow_and_insert_bigram(target, null_idx, bigram_targetset);
+      continue;
+    }
+
+    //fprintf(stderr, " (%s %d)", word(target->widx).c_str(), target->widx);
+    bigram_targetset.insert(target->widx);
+    //fprintf(stderr,"\n");
+  }
+}
+
 void HTKLatticeGrammar::pregenerate_bigram_idxlist() {
   m_bigram_idxlist.clear();
   m_bigram_idxlist.resize(m_words.size());
@@ -227,22 +243,8 @@ void HTKLatticeGrammar::pregenerate_bigram_idxlist() {
   for (std::vector<Arc>::iterator abeg=m_arcs.begin(); abeg!=m_arcs.end(); ++abeg) {
     if (abeg->widx == null_idx) continue;
     //fprintf(stderr, "Gen for (%s %d):\n", word(abeg->widx).c_str(), abeg->widx);
-    std::vector<int> &target_arclist = m_nodes[abeg->target].arcs_out;
     std::set<int> &bigram_targetset = m_bigram_idxlist.at(abeg->widx);
-    for (std::vector<int>::iterator atarget=target_arclist.begin();
-         atarget!=target_arclist.end(); ++atarget) {
-      Arc *target = &m_arcs[*atarget];
-
-      // Skip NULL nodes
-      while (target->widx == null_idx) {
-        Node nextnode = m_nodes[target->target];
-        assert(nextnode.arcs_out.size()==1);
-        target = &(m_arcs[nextnode.arcs_out[0]]);
-      }
-      //fprintf(stderr, " (%s %d)", word(target->widx).c_str(), target->widx);
-      bigram_targetset.insert(target->widx);
-    }
-    //fprintf(stderr,"\n");
+    follow_and_insert_bigram(&(*abeg), null_idx, bigram_targetset);
   }
 }
 

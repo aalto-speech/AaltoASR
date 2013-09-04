@@ -7,6 +7,8 @@
 
 #define IMPOSSIBLE_LOGPROB -10000
 
+#define IMPOSSIBLE_LOGPROB -10000
+
 /* We inherit the interface to NGram for simplicity. Internally,
    this class has nothing to do with n-grams.
 */
@@ -86,5 +88,6 @@ private:
   // This table is for LM lookahead and lists all allowable bigrams
   std::vector<std::set<int> > m_bigram_idxlist;
   void pregenerate_bigram_idxlist();
+  void follow_and_insert_bigram(Arc *, int, std::set<int> &);
 };
 #endif
