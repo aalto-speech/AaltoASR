@@ -1,6 +1,8 @@
 #include "Fst.hh"
 #include "str.hh"
 
+#include <cstdlib>
+
 Fst::Fst(): initial_node_idx(-1) {
 }
 
@@ -61,18 +63,22 @@ void Fst::read(std::string &fname) {
         nodes.resize(second_node_idx+1);
       }
 
-      Arc a;
+      auto aidx=arcs.size();
+      arcs.resize(aidx+1);
+      Arc &a = arcs[aidx];
       a.source = first_node_idx;
       a.target = second_node_idx;
-      if (fields.size()>=4) {
-        a.emit_symbol = fields[4];
+
+      if (fields.size()>=5) {
+        if (fields[4] != ",") {
+          a.emit_symbol = fields[4];
+        }
       }
 
       if (fields.size()>=6) {
         a.transition_logprob = strtof(fields[5].c_str(), NULL);
       }
-      arcs.push_back(a);
-      nodes[first_node_idx].arcptrs.push_back(&(arcs[arcs.size()-1]));
+      nodes[first_node_idx].arcidxs.push_back(aidx);
 
       // Move emission pdf indices from arcs to nodes
       auto emission_pdf_idx = atoi(fields[3].c_str());

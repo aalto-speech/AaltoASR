@@ -7,5 +7,8 @@ int main(int argc, char *argv[]) {
 
   std::string fst_fname("/home/vsiivola/Code/fst_grammar_network/work/final.fst");
   FstSearch fsts(fst_fname.c_str(), hmm_name.c_str(), dur_name.c_str());
-  
+
+  fsts.lna_open("asiakaspalvelu.lna", 1024);
+  std::string result(fsts.run());
+  fprintf(stderr, "%s\n", result.c_str());
 }

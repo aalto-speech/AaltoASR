@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <sstream>
 
 class Fst {
 public:
@@ -16,14 +17,26 @@ public:
     int target;
     float transition_logprob;
     std::string emit_symbol;
+
+    inline std::string str() {
+      std::ostringstream os;
+      os << "Arc " << source << " -> " << target << " (" << transition_logprob << "): " << emit_symbol;
+      return os.str();
+    }
   };
     
   struct Node {
     Node() : emission_pdf_idx(-1), end_node(false), pruned(false) {}
     int emission_pdf_idx;
-    std::vector<Arc *> arcptrs;
+    std::vector<int> arcidxs;
     bool end_node;
     bool pruned;
+
+    inline std::string str() {
+      std::ostringstream os;
+      os << "Node " << emission_pdf_idx << " (" << arcidxs.size() << ")";
+      return os.str();
+    }
   };
 
   Fst();
