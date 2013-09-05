@@ -7,6 +7,8 @@
 #include "OneFrameAcoustics.hh"
 //#include "Hmm.hh"
 
+typedef std::string bytestype;
+
 class FstSearch {
 public:
   FstSearch(const char * search_fst_fname, const char * hmm_path, const char * dur_path = NULL);
@@ -18,32 +20,10 @@ public:
   };
   struct InvalidFormat : public std::exception {
     virtual const char *what() const throw()
-      { return "NowayHmmReader: invalid format"; }
+    { return "NowayHmmReader: invalid format"; }
   };
 
-  struct Token {
-    Token(): logprob(0.0f), node_idx(-1), state_dur(0) {};
-    float logprob;
-    std::vector<std::string> unemitted_words;
-    int node_idx;
-    int state_dur;
-
-    inline std::string str() {
-      std::ostringstream os;
-      os << "Token " << node_idx << " " << logprob << " dur " << state_dur << " '";
-      for (auto s: unemitted_words) {
-        os << " " << s;
-      }
-      os << " '";
-      return os.str();
-    }
-
-  };
-
-  std::string run();
-  float propagate_token(Token &, float beam_prune_threshold=-999999999.0f);
-  float duration_logprob(int emission_pdf_idx, int duration);
-
+  bytestype run();
   // FIXME: These functions are direct copies from Toolbox, code duplication !
   void hmm_read(const char *file);
   void duration_read(const char *dur_file);
@@ -57,6 +37,19 @@ public:
   float transition_scale;
 
 private:
+  struct Token {
+    Token(): logprob(0.0f), node_idx(-1), state_dur(0) {};
+    float logprob;
+    std::vector<std::string> unemitted_words;
+    int node_idx;
+    int state_dur;
+
+    std::string str();
+  };
+
+  float propagate_token(Token &, float beam_prune_threshold=-999999999.0f);
+  float duration_logprob(int emission_pdf_idx, int duration);
+
   Fst m_fst;
   std::vector<Token> m_active_tokens;
   std::vector<Token> m_new_tokens;

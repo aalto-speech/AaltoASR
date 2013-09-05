@@ -3,6 +3,17 @@
 #include <algorithm>
 #include <math.h>
 
+std::string FstSearch::Token::str() {
+  std::ostringstream os;
+  os << "Token " << node_idx << " " << logprob << " dur " << state_dur << " '";
+  for (auto s: unemitted_words) {
+    os << " " << s;
+  }
+  os << " '";
+  return os.str();
+}
+
+
 FstSearch::FstSearch(const char * search_fst_fname, const char * hmm_path, const char * dur_path):
   duration_scale(3.0f), beam(2600.0f), token_limit(5000), transition_scale(1.0f), m_frame(0), m_hmm_reader(NULL), 
   m_hmms(NULL), m_acoustics(NULL), m_lna_reader(NULL)
@@ -61,7 +72,7 @@ void FstSearch::lna_close()
   m_lna_reader->close();
 }
 
-std::string FstSearch::run() {
+bytestype FstSearch::run() {
   // FIXME: Set a token to the initial state !!!
   m_new_tokens.resize(1);
   Token &t=m_new_tokens[0];

@@ -1,24 +1,17 @@
 %include "exception.i"
 %include "std_string.i"
+
+typedef std::string bytestype;
+%typemap(out) bytestype {
+	// This is for modern pythons (>=2.7)
+  $result = PyBytes_FromStringAndSize(static_cast<const char*>($1.c_str()),$1.size());
+	// This is for python <= 2.4
+  //$result = Py_BuildValue("s#",$1->c_str(),$1->size());
+}
+
 %module FstSearch
-
+%include FstSearch.hh
 %{
-class FstSearch {
-public:
-  FstSearch(const char * search_fst_fname, const char * hmm_path, const char * dur_path = NULL);
-  ~FstSearch();
-
-  std::string run();
-  // FIXME: These functions are direct copies from Toolbox, code duplication !
-  void hmm_read(const char *file);
-  void duration_read(const char *dur_file);
-  void lna_open(const char *file, int size);
-  void lna_open_fd(const int fd, int size);
-  void lna_close();
-
-  float duration_scale;
-  float beam;
-  int token_limit;
-  float transition_scale;
-};
+  #include "FstSearch.hh"
 %}
+
