@@ -23,7 +23,6 @@ public:
 
   struct Token {
     Token(): logprob(0.0f), node_idx(-1), state_dur(0) {};
-    //Token(Token &t): logprob(t.logprob), node_idx(t.node_idx), state_dur(t.state_dur) {};
     float logprob;
     std::vector<std::string> unemitted_words;
     int node_idx;
@@ -55,6 +54,7 @@ public:
   float duration_scale;
   float beam;
   int token_limit;
+  float transition_scale;
 
 private:
   Fst m_fst;

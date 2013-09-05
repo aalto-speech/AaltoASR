@@ -4,7 +4,7 @@
 #include <math.h>
 
 FstSearch::FstSearch(const char * search_fst_fname, const char * hmm_path, const char * dur_path):
-  duration_scale(3.0f), beam(2600.0f), token_limit(5000), m_frame(0), m_hmm_reader(NULL), 
+  duration_scale(3.0f), beam(2600.0f), token_limit(5000), transition_scale(1.0f), m_frame(0), m_hmm_reader(NULL), 
   m_hmms(NULL), m_acoustics(NULL), m_lna_reader(NULL)
 {
   m_fst.read(search_fst_fname);
@@ -88,10 +88,11 @@ std::string FstSearch::run() {
     std::sort(m_new_tokens.begin(), m_new_tokens.end(),
               [](Token const & a, Token const &b){return a.logprob > b.logprob;});
     
-    //fprintf(stderr, "Sorted\n");
-    //for (auto t: m_new_tokens) {
-      //fprintf(stderr, "  %s\n", t.str().c_str());
-    //}
+    /*fprintf(stderr, "Sorted\n");
+    int c=0;
+    for (auto t: m_new_tokens) {
+      fprintf(stderr, "  %d(%d): %s\n", ++c, m_frame, t.str().c_str());
+    }*/
     if (m_new_tokens.size() > token_limit) {
       m_new_tokens.resize(token_limit);
     }
@@ -108,8 +109,16 @@ std::string FstSearch::run() {
     m_frame++;
   }
 
+  /*
   // Print tokens at final states
-  //fprintf(stderr, "Tokens at final nodes:\n");
+  fprintf(stderr, "Tokens at final nodes:\n");
+  for (auto t: m_new_tokens) {
+    if (m_fst.nodes[t.node_idx].end_node) {
+      fprintf(stderr, "  %s\n", t.str().c_str());
+    }
+    }*/
+
+
   for (auto t: m_new_tokens) {
     if (!m_fst.nodes[t.node_idx].end_node) {
       continue;
@@ -120,7 +129,6 @@ std::string FstSearch::run() {
     }
     os << t.unemitted_words[t.unemitted_words.size()-1];
     return os.str(); // The best hypo at a final node
-    //fprintf(stderr, "  %s\n", t.str().c_str());
   }
 }
 
@@ -135,20 +143,31 @@ float FstSearch::propagate_token( Token &t, float beam_prune_threshold) {
     //fprintf(stderr, "%s\n", arc.str().c_str());
     //fprintf(stderr, "%s\n", node.str().c_str());
 
+    // Is this necessary, do objects have a default copy constructor?
     Token updated_token(t);
+    
+    //Token updated_token;
+    //updated_token.logprob = t.logprob;
+    //updated_token.state_dur = t.state_dur;
+    //updated_token.unemitted_words = t.unemitted_words;
+
+    updated_token.node_idx = arc.target;
+
     int source_emission_pdf_idx = m_fst.nodes[arc.source].emission_pdf_idx;
     //fprintf(stderr, "Add trans logprob %.5f\n", arc.transition_logprob);
-    updated_token.logprob += arc.transition_logprob;
+    updated_token.logprob += transition_scale * arc.transition_logprob;
     if (node.emission_pdf_idx >= 0) {
       //fprintf(stderr, "Emit logprob %.5f\n", m_acoustics->log_prob(node.emission_pdf_idx));
       updated_token.logprob += m_acoustics->log_prob(node.emission_pdf_idx);  
     }
-    if (arc.target != arc.source && source_emission_pdf_idx >= 0 ) {
-      //fprintf(stderr, "Adding dur logprob %d -> %d (%d)\n", arc.source, arc.target, updated_token.state_dur);
-      // Add the duration from prev state at state change boundary
-      updated_token.logprob += duration_scale * 
-        duration_logprob(source_emission_pdf_idx, updated_token.state_dur);
-      updated_token.state_dur = 1;
+    if (arc.target != arc.source) {
+      if (source_emission_pdf_idx >=0) {
+        //fprintf(stderr, "Adding dur logprob %d -> %d (%d)\n", arc.source, arc.target, updated_token.state_dur);
+        // Add the duration from prev state at state change boundary
+        updated_token.logprob += duration_scale * 
+          duration_logprob(source_emission_pdf_idx, updated_token.state_dur);
+        updated_token.state_dur = 1;
+      } //else fprintf(stderr, "Skip duration model.\n");
     } else {
       //fprintf(stderr, "Increasing state dur %d\n", arc.source);
       updated_token.state_dur +=1;
@@ -156,7 +175,6 @@ float FstSearch::propagate_token( Token &t, float beam_prune_threshold) {
     if (arc.emit_symbol.size()) {
       updated_token.unemitted_words.push_back(arc.emit_symbol);
     }
-    updated_token.node_idx = arc.target;
     //fprintf(stderr, "m_nbt size %ld, idx %d\n", m_node_best_token.size(), updated_token.node_idx);
     //fprintf(stderr, "%d\n", m_node_best_token[updated_token.node_idx]);
     int best_token_idx = m_node_best_token[updated_token.node_idx];
