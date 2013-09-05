@@ -5,7 +5,6 @@
 #include "NowayHmmReader.hh"
 #include "LnaReaderCircular.hh"
 #include "OneFrameAcoustics.hh"
-//#include "Hmm.hh"
 
 typedef std::string bytestype;
 
