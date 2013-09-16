@@ -8,10 +8,10 @@
 
 typedef std::string bytestype;
 
-class FstSearch {
+class SearchModelReader {
 public:
-  FstSearch(const char * search_fst_fname, const char * hmm_path, const char * dur_path = NULL);
-  ~FstSearch();
+  SearchModelReader(const char * hmm_path = NULL, const char * dur_path = NULL);
+  ~SearchModelReader();
 
   struct OpenError : public std::exception {
     virtual const char *what() const throw()
@@ -22,18 +22,54 @@ public:
     { return "NowayHmmReader: invalid format"; }
   };
 
-  bytestype run();
   // FIXME: These functions are direct copies from Toolbox, code duplication !
   void hmm_read(const char *file);
-  void duration_read(const char *dur_file);
+  void duration_read(const char *dur_file, std::vector<float> *a_table_ptr=NULL, 
+                     std::vector<float> *b_table_ptr=NULL);
   void lna_open(const char *file, int size);
   void lna_open_fd(const int fd, int size);
   void lna_close();
 
-  float duration_scale;
-  float beam;
-  int token_limit;
-  float transition_scale;
+  float duration_logprob(int emission_pdf_idx, int duration);
+
+  // Setters
+  void set_lna_reader(LnaReaderCircular *lr) {m_lna_reader = lr;}
+  void set_hmm_reader(NowayHmmReader *nhr) {m_hmm_reader = nhr;}
+  void set_dur_tables(const std::vector<float> &a_table, const std::vector<float> &b_table) {
+    m_a_table = a_table; // Sightly inefficient, copy the vectors
+    m_b_table = b_table;
+  }
+  virtual void set_duration_scale(float d) {m_duration_scale=d;}
+  virtual void set_beam(float b) {m_beam=b;}
+  virtual void set_token_limit(int t) {m_token_limit=t;}
+  virtual void set_transition_scale(float t) {m_transition_scale=t;}
+
+protected:
+  float m_duration_scale;
+  float m_beam;
+  int m_token_limit;
+  float m_transition_scale;
+  int m_frame;
+  Acoustics *m_acoustics;
+
+private:
+  std::vector<float> m_a_table;
+  std::vector<float> m_b_table;
+
+  bool m_delete_on_exit;
+
+  NowayHmmReader *m_hmm_reader;
+  LnaReaderCircular *m_lna_reader;
+
+};
+
+class FstSearch: public SearchModelReader {
+public:
+  FstSearch(const char * search_fst_fname, const char * hmm_path, const char * dur_path = NULL);
+
+  void init_search();
+  void run();
+  bytestype get_best_final_hypo_string();
 
 private:
   struct Token {
@@ -46,24 +82,13 @@ private:
     std::string str();
   };
 
+  void propagate_tokens();
   float propagate_token(Token &, float beam_prune_threshold=-999999999.0f);
-  float duration_logprob(int emission_pdf_idx, int duration);
 
   Fst m_fst;
   std::vector<Token> m_active_tokens;
   std::vector<Token> m_new_tokens;
   std::vector<int> m_node_best_token;
-
-  std::vector<float> m_a_table;
-  std::vector<float> m_b_table;
-
-  int m_frame;
-  NowayHmmReader *m_hmm_reader;
-  //std::map<std::string,int> *m_hmm_map;
-  std::vector<Hmm> *m_hmms;
-  Acoustics *m_acoustics;
-  LnaReaderCircular *m_lna_reader;
-  OneFrameAcoustics m_one_frame_acoustics;
 };
 
 #endif
