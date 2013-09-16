@@ -26,15 +26,14 @@ public:
   void hmm_read(const char *file);
   void duration_read(const char *dur_file, std::vector<float> *a_table_ptr=NULL, 
                      std::vector<float> *b_table_ptr=NULL);
-  void lna_open(const char *file, int size);
-  void lna_open_fd(const int fd, int size);
+  virtual void lna_open(const char *file, int size);
+  virtual void lna_open_fd(const int fd, int size);
   void lna_close();
 
   float duration_logprob(int emission_pdf_idx, int duration);
 
   // Setters
-  void set_lna_reader(LnaReaderCircular *lr) {m_lna_reader = lr;}
-  void set_hmm_reader(NowayHmmReader *nhr) {m_hmm_reader = nhr;}
+  void set_acoustics(Acoustics *a) {m_acoustics = a;}
   void set_dur_tables(const std::vector<float> &a_table, const std::vector<float> &b_table) {
     m_a_table = a_table; // Sightly inefficient, copy the vectors
     m_b_table = b_table;
@@ -52,24 +51,28 @@ protected:
   int m_frame;
   Acoustics *m_acoustics;
 
-private:
   std::vector<float> m_a_table;
   std::vector<float> m_b_table;
 
+private:
   bool m_delete_on_exit;
 
   NowayHmmReader *m_hmm_reader;
   LnaReaderCircular *m_lna_reader;
-
 };
 
 class FstSearch: public SearchModelReader {
+friend class FstWithPhoneLoop;
 public:
-  FstSearch(const char * search_fst_fname, const char * hmm_path, const char * dur_path = NULL);
+  FstSearch(const char * search_fst_fname, const char * hmm_path= NULL, const char * dur_path = NULL);
 
   void init_search();
   void run();
-  bytestype get_best_final_hypo_string();
+  bytestype get_best_final_hypo_string() {float foo; return get_best_final_hypo_string_and_logprob(foo);}
+  bytestype get_best_final_hypo_string_and_logprob(float &logprob);
+
+protected:
+  void propagate_tokens();
 
 private:
   struct Token {
@@ -82,7 +85,6 @@ private:
     std::string str();
   };
 
-  void propagate_tokens();
   float propagate_token(Token &, float beam_prune_threshold=-999999999.0f);
 
   Fst m_fst;

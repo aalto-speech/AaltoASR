@@ -182,11 +182,12 @@ void FstSearch::run() {
   }*/
 }
 
-bytestype FstSearch::get_best_final_hypo_string() {
+bytestype FstSearch::get_best_final_hypo_string_and_logprob(float &logprob) {
   for (auto t: m_new_tokens) {
     if (!m_fst.nodes[t.node_idx].end_node) {
       continue;
     }
+    logprob = t.logprob;
     std::ostringstream os;
     for (int i=0; i<t.unemitted_words.size()-1; ++i) {
       os << t.unemitted_words[i] << " ";
@@ -194,8 +195,10 @@ bytestype FstSearch::get_best_final_hypo_string() {
     os << t.unemitted_words[t.unemitted_words.size()-1];
     return os.str(); // The best hypo at a final node
   }
+  // FIXME: We should throw an exception if we end up here !!!!
+  logprob=-1.0f;
+  return "";
 }
-
 
 float FstSearch::propagate_token( Token &t, float beam_prune_threshold) {
   float best_logprob=-999999999.0f;

@@ -29,6 +29,7 @@ set(DECODERSOURCES
   lsstt_decoder.cc 
   Fst.cc
   FstSearch.cc
+  FstWithPhoneLoop.cc
   str.cc
 )
 
