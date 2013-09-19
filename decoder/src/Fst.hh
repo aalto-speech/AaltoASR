@@ -26,11 +26,10 @@ public:
   };
     
   struct Node {
-    Node() : emission_pdf_idx(-1), end_node(false), pruned(false) {}
+    Node() : emission_pdf_idx(-1), end_node(false) {}
     int emission_pdf_idx;
     std::vector<int> arcidxs;
     bool end_node;
-    bool pruned;
 
     inline std::string str() {
       std::ostringstream os;

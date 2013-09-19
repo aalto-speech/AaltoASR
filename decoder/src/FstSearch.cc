@@ -1,12 +1,13 @@
 #include "FstSearch.hh"
 
 #include <algorithm>
+#include <set>
 #include <math.h>
 
-std::string FstSearch::Token::str() {
+std::string FstSearch::Token::str() const {
   std::ostringstream os;
   os << "Token " << node_idx << " " << logprob << " dur " << state_dur << " '";
-  for (auto s: unemitted_words) {
+  for (const auto s: unemitted_words) {
     os << " " << s;
   }
   os << " '";
@@ -15,8 +16,7 @@ std::string FstSearch::Token::str() {
 
 SearchModelReader::SearchModelReader(const char *hmm_path, const char *dur_path):
   m_duration_scale(3.0f), m_beam(2600.0f), m_token_limit(5000), m_transition_scale(1.0f), 
-  m_frame(0), m_hmm_reader(NULL), m_acoustics(NULL), m_lna_reader(NULL), 
-  m_delete_on_exit(false) {
+  m_frame(0), m_acoustics(NULL), m_delete_on_exit(false), m_hmm_reader(NULL), m_lna_reader(NULL) {
 
   if (hmm_path != NULL) {
     hmm_read(hmm_path);
@@ -114,17 +114,17 @@ float SearchModelReader::duration_logprob(int emission_pdf_idx, int duration) {
 }
 
 FstSearch::FstSearch(const char * search_fst_fname, const char * hmm_path, const char * dur_path):
-  SearchModelReader( hmm_path, dur_path)
+  SearchModelReader( hmm_path, dur_path), m_one_token_per_node(false)
 {
   m_fst.read(search_fst_fname);
-  m_node_best_token.resize(m_fst.nodes.size());
+  if (m_one_token_per_node) m_node_best_token.resize(m_fst.nodes.size());
 }
 
 void FstSearch::init_search() {
   m_new_tokens.resize(1);
   Token &t=m_new_tokens[0];
   t.node_idx = m_fst.initial_node_idx;
-  std::fill(m_node_best_token.begin(), m_node_best_token.end(), -1);
+  if (m_one_token_per_node) std::fill(m_node_best_token.begin(), m_node_best_token.end(), -1);
 }
 
 void FstSearch::propagate_tokens() {
@@ -143,19 +143,40 @@ void FstSearch::propagate_tokens() {
   }
   
   // sort and prune
-  std::fill(m_node_best_token.begin(), m_node_best_token.end(), -1);
   std::sort(m_new_tokens.begin(), m_new_tokens.end(),
             [](Token const & a, Token const &b){return a.logprob > b.logprob;});
-  
-  /*fprintf(stderr, "Sorted\n");
-    int c=0;
-    for (auto t: m_new_tokens) {
-    fprintf(stderr, "  %d(%d): %s\n", ++c, m_frame, t.str().c_str());
-    }*/
-  if (m_new_tokens.size() > m_token_limit) {
-    m_new_tokens.resize(m_token_limit);
+
+  if (m_one_token_per_node) {
+    std::fill(m_node_best_token.begin(), m_node_best_token.end(), -1);
+    /*fprintf(stderr, "Sorted\n");
+      int c=0;
+      for (auto t: m_new_tokens) {
+      fprintf(stderr, "  %d(%d): %s\n", ++c, m_frame, t.str().c_str());
+      }*/
+    if (m_new_tokens.size() > m_token_limit) {
+      m_new_tokens.resize(m_token_limit);
+    }
+    //fprintf(stderr, "size after token limit %ld\n", m_new_tokens.size());
+  } else {
+    // For each active node, keep only one hypo with the same tokens
+    int num_accepted_tokens=0;
+    auto orig_tokens(m_new_tokens);
+    m_new_tokens.clear();
+    std::map<int, std::set<std::vector<std::string > > > histmap;
+    for (auto t: orig_tokens) {
+      //fprintf(stderr, "Is there already?");
+      auto &valset = histmap[t.node_idx];
+      if (valset.find(t.unemitted_words) !=valset.end() ) {
+        //fprintf(stderr, " Yes!\n");
+        continue;
+      }
+      //fprintf(stderr, " Nope!\n");
+      valset.insert(t.unemitted_words);
+      m_new_tokens.push_back(t);
+      if (num_accepted_tokens>= m_token_limit) break;
+      num_accepted_tokens++;
+    }
   }
-  //fprintf(stderr, "size after token limit %ld\n", m_new_tokens.size());
   
   int beam_prune_idx = 1;
   best_logprob = m_new_tokens[0].logprob;
@@ -171,33 +192,114 @@ void FstSearch::run() {
     propagate_tokens();
     m_frame++;
   }
+  //fprintf(stderr, "%s\n", tokens_at_final_states().c_str());
+  //fprintf(stderr, "%s\n", best_tokens().c_str());
+}
 
-  /*
-  // Print tokens at final states
-  fprintf(stderr, "Tokens at final nodes:\n");
-  for (auto t: m_new_tokens) {
-  if (m_fst.nodes[t.node_idx].end_node) {
-  fprintf(stderr, "  %s\n", t.str().c_str());
+float FstSearch::token_confidence() {
+  // NOTE: Tokens at the same state get pruned, if only one final state in network this can be quite unreliable
+  bool check_only_final_nodes=false;
+
+  float best_final_token_logprob;
+  std::vector<std::string> best_final_token_symbols;
+  for (const auto t: m_new_tokens) {
+    if (m_fst.nodes[t.node_idx].end_node) {
+      best_final_token_logprob = t.logprob;
+      best_final_token_symbols = t.unemitted_words;
+      fprintf(stderr, "Best %s\n", t.str().c_str());
+      break;
+    }
   }
-  }*/
+
+  if (best_final_token_symbols.size()==0) {
+    fprintf(stderr, "Emptiness\n");
+    return -9999999.9f;
+  }
+
+  float best_different_hypo_logprob=-9999999.9f;
+  for (const auto t:m_new_tokens) {
+    //fprintf(stderr, "Tokening %s\n", t.str().c_str());
+    if (check_only_final_nodes && m_fst.nodes[t.node_idx].end_node == false) continue;
+
+    if (t.unemitted_words.size() > best_final_token_symbols.size()) {
+      //fprintf(stderr, "size\n");
+      best_different_hypo_logprob = t.logprob;
+      break;
+    }
+
+    // Check for the same prefix
+    for (auto i=0; i<t.unemitted_words.size(); ++i) {
+      if (t.unemitted_words[i] != best_final_token_symbols[i]) {
+        best_different_hypo_logprob = t.logprob;
+        fprintf(stderr,"Diff hypo: ");
+        for (const auto w: t.unemitted_words) {
+          fprintf(stderr, " %s", w.c_str());
+        }
+        fprintf(stderr, "\n");
+        goto out;
+      }
+    }
+  }
+
+ out:
+  // Log difference
+  //float token_dist(best_final_token_logprob-best_different_hypo_logprob);
+  //float first_term = std::min(token_dist, 0.0f)*logf(static_cast<float>(m_frame))/1000.0f;
+  //fprintf(stderr, "%.4f %.4f\n", token_dist, first_term);
+  //return std::max(0.0f, 1.0f + first_term);
+
+  // Log division
+  fprintf(stderr, "%.4f %.4f %.4f\n", best_different_hypo_logprob, best_final_token_logprob, best_different_hypo_logprob/(best_final_token_logprob*2)); //3000.0f*logf(static_cast<float> (m_frame))));
+  return std::min(1.0f, best_different_hypo_logprob/(best_final_token_logprob*2)); //-3000.0f*logf(static_cast<float> (m_frame))));
+
+}
+
+bytestype FstSearch::tokens_at_final_states() {
+  std::ostringstream os;
+  os << "Tokens at final nodes:" << std::endl;
+  for (const auto t: m_new_tokens) {
+    if (m_fst.nodes[t.node_idx].end_node) {
+      os << "  " << t.str() << std::endl;
+    }
+  }
+  return os.str();
+}
+
+bytestype FstSearch::best_tokens(int n) {
+  std::ostringstream os;
+  os << "Best tokens:" << std::endl;
+  int c=0;
+  for (const auto t: m_new_tokens) {
+    os << "  " << t.str() << std::endl;
+    if (c++>n) break;
+  }
+  return os.str();
 }
 
 bytestype FstSearch::get_best_final_hypo_string_and_logprob(float &logprob) {
-  for (auto t: m_new_tokens) {
+  for (const auto t: m_new_tokens) {
     if (!m_fst.nodes[t.node_idx].end_node) {
       continue;
     }
     logprob = t.logprob;
     std::ostringstream os;
-    for (int i=0; i<t.unemitted_words.size()-1; ++i) {
-      os << t.unemitted_words[i] << " ";
+    for (const auto w: t.unemitted_words) {
+      os << w << " ";
     }
-    os << t.unemitted_words[t.unemitted_words.size()-1];
-    return os.str(); // The best hypo at a final node
+    std::string retval(os.str()); // The best hypo at a final node
+    return retval.substr(0, retval.size()-1); // Remove the trailing space
   }
   // FIXME: We should throw an exception if we end up here !!!!
   logprob=-1.0f;
   return "";
+}
+
+float FstSearch::get_best_final_token_logprob() {
+  for (const auto t: m_new_tokens) {
+    if (!m_fst.nodes[t.node_idx].end_node) continue;
+    return t.logprob;
+  }
+  return -9999999.9f;
 }
 
 float FstSearch::propagate_token( Token &t, float beam_prune_threshold) {
@@ -205,7 +307,7 @@ float FstSearch::propagate_token( Token &t, float beam_prune_threshold) {
   Fst::Node n = m_fst.nodes[t.node_idx];
   //fprintf(stderr, "Propagate token at node %d\n", t.node_idx);
   //fprintf(stderr, " num arcs %ld\n", n.arcidxs.size());
-  for (auto arcidx: n.arcidxs) {
+  for (const auto arcidx: n.arcidxs) {
     auto arc = m_fst.arcs[arcidx];
     auto node = m_fst.nodes[arc.target];
     //fprintf(stderr, "%s\n", arc.str().c_str());
@@ -245,11 +347,13 @@ float FstSearch::propagate_token( Token &t, float beam_prune_threshold) {
     }
     //fprintf(stderr, "m_nbt size %ld, idx %d\n", m_node_best_token.size(), updated_token.node_idx);
     //fprintf(stderr, "%d\n", m_node_best_token[updated_token.node_idx]);
-    int best_token_idx = m_node_best_token[updated_token.node_idx];
+    int best_token_idx = m_one_token_per_node? m_node_best_token[updated_token.node_idx] : -1;
     Token *best_token = best_token_idx == -1 ? NULL : &(m_new_tokens[best_token_idx]);
     if (updated_token.logprob > beam_prune_threshold && // Do approximate beam pruning here, exact later
         ( best_token_idx ==-1 || updated_token.logprob > best_token->logprob)) {
-      m_node_best_token[updated_token.node_idx] = m_new_tokens.size();
+      if (m_one_token_per_node) {
+        m_node_best_token[updated_token.node_idx] = m_new_tokens.size();
+      }
       //fprintf(stderr, "Accepted token %s\n", updated_token.str().c_str());
       m_new_tokens.push_back(updated_token);
       if (best_logprob < updated_token.logprob) {

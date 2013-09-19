@@ -12,16 +12,18 @@ FstWithPhoneLoop::FstWithPhoneLoop(const char *grammar_fst_name, const char * ph
 
 void FstWithPhoneLoop::run() {
   while (m_acoustics->go_to(m_frame)) {
-    m_grammar_fst.propagate_tokens();
     m_phone_fst.propagate_tokens();
+    m_grammar_fst.propagate_tokens();
     m_frame++;
   }
+  fprintf(stderr, "%s\n", m_grammar_fst.tokens_at_final_states().c_str());
+  fprintf(stderr, "%s\n", m_grammar_fst.best_tokens().c_str());
 }
 
 bytestype FstWithPhoneLoop::get_best_final_hypo_string_and_confidence(float &confidence_retval) {
-  float grammar_logprob=0.0f, ploop_logprob=0.0f;
+  float grammar_logprob=0.0f;
   bytestype res_string(m_grammar_fst.get_best_final_hypo_string_and_logprob(grammar_logprob));
-  bytestype phone_string(m_phone_fst.get_best_final_hypo_string_and_logprob(ploop_logprob));
+  float ploop_logprob(m_phone_fst.get_best_token_logprob());
   fprintf(stderr, "Got %.4f %.4f for '%s'\n", grammar_logprob, ploop_logprob, res_string.c_str());
 
   return res_string;

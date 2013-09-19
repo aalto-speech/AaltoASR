@@ -25,6 +25,8 @@ public:
     m_phone_fst.set_transition_scale(t);
   }
 
+  void set_phone_duration_scale(float t) {m_phone_fst.set_transition_scale(t);}
+
   void set_beam(float b) {
     throw ValueError();
   }

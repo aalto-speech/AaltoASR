@@ -43,6 +43,11 @@ public:
   virtual void set_token_limit(int t) {m_token_limit=t;}
   virtual void set_transition_scale(float t) {m_transition_scale=t;}
 
+  virtual float get_duration_scale() {return m_duration_scale;}
+  virtual float get_beam() {return m_beam;}
+  virtual int get_token_limit() {return m_token_limit;}
+  virtual float get_transition_scale() {return m_transition_scale;}
+
 protected:
   float m_duration_scale;
   float m_beam;
@@ -70,6 +75,11 @@ public:
   void run();
   bytestype get_best_final_hypo_string() {float foo; return get_best_final_hypo_string_and_logprob(foo);}
   bytestype get_best_final_hypo_string_and_logprob(float &logprob);
+  float get_best_token_logprob() {return m_new_tokens.size()>0? m_new_tokens[0].logprob: -9999999.0f;};
+  float get_best_final_token_logprob();
+  bytestype tokens_at_final_states();
+  bytestype best_tokens(int n=10);
+  float token_confidence();
 
 protected:
   void propagate_tokens();
@@ -82,15 +92,16 @@ private:
     int node_idx;
     int state_dur;
 
-    std::string str();
+    std::string str() const;
   };
 
-  float propagate_token(Token &, float beam_prune_threshold=-999999999.0f);
-
+  bool m_one_token_per_node;
   Fst m_fst;
   std::vector<Token> m_active_tokens;
   std::vector<Token> m_new_tokens;
   std::vector<int> m_node_best_token;
+
+  float propagate_token(Token &, float beam_prune_threshold=-999999999.0f);
 };
 
 #endif
