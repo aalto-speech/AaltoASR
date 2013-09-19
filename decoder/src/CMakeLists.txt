@@ -30,7 +30,6 @@ set(DECODERSOURCES
   Fst.cc
   FstSearch.cc
   FstWithPhoneLoop.cc
-  str.cc
 )
 
 ADD_DEFINITIONS(-std=gnu++0x)

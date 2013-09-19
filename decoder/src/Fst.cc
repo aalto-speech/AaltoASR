@@ -1,7 +1,8 @@
 #include "Fst.hh"
-#include "str.hh"
+#include "misc/str.hh"
 
 #include <cstdlib>
+#define strtof strtod
 
 Fst::Fst(): initial_node_idx(-1) {
 }
@@ -15,14 +16,14 @@ void Fst::read(std::string &fname) {
     exit(-1); // FIXME: we should use exceptions
   }
 
-  str::read_line(&line, ifh, true);
+  str::read_line(line, ifh, true);
   if (line != "#FSTBasic MaxPlus") {
     fprintf(stderr, "Unknown header '%s'.\n", line.c_str());
     throw ReadError();
   }
   std::vector<std::string> fields;
-  while (str::read_line(&line, ifh, true)) {
-    str::split(&line, " ", true, &fields);
+  while (str::read_line(line, ifh, true)) {
+    fields = str::split(line, " ", true);
     if (fields.size()<2) {
       fprintf(stderr, "Too few fields '%s'.\n", line.c_str());
       throw ReadError();
@@ -53,7 +54,7 @@ void Fst::read(std::string &fname) {
     }
     
     if (fields[0]=="T") {
-      if (fields.size()<3 or fields.size()>6) {
+      if (fields.size()<3 || fields.size()>6) {
         fprintf(stderr, "Weird number of fields for T: '%s'.\n", line.c_str());
         throw ReadError();
       }

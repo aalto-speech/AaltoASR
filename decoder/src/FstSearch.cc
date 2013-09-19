@@ -2,7 +2,12 @@
 
 #include <algorithm>
 #include <set>
+#ifdef _MSC_VER
+#include <boost/math/tr1.hpp>
+using namespace boost::math::tr1;
+#else
 #include <math.h>
+#endif
 
 std::string FstSearch::Token::str() const {
   std::ostringstream os;
