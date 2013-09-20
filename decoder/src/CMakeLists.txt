@@ -26,7 +26,6 @@ set(DECODERSOURCES
   ArpaReader.cc
   InterTreeGram.cc
   WordClasses.cc
-  lsstt_decoder.cc 
   Fst.cc
   FstSearch.cc
   FstWithPhoneLoop.cc
