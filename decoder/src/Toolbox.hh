@@ -242,17 +242,21 @@ public:
   void set_print_text_result(int print) { m_tp_search->set_print_text_result(print); }
   void set_print_state_segmentation(int print) { m_tp_search->set_print_state_segmentation(print); }
   void set_keep_state_segmentation(int value) { m_tp_search->set_keep_state_segmentation(value); }
-  void set_print_probs(bool print_probs) 
-  { 
+  void set_print_probs(bool print_probs)
+  {
     m_use_stack_decoder?m_search->set_print_probs(print_probs):m_tp_search->set_print_probs(print_probs);
   }
-  void set_multiple_endings(int multiple_endings) 
+  void set_multiple_endings(int multiple_endings)
   { m_search->set_multiple_endings(multiple_endings); }
-  void set_print_indices(bool print_indices) 
-  { m_search->set_print_indices(print_indices); }
-  void set_print_frames(bool print_frames) 
-  { 
-    m_search->set_print_frames(print_frames); 
+
+  void set_print_indices(bool print_indices)
+  {
+    if (m_use_stack_decoder) m_search->set_print_indices(print_indices);
+  }
+
+  void set_print_frames(bool print_frames)
+  {
+    if (m_use_stack_decoder) m_search->set_print_frames(print_frames);
   }
 
   /// \brief Sets the word that represents word boundary.
