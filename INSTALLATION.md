@@ -51,7 +51,7 @@ After this all a
 
     make install
 
-will install the binaries and libraries on the correct places. This location can be changed with the option -D CMAKE_INSTALL_PREFIX=/path to the cmake command.
+will install the binaries and libraries on the correct places. This location can be changed with the option -DCMAKE_INSTALL_PREFIX=/path to the cmake command.
 
 For a debug build, add -DCMAKE_BUILD_TYPE=Debug to the cmake command. For an optimized build add -DCMAKE_BUILD_TYPE=Release.
 
