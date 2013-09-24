@@ -2369,7 +2369,7 @@ Mixture::estimate_parameters(EstimationMode mode)
         //   m_weights[i] /= norm;
 
         // Heuristics: If outside permitted region, move halfway
-        if (!isnan(sol1))
+        if (!std::isnan(sol1))
         {
           if (sol1 <= 0)
             m_weights[i] = m_weights[i]/2.0;
