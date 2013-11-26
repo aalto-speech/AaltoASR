@@ -121,7 +121,7 @@ public:
             return;
 
         // Build character trie for the morphs.
-        const SymbolMap &syms = lm->symbol_map();
+        const misc::SymbolMap<std::string,int> &syms = lm->symbol_map();
         for (int s = 0; s < syms.size(); s++) {
             string morph = syms.at(s);
             int n = m_trie.root();
