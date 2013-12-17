@@ -1032,7 +1032,11 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
       // Add duration probability
       int temp_dur = token->dur + 1;
       duration_log_prob = m_duration_scale
-        * token->node->state->duration.get_log_prob(temp_dur);
+        // FIXME: -10.0f is for escaping long noisy silences without crashing. 
+        // it should be jus a bit higher than the global beam to allow
+        // escaping from insanely long phoneme
+        * std::max(token->node->state->duration.get_log_prob(temp_dur), -10.0f);
+
       updated_token.am_log_prob += duration_log_prob;
     }
 
