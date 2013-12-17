@@ -736,6 +736,8 @@ void TokenPassSearch::propagate_tokens(void)
 {
   int i;
 
+  m_long_duration_pass = 0; // 20131217 Ugly hack to fix running out of tokens on long noisy silences
+
 #if (defined PRUNING_EXTENSIONS || defined PRUNING_MEASUREMENT || defined FAN_IN_PRUNING || defined EQ_WC_PRUNING || defined EQ_DEPTH_PRUNING)
   for (i = 0; i < MAX_LEX_TREE_DEPTH/2; i++)
   {
@@ -1062,9 +1064,14 @@ TokenPassSearch::move_token_to_node(TPLexPrefixTree::Token *token,
   else {
     // Self transition
     updated_token.dur = token->dur + 1;
-    if (updated_token.dur > MAX_STATE_DURATION && token->node->state != NULL
-        && token->node->state->duration.is_valid_duration_model())
-      return; // Maximum state duration exceeded, discard token
+    if (updated_token.dur > MAX_STATE_DURATION 
+        && token->node->state != NULL
+        && token->node->state->duration.is_valid_duration_model()) {
+      if (m_long_duration_pass<10) {
+        m_long_duration_pass +=1;
+      } else
+        return; // Maximum state duration exceeded, discard token
+    }
     updated_token.depth = token->depth;
     updated_token.cur_am_log_prob = token->cur_am_log_prob
       + m_transition_scale * transition_score;
