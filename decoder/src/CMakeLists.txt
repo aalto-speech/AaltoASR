@@ -26,9 +26,9 @@ set(DECODERSOURCES
   ArpaReader.cc
   InterTreeGram.cc
   WordClasses.cc
+  FstAcoustics.cc
   Fst.cc
-  FstSearch.cc
-  FstWithPhoneLoop.cc
+  FstConfidence.cc
 )
 
 ADD_DEFINITIONS(-std=gnu++0x)

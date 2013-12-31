@@ -11,7 +11,7 @@ void Fst::read(std::string &fname) {
   std::string line;
 
   FILE *ifh = fopen(fname.c_str(), "r");
-  if (ifh==NULL) {
+  if (ifh==nullptr) {
     perror("Error");
     exit(-1); // FIXME: we should use exceptions
   }
@@ -77,7 +77,7 @@ void Fst::read(std::string &fname) {
       }
 
       if (fields.size()>=6) {
-        a.transition_logprob = strtof(fields[5].c_str(), NULL);
+        a.transition_logprob = strtof(fields[5].c_str(), nullptr);
       }
       nodes[first_node_idx].arcidxs.push_back(aidx);
 
