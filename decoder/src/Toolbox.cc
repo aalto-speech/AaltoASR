@@ -170,7 +170,6 @@ Toolbox::reinitialize_search() {
   }
   m_lna_reader = new LnaReaderCircular;
 
-
   if (m_tp_lexicon) {
     delete m_tp_lexicon;
   }
@@ -187,25 +186,25 @@ Toolbox::reinitialize_search() {
   m_tp_search = new TokenPassSearch(*m_tp_lexicon, *m_tp_vocabulary, m_lna_reader);
 
   if (m_use_stack_decoder) {
-  if (m_expander) {
-    delete m_expander;
-  }
-  m_expander = new Expander(*m_hmms, *m_lna_reader);
-  m_expander->set_post_durations(true);
-  m_expander->set_lexicon(m_lexicon);
+    if (m_expander) {
+      delete m_expander;
+    }
+    m_expander = new Expander(*m_hmms, *m_lna_reader);
+    m_expander->set_post_durations(true);
+    m_expander->set_lexicon(m_lexicon);
 
-  if (m_lexicon_reader) {
-    delete m_lexicon_reader;
-  }
-  m_lexicon_reader = new NowayLexiconReader(*m_hmm_map, *m_hmms);
+    if (m_lexicon_reader) {
+      delete m_lexicon_reader;
+    }
+    m_lexicon_reader = new NowayLexiconReader(*m_hmm_map, *m_hmms);
 
-  m_lexicon = &(m_lexicon_reader->lexicon());
-  m_vocabulary = &(m_lexicon_reader->vocabulary());
+    m_lexicon = &(m_lexicon_reader->lexicon());
+    m_vocabulary = &(m_lexicon_reader->vocabulary());
 
-  if (m_search) {
-    delete m_search;
-  }
-  m_search = new Search(*m_expander, *m_vocabulary);
+    if (m_search) {
+      delete m_search;
+    }
+    m_search = new Search(*m_expander, *m_vocabulary);
   }
 }
 
