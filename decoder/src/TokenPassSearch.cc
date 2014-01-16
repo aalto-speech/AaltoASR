@@ -1848,6 +1848,9 @@ void TokenPassSearch::find_word_from_lm(int word_id, std::string word,
       cm_log_prob = 0;
     }
   }
+  else {
+    cm_log_prob = 0;
+  }
 #else
   cm_log_prob = 0;
 #endif
