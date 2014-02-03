@@ -1,5 +1,10 @@
 #ifndef FST_HH
 #define FST_HH
+/* 
+   Simple class to handle mitfst (http://people.csail.mit.edu/ilh/fst/) format networks. 
+   AT&T fst toolkit and openfst have very similar formats, so this may work directly or
+   with small adjustments with thosenetworks.
+*/
 
 #include <vector>
 #include <string>
