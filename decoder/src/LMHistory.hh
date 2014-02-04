@@ -174,11 +174,12 @@ public:
 #endif
   };
 
-  LMHistory(const Word & last_word, LMHistory * previous);
+  LMHistory(const Word * last_word, LMHistory * previous);
+  LMHistory();
 
   const Word & last() const
   {
-    return m_last_word;
+    return *last_word;
   }
 
   ConstReverseIterator rbegin() const;
@@ -191,18 +192,22 @@ public:
   int word_start_frame;
   int word_first_silence_frame;  // "end frame", initialized to -1.
 
-private:
   // A reference to TokenPassSearch::m_word_lookup table.
-  const Word & m_last_word;
+  const Word * last_word;
 };
 
-inline LMHistory::LMHistory(const Word & last_word, LMHistory * previous) :
+inline LMHistory::LMHistory(const Word * last_word, LMHistory * previous) :
   previous(previous), reference_count(0), printed(false), word_start_frame(
-									   0), word_first_silence_frame(-1), m_last_word(last_word)
+									   0), word_first_silence_frame(-1), last_word(last_word)
 {
   if (previous)
     hist::link(previous);
 }
+
+inline LMHistory::LMHistory() :
+  previous(NULL), reference_count(0), printed(false), word_start_frame(0), 
+  word_first_silence_frame(-1), last_word(NULL)
+{}
 
 inline LMHistory::ConstReverseIterator &
 LMHistory::ConstReverseIterator::operator++()

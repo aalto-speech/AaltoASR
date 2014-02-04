@@ -477,7 +477,7 @@ namespace str {
    * \return the last substring delimited by the delimiting characters
    */
   inline std::string
-  pop_back(std::string &str, char *delims = " \t")
+  pop_back(std::string &str, const char *delims = " \t")
   {
     while (!str.empty()) {
       std::string::size_type pos = str.find_last_of(delims);
@@ -508,7 +508,7 @@ namespace str {
    * \return the first substring delimited by the delimiting characters
    */
   inline std::string
-  pop_front(std::string &str, char *delims = " \t")
+  pop_front(std::string &str, const char *delims = " \t")
   {
     while (!str.empty()) {
       std::string::size_type pos = str.find_first_of(delims);

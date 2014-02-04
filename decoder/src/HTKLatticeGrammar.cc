@@ -130,6 +130,9 @@ void HTKLatticeGrammar::read(FILE *file, bool binary) {
   }
   /*fprintf(stdout,"sidx %d, eidx %d, nidx %d\n", m_start_node_idx,
     m_end_node_idx, m_null_idx);*/
+  
+  // For lookahead
+  pregenerate_bigram_idxlist();
 }
 
 void HTKLatticeGrammar::write(FILE *file, bool binary) {
@@ -158,17 +161,17 @@ bool HTKLatticeGrammar::match_begin(const Gram &g) {
     std::vector<int> &cur_states = active_states[cur_token_num%2];
     std::vector<int> &new_states = active_states[(cur_token_num+1)%2];
 
-    //fprintf(stdout,"Active nodes:\n");
+#if 0
+    fprintf(stdout,"Active nodes:\n");
     for (int i=0;i<cur_states.size();i++) {
-      //fprintf(stdout,"%d (",cur_states[i]);
+      fprintf(stdout,"%d (",cur_states[i]);
       Node n = m_nodes[cur_states[i]];
       for (int j=0;j<n.arcs_out.size(); j++) {
-	//fprintf(stdout,"%d ", n.arcs_out[j]);
+	fprintf(stdout,"%d ", n.arcs_out[j]);
       }
-      //fprintf(stdout,")\n");
+      fprintf(stdout,")\n");
     }
-
-
+#endif
 
     if (cur_states.size()==0) return false;
     new_states.clear();
@@ -213,4 +216,53 @@ bool HTKLatticeGrammar::match_begin(const std::string &string_in) {
   }
 
   return match_begin(g);
+}
+
+void HTKLatticeGrammar::follow_and_insert_bigram(Arc *sourceA, int null_idx, std::set<int> &bigram_targetset) {
+  std::vector<int> &target_arclist = m_nodes[sourceA->target].arcs_out;
+  for (std::vector<int>::iterator atarget=target_arclist.begin();
+       atarget!=target_arclist.end(); ++atarget) {
+    Arc *target = &m_arcs[*atarget];
+    if (target->widx == null_idx) {
+      follow_and_insert_bigram(target, null_idx, bigram_targetset);
+      continue;
+    }
+
+    //fprintf(stderr, " (%s %d)", word(target->widx).c_str(), target->widx);
+    bigram_targetset.insert(target->widx);
+    //fprintf(stderr,"\n");
+  }
+}
+
+void HTKLatticeGrammar::pregenerate_bigram_idxlist() {
+  m_bigram_idxlist.clear();
+  m_bigram_idxlist.resize(m_words.size());
+
+  int null_idx = word_index("!NULL");
+
+  for (std::vector<Arc>::iterator abeg=m_arcs.begin(); abeg!=m_arcs.end(); ++abeg) {
+    if (abeg->widx == null_idx) continue;
+    //fprintf(stderr, "Gen for (%s %d):\n", word(abeg->widx).c_str(), abeg->widx);
+    std::set<int> &bigram_targetset = m_bigram_idxlist.at(abeg->widx);
+    follow_and_insert_bigram(&(*abeg), null_idx, bigram_targetset);
+  }
+}
+
+
+void HTKLatticeGrammar::fetch_bigram_list(int prev_word_id, 
+                                          std::vector<float> &result_buffer) {
+  result_buffer.resize(m_words.size());
+  for (std::vector<float>::iterator it=result_buffer.begin(); it!=result_buffer.end(); ++it) {
+    *it = IMPOSSIBLE_LOGPROB;
+  }
+
+  std::set<int> &possible_targets = m_bigram_idxlist[prev_word_id];
+  //fprintf(stderr, "%ld possible LA continuations for %s:", m_bigram_idxlist[prev_word_id].size(), 
+  //        word(prev_word_id).c_str());
+  for (std::set<int>::iterator idx = possible_targets.begin();
+       idx != possible_targets.end(); ++idx) {
+    //fprintf(stderr, " %d", *idx);
+    result_buffer[*idx] = 0.0f;
+  }
+  //fprintf(stderr, "\n");
 }

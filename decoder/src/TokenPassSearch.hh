@@ -62,6 +62,7 @@ public:
 
   TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
                   Acoustics *acoustics);
+  ~TokenPassSearch();
 
   /// \brief Resets the search and creates the initial token.
   ///
@@ -205,6 +206,9 @@ public:
 
   void set_require_sentence_end(bool s) { m_require_sentence_end = s; }
 
+  /// \brief Remove :[0-9]+ from the end of each word? This allows the
+  /// dictionary to have pronunciation IDs that do not affect decoding.
+  ///
   void set_remove_pronunciation_id(bool remove) { m_remove_pronunciation_id = remove; }
 
   /// This function has to be called before calling set_ngram() or
@@ -554,10 +558,17 @@ private:
   }
 
   TPLexPrefixTree::Token* acquire_token(void);
+  LMHistory* acquire_lmhist(const LMHistory::Word *, LMHistory *);
   void release_token(TPLexPrefixTree::Token *token);
+  void release_lmhist(LMHistory *);
 
   void save_token_statistics(int count);
   //void print_token_path(TPLexPrefixTree::PathHistory *hist);
+
+  // Help variables to cope with memory leaks
+  // Vector of pointers to memory blocks for m_token_pool, this is only for freeing up memory at the destructor
+  std::vector<TPLexPrefixTree::Token *> m_token_dealloc_table;
+  std::vector<LMHistory *> m_lmhist_dealloc_table;
 
 public:
 
@@ -577,6 +588,7 @@ private:
   token_list_type * m_new_token_list;
   token_list_type * m_word_end_token_list;
   token_list_type m_token_pool;
+  std::vector<LMHistory*> m_lmh_pool;
 
   std::vector<TPLexPrefixTree::Node*> m_active_node_list;
 

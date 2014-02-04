@@ -41,7 +41,7 @@ public:
   };
 
   // Actions
-  Expander(const std::vector<Hmm> &hmms, Lexicon &lexicon,
+  Expander(const std::vector<Hmm> &hmms,
 	   Acoustics &m_acoustics);
 
   ~Expander();
@@ -66,6 +66,7 @@ public:
 
   void set_post_durations(bool durations) { m_post_durations = durations; }
   void set_rabiner_post_mode(int mode) { m_rabiner_post_mode = mode; }
+  void set_lexicon(Lexicon *l) {m_lexicon = l;}
 
   // Info
   inline std::vector<Lexicon::Token*> &tokens() { return m_tokens; }
@@ -109,7 +110,7 @@ private:
   void release_token(Lexicon::Token *token);
   
   const std::vector<Hmm> &m_hmms;
-  Lexicon &m_lexicon;
+  Lexicon *m_lexicon;
   Acoustics &m_acoustics;
 
   // Options

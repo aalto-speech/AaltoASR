@@ -213,7 +213,10 @@ public:
   void set_global_beam(float beam) { m_global_beam = beam; }
   void set_verbose(int verbose) { m_verbose = verbose; }
   void set_print_probs(bool print_probs) { m_print_probs = print_probs; }
-  void set_print_indices(bool print_indices) { m_print_indices = print_indices; }
+  void set_print_indices(bool print_indices)
+  {
+    m_print_indices = print_indices;
+  }
   void set_print_frames(bool print_frames) { m_print_frames = print_frames; }
   void set_word_boundary(const std::string &word);
   void set_dummy_word_boundaries(bool value) { m_dummy_word_boundaries = value; }

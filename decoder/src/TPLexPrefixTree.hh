@@ -49,8 +49,7 @@
 /// The search network is built around a popular idea of a lexical prefix tree.
 /// As suggested by Demuynck et al. (2000), the traditional phone-level tree can
 /// be made even more efficient by utilizing the HMM level state tying, which
-/// has been implemented here. Cross-word triphone contexts are handled by
-/// building a separate network, to which the lexical prefix tree is linked.
+/// has been implemented here.
 ///
 /// The search network is built of nodes (TPLexPrefixTree::Node), which are
 /// linked to each other with arcs (TPLexPrefixTree::Arc). Nodes can either
@@ -60,6 +59,15 @@
 /// used to represent the active search network. A node can also have a word
 /// identity (word_id) associated with it, which leads to insertion of the word
 /// into the word history of the token passing that node.
+///
+/// Cross-word triphone contexts are handled by building a separate network, to
+/// which the lexical prefix tree is linked. The left context of the first
+/// triphone of a word, and the right context of the last triphone of a word, is
+/// silence, so the cross word network is linked to the second triphone and the
+/// second to last triphone of every word. The part of the cross word network
+/// linked to the beginning (second triphone) of a word is called fan-in. The
+/// part where the end (second to last triphone) of a word is linked to, is
+/// called fan-out.
 ///
 /// Every triphone is defined in the acoustic models, and they are not tied at
 /// the triphone level. Instead, each triphone has a set of HMM states
@@ -128,17 +136,43 @@ public:
 
     unsigned char depth;
     unsigned char dur;
+
+    Token():
+      node(NULL),
+      next_node_token(NULL),
+      am_log_prob(0.0f),
+      lm_log_prob(0.0f),
+      cur_am_log_prob(0.0f),
+      cur_lm_log_prob(0.0f),
+      total_log_prob(0.0f),
+      lm_history(NULL),
+      lm_hist_code(0),
+      fsa_lm_node(0),
+      recent_word_graph_node(0),
+      word_history(NULL),
+      word_start_frame(0),
+      word_count(0),
+      state_history(NULL),
+      depth(0),
+      dur(0)
+    { }
   };
+
 
   class Arc {
   public:
     float log_prob;
     Node *next;
+
+    Arc():
+      log_prob(0.0f),
+      next(NULL)
+    {}
   };
 
   class Node {
   public:
-    inline Node() : word_id(-1), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
+    inline Node() : word_id(-1), node_id(0), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
     inline Node(int wid) : word_id(wid), state(NULL), token_list(NULL), flags(NODE_NORMAL) { }
     inline Node(int wid, HmmState *s) : word_id(wid), state(s), token_list(NULL), flags(NODE_NORMAL) { }
     int word_id; // -1 for nodes without word identity.
@@ -156,6 +190,10 @@ public:
   struct NodeArcId {
     Node *node;
     int arc_index;
+    NodeArcId() :
+      node(NULL),
+      arc_index(0)
+    {}
   };
 
   TPLexPrefixTree(std::map<std::string,int> &hmm_map, std::vector<Hmm> &hmms);
@@ -406,7 +444,7 @@ private:
 TPLexPrefixTree::WordHistory::WordHistory(int word_id, int end_frame, 
 					  WordHistory *previous)
   : word_id(word_id), end_frame(end_frame), 
-    lm_log_prob(0), am_log_prob(0), cum_lm_log_prob(0), cum_am_log_prob(0),
+    lex_node_id(0), graph_node_id(0), lm_log_prob(0), am_log_prob(0), cum_lm_log_prob(0), cum_am_log_prob(0),
     printed(false), previous(previous), reference_count(0)
 {
   if (previous) {

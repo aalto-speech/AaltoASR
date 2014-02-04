@@ -73,7 +73,7 @@ ENDIF(FFTW_FOUND AND NOT KISS_FFT)
 add_library( aku ${AKUSOURCES} )
 add_dependencies(aku lapackpp_ext)
 
-set(AKU_CMDS feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats regtree clsstep clskld opt_ebw_d )
+set(AKU_CMDS feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats regtree clsstep clskld opt_ebw_d )
 
 foreach(AKU_CMD ${AKU_CMDS})
     add_executable ( ${AKU_CMD} ${AKU_CMD}.cc )
