@@ -15,6 +15,42 @@ namespace endian {
   /// Convert the endianity of 'elems' elements of 'bytes' bytes.
   void convert_buffer(void *buf, int elems, int bytes, int skip = 0);
 
+  /// Parse 4-byte value in little-endian format
+  template <typename T>
+  T get4(void *buf, bool read_big = false)
+  {
+    assert(sizeof(T) == 4);
+    if (big == read_big)
+      return *(T*)buf;
+
+    T ret = 0;
+    char *ptr = (char*)&ret;
+    char *src = (char*)buf;
+    ptr[0] = src[3];
+    ptr[1] = src[2];
+    ptr[2] = src[1];
+    ptr[3] = src[0];
+    return ret;
+  }
+
+  /// Write 4-byte value in little-endian format
+  template <typename T>
+  void put4(T value, void *buf, bool write_big = false)
+  {
+    assert(sizeof(T) == 4);
+    if (big == write_big) {
+      *(T*)buf = value;
+      return;
+    }
+
+    char *ptr = (char*)&value;
+    char *tgt = (char*)buf;
+    tgt[0] = ptr[3];
+    tgt[1] = ptr[2];
+    tgt[2] = ptr[1];
+    tgt[3] = ptr[0];
+  }
+
   /// Write 4-byte value in little-endian format
   template <typename T>
   size_t write4(T v, FILE *file, bool write_big = false)
