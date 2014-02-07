@@ -43,5 +43,6 @@ target_link_libraries ( hmm2fsm decoder )
 #target_link_libraries ( fst_test decoder )
 
 install(TARGETS arpa2bin bin2arpa DESTINATION bin)
-install(FILES Toolbox.hh WordGraph.hh NowayHmmReader.hh Hmm.hh NowayLexiconReader.hh Lexicon.hh Vocabulary.hh NowayLexiconReader.hh TPNowayLexReader.hh TPLexPrefixTree.hh config.hh HashCache.hh SimpleHashCache.hh LMHistory.hh history.hh WordClasses.hh LnaReaderCircular.hh Acoustics.hh Expander.hh Search.hh TreeGram.hh NGram.hh TokenPassSearch.hh OneFrameAcoustics.hh DESTINATION include)
+file(GLOB DECODER_HEADERS "*.hh") 
+install(FILES ${DECODER_HEADERS} DESTINATION include)
 install(TARGETS decoder DESTINATION lib)
