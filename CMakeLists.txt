@@ -40,10 +40,7 @@ set(LapackPP_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/vendor/lapackpp/include
                           ${CMAKE_BINARY_DIR}/vendor/lapackpp/include/lapackpp )
 set(LapackPP_LIBRARIES LapackPP)
 
-file(GLOB LapackPP_INCLUDES 
-    "${CMAKE_BINARY_DIR}/vendor/lapackpp/include/lapackpp/*"
-)
-install(FILES ${LapackPP_INCLUDES} DESTINATION include/lapackpp)
+install(DIRECTORY ${CMAKE_BINARY_DIR}/vendor/lapackpp/include/lapackpp DESTINATION include)
 install(FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.a DESTINATION lib)
 add_subdirectory( decoder )
 add_subdirectory( tools )
