@@ -8,6 +8,8 @@
 #endif
 #include <vector>
 
+#include <errno.h>
+#include <string.h>
 #include "FeatureBuffer.hh"
 #include "AudioReader.hh"
 #include "ModuleConfig.hh"

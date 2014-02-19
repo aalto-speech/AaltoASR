@@ -585,7 +585,13 @@ PreModule::PreModule() :
 void
 PreModule::set_fname(const char *fname)
 {
-  throw std::string("PreModule: set_fname not implemented.");
+  FILE *file = fopen(fname, "rb");
+  if (file == NULL)
+	throw std::string("could not open file ") + fname + ": " +
+	  strerror(errno);
+
+  set_file(file, false);
+
 }
 
 void
