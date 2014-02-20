@@ -290,8 +290,7 @@ private:
   int m_legacy_file; //!< If nonzero, the dimension in the file is a byte
   int m_file_offset;
   int m_cur_pre_frame;
-
-  bool m_close_file = false;
+  bool m_close_file;
 
   FILE *m_fp;
 

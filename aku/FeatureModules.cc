@@ -576,7 +576,8 @@ PreModule::PreModule() :
   m_file_offset(0),
   m_cur_pre_frame(INT_MAX),
   m_fp(NULL),
-  m_last_feature_frame(INT_MIN)
+  m_last_feature_frame(INT_MIN),
+  m_close_file(false)
 {
   m_type_str = type_str();
 }
@@ -692,11 +693,10 @@ PreModule::reset_module()
   m_last_feature.clear();
   m_last_feature_frame = INT_MIN;
   m_cur_pre_frame = INT_MAX;
-  if (m_close_file && m_fp != NULL) {
-	  close(m_fp);
-  }
+  if (m_close_file && m_fp != NULL)
+	  fclose(m_fp);
   m_fp = NULL;
-
+  m_close_file = false;
 }
 
 void
