@@ -586,11 +586,13 @@ void
 PreModule::set_fname(const char *fname)
 {
   FILE *file = fopen(fname, "rb");
+
   if (file == NULL)
 	throw std::string("could not open file ") + fname + ": " +
 	  strerror(errno);
 
   set_file(file, false);
+  m_close_file = true;
 
 }
 
@@ -690,7 +692,11 @@ PreModule::reset_module()
   m_last_feature.clear();
   m_last_feature_frame = INT_MIN;
   m_cur_pre_frame = INT_MAX;
+  if (m_close_file && m_fp != NULL) {
+	  close(m_fp);
+  }
   m_fp = NULL;
+
 }
 
 void

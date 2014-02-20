@@ -291,6 +291,8 @@ private:
   int m_file_offset;
   int m_cur_pre_frame;
 
+  bool m_close_file = false;
+
   FILE *m_fp;
 
   std::vector<double> m_first_feature; //!< Feature returned for negative frames
