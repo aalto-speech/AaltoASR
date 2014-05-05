@@ -31,7 +31,7 @@ conf::Config config;
 Recipe recipe;
 HmmSet model;
 FeatureGenerator fea_gen;
-SpeakerConfig speaker_config(fea_gen);
+SpeakerConfig speaker_config(fea_gen, &model);
 std::string module_name;
 std::vector<int> silence_states;
 
