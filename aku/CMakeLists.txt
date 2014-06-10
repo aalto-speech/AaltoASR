@@ -81,4 +81,7 @@ foreach(AKU_CMD ${AKU_CMDS})
     install(TARGETS ${AKU_CMD} DESTINATION bin)
 endforeach(AKU_CMD)
 
+file(GLOB AKU_HEADERS "*.hh") 
+install(FILES ${AKU_HEADERS} DESTINATION include)
+install(TARGETS aku DESTINATION lib)
 add_subdirectory( swig )

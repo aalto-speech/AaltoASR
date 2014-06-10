@@ -576,7 +576,8 @@ PreModule::PreModule() :
   m_file_offset(0),
   m_cur_pre_frame(INT_MAX),
   m_fp(NULL),
-  m_last_feature_frame(INT_MIN)
+  m_last_feature_frame(INT_MIN),
+  m_close_file(false)
 {
   m_type_str = type_str();
 }
@@ -585,7 +586,15 @@ PreModule::PreModule() :
 void
 PreModule::set_fname(const char *fname)
 {
-  throw std::string("PreModule: set_fname not implemented.");
+  FILE *file = fopen(fname, "rb");
+
+  if (file == NULL)
+	throw std::string("could not open file ") + fname + ": " +
+	  strerror(errno);
+
+  set_file(file, false);
+  m_close_file = true;
+
 }
 
 void
@@ -684,7 +693,10 @@ PreModule::reset_module()
   m_last_feature.clear();
   m_last_feature_frame = INT_MIN;
   m_cur_pre_frame = INT_MAX;
+  if (m_close_file && m_fp != NULL)
+	  fclose(m_fp);
   m_fp = NULL;
+  m_close_file = false;
 }
 
 void

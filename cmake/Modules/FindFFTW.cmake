@@ -1,6 +1,6 @@
-#  FFTW_INCLUDE_DIRS   - where to find sndfile.h
-#  FFTW_LIBRARIES      - List of libraries when using sndfile
-#  FFTW_FOUND          - True if sndfile found
+#  FFTW_INCLUDE_DIRS   - where to find fftw3.h
+#  FFTW_LIBRARIES      - List of libraries when using fftw
+#  FFTW_FOUND          - True if fftw found
 
 
 FIND_PATH(FFTW_INCLUDE_DIR NAMES fftw3.h)
