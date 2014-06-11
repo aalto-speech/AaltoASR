@@ -24,7 +24,7 @@ HmmSet model;
 FeatureGenerator fea_gen;
 FeatureGenerator model_fea_gen;
 FeatureGenerator *mfea_gen; // Set to the correct FeatureGenerator object
-SpeakerConfig speaker_config(fea_gen);
+SpeakerConfig speaker_config(fea_gen, &model);
 
 
 
