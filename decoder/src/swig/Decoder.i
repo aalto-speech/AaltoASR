@@ -4,6 +4,7 @@
 
 %module Decoder
 %{
+#include <cstddef>
 #include "fsalm/LM.hh"
 #include "Toolbox.hh"
 using namespace fsalm;

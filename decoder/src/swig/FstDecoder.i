@@ -2,12 +2,10 @@
 
 %include exception.i
 
-# %module FstDecoder
-# %{
-# #include "fsalm/LM.hh"
-# #include "Toolbox.hh"
-# using namespace fsalm;
-# %}
+%module FstDecoder
+%{
+#include <cstddef>
+%}
 
 %exception {
   try {
