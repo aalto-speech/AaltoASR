@@ -27,7 +27,7 @@ conf::Config config;
 Recipe recipe;
 HmmSet model;
 FeatureGenerator fea_gen;
-SpeakerConfig speaker_conf(fea_gen);
+SpeakerConfig speaker_conf(fea_gen, &model);
 
 VtlnModule *vtln_module;
 std::string cur_speaker;
