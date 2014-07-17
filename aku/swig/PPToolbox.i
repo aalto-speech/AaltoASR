@@ -4,6 +4,9 @@
 
 %module PPToolbox
 %{
+// SWIG defines c_abs which conflicts with c_abs
+// imported by f2c.h of Lapack++.
+#undef c_abs
 #include "PhoneProbsToolbox.hh"
 %}
 
