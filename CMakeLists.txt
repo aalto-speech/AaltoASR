@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
+set(CMAKE_GENERATOR_CC gcc cc)
+set(CMAKE_GENERATOR_CXX g++ c++)
 PROJECT(AaltoASR)
 
 # with -fPIC
