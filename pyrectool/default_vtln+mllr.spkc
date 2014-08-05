@@ -1,0 +1,10 @@
+speaker default
+{
+  feature vtln
+  {
+  }
+  
+  feature mllr
+  {
+  }
+}

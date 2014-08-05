@@ -1,0 +1,61 @@
+This Python tool makes it easy to recognize large evaluation sets with different
+parameters. It's able to take care of speaker adaptation and submit the commands
+to a computing cluster. Currently it works in ICSI which has a Pmake / Customs
+cluster, in Aalto ICS, which has a Condor cluster, and in the Triton SLURM
+cluster. It's easy to port it to any other clustering environment.
+
+The idea is that you write a script file where you set the parameters using
+environment variables. Most parameters have sane defaults. There's an example
+below.
+
+By default it writes the LNA files in
+
+$HOME/recognitions/<am>
+
+where <am> is the acoustic model name. This way it's able to reuse LNAs between
+runs that use the same acoustic model. Lattices etc. recognition files are
+written in
+
+$HOME/recognitions/<am>/<options>
+
+where <options> is combined from all the options that affect decoding. It
+combines the recognized hypotheses into a .trn file (by default in
+$HOME/results) whose name is combined from the acoustic model and all the
+selected options, so the name becomes really long, e.g.
+
+speecon_all_multicondition_mmi_kld0.002_6-FreeDictationLM.6gram-FreeDictationLM-FreeDictationLM.2gram-b280-tl100k.trn
+
+but this way you can store all the results with unique names and compare them
+later.
+
+
+===== Example call script =====
+
+#!/bin/bash
+# Recognizes the dsp2013 data set in Triton with VTLN+MLRR adaptation. 
+
+PUHE_DIR="/triton/ics/project/puhe"
+WORK_DIR="/triton/ics/work/$USER"
+
+export AKU="$PUHE_DIR/aku"
+export DECODER="$PUHE_DIR/decoder"
+export AM="..."
+export LM="..."
+export LOOKAHEAD_LM="..."
+export DICTIONARY="..."
+export CLASSES=
+export FSA=1
+export SPLIT_MULTIWORDS=
+export ADAPTATION=vtln+mllr
+export SPEAKER_ID_FIELD=2
+export BEAM=280
+export LM_SCALE=35
+export TOKEN_LIMIT=100000
+export NUM_BATCHES=100
+export MAX_PARALLEL=100
+export AUDIO_LIST="$PUHE_DIR/audio/dsp2013/wav-list"
+export REFERENCE_TRN="$PUHE_DIR/audio/dsp2013/ref.trn"
+export RESULTS_DIR="$WORK_DIR/results/dsp2013"
+export RECOGNITIONS_DIR="$WORK_DIR/recognitions/dsp2013"
+
+"$PUHE_DIR/git/rectool/pyrectool/recognize-batch.sh"
