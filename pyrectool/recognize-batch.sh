@@ -79,16 +79,18 @@ fi
 if [ "$FSA" != "" ]
 then
 	PARAMS="$PARAMS --fsa"
-	if [ -e "$LM.fsabin" ]
-	then
-		PARAMS="$PARAMS --bin-lm $LM.fsabin"
-	fi
+	BIN_LM_PATH="$LM.fsabin"
 	DECODER_OPT=$DECODER_OPT-fsa
 else
-	if [ -e "$LM.bin" ]
-	then
-		PARAMS="$PARAMS --bin-lm $LM.bin"
-	fi
+	BIN_LM_PATH="$LM.bin"
+fi
+if [ -e "$BIN_LM_PATH" ]
+then
+	PARAMS="$PARAMS --bin-lm $BIN_LM_PATH"
+elif [ ! -e "$LM" ]
+then
+	echo "Neither binary LM ($BIN_LM_PATH) nor ARPA LM ($LM) was found." >&2
+	exit 2
 fi
 
 # ARPA LM may be needed in any case for rescoring lattices.
