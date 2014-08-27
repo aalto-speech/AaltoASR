@@ -36,11 +36,34 @@ typedef std::string bytestype;
 	// This is for python <= 2.4
   //$result = Py_BuildValue("s#",$1->c_str(),$1->size());
 }
+// This migth work for modern pythons only (>=3.0)
+//#if defined(PY3)
+typedef std::vector<std::pair<std::string,std::pair<double,double> > > timed_token_stream_type;
+%typemap(out) timed_token_stream_type& {
+  $result = PyList_New(0);
+  for(size_t i = 0; i < $1->size(); i++){
+    PyObject *str,*start_time,*end_time,*new_token;
+
+    str = PyBytes_FromStringAndSize(static_cast<const char*>($1->at(i).first.c_str()),$1->at(i).first.size());
+    start_time = PyFloat_FromDouble(static_cast<const double>($1->at(i).second.first));
+    end_time = PyFloat_FromDouble(static_cast<const double>($1->at(i).second.second));
+    new_token = PyDict_New();
+    PyDict_SetItem(new_token,PyString_FromString("token"),str);
+    PyDict_SetItem(new_token,PyString_FromString("starttime"),start_time);
+    PyDict_SetItem(new_token,PyString_FromString("endtime"),end_time);
+    PyList_Append($result,new_token);
+    Py_DECREF(str);
+    Py_DECREF(start_time);
+    Py_DECREF(end_time);
+    Py_DECREF(new_token);
+  }
+}
+//#endif
+
 
 // Instantiate templates used 
 %template(StringVector) std::vector<std::string>;
 %template(FloatVector) std::vector<float>;
-
 
 #if !defined(PY3)
 // This is disabled, since doesn't exists for py3 any more
@@ -161,6 +184,7 @@ public:
   void print_best_lm_history();
   void print_best_lm_history_to_file(FILE *out);
   const bytestype &best_hypo_string(bool print_all, bool output_time);
+  const timed_token_stream_type &best_timed_hypo_string(bool print_all);
   void write_state_segmentation(const std::string &file);
 
   void set_forced_end(bool forced_end);

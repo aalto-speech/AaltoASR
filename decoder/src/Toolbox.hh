@@ -16,6 +16,8 @@
 #include "OneFrameAcoustics.hh"
 
 typedef std::string bytestype;
+typedef std::pair<std::string,std::pair<double,double> > timed_token_type;
+typedef std::vector<timed_token_type> timed_token_stream_type;
 
 class Toolbox {
 public:
@@ -171,6 +173,7 @@ public:
   void prune(int frame, int top);
   int paths() const { return HypoPath::g_count; }
 
+  const timed_token_stream_type &best_timed_hypo_string(bool print_all);
   const bytestype &best_hypo_string(bool print_all, bool output_time);
 
   // Options
