@@ -489,6 +489,33 @@ Toolbox::init(int expand_window)
   m_search->init_search(expand_window);
 }
 
+const std::vector<timed_token_type>& Toolbox::best_timed_hypo_string(bool print_all){
+  HistoryVector hist_vec;
+  static std::vector<timed_token_type> retval;
+  retval.clear();
+
+  m_tp_search->get_path(hist_vec, print_all, print_all ? NULL : m_last_guaranteed_history);
+  bool all_guaranteed = true;
+  
+  for (int i = hist_vec.size() - 1; i >= 0; i--) {
+    std::string newstring("");
+    LMHistory *hist = hist_vec[i];
+    assert(hist->reference_count > 0);
+    if (hist->previous->reference_count == 1) {
+      if (all_guaranteed)
+        m_last_guaranteed_history = hist;
+    }
+    else {
+      if (all_guaranteed)
+        newstring = "* ";
+      all_guaranteed = false;
+    }
+
+    newstring += word(hist->last().word_id());
+    retval.push_back(timed_token_type(newstring,pair<double,double>(hist->word_start_frame,hist->word_first_silence_frame)));
+  }
+  return retval;
+}
 const bytestype& Toolbox::best_hypo_string(bool print_all, bool output_time) {
   HistoryVector hist_vec;
   static std::string retval;
