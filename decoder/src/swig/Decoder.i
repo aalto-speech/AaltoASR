@@ -202,19 +202,19 @@ public:
   void set_rabiner_post_mode(int mode);
   void set_hypo_beam(float beam);
   void set_global_beam(float beam);
-	void set_word_end_beam(float beam);
-	void set_eq_depth_beam(float beam);
+  void set_word_end_beam(float beam);
+  void set_eq_depth_beam(float beam);
   void set_eq_word_count_beam(float beam);
-	void set_fan_in_beam(float beam);
-	void set_fan_out_beam(float beam);
-	void set_tp_state_beam(float beam);
+  void set_fan_in_beam(float beam);
+  void set_fan_out_beam(float beam);
+  void set_tp_state_beam(float beam);
   void set_max_state_duration(int duration);
   void set_split_multiwords(bool b);
   void set_cross_word_triphones(bool cw_triphones);
   void set_silence_is_word(bool b);
-	void set_ignore_case(bool b);		
+  void set_ignore_case(bool b);		
   void set_lm_lookahead(int lmlh);
-	void set_insertion_penalty(float ip);
+  void set_insertion_penalty(float ip);
   void set_print_text_result(int print);
   void set_print_state_segmentation(int print);
   void set_keep_state_segmentation(int keep);
@@ -225,8 +225,6 @@ public:
   void set_multiple_endings(int multiple_endings);
   void set_word_boundary(const std::string &word);
   void set_sentence_boundary(const std::string &start, const std::string &end);
-  void clear_hesitation_words();
-  void add_hesitation_word(const std::string &word);
   void set_dummy_word_boundaries(bool value);
   void set_generate_word_graph(bool value);
   void set_use_word_pair_approximation(bool value);
@@ -238,15 +236,15 @@ public:
 
   void prune_lm_lookahead_buffers(int min_delta, int max_depth);
 
-	void print_prunings();
+  void print_prunings();
   void print_hypo(Hypo &hypo);
   void print_sure();
-	void write_word_history(const std::string &file_name);
-	void print_lm_history();
-	
-	void print_tp_lex_node(int node);
+  void write_word_history(const std::string &file_name);
+  void print_lm_history();
+
+  void print_tp_lex_node(int node);
   void print_tp_lex_lookahead(int node);
 
-	void debug_print_best_lm_history();
+  void debug_print_best_lm_history();
 };
 

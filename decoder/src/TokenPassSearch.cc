@@ -149,29 +149,12 @@ void TokenPassSearch::set_sentence_boundary(const std::string &start,
   m_lexicon.set_sentence_boundary(m_sentence_start_id, m_sentence_end_id);
 }
 
-void TokenPassSearch::clear_hesitation_words()
-{
-  m_hesitation_ids.clear();
-}
-
-void TokenPassSearch::add_hesitation_word(const std::string & word)
-{
-  int id = m_vocabulary.word_index(word);
-  if (id != 0) {
-    m_hesitation_ids.push_back(id);
-  }
-}
-
 void TokenPassSearch::reset_search(int start_frame)
 {
   TPLexPrefixTree::Token *t;
   m_frame = start_frame;
   m_end_frame = -1;
   m_best_final_token = NULL;
-
-  if (m_verbose > 0) {
-    cerr << m_hesitation_ids.size() << " hesitation words." << endl;
-  }
 
   // Clear existing tokens and create a new token to the root
   for (int i = 0; i < m_active_token_list->size(); i++) {
@@ -780,40 +763,6 @@ void TokenPassSearch::propagate_token(TPLexPrefixTree::Token *token)
     move_token_to_node(token, source_node->arcs[i].next,
                        source_node->arcs[i].log_prob);
   }
-
-  //XXX
-  std::vector<int>::const_iterator iter = m_hesitation_ids.begin();
-  for (; iter != m_hesitation_ids.end(); ++iter) {
-    if (token->lm_history->last().word_id() == *iter) {
-      assert(!m_fsa_lm);
-      assert(!m_generate_word_graph);
-
-      // Add sentence_end and sentence_start and propagate the token with new word history
-      LMHistory * temp_lm_history = token->lm_history;
-
-      token->lm_history = acquire_lmhist(
-        &m_word_repository[m_sentence_end_id], token->lm_history);
-      hist::link(token->lm_history);
-      token->lm_history->word_start_frame = m_frame;
-      token->lm_history = acquire_lmhist(
-        &m_word_repository[m_sentence_start_id], token->lm_history);
-      hist::link(token->lm_history);
-      token->lm_history->word_start_frame = m_frame;
-      token->lm_hist_code = compute_lm_hist_hash_code(token->lm_history);
-
-      // Iterate all the arcs leaving the token's node.
-      for (i = 0; i < source_node->arcs.size(); i++) {
-        if (source_node->arcs[i].next != source_node) // Skip self transitions
-          move_token_to_node(token, source_node->arcs[i].next,
-                             source_node->arcs[i].log_prob);
-      }
-
-      hist::unlink(token->lm_history->previous, &m_lmh_pool);
-      hist::unlink(token->lm_history, &m_lmh_pool);
-      token->lm_history = temp_lm_history;
-    }
-  }
-  //XXX
 
   if ((source_node->flags & NODE_INSERT_WORD_BOUNDARY) != 0
       && m_generate_word_graph) {

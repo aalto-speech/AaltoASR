@@ -274,10 +274,6 @@ public:
 
   void set_sentence_boundary(const std::string &start, const std::string &end) { m_tp_search->set_sentence_boundary(start, end); }
 
-  void clear_hesitation_words() { m_tp_search->clear_hesitation_words(); }
-
-  void add_hesitation_word(const std::string & word) { m_tp_search->add_hesitation_word(word); }
-
   void set_dummy_word_boundaries(bool value) { m_search->set_dummy_word_boundaries(value); }
   void set_require_sentence_end(bool s) { m_tp_search->set_require_sentence_end(s); }
 
