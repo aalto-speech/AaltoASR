@@ -674,7 +674,8 @@ TokenPassSearch::get_best_final_token() const
     return *best_nonfinal_token;
   }
   else {
-    assert(false);
+    fprintf(stderr, "ERROR: No active tokens. Did you forget to call reset()?\n");
+    abort();
   }
 }
 
@@ -688,7 +689,8 @@ TokenPassSearch::get_first_token() const
       return *token;
   }
 
-  assert(false);
+  fprintf(stderr, "ERROR: No active tokens. Did you forget to call reset()?\n");
+  abort();
 }
 
 void TokenPassSearch::print_state_history(FILE *file)
