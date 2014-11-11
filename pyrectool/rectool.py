@@ -473,6 +473,24 @@ class RecognizerToolbox:
 				if word == '<w>':
 					self.morph_lm = True
 			lm_file.close()
+		elif self.fsa:
+			# Parse binary FSA language model:
+			lm_file = open(self.lm, 'r')
+			header = lm_file.readline().split(':')  # header + start symbol + newline
+			self.lm_order = int(header[1])
+			lm_file.readline()  # end symbol + newline
+			header = lm_file.readline().split(':')  # symbol map header + first symbol + newline
+			word = header[2].strip()
+			word_count = int(header[1])
+			while True:
+				if word == '<w>':
+					self.morph_lm = True
+					break;
+				if word_count <= 1:
+					break;
+				word = lm_file.readline().strip()
+				word_count -= 1;
+			lm_file.close()
 		else:
 			# Parse binary language model.
 			lm_file = open(self.lm, 'r')
