@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/bin/bash -e
 
 interrupt_handler() {
 	scancel $(printf " %s" "${jobs[@]}") 2>/dev/null
 	rm -f "$logfile".out.* "$logfile".err.*
+	rmdir --ignore-fail-on-non-empty $(dirname "$logfile")
 	exit 3
 }
 
@@ -85,8 +86,18 @@ do
 	sleep 4
 done
 
+failed=$(sacct --format=jobid,state --parsable2 --jobs=$(printf ",%s" "${jobs[@]}") --noheader | awk -F'|' '{ if ($2 != "COMPLETED") print; }')
+if [ "$failed" != "" ]; then
+	echo "Some jobs failed:"
+	echo "$failed"
+	echo "See log files for details:"
+	echo "$logfile".out.* "$logfile".err.*
+	exit 2
+fi
+
 # Kill the tail -f background job and delete the logs.
 kill $!
 rm -f "$logfile".out.* "$logfile".err.*
+rmdir --ignore-fail-on-non-empty $(dirname "$logfile")
 
 trap - INT
