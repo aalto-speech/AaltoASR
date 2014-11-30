@@ -91,7 +91,8 @@ if [ "$failed" != "" ]; then
 	echo "Some jobs failed:"
 	echo "$failed"
 	echo "See log files for details:"
-	echo "$logfile".out.* "$logfile".err.*
+	echo "$logfile.out.*"
+	echo "$logfile.err.*"
 	exit 2
 fi
 
