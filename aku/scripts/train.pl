@@ -54,7 +54,8 @@ use ClusterManager;
 
 ## Context phone tying options ##
   my $TIE_USE_OUT_PHN = 0; # 0=read transcript field, 1=read alignment field
-  my $TIE_RULES = "$SCRIPTDIR/estonian_rules.txt";
+  my $TIE_RULES = $ENV{'TRAIN_TIERULES'};
+  defined($TIE_RULES) || die("TRAIN_TIERULES environment variable needs to be set.");
   my $TIE_MIN_COUNT = 1500; # Minimum number of features per state
   my $TIE_MIN_GAIN = 5000;  # Minimum loglikelihood gain for a state split
   my $TIE_MAX_LOSS = 5000;  # Maximum loglikelihood loss for merging states
@@ -62,11 +63,10 @@ use ClusterManager;
 ## Gaussian splitting options ##
   my $SPLIT_MIN_OCCUPANCY = 200; # Accumulated state probability
   my $SPLIT_MAX_GAUSSIANS = 80; # Per state
-
   # If $SPLIT_TARGET_GAUSSIANS > 0, it defines the Gaussian splitting instead
-  # of $SPLIT_MIN_OCCUPANCY
+  # of $SPLIT_MIN_OCCUPANCY.
   my $SPLIT_TARGET_GAUSSIANS = $ENV{'TRAIN_GAUSSIANS'};
-  defined($SPLIT_TARGET_GAUSSIANS) || die("TRAIN_GAUSSIANS environment variable needs to be set.");
+  $SPLIT_TARGET_GAUSSIANS = -1 if !defined($SPLIT_TARGET_GAUSSIANS);
   my $SPLIT_ALPHA = 0.3;  # Smoothing power for occupancies
   my $GAUSS_REMOVE_THRESHOLD = 0.001; # Mixture component weight threshold
 
@@ -96,13 +96,10 @@ use ClusterManager;
   # States without duration model (silences/noises). These must be first
   # states of the models!
   my $DUR_SKIP_MODELS = 6;
- 
   my $VERBOSITY = 1;
-
   # NOTE: If you plan to recompile executables at the same time as running
   # them, it is a good idea to copy the old binaries to a different directory.
   my $COPY_BINARY_TO_WORK = 1;
-
   my $SAVE_STATISTICS = 0; # Save the statistics files in iteration directories
 
 ## Ignore some nodes if SLURM_EXCLUDE_NODES environment variable is set ##
