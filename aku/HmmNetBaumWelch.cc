@@ -8,6 +8,9 @@
 #include <string.h>
 
 
+using namespace std;
+
+
 namespace aku {
 
 
@@ -49,11 +52,11 @@ HmmNetBaumWelch::~HmmNetBaumWelch()
 }
 
 void
-HmmNetBaumWelch::open(std::string ref_file)
+HmmNetBaumWelch::open(string ref_file)
 {
   FILE *fp = fopen(ref_file.c_str(), "r");
   if (fp == NULL)
-    throw std::string("HmmNetBaumWelch::open: Could not open file `") + ref_file + std::string("'.");
+    throw string("HmmNetBaumWelch::open: Could not open file `") + ref_file + string("'.");
   read_fst(fp);
   fclose(fp);
 }
@@ -65,46 +68,46 @@ HmmNetBaumWelch::read_fst(FILE *file)
   m_initial_node_id = -1;
   m_final_node_id = -1;
 
-  std::string line;
-  std::vector<std::string> fields;
+  string line;
+  vector<string> fields;
   bool ok = true;
-  std::vector< LatticeLabel > orig_arc_labels;
+  vector< LatticeLabel > orig_arc_labels;
   
   while (str::read_line(&line, file, true))
   {
     str::split(&line, " \t", true, &fields);
     if (fields[0] == "#FSTBinary")
-      throw std::string("FSTBinary format not supported");
+      throw string("FSTBinary format not supported");
 
     if (fields[0] == "I") // Initial node
     {
       if (m_initial_node_id != -1)
-        throw std::string("Initial node redefined: ") + line;
+        throw string("Initial node redefined: ") + line;
       if (fields.size() != 2)
         ok = false;
       else
         m_initial_node_id = str::str2long(&fields[1], &ok);
       if (!ok || m_initial_node_id < 0)
-        throw std::string("Invalid initial node specification: ") + line;
+        throw string("Invalid initial node specification: ") + line;
     }
     else if (fields[0] == "F") // Final node
     {
       if (m_final_node_id != -1)
-        throw std::string("Final node redefined: ") + line;
+        throw string("Final node redefined: ") + line;
       if (fields.size() != 2)
         ok = false;
       else
         m_final_node_id = str::str2long(&fields[1], &ok);
       if (!ok || m_final_node_id < 0)
-        throw std::string("Invalid final node specification: ") + line;
+        throw string("Invalid final node specification: ") + line;
     }
     else if (fields[0] == "T") // Transition
     {
       int source = -1;
       int target = -1;
       int tr_index = EPSILON;
-      std::string in_label = "";
-      std::string out_label = "";
+      string in_label = "";
+      string out_label = "";
       double score = loglikelihoods.one();
 
       if (fields.size() < 3 || fields.size() > 6)
@@ -133,7 +136,7 @@ HmmNetBaumWelch::read_fst(FILE *file)
         }
 
         if (!ok || source < 0 || target < 0)
-          throw std::string("HmmNetBaumWelch: Invalid transition specification: ") + line;
+          throw string("HmmNetBaumWelch: Invalid transition specification: ") + line;
 
         LatticeLabel label(in_label, out_label);
         tr_index = label.get_transition_index();
@@ -153,17 +156,17 @@ HmmNetBaumWelch::read_fst(FILE *file)
   }
 
   if (m_initial_node_id < 0)
-    throw std::string("initial node not specified");
+    throw string("initial node not specified");
   if (m_final_node_id < 0)
-    throw std::string("final node not specified");
+    throw string("final node not specified");
 
   check_network_structure();
 
   // Process the arcs in topological order and set up the parent logical arcs
-  std::stack<int> active_nodes;
-  std::vector<int> visit_count;
-  typedef std::map< std::string, int > LabelIndexMap;
-  std::vector< LabelIndexMap > node_logical_arcs;
+  stack<int> active_nodes;
+  vector<int> visit_count;
+  typedef map< string, int > LabelIndexMap;
+  vector< LabelIndexMap > node_logical_arcs;
   int nodes_processed = 0;
   active_nodes.push(m_initial_node_id);
   visit_count.resize(m_nodes.size(), 0);
@@ -176,7 +179,7 @@ HmmNetBaumWelch::read_fst(FILE *file)
     nodes_processed++;
 
     if (nodes_processed > (int)m_nodes.size())
-      throw std::string("Error in creating logical arcs for the search network");
+      throw string("Error in creating logical arcs for the search network");
     
     // Process the physical arcs from the current node
     for (int i = 0; i < (int)m_nodes[cur_node].out_arcs.size(); i++)
@@ -210,7 +213,7 @@ HmmNetBaumWelch::read_fst(FILE *file)
       if (parent_label.is_valid())
       {
         LabelIndexMap::const_iterator it;
-        std::vector< std::string > parent_labels;
+        vector< string > parent_labels;
 
         // Look for the parent(s)
         while (parent_label.is_valid())
@@ -282,7 +285,7 @@ HmmNetBaumWelch::read_fst(FILE *file)
   {
     fprintf(stderr, "Creating topological ordering: %i nodes processed, out of %i\n",
             nodes_processed, (int)m_nodes.size());
-    throw std::string("Failed to create a topological order of the nodes");
+    throw string("Failed to create a topological order of the nodes");
   }
 }
 
@@ -298,7 +301,7 @@ HmmNetBaumWelch::fix_parent_arcs(int arc_id)
   int target_node = m_arcs[arc_id].target;
   int level = 1;
   // Collect the parent arcs of the incoming arcs of the target node
-  std::vector<int> incoming_parent;
+  vector<int> incoming_parent;
   for (int i = 0; i < (int)m_nodes[target_node].in_arcs.size(); i++)
   {
     int id = m_nodes[target_node].in_arcs[i];
@@ -317,10 +320,10 @@ HmmNetBaumWelch::fix_parent_arcs(int arc_id)
       {
         // Different parent arc but with the same label, propagate the
         // existing parent to the new incoming branch
-        std::set<int> processed_arcs;
+        set<int> processed_arcs;
         if (replace_branch_parent_arc(arc_id, level, incoming_parent[i],
                                       false, processed_arcs) != level)
-          throw std::string("Error in parent arc fixing");
+          throw string("Error in parent arc fixing");
         replaced = true;
         break;
       }
@@ -341,7 +344,7 @@ HmmNetBaumWelch::fix_parent_arcs(int arc_id)
 int
 HmmNetBaumWelch::replace_branch_parent_arc(int arc_id, int parent_level,
                                            int new_parent_id, bool forward,
-                                           std::set<int> &processed_arcs)
+                                           set<int> &processed_arcs)
 {
   if (processed_arcs.find(arc_id) != processed_arcs.end())
     return -1; // Processed already
@@ -412,11 +415,11 @@ HmmNetBaumWelch::LatticeLabel::LatticeLabel()
   last = true;
 }
 
-HmmNetBaumWelch::LatticeLabel::LatticeLabel(std::string in_str,
-                                            std::string out_str)
+HmmNetBaumWelch::LatticeLabel::LatticeLabel(string in_str,
+                                            string out_str)
 {
   bool ok = true;
-  std::string temp_str = in_str;
+  string temp_str = in_str;
   transition_index = EPSILON;
   if (out_str.size() > 0)
     temp_str += ';' + out_str;
@@ -440,40 +443,40 @@ HmmNetBaumWelch::LatticeLabel::LatticeLabel(std::string in_str,
   {
     epsilon = false;
     size_t n = temp_str.find_first_of(';');
-    if (n == std::string::npos)
+    if (n == string::npos)
     {
       // No logical arcs, just the transition index
       transition_index = str::str2long(&temp_str, &ok);
       if (!ok)
-        throw std::string("Invalid arc label ") + in_str;
+        throw string("Invalid arc label ") + in_str;
     }
     else
     {
-      std::string transition_str = temp_str.substr(0, n);
+      string transition_str = temp_str.substr(0, n);
       transition_index = str::str2long(&transition_str, &ok);
       if (!ok)
-        throw std::string("Invalid arc label ") + temp_str;
+        throw string("Invalid arc label ") + temp_str;
     }
     initialize_labels(temp_str);
   }
 }
 
 HmmNetBaumWelch::LatticeLabel::LatticeLabel(int tr_id,
-                                            std::string raw_label)
+                                            string raw_label)
 {
   transition_index = tr_id;
   initialize_labels(raw_label);
 }
 
 void
-HmmNetBaumWelch::LatticeLabel::initialize_labels(const std::string &raw_label)
+HmmNetBaumWelch::LatticeLabel::initialize_labels(const string &raw_label)
 {
   original_label = raw_label;
   label = remove_end_marks(original_label);
 
   // Find out whether the arc is the final one with the current level label
   size_t pos = original_label.find_first_of("#;",0);
-  if (pos != std::string::npos && original_label[pos] == '#')
+  if (pos != string::npos && original_label[pos] == '#')
     last = true;
   else
     last = false;
@@ -484,18 +487,18 @@ HmmNetBaumWelch::LatticeLabel
 HmmNetBaumWelch::LatticeLabel::higher_level_label(void) const
 {
   size_t pos = original_label.find_first_of(';');
-  if (pos == std::string::npos)
+  if (pos == string::npos)
     return LatticeLabel();
   return LatticeLabel(-1, original_label.substr(pos+1));
 }
 
 
-std::string
-HmmNetBaumWelch::LatticeLabel::remove_end_marks(const std::string &str) const
+string
+HmmNetBaumWelch::LatticeLabel::remove_end_marks(const string &str) const
 {
-  std::string s(str);
+  string s(str);
   size_t pos = 0;
-  while ((pos = s.find_first_of('#', pos)) != std::string::npos)
+  while ((pos = s.find_first_of('#', pos)) != string::npos)
     s.erase(pos, 1);
   return s;
 }
@@ -545,11 +548,11 @@ HmmNetBaumWelch::check_network_structure(void)
       if (m_arcs[arc_id].epsilon())
       {
         if (m_arcs[arc_id].target == m_arcs[arc_id].source)
-          throw std::string("HmmNetBaumWelch: Epsilon self loops are not allowed");
+          throw string("HmmNetBaumWelch: Epsilon self loops are not allowed");
 //         if (non_eps_in_transitions > 0)
 //         {
 //           fprintf(stderr, "At node %i:\n", i);
-//           throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+//           throw string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + string(")");
 //         }
         //epsilon_transitions = true;
       }
@@ -558,7 +561,7 @@ HmmNetBaumWelch::check_network_structure(void)
 //         if (epsilon_transitions)
 //         {
 //           fprintf(stderr, "At node %i:\n", i);
-//           throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+//           throw string("HmmNetBaumWelch: Both epsilon and normal transitions to a node (detected at ") + m_arcs[arc_id].label + string(")");
 //         }
         non_eps_in_transitions++;
       }
@@ -576,12 +579,12 @@ HmmNetBaumWelch::check_network_structure(void)
       if (m_arcs[arc_id].epsilon())
       {
         if (m_arcs[arc_id].target == m_arcs[arc_id].source)
-          throw std::string("HmmNetBaumWelch: Epsilon self loops are not allowed");
+          throw string("HmmNetBaumWelch: Epsilon self loops are not allowed");
         if (non_eps_out_transitions > 0)
         {
           // Actually these might be supported now. Try at your own risk!
           // fprintf(stderr, "At node %i:\n", i);
-          // throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+          // throw string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + string(")");
         }
         eps_out_transitions++;
       }
@@ -591,7 +594,7 @@ HmmNetBaumWelch::check_network_structure(void)
         {
           // Actually these might be supported now. Try at your own risk!
           // fprintf(stderr, "At node %i:\n", i);
-          // throw std::string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + std::string(")");
+          // throw string("HmmNetBaumWelch: Both epsilon and normal transitions from a node (detected at ") + m_arcs[arc_id].label + string(")");
         }
         non_eps_out_transitions++;
       }
@@ -603,14 +606,14 @@ HmmNetBaumWelch::check_network_structure(void)
     if (eps_out_transitions+non_eps_out_transitions > 1 && self_transition)
     {
       fprintf(stderr, "At node %i:\n", i);          
-      throw std::string("HmmNetBaumWelch: Self transitions and multiple out transitions can not be combined");
+      throw string("HmmNetBaumWelch: Self transitions and multiple out transitions can not be combined");
     }
   }
 
   if (m_nodes[m_initial_node_id].in_arcs.size() > 0)
-    throw std::string("HmmNetBaumWelch: Initial node may not have in arcs!");
+    throw string("HmmNetBaumWelch: Initial node may not have in arcs!");
   if (m_nodes[m_final_node_id].out_arcs.size() > 0)
-    throw std::string("HmmNetBaumWelch: Final node may not have out arcs!");
+    throw string("HmmNetBaumWelch: Final node may not have out arcs!");
 }
 
 
@@ -639,12 +642,12 @@ HmmNetBaumWelch::reset(void)
 
 
 HmmNetBaumWelch::SegmentedLattice*
-HmmNetBaumWelch::load_segmented_lattice(std::string &file)
+HmmNetBaumWelch::load_segmented_lattice(string &file)
 {
   FILE *fp;
 
   if ((fp = fopen(file.c_str(), "r")) == NULL)
-    throw std::string("Could not open file "+file);
+    throw string("Could not open file "+file);
   SegmentedLattice *lattice = new SegmentedLattice;
   lattice->load_segmented_lattice(fp, *this);
   fclose(fp);
@@ -675,7 +678,7 @@ HmmNetBaumWelch::next_frame(void)
     return false;
   
   if (m_segmentator_seglat == NULL)
-    throw std::string("Segmentation has not been initialized!");
+    throw string("Segmentation has not been initialized!");
 
   // Requires a frame lattice
   assert( m_segmentator_seglat->frame_lattice );
@@ -708,8 +711,8 @@ HmmNetBaumWelch::next_frame(void)
   // By definition, next_frame() resets the model PDF cache
   m_model.reset_cache();
 
-  std::set<int> target_nodes; // Store target nodes here
-  std::set<int>::iterator it = m_active_nodes.begin();
+  set<int> target_nodes; // Store target nodes here
+  set<int>::iterator it = m_active_nodes.begin();
   double prob_sum = 0;
   double highest_prob = 0;
   m_most_probable_label.clear();
@@ -759,7 +762,7 @@ HmmNetBaumWelch::next_frame(void)
 
   // Fix the label if it conforms with the hierarchical system.
   // NOTE! Assumes the following label: mixturenum;statenum;(tri-)phone;...
-  std::vector<std::string> fields;
+  vector<string> fields;
   str::split(&m_most_probable_label, ";", false, &fields);
   if (fields.size() >= 3)
     m_most_probable_label = fields[2] + "." + fields[1];
@@ -813,7 +816,7 @@ HmmNetBaumWelch::generate_features(void)
 bool
 HmmNetBaumWelch::fill_backward_probabilities(void)
 {
-  std::vector< BackwardToken > active_tokens;
+  vector< BackwardToken > active_tokens;
   NodeTokenMap node_token_map;
   NodeTransitionMap active_transitions; // multimap
   FeatureVec empty_fea_vec;
@@ -1019,7 +1022,7 @@ HmmNetBaumWelch::fill_backward_probabilities(void)
 
 void
 HmmNetBaumWelch::backward_propagate_epsilon_arcs(
-  std::vector< BackwardToken > &active_tokens,
+  vector< BackwardToken > &active_tokens,
   NodeTokenMap &node_token_map,
   int cur_frame)
 {
@@ -1051,7 +1054,7 @@ HmmNetBaumWelch::backward_propagate_epsilon_arcs(
         if (m_segmentation_mode == MODE_VITERBI)
         {
           active_tokens[token_id].score =
-            std::max(active_tokens[token_id].score, backward_score);
+            max(active_tokens[token_id].score, backward_score);
         }
         else
         {
@@ -1091,13 +1094,13 @@ HmmNetBaumWelch::create_segmented_lattice(void)
   // Network traversal is implemented with token passing. Only one token
   // may exist in any single network node. Two token buffers are used for
   // propagating the tokens.
-  std::vector< ForwardToken> active_tokens[2];
+  vector< ForwardToken> active_tokens[2];
   NodeTokenMap node_token_map[2];
 
   // One pending arc represents a traversal through a non-epsilon arc
   // from a certain source node. One pending arc may get connected to
   // multiple target nodes.
-  std::vector< PendingArc > pending_arcs;
+  vector< PendingArc > pending_arcs;
   
   if (m_last_frame > 0)
     end_frame = m_last_frame;
@@ -1220,7 +1223,7 @@ HmmNetBaumWelch::create_segmented_lattice(void)
           copy_pending_arcs = false;
             
         // Copy the pending arcs to the target token
-        for (std::set<int>::iterator it =
+        for (set<int>::iterator it =
                active_tokens[sbuf][i].pending_arcs.begin();
              it != active_tokens[sbuf][i].pending_arcs.end(); ++it)
         {
@@ -1290,7 +1293,7 @@ HmmNetBaumWelch::create_segmented_lattice(void)
     /////////////////////////////////////////////////////////////////////
 
     // Collect the new pending arcs here
-    std::vector< PendingArc > temp_pending_arcs;
+    vector< PendingArc > temp_pending_arcs;
     
     for (int i = 0; i < (int)active_tokens[sbuf].size(); i++)
     {
@@ -1322,8 +1325,8 @@ HmmNetBaumWelch::create_segmented_lattice(void)
           sl->nodes.push_back(SegmentedNode(cur_frame));
 
           // Connect the pending arcs
-          std::set<int> &pa_set = active_tokens[sbuf][i].pending_arcs;
-          for (std::set<int>::iterator pa_it = pa_set.begin();
+          set<int> &pa_set = active_tokens[sbuf][i].pending_arcs;
+          for (set<int>::iterator pa_it = pa_set.begin();
                pa_it != pa_set.end(); ++pa_it)
           {
             PendingArc &p = pending_arcs[(*pa_it)];
@@ -1389,8 +1392,8 @@ HmmNetBaumWelch::create_segmented_lattice(void)
   sl->nodes.push_back(SegmentedNode(cur_frame));
   for (int i = 0; i < (int)active_tokens[tbuf].size(); i++)
   {
-    std::set<int> &pa_set = active_tokens[tbuf][i].pending_arcs;
-    for (std::set<int>::iterator pa_it = pa_set.begin();
+    set<int> &pa_set = active_tokens[tbuf][i].pending_arcs;
+    for (set<int>::iterator pa_it = pa_set.begin();
          pa_it != pa_set.end(); ++pa_it)
     {
       PendingArc &p = pending_arcs[(*pa_it)];
@@ -1408,7 +1411,7 @@ HmmNetBaumWelch::create_segmented_lattice(void)
                                         active_tokens[tbuf][i].score);
   }
   if (num_end_arcs == 0)
-    throw std::string("No paths survived to the end of the network!");
+    throw string("No paths survived to the end of the network!");
 
   sl->total_score = total_score;
 
@@ -1418,7 +1421,7 @@ HmmNetBaumWelch::create_segmented_lattice(void)
 
 HmmNetBaumWelch::ForwardToken&
 HmmNetBaumWelch::create_or_update_token(
-  std::vector< ForwardToken > &token_vector, NodeTokenMap &node_token_map,
+  vector< ForwardToken > &token_vector, NodeTokenMap &node_token_map,
   int node_id, double forward_score)
 {
   // Find out whether the next network node has an active token
@@ -1445,7 +1448,7 @@ HmmNetBaumWelch::create_or_update_token(
 
 int
 HmmNetBaumWelch::SegmentedLattice::create_segmented_arc(
-  int arc_id, std::string &label, int transition_index,
+  int arc_id, string &label, int transition_index,
   int source_seg_node, int target_seg_node,
   double arc_score, double acoustic_score, double total_score)
 {
@@ -1472,8 +1475,8 @@ void
 HmmNetBaumWelch::SegmentedLattice::compute_custom_path_scores(
   CustomScoreQuery *callback, int combination_mode)
 {
-  std::vector<ScorePair> fw_scores; // Node forward scores
-  typedef std::multimap<int, int> FrameNode;
+  vector<ScorePair> fw_scores; // Node forward scores
+  typedef multimap<int, int> FrameNode;
   FrameNode topological_order; // Nodes sorted by frame numbers
 
   // Fill the custom scores
@@ -1533,7 +1536,7 @@ HmmNetBaumWelch::SegmentedLattice::compute_custom_path_scores(
   total_custom_score = fw_scores[final_node].custom_score;
 
   // Backward phase
-  std::vector<ScorePair> bw_scores; // Node backward scores
+  vector<ScorePair> bw_scores; // Node backward scores
   bw_scores.resize(nodes.size(), ScorePair(loglikelihoods.zero(), 0));
   bw_scores[final_node] = ScorePair(loglikelihoods.one(), 0);
   for (FrameNode::reverse_iterator fn = topological_order.rbegin();
@@ -1598,7 +1601,7 @@ HmmNetBaumWelch::SegmentedLattice::combine_custom_scores(
   else if (combination_mode == CUSTOM_SUM)
     combined_score = custom_score + old_custom_score;
   else // combination_mode == CUSTOM_MAX
-    combined_score = std::max(custom_score, old_custom_score);
+    combined_score = max(custom_score, old_custom_score);
   return combined_score;
 }
 
@@ -1607,8 +1610,8 @@ HmmNetBaumWelch::SegmentedLattice::combine_custom_scores(
 void
 HmmNetBaumWelch::SegmentedLattice::compute_total_scores(void)
 {
-  std::vector<double> fw_scores; // Node forward scores
-  typedef std::multimap<int, int> FrameNode; 
+  vector<double> fw_scores; // Node forward scores
+  typedef multimap<int, int> FrameNode; 
   FrameNode topological_order; // Nodes sorted by frame numbers
 
   // Construct the topological order of the nodes
@@ -1647,7 +1650,7 @@ HmmNetBaumWelch::SegmentedLattice::compute_total_scores(void)
   total_score = fw_scores[final_node]; // Total lattice score
   
   // Backward phase
-  std::vector<double> bw_scores; // Node backward scores
+  vector<double> bw_scores; // Node backward scores
   bw_scores.resize(nodes.size(), loglikelihoods.zero());
   bw_scores[final_node] = loglikelihoods.one();
   for (FrameNode::reverse_iterator fn = topological_order.rbegin();
@@ -1696,13 +1699,13 @@ HmmNetBaumWelch::SegmentedLattice::propagate_custom_scores_to_frame_segmented_la
   SegmentedLattice *frame_sl, int combination_mode)
 {
   if (frame_lattice)
-    throw std::string("HmmNetBaumWelch::propagate_custom_scores_to_frame_segmented_lattice: source is a frame-level lattice");
+    throw string("HmmNetBaumWelch::propagate_custom_scores_to_frame_segmented_lattice: source is a frame-level lattice");
   if (!frame_sl->frame_lattice)
-    throw std::string("HmmNetBaumWelch::propagate_custom_scores_to_frame_segmented_lattice: target is not a frame-level lattice");
+    throw string("HmmNetBaumWelch::propagate_custom_scores_to_frame_segmented_lattice: target is not a frame-level lattice");
 
   assert( arcs.size() == child_arcs.size() );
 
-  std::vector<double> child_arc_scores;
+  vector<double> child_arc_scores;
   child_arc_scores.resize(frame_sl->arcs.size(), loglikelihoods.zero());
 
   for (int i = 0; i < (int)child_arcs.size(); i++)
@@ -1748,7 +1751,7 @@ HmmNetBaumWelch::SegmentedLattice::write_segmented_lattice_fst(
 
   for (int i = 0; i < (int)arcs.size(); i++)
   {
-    std::stringstream label;
+    stringstream label;
     label << arcs[i].label;
     // << nodes[arcs[i].source_node].frame << "->"
     // << "->" << nodes[arcs[i].target_node].frame;
@@ -1816,8 +1819,8 @@ void
 HmmNetBaumWelch::SegmentedLattice::load_segmented_lattice(
   FILE *file, HmmNetBaumWelch &parent)
 {
-  std::string line;
-  std::vector<std::string> fields;
+  string line;
+  vector<string> fields;
   int num_nodes = -1;
   int num_arcs = -1;
 //  bool ok = true;
@@ -1827,12 +1830,12 @@ HmmNetBaumWelch::SegmentedLattice::load_segmented_lattice(
   
   str::read_line(&line, file, true);
   if (line != "#SegmentedLattice......")
-    throw std::string("Invalid file type for segmented lattice");
+    throw string("Invalid file type for segmented lattice");
 
   int itemp;
   if (fread(&num_nodes, sizeof(int), 1, file) != 1 ||
       fread(&num_arcs, sizeof(int), 1, file) != 1)
-    throw std::string("Read error");
+    throw string("Read error");
 
   frame_lattice = true;
 
@@ -1844,12 +1847,12 @@ HmmNetBaumWelch::SegmentedLattice::load_segmented_lattice(
       fread(&final_node, sizeof(int), 1, file) != 1 ||
       fread(&total_score, sizeof(double), 1, file) != 1 ||
       fread(&total_custom_score, sizeof(double), 1, file) != 1)
-    throw std::string("Read error");
+    throw string("Read error");
 
   for (int i = 0; i < num_nodes; i++)
   {
     if (fread(&itemp, sizeof(int), 1, file) != 1)
-      throw std::string("Read error");
+      throw string("Read error");
     nodes[i].frame = itemp;
   }
 
@@ -1859,7 +1862,7 @@ HmmNetBaumWelch::SegmentedLattice::load_segmented_lattice(
     for (int i = 0; i < (4-(num_nodes%4)); i++)
     {
       if (fread(&itemp, sizeof(int), 1, file) != 1)
-        throw std::string("Read error");
+        throw string("Read error");
     }
   }
 
@@ -1879,7 +1882,7 @@ HmmNetBaumWelch::SegmentedLattice::load_segmented_lattice(
         fread(&arc_total_score, sizeof(double), 1, file) != 1 ||
         fread(&arc_custom_score, sizeof(double), 1, file) != 1 ||
         fread(&arc_custom_path_score, sizeof(double), 1, file) != 1)
-      throw std::string("Read error");
+      throw string("Read error");
 
     assert( target_node == temp ); // Alignment int test
 
@@ -1888,7 +1891,7 @@ HmmNetBaumWelch::SegmentedLattice::load_segmented_lattice(
         target_node >= 0 && target_node < num_nodes)
     {
       int tr_index = parent.m_arcs[net_arc_id].transition_index;
-      std::string label = parent.m_arcs[net_arc_id].label;
+      string label = parent.m_arcs[net_arc_id].label;
       int new_arc_id =
         create_segmented_arc(net_arc_id, label, tr_index,
                              source_node, target_node,
@@ -1956,17 +1959,17 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
                                            int level)
 {
   if (!frame_sl->frame_lattice)
-    throw std::string("HmmNetBaumWelch::extract_segmented_lattice operates on frame-level lattice");
+    throw string("HmmNetBaumWelch::extract_segmented_lattice operates on frame-level lattice");
   if (level <= 0)
-    throw std::string("HmmNetBaumWelch::extract_segmented_lattice: Invalid hierarchy level");
+    throw string("HmmNetBaumWelch::extract_segmented_lattice: Invalid hierarchy level");
 
   SegmentedLattice *sl = new SegmentedLattice;
   sl->frame_lattice = false;
 
   // One frame lattice node can occupy several pending logical arcs
-  typedef std::multimap<int, ESLPendingArc> NodePendingArcs;
+  typedef multimap<int, ESLPendingArc> NodePendingArcs;
   NodePendingArcs active_nodes[2]; // Frame lattice nodes
-  std::vector< std::pair<int, int> > child_arc_tree; // (parent index, arc_id)
+  vector< pair<int, int> > child_arc_tree; // (parent index, arc_id)
   int tbuf = 0;
   
   // Initialize
@@ -1985,7 +1988,7 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
   {
     // Extracted segmented nodes created for a particular frame node
     // (at a certain frame). Map is (frame_sl node) -> (sl node)
-    std::map<int, int> new_seg_nodes;
+    map<int, int> new_seg_nodes;
     
     int sbuf = tbuf;
     tbuf ^= 1;
@@ -2023,11 +2026,11 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
           if ((*it).second.arc_id != -1 && !logical_connected)
           {
             // Realize the current pending arc
-            std::map<int,int>::iterator nit = new_seg_nodes.find((*it).first);
+            map<int,int>::iterator nit = new_seg_nodes.find((*it).first);
             if (nit == new_seg_nodes.end())
             {
               nit = new_seg_nodes.insert(
-                std::map<int,int>::value_type(
+                map<int,int>::value_type(
                   (*it).first, sl->nodes.size())).first;
               sl->nodes.push_back(
                 SegmentedNode(frame_sl->nodes[(*it).first].frame));
@@ -2054,7 +2057,7 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
             next_seg_node = sl->initial_node;
             if ((*it).second.arc_id != -1)
             {
-              std::map<int,int>::iterator nit =
+              map<int,int>::iterator nit =
                 new_seg_nodes.find((*it).first);
               assert( nit != new_seg_nodes.end() );
               next_seg_node = (*nit).second;
@@ -2086,7 +2089,7 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
                   ESLPendingArc(next_seg_node, logical_arc_id,
                                 frame_sl->arcs[frame_arc_id].arc_score)));
             (*insert_it).second.child_arc_leaf = child_arc_tree.size();
-            child_arc_tree.push_back(std::pair<int,int>(-1, frame_arc_id));
+            child_arc_tree.push_back(pair<int,int>(-1, frame_arc_id));
           }
         }
         else
@@ -2096,7 +2099,7 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
           ESLPendingArc copy = ESLPendingArc((*it).second);
 
           // Update the pending arc information
-          child_arc_tree.push_back(std::pair<int,int>(copy.child_arc_leaf,
+          child_arc_tree.push_back(pair<int,int>(copy.child_arc_leaf,
                                                       frame_arc_id));
           copy.child_arc_leaf = child_arc_tree.size() - 1;
           copy.score = loglikelihoods.times(
@@ -2170,11 +2173,11 @@ HmmNetBaumWelch::extract_segmented_lattice(SegmentedLattice *frame_sl,
 
 int
 HmmNetBaumWelch::esl_merge_child_arcs(int leaf1, int leaf2,
-                                      std::vector< std::pair<int,int> > &tree)
+                                      vector< pair<int,int> > &tree)
 {
   int cur_node1 = leaf1;
   int cur_node2 = leaf2;
-  std::vector<int> tree_nodes;
+  vector<int> tree_nodes;
   
   while (cur_node1 != cur_node2)
   {
@@ -2192,8 +2195,8 @@ HmmNetBaumWelch::esl_merge_child_arcs(int leaf1, int leaf2,
 
   // Chain the two child arc branches. The last node is already valid.
   // NOTE! It is assumed that the child arc indices in the two branches
-  // are unique. If this would not be the case, std::map should be used
-  // for tree_nodes instead of std::vector.
+  // are unique. If this would not be the case, map should be used
+  // for tree_nodes instead of vector.
   int parent_node = tree_nodes.back();
   for (int i = tree_nodes.size()-2; i >= 0; i--)
   {
@@ -2207,19 +2210,19 @@ HmmNetBaumWelch::esl_merge_child_arcs(int leaf1, int leaf2,
 
 
 void
-HmmNetBaumWelch::esl_fill_child_arcs(std::vector<int> &child_arcs,
+HmmNetBaumWelch::esl_fill_child_arcs(vector<int> &child_arcs,
                                      int leaf_index,
-                                     std::vector< std::pair<int,int> > &tree)
+                                     vector< pair<int,int> > &tree)
 {
   int cur_node = leaf_index;
-  std::vector<int> temp;
+  vector<int> temp;
   while (cur_node != -1)
   {
     temp.push_back(tree[cur_node].second);
     cur_node = tree[cur_node].first;
   }
   child_arcs.resize(temp.size());
-  std::copy(temp.rbegin(), temp.rend(), child_arcs.begin());
+  copy(temp.rbegin(), temp.rend(), child_arcs.begin());
 }
 
 
@@ -2292,7 +2295,7 @@ HmmNetBaumWelch::FrameScores::set_new_score(int frame, double score)
   if (num_scores == score_table_size)
   {
     // Increase the size of the score table
-    int new_size = std::max(score_table_size*2, score_table_size+4);
+    int new_size = max(score_table_size*2, score_table_size+4);
     double *new_table = new double[new_size];
     if (score_table_size > 0)
     {
