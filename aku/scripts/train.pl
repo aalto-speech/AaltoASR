@@ -1,61 +1,51 @@
 #!/usr/bin/perl
 
-# DO NOT USE THIS SCRIPT DIRECTLY! Copy it to your own directory and
-# modify appropriately. You MUST modify at least the path settings,
-# training file list and BASE_ID/initial model names!
-
-# Run this script at your desktop machine, which acts as the host
-# for the Condor batch system.
-
-use lib '/share/puhe/scripts/cluster'; # For CondorManager
 use locale;
 use strict;
-use CondorManager;
+use ClusterManager;
 
 
 ## Model name ##
-  my $BASE_ID="speecon_mfcc";
+  my $BASE_ID = $ENV{'TRAIN_NAME'};
+  defined($BASE_ID) || die("TRAIN_NAME environment variable needs to be set.");
 
 ## Path settings ##
-  my $BINDIR="/home/".$ENV{"USER"}."/aku";
-  my $SCRIPTDIR="$BINDIR/scripts";
-  my $HMMDIR="/share/puhe/".$ENV{"USER"}."/hmms";
-  my $workdir="/share/work/".$ENV{"USER"}."/aku_work";
-  my $lna_outdir = "/share/work/".$ENV{"USER"}."/lnas";
+  my $BINDIR = $ENV{'TRAIN_BINDIR'};
+  defined($BINDIR) || die("TRAIN_BINDIR environment variable needs to be set.");
+  my $SCRIPTDIR = $ENV{'TRAIN_SCRIPTDIR'};
+  defined($SCRIPTDIR) || die("TRAIN_SCRIPTDIR environment variable needs to be set.");
+  my $WORKDIR = $ENV{'TRAIN_DIR'};
+  defined($WORKDIR) || die("TRAIN_DIR environment variable needs to be set.");
+  my $HMMDIR = "$WORKDIR/hmm";
 
 ## Training file list ##
-my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
+  my $RECIPE = $ENV{'TRAIN_RECIPE'};
+  defined($RECIPE) || die("TRAIN_RECIPE environment variable needs to be set.");
 
 ## Initial model names ##
-  my $init_model = $HMMDIR."/".$BASE_ID;      # Created in tying
-  my $init_cfg = $HMMDIR."/".$BASE_ID.".cfg"; # Used in tying and training
+  # Now initial model is created in tying, and we use only the .cfg file
+  # of the original model.
+  my $init_model = "$HMMDIR/$BASE_ID";
+  my $init_cfg = "$HMMDIR/init.cfg";
 
 ## Batch settings ##
-  my $NUM_BATCHES = 20; # Number of batches, maximum number of parallel jobs
+  # Number of batches, maximum number of parallel jobs
+  my $NUM_BATCHES = $ENV{'TRAIN_BATCHES'};
+  $NUM_BATCHES = 20 if !defined($NUM_BATCHES);
   my $BATCH_PRIORITY = 0; # Not used currently.
   my $BATCH_MAX_MEM = 2000; # In megabytes
-  # Note that you may need considerable amount of memory if the
-  # training data contains e.g. long utterances! If too little memory
-  # is reserved, unexpected termination of the training may occur. On
-  # Condor there are currently no memory restrictions so this has no
-  # effect when training with Condor.
+  # Note that you may need memory if the training data contains
+  # e.g. long utterances! If too little memory is reserved, unexpected
+  # termination of the training may occur. On Condor there are currently
+  # no memory restrictions.
 
-## Training/Baum-Welch settings ##
+## Train/Baum-Welch settings ##
   my $USE_HMMNETS = 1; # If 0, the script must call align appropriately
   my $FORWARD_BEAM = 15;
   my $BACKWARD_BEAM = 200;
   my $AC_SCALE = 1; # Acoustic scaling (For ML 1, for MMI 1/(LMSCALE/lne(10)))
   my $ML_STATS_MODE = "--ml";
   my $ML_ESTIMATE_MODE = "--ml";
-
-## HMMNET options ##
-  my $ENABLE_ALTERNATIVE_PATHS = 0;
-  ## The next options are not used by default when $ENABLE_ALTERNATIVE_PATHS = 0
-  my $MORPH_HMMNETS = 1; # True (1) if HMMNETs are not based on words
-  my $LEX_FILE = "$SCRIPTDIR/fin_voc.lex"; # Morph/word lexicon
-  # TRN file for transcription. If empty, uses PHNs. Required if the HMMs
-  # are not based on graphemes!
-  my $TRN_FILE = "" ;
 
 ## Alignment settings ##
   my $ALIGN_WINDOW = 4000;
@@ -64,25 +54,20 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
 
 ## Context phone tying options ##
   my $TIE_USE_OUT_PHN = 0; # 0=read transcript field, 1=read alignment field
-  my $TIE_RULES = "$SCRIPTDIR/finnish_rules.txt";
+  my $TIE_RULES = "$SCRIPTDIR/estonian_rules.txt";
   my $TIE_MIN_COUNT = 1500; # Minimum number of features per state
-  my $TIE_MIN_GAIN = 4000;  # Minimum loglikelihood gain for a state split
-  my $TIE_MAX_LOSS = 4000;  # Maximum loglikelihood loss for merging states
+  my $TIE_MIN_GAIN = 5000;  # Minimum loglikelihood gain for a state split
+  my $TIE_MAX_LOSS = 5000;  # Maximum loglikelihood loss for merging states
 
 ## Gaussian splitting options ##
-  # Minimum accumulated state probability per Gaussian to allow splitting
-  my $SPLIT_MIN_OCCUPANCY = 300;
-  my $SPLIT_MAX_GAUSSIANS = 80; # Maximum number of Gaussians in mixture/state
+  my $SPLIT_MIN_OCCUPANCY = 200; # Accumulated state probability
+  my $SPLIT_MAX_GAUSSIANS = 80; # Per state
 
-  # If $SPLIT_TARGET_GAUSSIANS > 0, it defines the Gaussian splitting.
-  # $SPLIT_MIN_OCCUPANCY is still used as a per Gaussian splitting requirement,
-  # but it can be disabled by setting it to 0.
-  my $SPLIT_TARGET_GAUSSIANS = 30000; # Number of Gaussians in the final model
-
-  # Smoothing power for occupancies, 0 < alpha <= 1. 
-  # Valid only with $SPLIT_TARGET_GAUSSIANS
-  my $SPLIT_ALPHA = 0.3;
-
+  # If $SPLIT_TARGET_GAUSSIANS > 0, it defines the Gaussian splitting instead
+  # of $SPLIT_MIN_OCCUPANCY
+  my $SPLIT_TARGET_GAUSSIANS = $ENV{'TRAIN_GAUSSIANS'};
+  defined($SPLIT_TARGET_GAUSSIANS) || die("TRAIN_GAUSSIANS environment variable needs to be set.");
+  my $SPLIT_ALPHA = 0.3;  # Smoothing power for occupancies
   my $GAUSS_REMOVE_THRESHOLD = 0.001; # Mixture component weight threshold
 
 ## Minimum variance ##
@@ -93,20 +78,19 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
   my $GAUSS_EVAL_RATIO = 0.1;
 
 ## MLLT options ##
-  my $mllt_start_iter = 13; # At which iteration MLLT estimation should begin
+  my $mllt_start_iter = 15; # At which iteration MLLT estimation should begin
   my $mllt_frequency = 2; # How many EM iterations between MLLT estimation
   my $MLLT_MODULE_NAME = "transform";
 
 ## Training iterations ##
-  my $num_ml_train_iter = 20;
+  my $num_ml_train_iter = 22;
   my $split_frequency = 2; # How many EM iterations between Gaussian splits
-  my $split_stop_iter = 16; # Iteration after which no more splits are done
+  my $split_stop_iter = 18; # Iteration after which no more splits are done
 
 ## Adaptation settings ##
   my $VTLN_MODULE = "vtln";
   my $MLLR_MODULE = "mllr";
   my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
-
 
 ## Misc settings ##
   # States without duration model (silences/noises). These must be first
@@ -121,21 +105,25 @@ my $RECIPE="/share/puhe/audio/speecon-fi/speecon_adult_train.recipe";
 
   my $SAVE_STATISTICS = 0; # Save the statistics files in iteration directories
 
+## Ignore some nodes if SLURM_EXCLUDE_NODES environment variable is set ##
+  my $EXCLUDE_NODES = $ENV{'SLURM_EXCLUDE_NODES'};
+  $EXCLUDE_NODES = '' if !defined($EXCLUDE_NODES);
+
 
 ######################################################################
 # Training script begins
 ######################################################################
 
 # Create own working directory
-mkdir $workdir;
-my $tempdir = $workdir."/".$BASE_ID;
+my $tempdir = "$WORKDIR/temp";
+mkdir $WORKDIR;
 mkdir $tempdir;
+mkdir $HMMDIR;
 chdir $tempdir || die("Could not chdir to $tempdir");
 
 if ($COPY_BINARY_TO_WORK > 0) {
-    copy_binary_to_work($BINDIR, $tempdir."/bin");
+    copy_binary_to_work($BINDIR, "$tempdir/bin");
 }
-
 
 # Generate initial model by context phone tying using existing alignments
 context_phone_tying($init_model, $init_cfg);
@@ -155,9 +143,9 @@ my $om = $ml_model;
 
 # Estimate duration model
 if ($USE_HMMNETS) {
-  align_hmmnets($tempdir, $om, $RECIPE, $SPKC_FILE);
+  align_hmmnets($tempdir, $om, $RECIPE);
 } else {
-  align($tempdir, $om, $RECIPE, $SPKC_FILE);
+  align($tempdir, $om, $RECIPE);
 }
 estimate_dur_model($om);
 
@@ -169,12 +157,9 @@ estimate_dur_model($om);
 # estimate_mllr($tempdir, $om, $RECIPE, $om.".spkc");
 
 # Cluster the Gaussians
-# if ($NUM_GAUSS_CLUSTERS > 0) {
-#   cluster_gaussians($om);
-# }
-
-# Generate lnas for the final model
-#generate_lnas($tempdir, $om, $lna_recipe, $lna_outdir);
+ if ($NUM_GAUSS_CLUSTERS > 0) {
+   cluster_gaussians($om);
+ }
 
 
 
@@ -204,10 +189,13 @@ sub context_phone_tying {
   my $phn_flag = "";
   $phn_flag = "-O" if ($TIE_USE_OUT_PHN);
 
-  my $cm = CondorManager->new;
+  my $cm = ClusterManager->new;
   $cm->{"identifier"} = "tie_".$BASE_ID;
   $cm->{"run_dir"} = $tempdir;
   $cm->{"log_dir"} = $tempdir;
+  $cm->{"run_time"} = 239;
+  $cm->{"mem_req"} = 4000;
+  $cm->{"exclude_nodes"} = $EXCLUDE_NODES;
 
   $cm->submit("$BINDIR/tie -c $im_cfg -o $out_model -r $RECIPE $phn_flag -u $TIE_RULES --count $TIE_MIN_COUNT --sgain $TIE_MIN_GAIN --mloss $TIE_MAX_LOSS -i $VERBOSITY\n", "");
 
@@ -323,17 +311,20 @@ sub collect_stats {
   $spkc_switch = "-S $SPKC_FILE" if ($SPKC_FILE ne "");
   $mllt_option = "--mllt" if ($mllt_flag);
 
-  my $cm = CondorManager->new;
+  my $cm = ClusterManager->new;
   $cm->{"identifier"} = $id;
   $cm->{"run_dir"} = $temp_dir;
   $cm->{"log_dir"} = $log_dir;
+  $cm->{"run_time"} = 2000;
   if ($NUM_BATCHES > 0) {
     $cm->{"first_batch"} = 1;
     $cm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"run_time"} = 239;
   }
   $cm->{"priority"} = $BATCH_PRIORITY;
   $cm->{"mem_req"} = $BATCH_MAX_MEM;
   $cm->{"failed_batch_retry_count"} = 1;
+  $cm->{"exclude_nodes"} = $EXCLUDE_NODES;
 
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
 
@@ -408,43 +399,26 @@ sub generate_hmmnet_files {
   mkdir $new_temp_dir;
   chdir $new_temp_dir || die("Could not chdir to $new_temp_dir");
 
-  my $cm = CondorManager->new;
+  my $cm = ClusterManager->new;
   $cm->{"identifier"} = "hmmnets_${BASE_ID}";
   $cm->{"run_dir"} = $new_temp_dir;
   $cm->{"log_dir"} = $new_temp_dir;
+  $cm->{"run_time"} = 2000;
+  $cm->{"mem_req"} = 1000;
   if ($NUM_BATCHES > 0) {
     $cm->{"first_batch"} = 1;
     $cm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"run_time"} = 239;
   }
   $cm->{"failed_batch_retry_count"} = 1;
+  $cm->{"exclude_nodes"} = $EXCLUDE_NODES;
+
   my $batch_options = "";
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
 
-  if ($ENABLE_ALTERNATIVE_PATHS) {
-    my $morph_switch = "";
-    if ($MORPH_HMMNETS > 0) {
-      $morph_switch = "-m ${LEX_FILE}.voc";
-    }
-    my $trn_switch = "";
-    if (length($TRN_FILE) > 0) {
-      $trn_switch = "-t $TRN_FILE";
-    }
-    # Construct helper FSTs (L.fst, C.fst, H.fst, optional_silence.fst and
-    # end_mark.fst) and vocabulary file.
-    # Assumes that the current directory is $temp_dir!
-    if ($MORPH_HMMNETS > 0) {
-      $morph_switch = "-m";
-    }
-    system("$SCRIPTDIR/build_helper_fsts.sh $morph_switch -s $SCRIPTDIR $LEX_FILE $im.ph");
-
-    # Use real FST processing in create_hmmnets.pl to create hmmnets
-    # with alternative paths for pronunciations and silences
-    $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -r $RECIPE $morph_switch $trn_switch -T $new_temp_dir -F $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options\n", "");
-  } else {
-    # Create hmmnets directly from PHN files, without lexicon
-    # or alternative paths e.g. for silences:
-    $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -o -r $RECIPE -b $im -T $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
-  }
+  # Create hmmnets directly from PHN files, without lexicon
+  # or alternative paths e.g. for silences:
+  $cm->submit("$SCRIPTDIR/create_hmmnets.pl -n -o -r $RECIPE -b $im -T $new_temp_dir -D $BINDIR -s $SCRIPTDIR $batch_options");
 
   chdir($temp_dir);
 }
@@ -463,16 +437,18 @@ sub align {
   mkdir $new_temp_dir;
   chdir $new_temp_dir || die("Could not chdir to $new_temp_dir");
 
-  my $cm = CondorManager->new;
+  my $cm = ClusterManager->new;
   $cm->{"identifier"} = "align_${BASE_ID}";
   $cm->{"run_dir"} = $new_temp_dir;
   $cm->{"log_dir"} = $new_temp_dir;
+  $cm->{"mem_req"} = $BATCH_MAX_MEM;
   if ($NUM_BATCHES > 0) {
     $cm->{"first_batch"} = 1;
     $cm->{"last_batch"} = $NUM_BATCHES;
   }
   $cm->{"priority"} = $BATCH_PRIORITY;
   $cm->{"failed_batch_retry_count"} = 1;
+  $cm->{"exclude_nodes"} = $EXCLUDE_NODES;
 
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
   $cm->submit("$BINDIR/align -b $model -c $model.cfg -r $recipe --swins $ALIGN_WINDOW --beam $ALIGN_BEAM --sbeam $ALIGN_SBEAM $spkc_switch $batch_options -i $VERBOSITY\n", "");
@@ -494,16 +470,20 @@ sub align_hmmnets {
   mkdir $new_temp_dir;
   chdir $new_temp_dir || die("Could not chdir to $new_temp_dir");
 
-  my $cm = CondorManager->new;
+  my $cm = ClusterManager->new;
   $cm->{"identifier"} = "align_${BASE_ID}";
   $cm->{"run_dir"} = $new_temp_dir;
   $cm->{"log_dir"} = $new_temp_dir;
+  $cm->{"run_time"} = 2000;
+  $cm->{"mem_req"} = $BATCH_MAX_MEM;
   if ($NUM_BATCHES > 0) {
     $cm->{"first_batch"} = 1;
     $cm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"run_time"} = 239;
   }
   $cm->{"priority"} = $BATCH_PRIORITY;
   $cm->{"failed_batch_retry_count"} = 1;
+  $cm->{"exclude_nodes"} = $EXCLUDE_NODES;
 
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
   $cm->submit("$BINDIR/stats -b $model -c $model.cfg -r $recipe -H --ml -M vit -a -n -o /dev/null $spkc_switch $batch_options -i $VERBOSITY\n", "");
@@ -520,17 +500,21 @@ sub estimate_mllr {
   my $temp_out;
   my $batch_options = "";
 
-  my $cm = CondorManager->new;
+  my $cm = ClusterManager->new;
   $cm->{"identifier"} = "mllr_${BASE_ID}";
   $cm->{"run_dir"} = $temp_dir;
   $cm->{"log_dir"} = $temp_dir;
+  $cm->{"run_time"} = 2000;
+  $cm->{"mem_req"} = $BATCH_MAX_MEM;
   if ($NUM_BATCHES > 0) {
     $cm->{"first_batch"} = 1;
     $cm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"run_time"} = 239;
   }
   $cm->{"priority"} = $BATCH_PRIORITY;
   $cm->{"mem_req"} = $BATCH_MAX_MEM; # No large mem requirements
   $cm->{"failed_batch_retry_count"} = 1;
+  $cm->{"exclude_nodes"} = $EXCLUDE_NODES;
 
   $temp_out = $out_file;
   if ($NUM_BATCHES > 1) {
@@ -554,16 +538,20 @@ sub estimate_vtln {
   my $temp_out;
   my $batch_options = "";
 
-  my $cm = CondorManager->new;
+  my $cm = ClusterManager->new;
   $cm->{"identifier"} = "vtln_${BASE_ID}.sh";
   $cm->{"run_dir"} = $temp_dir;
   $cm->{"log_dir"} = $temp_dir;
+  $cm->{"run_time"} = 2000;
+  $cm->{"mem_req"} = $BATCH_MAX_MEM;
   if ($NUM_BATCHES > 0) {
     $cm->{"first_batch"} = 1;
     $cm->{"last_batch"} = $NUM_BATCHES;
+    $cm->{"run_time"} = 239;
   }
   $cm->{"priority"} = $BATCH_PRIORITY;
   $cm->{"failed_batch_retry_count"} = 1;
+  $cm->{"exclude_nodes"} = $EXCLUDE_NODES;
 
   $temp_out = $out_file;
   if ($NUM_BATCHES > 1) {
@@ -594,36 +582,4 @@ sub cluster_gaussians {
   if (!(-e $im.".gcl")) {
     die("Error in Gaussian clustering\n");
   }
-}
-
-
-
-sub generate_lnas {
-  my $temp_dir = shift(@_);
-  my $model = shift(@_);
-  my $recipe = shift(@_);
-  my $out_dir = shift(@_);
-  my $spkc_file = shift(@_);
-  my $batch_options = "";
-  my $cluster_options = "";
-
-  my $spkc_switch = "";
-  $spkc_switch = "-S $spkc_file" if ($spkc_file ne "");
-
-  mkdir $out_dir;
-
-  my $cm = CondorManager->new;
-  $cm->{"identifier"} = "lna_${BASE_ID}";
-  $cm->{"run_dir"} = $temp_dir;
-  $cm->{"log_dir"} = $temp_dir;
-  if ($NUM_BATCHES > 0) {
-    $cm->{"first_batch"} = 1;
-    $cm->{"last_batch"} = $NUM_BATCHES;
-  }
-  $cm->{"priority"} = $BATCH_PRIORITY;
-  $cm->{"failed_batch_retry_count"} = 1;
-
-  $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
-  $cluster_options = "-C $model.gcl --eval-ming $GAUSS_EVAL_RATIO" if ($NUM_GAUSS_CLUSTERS);
-  $cm->submit("$BINDIR/phone_probs -b $model -c $model.cfg -r $recipe -o $out_dir $spkc_switch $batch_options -i $VERBOSITY $cluster_options\n", "");
 }
