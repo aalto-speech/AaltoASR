@@ -1,7 +1,9 @@
 add_subdirectory( fsalm )
 add_subdirectory( misc )
 add_subdirectory( morpheus )
-add_subdirectory( swig )
+if(NOT DISABLE_SWIG)
+  add_subdirectory( swig )
+endif(NOT DISABLE_SWIG)
 include_directories(".")
 
 set(DECODERSOURCES 

@@ -44,6 +44,9 @@ set(LapackPP_LIBRARIES LapackPP)
 
 install(DIRECTORY ${CMAKE_BINARY_DIR}/vendor/lapackpp/include/lapackpp DESTINATION include)
 install(FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.a DESTINATION lib)
+
+option(DISABLE_SWIG "Disable building swig/python interface for decoder")
+
 add_subdirectory( decoder )
 add_subdirectory( tools )
 add_subdirectory( aku )
