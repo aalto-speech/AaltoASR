@@ -1,6 +1,8 @@
 arpa2bin
 bin2arpa
+hmm2fsm
 fsalm/libfsalm.a
+fsalm/fsalm-convert
 libdecoder.a
 misc/libmisc.a
 morpheus/morpheus
