@@ -1,6 +1,6 @@
 include_directories("..")
 
-add_executable(fsalm-convert lm.cc)
+add_executable(fsalm-convert fsalm-convert.cc)
 target_link_libraries(fsalm-convert fsalm misc)
 add_library(fsalm LM.cc ArpaReader.cc)
 install(TARGETS fsalm-convert DESTINATION bin)
