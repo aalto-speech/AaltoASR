@@ -1,4 +1,8 @@
-2013-02-28  senarvi  <senarvi@cis.hut.fi>
+2015-01-19  Seppo Enarvi  <seppo.enarvi@aalto.fi>
+
+	* src/fsalm/lm: Renamed to fsalm-convert to avoid name conflict in Windows.
+
+2013-02-28  Seppo Enarvi  <seppo.enarvi@aalto.fi>
 
 	* src/TPLexPrefixTree.cc (TPLexPrefixTree::add_word): Supports pronunciation
 	probabilities.
@@ -7,7 +11,7 @@
 	* src/TPNowayLexReader.cc (TPNowayLexReader::read): Handles pronunciation
 	probabilities. 
 
-2013-01-30  senarvi  <senarvi@cis.hut.fi>
+2013-01-30  Seppo Enarvi  <seppo.enarvi@aalto.fi>
 
 	* src/swig/Decoder.i: Toolbox::htk_lattice_grammar_read() doesn't return a
 	value.
@@ -20,14 +24,14 @@
 	* src/Toolbox.hh (Toolbox): Check that set_word_boundary() is not called
 	after reading language model or lexicon.
 
-2012-11-01  senarvi  <senarvi@cis.hut.fi>
+2012-11-01  Seppo Enarvi  <seppo.enarvi@aalto.fi>
 
 	* src/TokenPassSearch.cc (TokenPassSearch::create_word_repository): Ignore
 	pronunciation ID in the end of a word (colon followed by digits), so that we
 	can easily get the information of what pronunciation the decoder has
 	selected by simply adding these IDs to the dictionary.
  
-2012-11-01  senarvi  <senarvi@cis.hut.fi>
+2012-11-01  Seppo Enarvi  <seppo.enarvi@aalto.fi>
 
 	* src/TokenPassSearch.cc (TokenPassSearch::reset_search):
 	m_recent_word_graph_info is indexed by word ID, so size has to be
@@ -39,7 +43,7 @@
 	(TokenPassSearch::get_lm_trigram_lookahead): m_word_repository.size() is the
 	number of different word IDs, not m_lexicon.words().
 
-2012-10-25  senarvi  <senarvi@cis.hut.fi>
+2012-10-25  Seppo Enarvi  <seppo.enarvi@aalto.fi>
 
 	* src/LMHistory.cc (LMHistory::rend): A NULL value represents the beginning
 	of an LMHistory, or the end of reverse iteration.
@@ -56,7 +60,7 @@
 	(TokenPassSearch::get_lm_lookahead_score): Use
 	LMHistory::ConstReverseIterator.
 
-2012-10-01  senarvi  <senarvi@cis.hut.fi>
+2012-10-01  Seppo Enarvi  <seppo.enarvi@aalto.fi>
 
 	* src/LMHistory.cc (LMHistory::rbegin): Returns a reverse iterator pointing
 	to the last word or multiword component in the LMHistory.
@@ -68,7 +72,7 @@
 	* src/TokenPassSearch.cc (TokenPassSearch::split_and_compute_ngram_score):
 	Uses LMHistory::Word::ConstReverseIterator. 
  
-2012-09-25  senarvi  <senarvi@cis.hut.fi>
+2012-09-25  Seppo Enarvi  <seppo.enarvi@aalto.fi>
 
 	* src/LMHistory.hh (LMHistory.Word): Store also word ID and lookahead LM ID
 	of each component. 
@@ -81,7 +85,7 @@
 	(TokenPassSearch::get_lm_lookahead_score): When using multiwords, consider
 	the last two multiword components, instead of the last two words. 
 
-2012-09-24  senarvi  <senarvi@cis.hut.fi>
+2012-09-24  Seppo Enarvi  <seppo.enarvi@aalto.fi>
 
 	* src/LMHistory.hh (LMHistory.Word): Stores also ID to lookahead LM.
 	* src/TokenPassSearch.cc (TokenPassSearch::find_similar_lm_history): Calls
