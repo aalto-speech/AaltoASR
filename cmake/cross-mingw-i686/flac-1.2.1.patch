@@ -1,0 +1,71 @@
+diff -Naur flac-1.2.1-orig/configure flac-1.2.1/configure
+--- flac-1.2.1-orig/configure	2007-09-16 20:05:33.000000000 +0000
++++ flac-1.2.1/configure	2014-08-22 12:21:16.744590047 +0000
+@@ -21545,10 +21545,10 @@
+ 
+ 
+ # only needed because of ntohl() usage, can get rid of after that's gone:
+-case "$host" in
+-	*-*-cygwin|*mingw*) MINGW_WINSOCK_LIBS=-lwsock32 ;;
+-	*) MINGW_WINSOCK_LIBS= ;;
+-esac
++#case "$host" in
++#	*-*-cygwin|*mingw*) MINGW_WINSOCK_LIBS=-lwsock32 ;;
++#	*) MINGW_WINSOCK_LIBS= ;;
++#esac
+ 
+ 
+ case "$host" in
+diff -Naur flac-1.2.1-orig/examples/cpp/encode/file/main.cpp flac-1.2.1/examples/cpp/encode/file/main.cpp
+--- flac-1.2.1-orig/examples/cpp/encode/file/main.cpp	2007-09-13 15:58:03.000000000 +0000
++++ flac-1.2.1/examples/cpp/encode/file/main.cpp	2014-08-22 12:20:48.605157805 +0000
+@@ -30,6 +30,7 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include "FLAC++/metadata.h"
+ #include "FLAC++/encoder.h"
+ 
+diff -Naur flac-1.2.1-orig/src/libFLAC/bitreader.c flac-1.2.1/src/libFLAC/bitreader.c
+--- flac-1.2.1-orig/src/libFLAC/bitreader.c	2007-09-11 04:48:55.000000000 +0000
++++ flac-1.2.1/src/libFLAC/bitreader.c	2014-08-22 12:24:28.420723218 +0000
+@@ -40,7 +40,7 @@
+ #elif defined FLAC__SYS_DARWIN
+ #include <machine/endian.h> /* for ntohl() */
+ #elif defined __MINGW32__
+-#include <winsock.h> /* for ntohl() */
++/* #include <winsock.h> for ntohl() */
+ #else
+ #include <netinet/in.h> /* for ntohl() */
+ #endif
+@@ -64,7 +64,7 @@
+ #ifdef _MSC_VER
+ #define SWAP_BE_WORD_TO_HOST(x) local_swap32_(x)
+ #else
+-#define SWAP_BE_WORD_TO_HOST(x) ntohl(x)
++#define SWAP_BE_WORD_TO_HOST(x) __builtin_bswap32(x)
+ #endif
+ #endif
+ /* counts the # of zero MSBs in a word */
+diff -Naur flac-1.2.1-orig/src/libFLAC/bitwriter.c flac-1.2.1/src/libFLAC/bitwriter.c
+--- flac-1.2.1-orig/src/libFLAC/bitwriter.c	2007-09-10 23:08:38.000000000 +0000
++++ flac-1.2.1/src/libFLAC/bitwriter.c	2014-08-22 12:24:46.844351594 +0000
+@@ -40,7 +40,7 @@
+ #elif defined FLAC__SYS_DARWIN
+ #include <machine/endian.h> /* for ntohl() */
+ #elif defined __MINGW32__
+-#include <winsock.h> /* for ntohl() */
++/* #include <winsock.h> for ntohl() */
+ #else
+ #include <netinet/in.h> /* for ntohl() */
+ #endif
+@@ -66,7 +66,7 @@
+ #ifdef _MSC_VER
+ #define SWAP_BE_WORD_TO_HOST(x) local_swap32_(x)
+ #else
+-#define SWAP_BE_WORD_TO_HOST(x) ntohl(x)
++#define SWAP_BE_WORD_TO_HOST(x) __builtin_bswap32(x)
+ #endif
+ #endif
+ 
