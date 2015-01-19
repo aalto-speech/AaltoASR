@@ -1,7 +1,7 @@
 The Aalto ASR tools are build with the cmake build system.
 
 
-## Requirements
+## Building under Unix-like operating systems
 
 ### Required packages for Ubuntu (and other Debian-based distributions)
 
@@ -15,7 +15,7 @@ The Aalto ASR tools are build with the cmake build system.
     python2.7-dev
     gfortran
 
-    libfftw3-dev (optional. If not provided KissFFT is used)
+    libfftw3-dev (Optional. If not provided KissFFT is used)
 
 ### Required packages for Scientific Linux (and other Redhat-based distributions)
 
@@ -29,10 +29,7 @@ The Aalto ASR tools are build with the cmake build system.
     
     fftw-devel (optional. If not provided KissFFT is used)
 
-
-## Building under Unix-like operating systems
-
-Make sure the requirements are met, see REQUIREMENTS above
+### Build instructions
 
     git clone https://github.com/aalto-speech/AaltoASR.git
     cd AaltoASR
@@ -54,12 +51,11 @@ After this all a
 
 will install the binaries and libraries on the correct places. This location can be changed with the option -DCMAKE_INSTALL_PREFIX=/path to the cmake command.
 
-For a debug build, add -DCMAKE_BUILD_TYPE=Debug to the cmake command. For an optimized build add -DCMAKE_BUILD_TYPE=Release.
+For a debug build, add -DCMAKE_BUILD_TYPE=Debug to the cmake command (very slow). For an optimized build add -DCMAKE_BUILD_TYPE=Release.
 
 Normally, if available, the FFTW library is used, otherwise the KissFFT library is used. To force the KissFFT library, add -DKISS_FFT=1 to the cmake command.
 
-
-## Creating an Eclipse project
+### Creating an Eclipse project
 
 If you would like to edit/debug the source code in Eclipse, you can follow the instructions given on http://www.vtk.org/Wiki/Eclipse_CDT4_Generator
 
@@ -74,11 +70,11 @@ And import the resulting project in eclipse.
 
 ## Building under Windows and MinGW
 
-1. Install MinGW and MSYS environment.
+* Install MinGW and MSYS environment.
 
 Follow the instructions on this page: http://ingar.satgnu.net/devenv/mingw32/base.html
 
-2. Open MSYS shell and load the correct build environment.
+* Open MSYS shell and load the correct build environment.
 
 For a 32-bit build, use
 
@@ -88,7 +84,7 @@ For a 64-bit build, use
 
     source /local64/etc/profile.local
 
-3. Install SDL.
+* Install SDL.
 
     cd ${LOCALSOURCEDIR} && \
     wget -c http://www.libsdl.org/release/SDL-1.2.15.tar.gz && \
@@ -99,7 +95,7 @@ For a 64-bit build, use
     make && \
     make install
 
-3. Install libsndfile.
+* Install libsndfile.
 
     cd ${LOCALSOURCEDIR} && \
     wget -c http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz && \
@@ -110,7 +106,7 @@ For a 64-bit build, use
     make && \
     make install
     
-4. Install ATLAS.
+* Install ATLAS.
 
 For a 32-bit build, use
 
@@ -134,7 +130,7 @@ For a 64-bit build, use
     make && \
     make install
 
-5. Install AaltoASR.
+* Install AaltoASR.
 
     cd ${LOCALSOURCEDIR} && \
     git clone https://github.com/aalto-speech/AaltoASR.git && \
@@ -151,4 +147,39 @@ For a 64-bit build, use
 
 OR
 
-	cmake -G"Eclipse CDT4 - MinGW Makefiles" -DDISABLE_SWIG=On -DCMAKE_BUILD_TYPE=Release
+    cmake -G"Eclipse CDT4 - MinGW Makefiles" -DDISABLE_SWIG=On -DCMAKE_BUILD_TYPE=Release
+
+
+## Cross-compiling for Windows under Unix-like operating systems
+
+### Required packages for Ubuntu (and other Debian-based distributions)
+
+    build-essential
+    cmake
+    gcc-mingw-w64-i686
+
+    libsndfile1-dev
+    libsdl1.2-dev
+    liblapack-dev
+    python2.7-dev
+    gfortran
+
+### Build instructions
+
+* Build libsndfile.
+
+    wget http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz
+    tar xzf libsndfile-1.0.25.tar.gz
+    cd libsndfile-1.0.25
+    ./configure --host=i686-w64-mingw32 --disable-sqlite --disable-alsa --disable-external-libs --prefix=/usr/local/i686-w64-mingw32
+    make
+    make install
+
+* Build AaltoASR.
+
+    git clone https://github.com/aalto-speech/AaltoASR.git
+    cd AaltoASR
+    mkdir build
+    cd build 
+    cmake -DCMAKE_TOOLCHAIN_FILE=cmake/cross-mingw-i686/toolchain.cmake -DDISABLE_SWIG=On ..
+    make
