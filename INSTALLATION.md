@@ -121,11 +121,8 @@ For a 64-bit build, use
     cd ${LOCALBUILDDIR} && \
     mkdir AaltoASR && \
     cd AaltoASR && \
-    cmake -G"MSYS Makefiles" -DDISABLE_SWIG=On \
-    -DSDL_INCLUDE_DIR="${LOCALDESTDIR}/include/SDL" \
-    -DSNDFILE_LIBRARY="${LOCALDESTDIR}/lib" \
-    -DSNDFILE_INCLUDE_DIR="${LOCALDESTDIR}/include" \
-    -DCMAKE_BUILD_TYPE=Release ${LOCALSOURCEDIR}/AaltoASR && \
+    cmake ${LOCALSOURCEDIR}/AaltoASR -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_PREFIX_PATH=${LOCALDESTDIR} -DDISABLE_SWIG=On && \
     make && \
     make install
 
