@@ -1,4 +1,4 @@
-The Aalto ASR tools are build with the cmake build system.
+The Aalto ASR libraries and tools are built with cmake build system.
 
 
 ## Building under Unix-like operating systems
@@ -70,65 +70,73 @@ And import the resulting project in eclipse.
 
 ## Building under Windows and MinGW
 
-* Install MinGW and MSYS environment.
+1. Install MinGW and MSYS environment.
+    
+  Follow the instructions on this page: http://ingar.satgnu.net/devenv/mingw32/base.html
 
-Follow the instructions on this page: http://ingar.satgnu.net/devenv/mingw32/base.html
+2. Open MSYS shell and load the correct build environment.
 
-* Open MSYS shell and load the correct build environment.
+  For a 32-bit build, enter in the MSYS prompt:
 
-For a 32-bit build, use
+      source /local32/etc/profile.local
 
-    source /local32/etc/profile.local
+  For a 64-bit build, enter in the MSYS prompt:
 
-For a 64-bit build, use
+      source /local64/etc/profile.local
 
-    source /local64/etc/profile.local
+3. Install SDL.
 
-* Install SDL.
+  Enter in the MSYS prompt:
+  
+      cd ${LOCALSOURCEDIR} && \
+      wget -c http://www.libsdl.org/release/SDL-1.2.15.tar.gz && \
+      cd ${LOCALBUILDDIR} && \
+      tar xzf ${LOCALSOURCEDIR}/SDL-1.2.15.tar.gz && \
+      cd SDL-1.2.15 && \
+      ./configure --prefix=${LOCALDESTDIR} && \
+      make && \
+      make install
 
-    cd ${LOCALSOURCEDIR} && \
-    wget -c http://www.libsdl.org/release/SDL-1.2.15.tar.gz && \
-    cd ${LOCALBUILDDIR} && \
-    tar xzf ${LOCALSOURCEDIR}/SDL-1.2.15.tar.gz && \
-    cd SDL-1.2.15 && \
-    ./configure --prefix=${LOCALDESTDIR} && \
-    make && \
-    make install
+4. Install libsndfile.
 
-* Install libsndfile.
+  Enter in the MSYS prompt:
 
-    cd ${LOCALSOURCEDIR} && \
-    wget -c http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz && \
-    cd ${LOCALBUILDDIR} && \
-    tar xzf ${LOCALSOURCEDIR}/libsndfile-1.0.25.tar.gz && \
-    cd libsndfile-1.0.25 && \
-    ./configure --prefix=${LOCALDESTDIR} && \
-    make && \
-    make install
+      cd ${LOCALSOURCEDIR} && \
+      wget -c http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz && \
+      cd ${LOCALBUILDDIR} && \
+      tar xzf ${LOCALSOURCEDIR}/libsndfile-1.0.25.tar.gz && \
+      cd libsndfile-1.0.25 && \
+      ./configure --prefix=${LOCALDESTDIR} && \
+      make && \
+      make install
 
-* Install OpenBLAS.
+5. Install OpenBLAS.
 
-    cd ${LOCALBUILDDIR} && \
-    git clone https://github.com/xianyi/OpenBLAS.git && \
-    cd OpenBLAS && \
-    make && \
-    make install PREFIX=${LOCALDESTDIR}
+  Enter in the MSYS prompt:
 
-* Install AaltoASR.
+      cd ${LOCALBUILDDIR} && \
+      git clone https://github.com/xianyi/OpenBLAS.git && \
+      cd OpenBLAS && \
+      make && \
+      make install PREFIX=${LOCALDESTDIR}
 
-    cd ${LOCALSOURCEDIR} && \
-    git clone https://github.com/aalto-speech/AaltoASR.git && \
-    cd ${LOCALBUILDDIR} && \
-    mkdir AaltoASR && \
-    cd AaltoASR && \
-    cmake ${LOCALSOURCEDIR}/AaltoASR -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_PREFIX_PATH=${LOCALDESTDIR} -DDISABLE_SWIG=On && \
-    make && \
-    make install
+6. Install AaltoASR.
 
-OR
+  Enter in the MSYS prompt:
 
-    cmake -G"Eclipse CDT4 - MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DDISABLE_SWIG=On -DDISABLE_TOOLS=On
+      cd ${LOCALSOURCEDIR} && \
+      git clone https://github.com/aalto-speech/AaltoASR.git && \
+      cd ${LOCALBUILDDIR} && \
+      mkdir AaltoASR && \
+      cd AaltoASR && \
+      cmake ${LOCALSOURCEDIR}/AaltoASR -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH=${LOCALDESTDIR} -DDISABLE_SWIG=On -DDISABLE_TOOLS=On && \
+      make && \
+      make install
+
+  Or, to create an Eclipse project, enter in Windows command prompt:
+
+      cmake -G"Eclipse CDT4 - MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DDISABLE_SWIG=On -DDISABLE_TOOLS=On
 
 
 ## Cross-compiling for Windows under Unix-like operating systems
