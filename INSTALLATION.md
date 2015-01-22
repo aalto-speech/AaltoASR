@@ -105,30 +105,14 @@ For a 64-bit build, use
     ./configure --prefix=${LOCALDESTDIR} && \
     make && \
     make install
-    
-* Install ATLAS.
 
-For a 32-bit build, use
+* Install OpenBLAS.
 
-    cd ${LOCALSOURCEDIR} && \
-    git clone https://github.com/vtjnash/atlas-3.10.0.git && \
     cd ${LOCALBUILDDIR} && \
-    mkdir atlas-3.10.0 && \
-    cd atlas-3.10.0 && \
-    ${LOCALSOURCEDIR}/atlas-3.10.0/configure --prefix=${LOCALDESTDIR} -b 32 && \
+    git clone https://github.com/xianyi/OpenBLAS.git && \
+    cd OpenBLAS && \
     make && \
-    make install
-
-For a 64-bit build, use
-
-    cd ${LOCALSOURCEDIR} && \
-    git clone https://github.com/vtjnash/atlas-3.10.0.git && \
-    cd ${LOCALBUILDDIR} && \
-    mkdir atlas-3.10.0 && \
-    cd atlas-3.10.0 && \
-    ${LOCALSOURCEDIR}/atlas-3.10.0/configure --prefix=${LOCALDESTDIR} -b 64 && \
-    make && \
-    make install
+    make install PREFIX=${LOCALDESTDIR}
 
 * Install AaltoASR.
 
@@ -137,11 +121,8 @@ For a 64-bit build, use
     cd ${LOCALBUILDDIR} && \
     mkdir AaltoASR && \
     cd AaltoASR && \
-    cmake -G"MSYS Makefiles" -DDISABLE_SWIG=On \
-    -DSDL_INCLUDE_DIR="${LOCALDESTDIR}/include/SDL" \
-    -DSNDFILE_LIBRARY="${LOCALDESTDIR}/lib" \
-    -DSNDFILE_INCLUDE_DIR="${LOCALDESTDIR}/include" \
-    -DCMAKE_BUILD_TYPE=Release .. && \
+    cmake ${LOCALSOURCEDIR}/AaltoASR -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_PREFIX_PATH=${LOCALDESTDIR} -DDISABLE_SWIG=On && \
     make && \
     make install
 
@@ -156,30 +137,16 @@ OR
 
     build-essential
     cmake
-    gcc-mingw-w64-i686
-
-    libsndfile1-dev
-    libsdl1.2-dev
-    liblapack-dev
-    python2.7-dev
-    gfortran
+    gcc-mingw-w64-i686 (or gcc-mingw-w64-x86-64)
+    gfortran-mingw-w64-i686 (or gfortran-mingw-w64-x86-64)
 
 ### Build instructions
 
-* Build libsndfile.
-
-    wget http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz
-    tar xzf libsndfile-1.0.25.tar.gz
-    cd libsndfile-1.0.25
-    ./configure --host=i686-w64-mingw32 --disable-sqlite --disable-alsa --disable-external-libs --prefix=/usr/local/i686-w64-mingw32
-    make
-    make install
-
-* Build AaltoASR.
+When using the cross-compilation toolchain, cmake compiles the dependencies automatically using a cross-compiler.
 
     git clone https://github.com/aalto-speech/AaltoASR.git
     cd AaltoASR
     mkdir build
-    cd build 
+    cd build
     cmake -DCMAKE_TOOLCHAIN_FILE=cmake/cross-mingw-i686/toolchain.cmake -DDISABLE_SWIG=On ..
     make
