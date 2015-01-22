@@ -155,9 +155,10 @@ install(DIRECTORY ${CMAKE_BINARY_DIR}/vendor/lapackpp/include/lapackpp DESTINATI
 install(FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.a DESTINATION lib)
 
 option(DISABLE_SWIG "Disable building swig/python interface for decoder")
+option(DISABLE_TOOLS "Disable building tools")
 
 add_subdirectory( decoder )
-IF(NOT CROSS_MINGW)
+if(NOT DISABLE_TOOLS)
   add_subdirectory( tools )
-ENDIF(NOT CROSS_MINGW)
+ENDIF(NOT DISABLE_TOOLS)
 add_subdirectory( aku )

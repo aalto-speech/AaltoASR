@@ -128,7 +128,7 @@ For a 64-bit build, use
 
 OR
 
-    cmake -G"Eclipse CDT4 - MinGW Makefiles" -DDISABLE_SWIG=On -DCMAKE_BUILD_TYPE=Release
+    cmake -G"Eclipse CDT4 - MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DDISABLE_SWIG=On -DDISABLE_TOOLS=On
 
 
 ## Cross-compiling for Windows under Unix-like operating systems
@@ -148,5 +148,5 @@ When using the cross-compilation toolchain, cmake compiles the dependencies auto
     cd AaltoASR
     mkdir build
     cd build
-    cmake -DCMAKE_TOOLCHAIN_FILE=cmake/cross-mingw-i686/toolchain.cmake -DDISABLE_SWIG=On ..
+    cmake -DCMAKE_TOOLCHAIN_FILE=cmake/cross-mingw-i686/toolchain.cmake -DDISABLE_SWIG=On -DDISABLE_TOOLS=On ..
     make
