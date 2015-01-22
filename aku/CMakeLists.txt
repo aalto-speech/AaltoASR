@@ -1,8 +1,10 @@
 PROJECT (aku)
 
-Find_Package ( SNDFILE REQUIRED )
-Find_Package ( BLAS REQUIRED )
-Find_Package ( LAPACK REQUIRED )
+IF(NOT CROSS_MINGW)
+  Find_Package ( SNDFILE REQUIRED )
+  Find_Package ( BLAS REQUIRED )
+  Find_Package ( LAPACK REQUIRED )
+ENDIF(NOT CROSS_MINGW)
 
 link_libraries (
     ${LapackPP_LIBRARIES}
@@ -84,4 +86,6 @@ endforeach(AKU_CMD)
 file(GLOB AKU_HEADERS "*.hh") 
 install(FILES ${AKU_HEADERS} DESTINATION include)
 install(TARGETS aku DESTINATION lib)
-add_subdirectory( swig )
+if(NOT DISABLE_SWIG)
+  add_subdirectory( swig )
+endif(NOT DISABLE_SWIG )
