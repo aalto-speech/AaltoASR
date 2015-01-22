@@ -3,6 +3,7 @@ PROJECT (aku)
 include(CMakePushCheckState)
 
 Find_Package ( SNDFILE REQUIRED )
+
 Find_Package ( BLAS QUIET )
 IF(NOT BLAS_FOUND)
   Find_Package ( OpenBLAS )
