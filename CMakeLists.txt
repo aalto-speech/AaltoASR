@@ -4,6 +4,7 @@ set(CMAKE_GENERATOR_CXX g++ c++)
 PROJECT(AaltoASR)
 
 include(ExternalProject)
+include(CMakePushCheckState)
 
 # with -fPIC
 IF(UNIX AND NOT WIN32)
@@ -18,7 +19,13 @@ IF(UNIX AND NOT WIN32)
   ENDIF(CMAKE_UNAME)
 ENDIF(UNIX AND NOT WIN32)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules")
+
+
+### MINGW CROSS-COMPILATION
+### Cross-compile also dependencies.
 IF(CROSS_MINGW)
+
   message(STATUS "Cross-compiling for Windows / MinGW")
 
   SET(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH} ${CROSS_DEPS}/include)
@@ -87,19 +94,49 @@ IF(CROSS_MINGW)
     BUILD_IN_SOURCE 1
     INSTALL_COMMAND make install PREFIX=${CROSS_DEPS}
   )
-ENDIF(CROSS_MINGW)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules")
+### NORMAL BUILD OR IN UNIX OR MINGW
+### Find ATLAS or OpenBLAS (MinGW) and set LAPACKPP_CONFIGURE if needed.
+ELSE(CROSS_MINGW)
+
+  Find_Package ( BLAS QUIET )
+  IF(NOT BLAS_FOUND)
+    Find_Package ( OpenBLAS )
+    IF(NOT OPENBLAS_FOUND)
+      MESSAGE(FATAL_ERROR "BLAS or OpenBLAS not found.")
+    ELSE(NOT OPENBLAS_FOUND)
+      set(BLAS_LIBRARIES ${OPENBLAS_LIBRARIES})
+      set(LAPACK_LIBRARIES ${BLAS_LIBRARIES} "-lgfortran")
+      cmake_push_check_state()
+      set(CMAKE_REQUIRED_LIBRARIES ${LAPACK_LIBRARIES})
+      check_function_exists("cheev_" LAPACK_LIBRARY_WORKS)
+      mark_as_advanced(LAPACK_LIBRARY_WORKS)
+      cmake_pop_check_state()
+      if( NOT LAPACK_LIBRARY_WORKS )
+        message(FATAL_ERROR "LAPACK features in OpenBLAS not found")
+      else( )
+        SET(LAPACK_FOUND TRUE)
+        SET(LAPACKPP_CONFIGURE --disable-atlas --with-blas=openblas --with-lapack=openblas)
+        message(STATUS "Working build of OpenBLAS with LAPACK found")
+      endif( )
+    ENDIF(NOT OPENBLAS_FOUND)
+  ELSE(NOT BLAS_FOUND)
+    Find_Package ( LAPACK REQUIRED )
+  ENDIF(NOT BLAS_FOUND)
+
+ENDIF(CROSS_MINGW)
+### END SYSTEM DEPENDENT PART
+
 
 ADD_DEFINITIONS(-std=gnu++0x)
 
+### Build patched LapackPP.
 ExternalProject_Add(lapackpp_ext
    PREFIX ${CMAKE_BINARY_DIR}/vendor/lapackpp
    URL http://downloads.sourceforge.net/project/lapackpp/lapackpp-2.5.4.tar.gz
    URL_MD5 9ad74fb73fbcbf378c36a19a5dccbda7
-  # SOURCE_DIR vendor/lapackpp-2.5.4
    PATCH_COMMAND patch -p1 < ${CMAKE_CURRENT_LIST_DIR}/vendor/lapackpp-2.5.4.ics.patch
-   CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-static=yes --enable-shared=no --prefix=<INSTALL_DIR> CXXFLAGS=-fPIC
+   CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-static=yes --enable-shared=no --prefix=<INSTALL_DIR> ${LAPACKPP_CONFIGURE} CXXFLAGS=-fPIC
    BUILD_COMMAND make
    BUILD_IN_SOURCE 1
    INSTALL_COMMAND make install
