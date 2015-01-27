@@ -46,9 +46,9 @@ use ClusterManager;
 ## HMMNET options ##
   my $MORPH_HMMNETS = 0; # True (1) if HMMNETs are not based on words
   my $LEX_FILE=$ENV{'TRAIN_LEX'};
-  length($LEX_FILE) > 0 || die("TRAIN_LEX environment variable needs to be set.");
+  defined($LEX_FILE) || die("TRAIN_LEX environment variable needs to be set.");
   my $TRN_FILE=$ENV{'TRAIN_TRN'};
-  length($TRN_FILE) > 0 || die("TRAIN_TRN environment variable needs to be set.");
+  defined($TRN_FILE) || die("TRAIN_TRN environment variable needs to be set.");
 
 ## Alignment settings ##
   my $ALIGN_WINDOW = 4000;
@@ -141,10 +141,7 @@ sub generate_hmmnet_files {
   if ($MORPH_HMMNETS > 0) {
     $morph_switch = "-m ${LEX_FILE}.voc";
   }
-  my $trn_switch = "";
-  if (length($TRN_FILE) > 0) {
-    $trn_switch = "-t $TRN_FILE";
-  }
+  $trn_switch = "-t $TRN_FILE";
   # Construct helper FSTs (L.fst, C.fst, H.fst, optional_silence.fst and
   # end_mark.fst) and vocabulary file.
   # Assumes that the current directory is $temp_dir!
