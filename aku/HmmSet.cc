@@ -2,7 +2,6 @@
 #include <iostream>
 #include <fstream>
 #include <math.h>
-#include <values.h>
 #include <algorithm>
 
 #include "HmmSet.hh"
