@@ -65,7 +65,7 @@ In short
     cd AaltoASR
     cmake -G"Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug .
 
-And import the resulting project in eclipse.
+And import the resulting project in Eclipse.
 
 
 ## Building under Windows and MinGW
@@ -134,9 +134,18 @@ And import the resulting project in eclipse.
       make && \
       make install
 
-  Or, to create an Eclipse project, enter in Windows command prompt:
+### Creating an Eclipse project
 
-      cmake -G"Eclipse CDT4 - MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DDISABLE_SWIG=On -DDISABLE_TOOLS=On
+  It is possible to create an Eclipse project in Windows, but compilation has to be
+  done from an MSYS shell. Follow the instructions above, but instead of the typical
+  out-of-source build, use the Eclipse CDT4 generator in the source directory:
+
+      cd ${LOCALSOURCEDIR}/AaltoASR && \
+      cmake . -G"Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH=${LOCALDESTDIR} -DDISABLE_SWIG=On -DDISABLE_TOOLS=On
+
+  and import the project from C:\MinGW\sources\AaltoASR. To compile, run make from
+  the MSYS prompt.
 
 
 ## Cross-compiling for Windows under Unix-like operating systems
