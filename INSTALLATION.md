@@ -165,5 +165,6 @@ When using the cross-compilation toolchain, cmake compiles the dependencies auto
     cd AaltoASR
     mkdir build
     cd build
-    cmake -DCMAKE_TOOLCHAIN_FILE=cmake/cross-mingw-i686/toolchain.cmake -DDISABLE_SWIG=On -DDISABLE_TOOLS=On ..
+    cmake .. -DCMAKE_TOOLCHAIN_FILE=cmake/cross-mingw-i686/toolchain.cmake -DCMAKE_BUILD_TYPE=Release \
+      -DDISABLE_SWIG=On -DDISABLE_TOOLS=On ..
     make

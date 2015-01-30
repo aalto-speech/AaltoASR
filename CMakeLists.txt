@@ -99,6 +99,8 @@ IF(CROSS_MINGW)
 ### Find ATLAS or OpenBLAS (MinGW) and set LAPACKPP_CONFIGURE if needed.
 ELSE(CROSS_MINGW)
 
+  Find_Package ( SNDFILE REQUIRED )
+
   Find_Package ( BLAS QUIET )
   IF(NOT BLAS_FOUND)
     Find_Package ( OpenBLAS )

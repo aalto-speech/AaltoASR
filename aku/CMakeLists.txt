@@ -1,7 +1,5 @@
 PROJECT (aku)
 
-Find_Package ( SNDFILE REQUIRED )
-
 link_libraries (
     ${LapackPP_LIBRARIES}
     ${SNDFILE_LIBRARIES}
