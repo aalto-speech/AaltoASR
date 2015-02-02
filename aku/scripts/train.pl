@@ -74,7 +74,8 @@ use ClusterManager;
   my $MINVAR = 0.1;
 
 ## Gaussian clustering options ##
-  my $NUM_GAUSS_CLUSTERS = 1000; # 0 if no clustering
+  my $NUM_GAUSS_CLUSTERS = $ENV{'TRAIN_CLUSTERS'};
+  $NUM_GAUSS_CLUSTERS = 1000 if !defined($NUM_GAUSS_CLUSTERS); # 0 if no clustering
   my $GAUSS_EVAL_RATIO = 0.1;
 
 ## MLLT options ##

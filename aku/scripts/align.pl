@@ -141,7 +141,7 @@ sub generate_hmmnet_files {
   if ($MORPH_HMMNETS > 0) {
     $morph_switch = "-m ${LEX_FILE}.voc";
   }
-  $trn_switch = "-t $TRN_FILE";
+  my $trn_switch = "-t $TRN_FILE";
   # Construct helper FSTs (L.fst, C.fst, H.fst, optional_silence.fst and
   # end_mark.fst) and vocabulary file.
   # Assumes that the current directory is $temp_dir!
