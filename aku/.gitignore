@@ -23,3 +23,5 @@ segfea
 stats
 tie
 vtln
+*.exe
+*.a
