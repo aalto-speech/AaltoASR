@@ -1,12 +1,12 @@
 arpa2bin
 bin2arpa
 hmm2fsm
+*.exe
+*.a
 fsalm/libfsalm.a
 fsalm/fsalm-convert
-libdecoder.a
 misc/libmisc.a
 morpheus/morpheus
 swig/Decoder.py
 swig/DecoderPYTHON_wrap.cxx
 swig/_Decodermodule.so
-
