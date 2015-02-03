@@ -10,10 +10,11 @@
 #include "HmmSet.hh"
 
 using namespace aku;
+using namespace std;
 
-std::string statistics_file;
-std::string out_model_name;
-std::string state_file;
+string statistics_file;
+string out_model_name;
+string state_file;
 
 int info;
 
@@ -42,7 +43,7 @@ int global_num_negative_objective = 0;
 double mpe_smooth = 800;
 
 
-std::vector<double> gaussian_weights; // Mixture weights for each Gaussian
+vector<double> gaussian_weights; // Mixture weights for each Gaussian
 bool weighted_gaussian_kld_ratios = false;
 
 
@@ -367,13 +368,13 @@ bool CriticalMixtureWeightSolver::solve_weight(double &weight) const
     if (global_debug_flag)
       fprintf(stderr, "CriticalMixtureWeightSolver::solve_weight: lambda == 0, c = %g\n", c);
     // Normal CLS equation:
-    // weight = std::min(std::max(cur_gamma/c, min_weight), 1.0);
+    // weight = min(max(cur_gamma/c, min_weight), 1.0);
 
     // Alternative formulation (EBW style estimation):
     if (abs_gamma - cur_gamma + 2*c*weight0 <= 0)
       weight = 1.0;
     else
-      weight = std::min(std::max(weight0*(abs_gamma+cur_gamma)/
+      weight = min(max(weight0*(abs_gamma+cur_gamma)/
                                  (abs_gamma-cur_gamma+2*c*weight0), min_weight),
                         1.0);
     return true;
@@ -449,7 +450,7 @@ bool CriticalMixtureWeightSolver::solve_weight(double &weight) const
   //   }
 
   //   // Ensure weight limits
-  //   weight = std::min(std::max(weight, min_weight), 1.0);
+  //   weight = min(max(weight, min_weight), 1.0);
   //   // if (global_debug_flag)
   //   //   fprintf(stderr, "CriticalMixtureWeightSolver::solve_weight: Final weight = %g\n", weight);
     
@@ -484,7 +485,7 @@ bool CriticalMixtureWeightSolver::solve_weight(double &weight) const
       if (global_debug_flag)
         fprintf(stderr, "CriticalMixtureWeightSolver::solve_weight: weight = %g\n", weight);
     }
-    weight = std::min(std::max(weight, min_weight), 1.0);
+    weight = min(max(weight, min_weight), 1.0);
     if (global_debug_flag)
       fprintf(stderr, "CriticalMixtureWeightSolver::solve_weight: Final weight = %g\n", weight);
     return true;
@@ -931,7 +932,7 @@ LinearMixtureSolver::solve_new_weights(double lambda, double sum_constraint,
   double norm = 0;
   for (int i = 0; i < weights0.size(); i++)
   {
-    new_weights(i) = std::max(std::min(weights0(i)*exp((grad(i)-sum_constraint)/lambda-1), 1.0), 1e-8);
+    new_weights(i) = max(min(weights0(i)*exp((grad(i)-sum_constraint)/lambda-1), 1.0), 1e-8);
     norm += new_weights(i);
   }
   return norm;
@@ -1054,7 +1055,7 @@ void CriticalMeanSolver::solve_mean(double lambda, Vector &new_mean) const
   // That's why it is limited to a small positive constant, so that the
   // function works also at the limit.
   for (int i = 0; i < dim; i++)
-    new_mean(i) = (m1_stats(i)+lambda*mean0(i))/std::max(m0_stats+lambda,1e-20);
+    new_mean(i) = (m1_stats(i)+lambda*mean0(i))/max(m0_stats+lambda,1e-20);
 }
 
 
@@ -1124,7 +1125,7 @@ void MeanSolver::solve_mean(double lambda, Vector &new_mean) const
   // That's why it is limited to a small positive constant, so that the
   // function works also at the limit.
   for (int i = 0; i < dim; i++)
-    new_mean(i) = (m1_stats(i)+lambda*mean0(i))/std::max(m0_stats+lambda,1e-20);
+    new_mean(i) = (m1_stats(i)+lambda*mean0(i))/max(m0_stats+lambda,1e-20);
 }
 
 
@@ -1209,10 +1210,10 @@ void CriticalCovSolver::solve_cov(double lambda, Vector &new_cov) const
       double m0_l = -m0_stats + lambda;
       double l_c = lambda/cov0(i);
       // Avoid numerical problems with sqrt
-      double temp2 = sqrt(std::max(m0_l*m0_l+4*l_c*temp, 0.0)); 
+      double temp2 = sqrt(max(m0_l*m0_l+4*l_c*temp, 0.0)); 
       new_cov(i) = (m0_l + temp2)/(2*l_c);
     }
-    new_cov(i) = std::max(new_cov(i), minv);
+    new_cov(i) = max(new_cov(i), minv);
   }
 }
 
@@ -1237,7 +1238,7 @@ void LinearCovSolver::solve_cov(double lambda, Vector &new_cov) const
   for (int i = 0; i < dim; i++)
   {
     new_cov(i) = lambda*cov0(i)/(lambda-2*cov0(i)*grad(i));
-    new_cov(i) = std::max(new_cov(i), minv);
+    new_cov(i) = max(new_cov(i), minv);
   }
 }
 
@@ -1333,7 +1334,7 @@ void CovSolver::solve_cov(double lambda, Vector &new_cov) const
         double m0_l = -m_m0_stats + lambda;
         double l_c = lambda/m_cov0(i);
         // Avoid numerical problems with sqrt
-        double temp2 = sqrt(std::max(m0_l*m0_l+4*l_c*temp, 0.0)); 
+        double temp2 = sqrt(max(m0_l*m0_l+4*l_c*temp, 0.0)); 
         new_cov(i) = (m0_l + temp2)/(2*l_c);
       }
     }
@@ -1346,7 +1347,7 @@ void CovSolver::solve_cov(double lambda, Vector &new_cov) const
   }
   // Ensure minimum variance
   for (int i = 0; i < dim; i++)
-    new_cov(i) = std::max(new_cov(i), m_minv);
+    new_cov(i) = max(new_cov(i), m_minv);
 }
 
 
@@ -1500,8 +1501,8 @@ private:
 
 double GaussianCovParameterKLD::evaluate_function(double p) const
 {
-  double old_v = std::max(exp(orig_cov), min_var);
-  double new_v = std::max(exp(orig_cov + p*change), min_var);
+  double old_v = max(exp(orig_cov), min_var);
+  double new_v = max(exp(orig_cov + p*change), min_var);
   return (new_v/old_v + log(old_v/new_v) - 1) / 2.0;
 }
 
@@ -1525,8 +1526,8 @@ GaussianCovKLD::evaluate_function(double p) const
   double kld = 0;
   for (int i = 0; i < dim; i++)
   {
-    double orig_v = std::max(exp((*gcp)(i)), min_var);
-    double new_v = std::max(exp((*gcp)(i) + p*(*dcp)(i)), min_var);
+    double orig_v = max(exp((*gcp)(i)), min_var);
+    double new_v = max(exp((*gcp)(i) + p*(*dcp)(i)), min_var);
     kld += new_v/orig_v + log(orig_v/new_v);
   }
   return (kld - dim)/2.0;
@@ -1536,7 +1537,7 @@ GaussianCovKLD::evaluate_function(double p) const
 class GaussianCovPartialChangeKLD : public FuncEval {
 public:
   GaussianCovPartialChangeKLD(const Vector *cov, const Vector *cov_search_dir,
-                              const std::vector<int> &increase_indicator,
+                              const vector<int> &increase_indicator,
                               int dimension, double mv) :
     gcp(cov), dcp(cov_search_dir), indicator(increase_indicator),
     dim(dimension), min_var(mv) { }
@@ -1544,7 +1545,7 @@ public:
 private:
   const Vector *gcp;
   const Vector *dcp;
-  const std::vector<int> &indicator;
+  const vector<int> &indicator;
   int dim;
   double min_var;
 };
@@ -1554,12 +1555,12 @@ double GaussianCovPartialChangeKLD::evaluate_function(double p) const
   double kld = 0;
   for (int i = 0; i < dim; i++)
   {
-    double orig_v = std::max(exp((*gcp)(i)), min_var);
+    double orig_v = max(exp((*gcp)(i)), min_var);
     double new_v;
     if (indicator[i])
-      new_v = std::max(exp((*gcp)(i) + p*(*dcp)(i)), min_var);
+      new_v = max(exp((*gcp)(i) + p*(*dcp)(i)), min_var);
     else
-      new_v = std::max(exp((*gcp)(i) + (*dcp)(i)), min_var);
+      new_v = max(exp((*gcp)(i) + (*dcp)(i)), min_var);
     kld += new_v/orig_v + log(orig_v/new_v);
   }
   return (kld - dim)/2.0;
@@ -1656,13 +1657,13 @@ void original_cls_mixture_step(void)
       {
         if (new_weights(j) <= 1e-6)
         {
-          step_size = std::min(step_size,
+          step_size = min(step_size,
                                (1.0e-6 - orig_weights(j))/search_dir(j));
           rescale = true;
         }
         else if (new_weights(j) > 1)
         {
-          step_size = std::min(step_size,
+          step_size = min(step_size,
                                (1.0 - orig_weights(j))/search_dir(j));
           rescale = true;
         }
@@ -1692,7 +1693,7 @@ void original_cls_mixture_step(void)
       // Set the new mixture parameters
       for (int j = 0; j < m->size(); j++)
         m->set_mixture_coefficient(
-          j, std::max(std::min(new_weights(j)/norm, 1.0), 1e-6));
+          j, max(min(new_weights(j)/norm, 1.0), 1e-6));
 
       // Compute KLD
       double kld = 0;
@@ -1719,7 +1720,7 @@ void original_cls_mean_cov_step(void)
   {
     Gaussian *pdf = dynamic_cast< Gaussian* >(pool->get_pdf(i));
     if (pdf == NULL)
-      throw std::string("Only Gaussian PDFs are supported!");
+      throw string("Only Gaussian PDFs are supported!");
     Vector mean;
     Vector cov;
     Vector target_mean;
@@ -1837,7 +1838,7 @@ void original_cls_mean_cov_step(void)
       if (d_gamma*d_m2(j) < d_m1(j)*d_m1(j))
         pos = false;
 
-      cov(j) = util::safe_log(std::max(min_var, cov(j)));
+      cov(j) = util::safe_log(max(min_var, cov(j)));
       if (pos)
       {
         target_cov(j) = d_m2(j)/d_gamma -
@@ -1898,7 +1899,7 @@ void original_cls_mean_cov_step(void)
     
     // Update the covariance
     for (int j = 0; j < pool->dim(); j++)
-      target_cov(j) = std::max(min_var, exp(cov(j) + cov_search_dir(j)));
+      target_cov(j) = max(min_var, exp(cov(j) + cov_search_dir(j)));
     pdf->set_covariance(target_cov);
 
     // Check KLD
@@ -1960,7 +1961,7 @@ void soft_max_mixture_cls_step(void)
     {
       // Extract gradient wrt the original parameters
       search_dir.resize(m->size());
-      std::vector<double> temp;
+      vector<double> temp;
       temp.resize(m->size());  
       for (int j = 0; j < m->size(); j++)
       {
@@ -2076,7 +2077,7 @@ void combined_mean_covariance_cls_update(void)
   {
     Gaussian *pdf = dynamic_cast< Gaussian* >(pool->get_pdf(i));
     if (pdf == NULL)
-      throw std::string("Only Gaussian PDFs are supported!");
+      throw string("Only Gaussian PDFs are supported!");
 
     Vector mean;
     Vector cov;
@@ -2146,9 +2147,9 @@ void combined_mean_covariance_cls_update(void)
     // Transform covariances and determine the existence of the critical point
     for (int j = 0; j < dim; j++)
     {
-      cov(j) = util::safe_log(std::max(1.0001*min_var, cov(j)) - min_var);
+      cov(j) = util::safe_log(max(1.0001*min_var, cov(j)) - min_var);
       if (pos)
-        target_cov(j) = util::safe_log(std::max(1.0001*min_var, target_cov(j))-
+        target_cov(j) = util::safe_log(max(1.0001*min_var, target_cov(j))-
                                        min_var);
       if (2*mpe_m1(j)*mean(j)-mpe_m2(j) >= mean(j)*mean(j))
         pos = false;
@@ -2239,7 +2240,7 @@ void separate_mean_covariance_cls_update(void)
   {
     Gaussian *pdf = dynamic_cast< Gaussian* >(pool->get_pdf(i));
     if (pdf == NULL)
-      throw std::string("Only Gaussian PDFs are supported!");
+      throw string("Only Gaussian PDFs are supported!");
 
     Vector mean;
     Vector cov;
@@ -2356,9 +2357,9 @@ void separate_mean_covariance_cls_update(void)
       //     mpe_gamma*mean(j)*(2*mpe_m1(j)-mpe_gamma*mean(j)))
       //   pos = false;
 
-      cov(j) = util::safe_log(std::max(min_var, cov(j)));
+      cov(j) = util::safe_log(max(min_var, cov(j)));
       if (pos)
-        target_cov(j) = util::safe_log(std::max(min_var, target_cov(j)));
+        target_cov(j) = util::safe_log(max(min_var, target_cov(j)));
     }
 
     if (mpe_gamma == 0)
@@ -2482,7 +2483,7 @@ void separate_mean_covariance_cls_update(void)
       }
       // Update the covariance
       for (int j = 0; j < pool->dim(); j++)
-        target_cov(j) = std::max(min_var, exp(cov(j) + step*cov_search_dir(j)));
+        target_cov(j) = max(min_var, exp(cov(j) + step*cov_search_dir(j)));
       pdf->set_covariance(target_cov);
     }
 //     else
@@ -2710,7 +2711,7 @@ void kld_constrained_mean_covariance_update(void)
   {
     Gaussian *pdf = dynamic_cast< Gaussian* >(pool->get_pdf(i));
     if (pdf == NULL)
-      throw std::string("Only Gaussian PDFs are supported!");
+      throw string("Only Gaussian PDFs are supported!");
 
     Vector mean;
     Vector cov;
@@ -2787,11 +2788,11 @@ void kld_constrained_mean_covariance_update(void)
     //   double d = (d_m1(j)-mean(j)*d_gamma)/(mpe_smooth + abs_gamma);
     //   cur_mean_kld_limit += d*d/cov(j);
     // }
-    // cur_mean_kld_limit = std::min(mean_kld_limit, cur_mean_kld_limit/2.0);
+    // cur_mean_kld_limit = min(mean_kld_limit, cur_mean_kld_limit/2.0);
     // fprintf(stderr, "Mean %i: Maximum KLD %g\n", i, cur_mean_kld_limit);
     double cur_mean_kld_limit = mean_kld_limit;
 
-    double min_mean_lambda = std::max(-d_gamma, 0.0);
+    double min_mean_lambda = max(-d_gamma, 0.0);
     if (info > 0)
       fprintf(stderr, "Mean %i, minimum lambda limit: > %g\n", i,
               min_mean_lambda);
@@ -2804,7 +2805,7 @@ void kld_constrained_mean_covariance_update(void)
     }
     else
     {
-      lambda = search_lambda(std::max(avg_mean_lambda, min_mean_lambda),
+      lambda = search_lambda(max(avg_mean_lambda, min_mean_lambda),
                              cur_mean_kld_limit, mean_solver);
       avg_mean_lambda = (avg_mean_lambda*num_mean_update +
                          lambda) / (num_mean_update + 1);
@@ -2893,10 +2894,10 @@ void kld_constrained_mean_covariance_update(void)
     //   double d = (d_m2(j) - d_gamma*cov(j) +
     //        (mpe_smooth+abs_gamma-d_gamma)*mean(j)*mean(j)) /
     //     (mpe_smooth + abs_gamma) - target_mean(j)*target_mean(j);
-    //   double new_cov = std::max(cov(j) + d, min_var);
+    //   double new_cov = max(cov(j) + d, min_var);
     //   cur_cov_kld_limit += new_cov/cov(j) + log(cov(j)/new_cov) - 1;
     // }
-    // cur_cov_kld_limit = std::min(cov_kld_limit, cur_cov_kld_limit/2.0);
+    // cur_cov_kld_limit = min(cov_kld_limit, cur_cov_kld_limit/2.0);
     // fprintf(stderr, "Cov %i: Maximum KLD %g\n", i, cur_cov_kld_limit);
     
     CovSolver cov_solver(mean, cov, d_gamma, abs_gamma, d_m1, d_m2,
@@ -2930,7 +2931,7 @@ void kld_constrained_mean_covariance_update(void)
       lambda = min_lambda;
       if (max_kld > cur_cov_kld_limit)
       {
-        lambda = search_lambda(std::max(min_lambda, avg_cov_max_lambda),
+        lambda = search_lambda(max(min_lambda, avg_cov_max_lambda),
                                cur_cov_kld_limit, cov_solver);
         assert( lambda >= min_lambda );
       }
@@ -3014,9 +3015,9 @@ void ebw_mixture_update(void)
   for (int i = 0; i < model.num_emission_pdfs(); i++)
   {
     Mixture *m = model.get_emission_pdf(i);
-    std::vector<double> num_gamma;
-    std::vector<double> den_gamma;
-    std::vector<double> weights;
+    vector<double> num_gamma;
+    vector<double> den_gamma;
+    vector<double> weights;
 
     num_gamma.resize(m->size());
     den_gamma.resize(m->size());
@@ -3042,7 +3043,7 @@ void ebw_mixture_update(void)
     double currfval=0, oldfval=0, diff=1;
 
     // Iterate until convergence
-    std::vector<double> old_weights = weights;
+    vector<double> old_weights = weights;
     int iter=0;
     while (diff > 0.00001 && iter < 1000)
     {
@@ -3058,7 +3059,7 @@ void ebw_mixture_update(void)
       // Go through every mixture weight
       for (int w = 0; w < m->size(); w++)
       {
-        std::vector<double> previous_weights = weights;
+        vector<double> previous_weights = weights;
         
         // Solve a quadratic equation
         // See Povey: Frame discrimination training ... 3.3 (9)
@@ -3100,7 +3101,7 @@ void ebw_mixture_update(void)
             weights[w] = weights[w] + (1-weights[w])/2.0;
           else
             weights[w] = sol1;
-          weights[w] = std::max(weights[w], 1e-8); // FIXME: Minimum weight
+          weights[w] = max(weights[w], 1e-8); // FIXME: Minimum weight
         }
         
         // Renormalize others
@@ -3116,7 +3117,7 @@ void ebw_mixture_update(void)
       for (int w = 0; w < m->size(); w++)
         currfval += num_gamma[w] * log(weights[w]) -
           den_gamma[w] * weights[w] / old_weights[w];
-      diff = std::fabs(oldfval-currfval);
+      diff = fabs(oldfval-currfval);
       if (iter > 1 && oldfval > currfval)
       {
         fprintf(stderr, "Warning: Mixture size %i, iter %i, reduced function value, %g\n", m->size(), iter, currfval - oldfval);
@@ -3128,7 +3129,7 @@ void ebw_mixture_update(void)
 }
 
 
-void cls_step(bool kldcs) //const std::string &in_grad_file, const std::string &out_grad_file)
+void cls_step(bool kldcs) //const string &in_grad_file, const string &out_grad_file)
 {
   if (!kldcs)
   {
@@ -3149,8 +3150,8 @@ void cls_step(bool kldcs) //const std::string &in_grad_file, const std::string &
 int
 main(int argc, char *argv[])
 {
-  std::map< std::string, double > sum_statistics;
-  std::string base_file_name;
+  map< string, double > sum_statistics;
+  string base_file_name;
   PDF::StatisticsMode statistics_mode = 0;
   
   try {
@@ -3184,8 +3185,8 @@ main(int argc, char *argv[])
     info = config["info"].get_int();
     out_model_name = config["out"].get_str();
 
-    std::string mode_str = config["mode"].get_str();
-    std::transform(mode_str.begin(), mode_str.end(), mode_str.begin(),
+    string mode_str = config["mode"].get_str();
+    transform(mode_str.begin(), mode_str.end(), mode_str.begin(),
                    ::tolower);
     if (mode_str == "mmi")
     {
@@ -3199,7 +3200,7 @@ main(int argc, char *argv[])
     }
     else
     {
-      throw std::string("Invalid optimization mode: ") + config["mode"].get_str();
+      throw string("Invalid optimization mode: ") + config["mode"].get_str();
     }
       
     // Load the previous models
@@ -3218,11 +3219,11 @@ main(int argc, char *argv[])
     }
     else
     {
-      throw std::string("Must give either --base or all --gk, --mc and --ph");
+      throw string("Must give either --base or all --gk, --mc and --ph");
     }
 
     // Open the list of statistics files
-    std::ifstream filelist(config["list"].get_str().c_str());
+    ifstream filelist(config["list"].get_str().c_str());
     if (!filelist)
     {
       fprintf(stderr, "Could not open %s\n", config["list"].get_str().c_str());
@@ -3236,13 +3237,13 @@ main(int argc, char *argv[])
     while (filelist >> statistics_file && statistics_file != " ") {
       model.accumulate_gk_from_dump(statistics_file+".gks");
       model.accumulate_mc_from_dump(statistics_file+".mcs");
-      std::string lls_file_name = statistics_file+".lls";
-      std::ifstream lls_file(lls_file_name.c_str());
+      string lls_file_name = statistics_file+".lls";
+      ifstream lls_file(lls_file_name.c_str());
       while (lls_file.good())
       {
         char buf[256];
-        std::string temp;
-        std::vector<std::string> fields;
+        string temp;
+        vector<string> fields;
         lls_file.getline(buf, 256);
         temp.assign(buf);
         str::split(&temp, ":", false, &fields, 2);
@@ -3319,20 +3320,20 @@ main(int argc, char *argv[])
     }
     
     if (config["savesum"].specified  && !config["no-write"].specified) {
-      std::string summary_file_name = config["savesum"].get_str();
-      std::ofstream summary_file(summary_file_name.c_str(),
-                                 std::ios_base::app);
+      string summary_file_name = config["savesum"].get_str();
+      ofstream summary_file(summary_file_name.c_str(),
+                                 ios_base::app);
       if (!summary_file)
         fprintf(stderr, "Could not open summary file: %s\n",
                 summary_file_name.c_str());
       else
       {
-        summary_file << base_file_name << std::endl;
-        for (std::map<std::string, double>::const_iterator it =
+        summary_file << base_file_name << endl;
+        for (map<string, double>::const_iterator it =
                sum_statistics.begin(); it != sum_statistics.end(); it++)
         {
           summary_file << "  " << (*it).first << ": " << (*it).second <<
-            std::endl;
+            endl;
         }
       }
       summary_file.close();
@@ -3345,12 +3346,12 @@ main(int argc, char *argv[])
     printf("%i negative objective functions\n", global_num_negative_objective);
   }
   
-  catch (std::exception &e) {
+  catch (exception &e) {
     fprintf(stderr, "exception: %s\n", e.what());
     abort();
   }
   
-  catch (std::string &str) {
+  catch (string &str) {
     fprintf(stderr, "exception: %s\n", str.c_str());
     abort();
   }
