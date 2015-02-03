@@ -1,6 +1,5 @@
 #include <limits.h>
 #include <float.h>
-#include <values.h>
 #include <math.h>
 #include <string>
 #include <algorithm>
