@@ -133,7 +133,8 @@ And import the resulting project in Eclipse.
       mkdir AaltoASR && \
       cd AaltoASR && \
       cmake ${LOCALSOURCEDIR}/AaltoASR -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_PREFIX_PATH=${LOCALDESTDIR} -DDISABLE_SWIG=On -DDISABLE_TOOLS=On && \
+        -DCMAKE_PREFIX_PATH=${LOCALDESTDIR} -DCMAKE_INSTALL_PREFIX=${LOCALDESTDIR} \
+        -DDISABLE_SWIG=On -DDISABLE_TOOLS=On && \
       make && \
       make install
 
