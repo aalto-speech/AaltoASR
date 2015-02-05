@@ -1,4 +1,7 @@
-The Aalto ASR libraries and tools are built with cmake build system.
+The Aalto ASR libraries and tools are built with CMake build system. They build
+natively in Unix-like operating systems. Building for Windows is possible under
+MinGW / MSYS environment, or using the gcc-mingw cross-building tools under
+Unix.
 
 
 ## Building under Unix-like operating systems
