@@ -8,6 +8,8 @@ include(CMakePushCheckState)
 
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules")
+ADD_DEFINITIONS(-DDLLIMPORT=)
+ADD_DEFINITIONS(-std=gnu++0x)
 
 
 ### MINGW CROSS-COMPILATION
@@ -17,7 +19,6 @@ IF(CROSS_MINGW)
   message(STATUS "Cross-compiling for Windows / MinGW")
 
   ADD_DEFINITIONS(-fPIC)
-  ADD_DEFINITIONS(-DDLLIMPORT=)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
 
   SET(KISS_FFT 1)
@@ -88,7 +89,6 @@ IF(CROSS_MINGW)
   SET(LAPACK_LIBRARIES ${CROSS_DEPS}/lib/libopenblas.a -lgfortran)
 
   # Build patched LapackPP against OpenBLAS.
-  ADD_DEFINITIONS(-std=gnu++0x)
   ExternalProject_Add(lapackpp_ext
     PREFIX ${CROSS_DEPS}
     URL http://downloads.sourceforge.net/project/lapackpp/lapackpp-2.5.4.tar.gz
@@ -153,7 +153,6 @@ ELSE(CROSS_MINGW)
   ENDIF(NOT BLAS_FOUND)
 
   # Build patched LapackPP last, so that it will use OpenBLAS if necessary.
-  ADD_DEFINITIONS(-std=gnu++0x)
   ExternalProject_Add(lapackpp_ext
     PREFIX ${CMAKE_BINARY_DIR}/vendor/lapackpp
     URL http://downloads.sourceforge.net/project/lapackpp/lapackpp-2.5.4.tar.gz
