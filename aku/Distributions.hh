@@ -4,7 +4,6 @@
 #include <queue>
 
 #include "FeatureBuffer.hh"
-#include "FeatureModules.hh"
 #include "LinearAlgebra.hh"
 #ifdef USE_SUBSPACE_COV
 # include "Subspaces.hh"

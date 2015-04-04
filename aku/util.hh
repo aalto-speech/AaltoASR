@@ -4,12 +4,11 @@
 #include <algorithm>
 #include <vector>
 
-// Visual studio math.h doesn't have log1p and log1pf functions varjokal 24.3.2010
-// This needs to be defined for VS and M_LN10 constant varjokal 24.3.2010
+// Visual Studio math.h doesn't have log1p and log1pf functions varjokal 24.3.2010
+// This needs to be defined for VS varjokal 24.3.2010
 #ifdef _MSC_VER
 #include <boost/math/tr1.hpp>
 using namespace boost::math::tr1;
-#define _USE_MATH_DEFINES
 #endif
 
 #include <math.h>
@@ -72,8 +71,10 @@ namespace util {
   inline float
   log10addf(float a, float b)
   {
-    const float LOG10TOe = M_LN10;
-    const float LOGeTO10 = 1.0 / M_LN10;
+    // M_LN10 is not part of C++ standard and not defined in every compiler.
+    const float LN10 = 2.30258509299404568402;
+    const float LOG10TOe = LN10;
+    const float LOGeTO10 = 1.0 / LN10;
 
     a = a * LOG10TOe;
     b = b * LOG10TOe;
@@ -89,8 +90,10 @@ namespace util {
   inline double
   log10add(double a, double b)
   {
-    const double LOG10TOe = M_LN10;
-    const double LOGeTO10 = 1.0 / M_LN10;
+    // M_LN10 is not part of C++ standard and not defined in every compiler.
+    const double LN10 = 2.30258509299404568402;
+    const double LOG10TOe = LN10;
+    const double LOGeTO10 = 1.0 / LN10;
 
     a = a * LOG10TOe;
     b = b * LOG10TOe;
@@ -147,9 +150,11 @@ namespace util {
 
   inline float sinc(float x)
   {
+    // M_PI is not part of C++ standard and not defined in every compiler.
+    const double PI = 3.14159265358979323846;
     if (fabs(x) < 1e-8)
       return 1;
-    double y = M_PI*x;
+    double y = PI*x;
     return sin(y)/y;
   }
 

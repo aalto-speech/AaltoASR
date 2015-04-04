@@ -1,4 +1,5 @@
 #include "FeatureModules.hh"
+#include "AudioFileModule.hh"
 #include "FeatureGenerator.hh"
 
 #include <climits>

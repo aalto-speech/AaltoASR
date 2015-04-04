@@ -1,9 +1,14 @@
 #ifndef AUDIOREADER_HH
 #define AUDIOREADER_HH
 
-#include <sndfile.h>
+#include <memory>
 #include <vector>
-#include <assert.h>
+#include <cassert>
+
+// Defined in sndfile.h. We don't want to force the client to install libsndfile
+// by including the header from this public header.
+struct SF_INFO;
+typedef struct SNDFILE_tag SNDFILE;
 
 namespace aku {
 
@@ -79,10 +84,10 @@ public:
   }
 
   /** Return the sample rate of the audio file. */
-  int sample_rate() const { return sf_info.samplerate; }
+  int sample_rate() const;
 
   /** Return the number of samples in the file. */
-  int num_samples() const { return sf_info.frames; }
+  int num_samples() const;
 
   /** Sets endianess. */
   void set_little_endian(bool endian) { m_little_endian = endian; }
@@ -91,7 +96,7 @@ public:
   void enforce_raw(bool raw) { m_raw = raw; }
 
   /** The sample format. */
-  SF_INFO sf_info;
+  std::unique_ptr<SF_INFO> sf_info;
 
 protected:
 

@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "HmmSet.hh"
+#include "FeatureModules.hh"
 #include "util.hh"
 #include "str.hh"
 

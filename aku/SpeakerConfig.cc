@@ -1,4 +1,5 @@
 #include "SpeakerConfig.hh"
+#include "FeatureModules.hh"
 #include "str.hh"
 
 

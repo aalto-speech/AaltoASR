@@ -8,7 +8,6 @@
 #include <assert.h>
 
 #include "FeatureGenerator.hh"
-#include "FeatureModules.hh"
 #include "Distributions.hh"
 
 #define MAX_MLLT_ITER 7

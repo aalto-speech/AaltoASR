@@ -4,10 +4,16 @@
 #include <vector>
 #include <map>
 #include <string>
-#include "FeatureModules.hh"
+
+#include "FeatureBuffer.hh"
 
 
 namespace aku {
+
+// Defined in FeatureModules.hh. Don't include FeatureModules.hh to avoid
+// unnecessary inclusion of the FFT library header.
+class FeatureModule;
+class BaseFeaModule;
 
 /** A class for generating feature vectors from an audio file.  The
  * FeatureGenerator and the feature modules are configured in a text
@@ -62,27 +68,27 @@ public:
    * call to check if the end of file was reached during the generated
    * frame.
    **/
-  inline const FeatureVec generate(int frame);
+  const FeatureVec generate(int frame);
 
   /** Returns the last frame that does not generate eof */
-  inline int last_frame(void) { return m_base_module->last_frame(); }
+  int last_frame();
 
   /** Returns true if the frame requested from generate() contained
    * end of file. */
-  inline bool eof(void) { return m_eof_on_last_frame; }
+  bool eof() { return m_eof_on_last_frame; }
 
   /** Return the sample rate (samples per second). */
-  inline int sample_rate(void);
+  int sample_rate();
 
   /** Return the frame rate (frames per second). */
-  inline float frame_rate(void);
+  float frame_rate();
 
   /** Return the dimension of the feature fector. */
-  inline int dim(void);
+  int dim();
 
   /** Print the module structure in DOT format. */
   void print_dot_graph(FILE *file);
-      
+
 
 private:
 
@@ -115,37 +121,6 @@ private:
   /** Was end of file reached on the frame requested from generate(). */
   bool m_eof_on_last_frame;
 };
-
-
-const FeatureVec
-FeatureGenerator::generate(int frame)
-{
-  assert( m_last_module != NULL );
-  const FeatureVec temp = m_last_module->at(frame);
-  m_eof_on_last_frame = m_base_module->eof(frame);
-  return temp;
-}
-
-int
-FeatureGenerator::sample_rate(void)
-{
-  assert( m_base_module != NULL );
-  return m_base_module->sample_rate();
-}
-
-float
-FeatureGenerator::frame_rate(void)
-{
-  assert( m_base_module != NULL );
-  return m_base_module->frame_rate();
-}
-
-int
-FeatureGenerator::dim(void)
-{
-  assert( m_last_module != NULL );
-  return m_last_module->dim();
-}
 
 }
 

@@ -8,6 +8,7 @@
 #include "str.hh"
 #include "conf.hh"
 #include "FeatureGenerator.hh"
+#include "FeatureModules.hh"
 #include "Recipe.hh"
 #include "SpeakerConfig.hh"
 
