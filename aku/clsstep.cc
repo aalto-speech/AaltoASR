@@ -1993,7 +1993,7 @@ void soft_max_mixture_cls_step(void)
     double init_step = 1;
     double kld = mix.evaluate_function(init_step);
 
-    while ((isnan(kld) || isinf(kld)) && init_step > 1e-30)
+    while ((std::isnan(kld) || std::isinf(kld)) && init_step > 1e-30)
     {
       init_step /= 2;
       kld = mix.evaluate_function(init_step);
@@ -2020,7 +2020,7 @@ void soft_max_mixture_cls_step(void)
           init_step *= 2;
           kld = mix.evaluate_function(init_step);
         }
-        if (isnan(kld) || isinf(kld))
+        if (std::isnan(kld) || std::isinf(kld))
         {
           init_step /= 2;
           kld = mix.evaluate_function(init_step);
@@ -2049,7 +2049,7 @@ void soft_max_mixture_cls_step(void)
       }
     }
 
-    if (norm > 0 && !isnan(norm) && !isinf(norm))
+    if (norm > 0 && !std::isnan(norm) && !std::isinf(norm))
     {
       // Set the new mixture parameters
       for (int j = 0; j < m->size(); j++)
@@ -2172,7 +2172,7 @@ void combined_mean_covariance_cls_update(void)
       GaussianCovKLD g(&cov, &cov_search_dir, dim, min_var);
       double step = 1e-9;
       double kld = g.evaluate_function(step);
-      while ((isnan(kld) || isinf(kld)) && step > 1e-50)
+      while ((std::isnan(kld) || std::isinf(kld)) && step > 1e-50)
       {
         step /= 2;
         kld = g.evaluate_function(step);
@@ -2408,7 +2408,7 @@ void separate_mean_covariance_cls_update(void)
     if (!pos || mpe_gamma < 0)
     {
       // Scale the search direction to achieve the KLD limit of the covariance
-      while ((isnan(kld) || isinf(kld) || kld>100*cov_kld_limit) && step > 1e-50)
+      while ((std::isnan(kld) || std::isinf(kld) || kld>100*cov_kld_limit) && step > 1e-50)
       {
         step /= 2;
         kld = gc.evaluate_function(step);
@@ -2420,7 +2420,7 @@ void separate_mean_covariance_cls_update(void)
           step *= 2;
           kld = gc.evaluate_function(step);
         }
-        if (isnan(kld) || isinf(kld))
+        if (std::isnan(kld) || std::isinf(kld))
         {
           step /= 2;
           kld = gc.evaluate_function(step);
@@ -3093,7 +3093,7 @@ void ebw_mixture_update(void)
         }
 
         // Heuristics: If outside permitted region, move halfway
-        if (!isnan(sol1))
+        if (!std::isnan(sol1))
         {
           if (sol1 <= 0)
             weights[w] = weights[w]/2.0;
