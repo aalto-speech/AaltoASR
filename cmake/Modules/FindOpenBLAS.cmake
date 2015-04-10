@@ -7,7 +7,8 @@
 
 find_library(OPENBLAS_LIBRARY
     NAMES libopenblas.so libopenblas.lib libopenblas.a
-    PATHS ${OPENBLAS_ROOT}/lib
+    PATHS ${CMAKE_PREFIX_PATH}/lib
+	${OPENBLAS_ROOT}/lib
 	/usr/lib/openblas-base
 	/usr/local/lib
     )
@@ -15,7 +16,7 @@ find_library(OPENBLAS_LIBRARY
 if(NOT OPENBLAS_IGNORE_HEADERS)
 	find_path(OPENBLAS_INCLUDE_DIR
 		NAMES openblas_config.h
-		PATHS ${OPENBLAS_ROOT}/include /usr/include /usr/local/include
+		PATHS ${CMAKE_PREFIX_PATH}/include/OpenBLAS ${OPENBLAS_ROOT}/include /usr/include /usr/local/include
 		)
 endif()
 
