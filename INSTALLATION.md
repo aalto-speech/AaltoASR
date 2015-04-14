@@ -73,69 +73,39 @@ And import the resulting project in Eclipse.
 
 ## Building under Windows and MinGW
 
-1. Install MinGW and MSYS environment.
+1. Install MSYS2 environment.
     
-  Follow the instructions on this page: http://ingar.satgnu.net/devenv/mingw32/base.html
+  Follow the instructions on this page: http://sourceforge.net/p/msys2/wiki/MSYS2%20installation/
 
-2. Open MSYS shell and load the correct build environment.
+2. Open MinGW-w64 Win32 Shell and install the build tools and dependencies.
 
-  For a 32-bit build, enter in the MSYS prompt:
-
-      source /local32/etc/profile.local
-
-  For a 64-bit build, enter in the MSYS prompt:
-
-      source /local64/etc/profile.local
-
-3. Install SDL.
-
-  Enter in the MSYS prompt:
+  Enter in the MSYS2 prompt:
   
-      cd ${LOCALSOURCEDIR} && \
-      wget -c http://www.libsdl.org/release/SDL-1.2.15.tar.gz && \
-      cd ${LOCALBUILDDIR} && \
-      tar xzf ${LOCALSOURCEDIR}/SDL-1.2.15.tar.gz && \
-      cd SDL-1.2.15 && \
-      ./configure --prefix=${LOCALDESTDIR} && \
-      make && \
-      make install
+      pacman -S mingw-w64-i686-gcc
+      pacman -S mingw-w64-i686-gcc-fortran
+      pacman -S git
+      pacman -S make
+      pacman -S mingw-w64-i686-cmake-git
+      pacman -S mingw-w64-i686-SDL
+      pacman -S mingw-w64-i686-libsndfile
+      pacman -S mingw-w64-i686-openblas-git
+      pacman -S mingw-w64-i686-lapack
 
-4. Install libsndfile.
+3. Install AaltoASR.
 
-  Enter in the MSYS prompt:
+  Enter in the MSYS2 prompt:
 
-      cd ${LOCALSOURCEDIR} && \
-      wget -c http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz && \
-      cd ${LOCALBUILDDIR} && \
-      tar xzf ${LOCALSOURCEDIR}/libsndfile-1.0.25.tar.gz && \
-      cd libsndfile-1.0.25 && \
-      ./configure --prefix=${LOCALDESTDIR} && \
-      make && \
-      make install
-
-5. Install OpenBLAS.
-
-  Enter in the MSYS prompt:
-
-      cd ${LOCALBUILDDIR} && \
-      git clone https://github.com/xianyi/OpenBLAS.git && \
-      cd OpenBLAS && \
-      make && \
-      make install PREFIX=${LOCALDESTDIR}
-
-6. Install AaltoASR.
-
-  Enter in the MSYS prompt:
-
-      cd ${LOCALSOURCEDIR} && \
-      git clone https://github.com/aalto-speech/AaltoASR.git && \
-      cd ${LOCALBUILDDIR} && \
-      mkdir AaltoASR && \
-      cd AaltoASR && \
-      cmake ${LOCALSOURCEDIR}/AaltoASR -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_PREFIX_PATH=${LOCALDESTDIR} -DCMAKE_INSTALL_PREFIX=${LOCALDESTDIR} \
-        -DDISABLE_SWIG=On -DDISABLE_TOOLS=On && \
-      make && \
+      cd /mingw32
+      mkdir src
+      cd src
+      git clone https://github.com/aalto-speech/AaltoASR.git
+      cd AaltoASR
+      mkdir build
+      cd build
+      cmake .. -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH=/mingw32 -DCMAKE_INSTALL_PREFIX=/mingw32 \
+        -DDISABLE_SWIG=On -DDISABLE_TOOLS=On
+      make
       make install
 
 ### Creating an Eclipse project
