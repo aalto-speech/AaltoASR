@@ -1,5 +1,7 @@
 #include "Lattice.hh"
 
+namespace aku {
+
 Lattice::Lattice()
 {
   resize(0, 0, 0);
@@ -206,4 +208,6 @@ Lattice::swap(int frame_1, int frame_2)
   m_blocks[frame_1] = m_blocks[frame_2];
   m_ranges[frame_2] = temp_range;
   m_blocks[frame_2] = temp_block;
+}
+
 }

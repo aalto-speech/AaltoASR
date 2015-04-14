@@ -7,9 +7,11 @@
 #include "HmmSet.hh"
 #include "Recipe.hh"
 
+using namespace aku;
+
 conf::Config config;
-aku::Recipe recipe;
-aku::HmmSet model;
+Recipe recipe;
+HmmSet model;
 int info;
 int max_dur;
 
@@ -18,7 +20,7 @@ std::vector<std::vector<int> > dur_table;
 void add_duration(std::string &label, int state, int num_frames,
 		  int skip_states)
 {
-  aku::Hmm &hmm = model.hmm(label);
+  Hmm &hmm = model.hmm(label);
   int state_index = hmm.state(state);
   if (state_index >= skip_states) {
     if (num_frames > max_dur)
@@ -28,9 +30,9 @@ void add_duration(std::string &label, int state, int num_frames,
   }
 }
 
-void collect_dur_stats(aku::PhnReader *phn_reader, int skip_states)
+void collect_dur_stats(PhnReader *phn_reader, int skip_states)
 {
-  aku::PhnReader::Phn phn;
+  PhnReader::Phn phn;
 
   while (phn_reader->next_phn_line(phn)) {
     if (phn.state == -1)
@@ -139,7 +141,7 @@ write_gamma_models(const std::string &filename, int skip_states, int min_count)
 
 int main(int argc, char *argv[])
 {
-  aku::PhnReader phn_reader(NULL);
+  PhnReader phn_reader(NULL);
   int skip_states;
   try {
     config("usage: dur_est [OPTION...]\n")

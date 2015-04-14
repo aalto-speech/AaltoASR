@@ -8,6 +8,8 @@
 #include "HmmSet.hh"
 #include "Recipe.hh"
 
+namespace aku {
+
 class PPToolbox {
 public:
   void read_models(const std::string &base);
@@ -25,5 +27,7 @@ private:
 
   void write_int(FILE *fp, unsigned int i);
 };
+
+}
 
 #endif

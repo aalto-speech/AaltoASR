@@ -3,7 +3,10 @@
 
 #include <string>
 #include <vector>
-#include <stdio.h>
+#include <cstdio>
+
+/** Everything under aku namespace so that we won't conflict with decoder. */
+namespace aku {
 
 /** Functions for handling strings of the Standard Template Library. */
 namespace str {
@@ -89,6 +92,9 @@ namespace str {
   long str2long(const std::string *str, bool *ok);
   double str2float(const std::string *str, bool *ok);
   /*@}*/
-};
+
+}
+
+}
 
 #endif /* STR_HH */

@@ -24,7 +24,7 @@
 #define O_BINARY 0
 #endif
 
-using namespace aku;
+namespace aku {
 
 void PPToolbox::write_int(FILE *fp, unsigned int i)
 {
@@ -221,5 +221,4 @@ void PPToolbox::generate(const std::string &input_name, const std::string &outpu
   close(out);
 };
 
-
-
+}
