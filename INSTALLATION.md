@@ -133,6 +133,41 @@ And import the resulting project in Eclipse.
 
 ### Build instructions
 
+First the dependencies have to be compiled with the cross-compiler. You want to install all the cross-compiled software in a separate directory structure. The following examples use /local/i686-w64-mingw32.
+
+    wget http://downloads.xiph.org/releases/ogg/libogg-1.3.2.tar.gz
+    tar xf libogg-1.3.2.tar.gz
+    cd libogg-1.3.2
+    ./configure --enable-static=yes --enable-shared=no --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32
+    make
+    make install
+    cd ..
+    
+    wget http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.4.tar.gz
+    tar xf libvorbis-1.3.4.tar.gz
+    cd libvorbis-1.3.4
+    ./configure --enable-static=yes --enable-shared=no --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
+      CFLAGS=-I/local/i686-w64-mingw32/include LDFLAGS=-L/local/i686-w64-mingw32/lib
+    make
+    make install
+    cd ..
+    
+    wget http://downloads.xiph.org/releases/flac/flac-1.3.1.tar.xz
+    tar xf flac-1.3.1.tar.xz
+    ./configure --enable-static=yes --enable-shared=no --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
+      CFLAGS=-I/local/i686-w64-mingw32/include LDFLAGS=-L/local/i686-w64-mingw32/lib
+    make
+    make install
+
+    wget http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz
+    tar xf libsndfile-1.0.25.tar.gz
+    cd libsndfile-1.0.25
+    ./configure --enable-static=yes --enable-shared=no --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
+      --disable-sqlite --disable-alsa \
+      CFLAGS=-I/local/i686-w64-mingw32/include LDFLAGS=-L/local/i686-w64-mingw32/lib
+    make
+    make install
+    
 When using the cross-compilation toolchain, cmake compiles the dependencies automatically using a cross-compiler.
 
     git clone https://github.com/aalto-speech/AaltoASR.git
@@ -140,5 +175,6 @@ When using the cross-compilation toolchain, cmake compiles the dependencies auto
     mkdir build
     cd build
     cmake .. -DCMAKE_TOOLCHAIN_FILE=cmake/cross-mingw-i686/toolchain.cmake -DCMAKE_BUILD_TYPE=Release \
-      -DDISABLE_SWIG=On -DDISABLE_TOOLS=On ..
+      -DDISABLE_SWIG=On -DDISABLE_TOOLS=On \
+      -DCMAKE_PREFIX_PATH=/local/i686-w64-mingw32 -DCMAKE_INSTALL_PREFIX:PATH=/local/i686-w64-mingw32
     make
