@@ -70,7 +70,11 @@ ELSE(FFTW_FOUND AND NOT KISS_FFT)
   set( AKUSOURCES "${AKUSOURCES}" ../vendor/kiss_fft/kiss_fft.c ../vendor/kiss_fft/kiss_fftr.c ) 
 ENDIF(FFTW_FOUND AND NOT KISS_FFT)
 
+IF(CROSS_MINGW)
+add_library( aku STATIC ${AKUSOURCES} )
+ELSE(CROSS_MINGW)
 add_library( aku ${AKUSOURCES} )
+ENDIF(CROSS_MINGW)
 add_dependencies(aku lapackpp_ext)
 
 set(AKU_CMDS feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats regtree clsstep clskld opt_ebw_d )
