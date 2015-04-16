@@ -23,53 +23,7 @@ IF(CROSS_MINGW)
 
   SET(KISS_FFT 1)
 
-  ExternalProject_Add(libogg
-    PREFIX ${CROSS_DEPS}
-    URL http://downloads.xiph.org/releases/ogg/libogg-1.3.2.tar.gz
-    URL_MD5 b72e1a1dbadff3248e4ed62a4177e937
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-static=yes --enable-shared=no --prefix=<INSTALL_DIR> --host=${CROSS_TARGET}
-    BUILD_COMMAND make
-    BUILD_IN_SOURCE 1
-    INSTALL_COMMAND make install
-  )
-  ExternalProject_add(libvorbis
-    DEPENDS libogg
-    PREFIX ${CROSS_DEPS}
-    URL http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.4.tar.gz
-    URL_MD5 8851c593a52d1ef9c526d95174873852
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-static=yes --enable-shared=no --prefix=<INSTALL_DIR> --host=${CROSS_TARGET} CFLAGS=-I<INSTALL_DIR>/include LDFLAGS=-L<INSTALL_DIR>/lib
-    BUILD_COMMAND make
-    BUILD_IN_SOURCE 1
-    INSTALL_COMMAND make install
-  )
-  ExternalProject_Add(flac
-    DEPENDS libogg
-    PREFIX ${CROSS_DEPS}
-    URL http://downloads.xiph.org/releases/flac/flac-1.2.1.tar.gz
-    URL_MD5 153c8b15a54da428d1f0fadc756c22c7
-    PATCH_COMMAND patch -p1 < ${CMAKE_CURRENT_LIST_DIR}/vendor/flac-1.2.1.patch
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-static=yes --enable-shared=no --prefix=<INSTALL_DIR> --host=${CROSS_TARGET} CFLAGS=-I<INSTALL_DIR>/include LDFLAGS=-L<INSTALL_DIR>/lib
-    BUILD_COMMAND make
-    BUILD_IN_SOURCE 1
-    INSTALL_COMMAND make install
-  )
-  ExternalProject_Add(sndfile
-    DEPENDS libogg libvorbis flac
-    PREFIX ${CROSS_DEPS}
-    URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz
-    URL_MD5 e2b7bb637e01022c7d20f95f9c3990a2
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-static=yes --enable-shared=no --prefix=<INSTALL_DIR> --host=${CROSS_TARGET} --disable-sqlite --disable-alsa CFLAGS=-I<INSTALL_DIR>/include LDFLAGS=-L<INSTALL_DIR>/lib
-    BUILD_COMMAND make
-    BUILD_IN_SOURCE 1
-    INSTALL_COMMAND make install
-  )
-  SET(SNDFILE_INCLUDE_DIRS ${CROSS_DEPS}/include)
-  SET(SNDFILE_LIBRARIES ${CROSS_DEPS}/lib/libsndfile.a
-                        ${CROSS_DEPS}/lib/libFLAC.a
-                        ${CROSS_DEPS}/lib/libvorbisenc.a
-                        ${CROSS_DEPS}/lib/libvorbis.a
-                        ${CROSS_DEPS}/lib/libogg.a)
-  SET(SNDFILE_FOUND TRUE)
+  Find_Package ( SNDFILE REQUIRED )
 
   IF(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     SET(OPENBLAS_BITS 64)
