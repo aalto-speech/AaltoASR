@@ -170,6 +170,12 @@ First the dependencies have to be compiled with the cross-compiler. You want to 
     make install
     cd ..
     
+    git clone https://github.com/xianyi/OpenBLAS.git
+    cd OpenBLAS
+    make BINARY=32 CC=i686-w64-mingw32-gcc FC=i686-w64-mingw32-gfortran HOSTCC=gcc TARGET=CORE2
+    make install PREFIX=/local/i686-w64-mingw32
+    cd ..
+    
 Then build AaltoASR using the cross-compilation toolchain.
 
     git clone https://github.com/aalto-speech/AaltoASR.git
