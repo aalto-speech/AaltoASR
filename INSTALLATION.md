@@ -138,7 +138,7 @@ First the dependencies have to be compiled with the cross-compiler. You want to 
     wget http://downloads.xiph.org/releases/ogg/libogg-1.3.2.tar.gz
     tar xf libogg-1.3.2.tar.gz
     cd libogg-1.3.2
-    ./configure --enable-static=yes --enable-shared=no --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32
+    ./configure --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32
     make
     make install
     cd ..
@@ -146,7 +146,7 @@ First the dependencies have to be compiled with the cross-compiler. You want to 
     wget http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.4.tar.gz
     tar xf libvorbis-1.3.4.tar.gz
     cd libvorbis-1.3.4
-    ./configure --enable-static=yes --enable-shared=no --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
+    ./configure --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
       CFLAGS=-I/local/i686-w64-mingw32/include LDFLAGS=-L/local/i686-w64-mingw32/lib
     make
     make install
@@ -154,21 +154,23 @@ First the dependencies have to be compiled with the cross-compiler. You want to 
     
     wget http://downloads.xiph.org/releases/flac/flac-1.3.1.tar.xz
     tar xf flac-1.3.1.tar.xz
-    ./configure --enable-static=yes --enable-shared=no --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
+    ./configure --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
       CFLAGS=-I/local/i686-w64-mingw32/include LDFLAGS=-L/local/i686-w64-mingw32/lib
     make
     make install
+    cd ..
 
     wget http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.25.tar.gz
     tar xf libsndfile-1.0.25.tar.gz
     cd libsndfile-1.0.25
-    ./configure --enable-static=yes --enable-shared=no --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
+    ./configure --prefix=/local/i686-w64-mingw32 --host=i686-w64-mingw32 \
       --disable-sqlite --disable-alsa \
       CFLAGS=-I/local/i686-w64-mingw32/include LDFLAGS=-L/local/i686-w64-mingw32/lib
     make
     make install
+    cd ..
     
-When using the cross-compilation toolchain, cmake compiles the dependencies automatically using a cross-compiler.
+Then build AaltoASR using the cross-compilation toolchain.
 
     git clone https://github.com/aalto-speech/AaltoASR.git
     cd AaltoASR
@@ -178,3 +180,4 @@ When using the cross-compilation toolchain, cmake compiles the dependencies auto
       -DDISABLE_SWIG=On -DDISABLE_TOOLS=On \
       -DCMAKE_PREFIX_PATH=/local/i686-w64-mingw32 -DCMAKE_INSTALL_PREFIX:PATH=/local/i686-w64-mingw32
     make
+    make install
