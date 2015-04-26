@@ -14,7 +14,7 @@ if rt.adaptation is not None:
 	if (not rt.use_existing_lnas()) and (not rt.use_existing_adaptation()):
 		command[0] = script_path('recognize-stateseg.py')
 		# estimate_adaptation() will set options so that recognize.py will use the
-		# adaptation data, as long as we son't ask it to estimate adaptation again.
+		# adaptation data, as long as we won't ask it to estimate adaptation again.
 		# Neither should the parameter be passed to recognize_stateseg.py.
 		command = remove_option(command, '--adapt')
 		rt.batch_command(command)
