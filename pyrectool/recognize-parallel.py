@@ -24,7 +24,7 @@ if rt.adaptation is not None:
 		# already. Options have been set so that recognize.py will use the
 		# adaptation data, as long as we won't ask it to estimate adaptation again.
 		command = remove_option(command, '--adapt')
-	# These have been change to use the adaptation data.
+	# These have been changed to use the adaptation data.
 	command = set_option(command, '--feature-configuration', rt.cfg_path)
 	command = set_option(command, '--lna-directory', rt.lna_directory)
 	command = set_option(command, '--speaker-configuration', rt.spkc_path)
