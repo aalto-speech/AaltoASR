@@ -737,14 +737,24 @@ class RecognizerToolbox:
 		self.lna_directory = adaptation_directory
 		return True
 
-	# Checks if adaptation parameters exist already. If so, sets the options to use
-	# the existing adaptation as if estimate_adaptation() was called.
+	# Checks if adaptation parameters exist already, or user has provided a
+	# speaker configuration file. If so, sets the options to use the
+	# existing adaptation as if estimate_adaptation() was called.
 	#
 	def use_existing_adaptation(self):
 		if self.adaptation is None:
 			return True
 
 		adaptation_directory = self.work_directory + '/' + self.adaptation
+
+		if self.spkc_path is not None:
+			print "Using the adaptation parameters provided in " + self.spkc_path + "."
+			# From now on, use the adaptation configuration.
+			self.cfg_path = self.am + '_' + self.adaptation + '.cfg'
+			# Write / use LNAs in the adaptation subdirectory.
+			self.lna_directory = adaptation_directory
+			return True
+
 		return self.__use_existing_adaptation(adaptation_directory)
 
 	# Estimates adaptation parameters for a single adaptation. This needs to be
