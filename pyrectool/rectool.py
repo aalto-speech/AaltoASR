@@ -392,9 +392,9 @@ class RecognizerToolbox:
 		else:
 			print "Not a class-based language model."
 		if self.lookahead_lm is not None:
-			print "No language model lookahead."
-		else:
 			print "Lookahead language model path:", self.lookahead_lm
+		else:
+			print "No language model lookahead."
 		print "Split multiwords:", self.split_multiwords
 		if self.generate_word_graph:
 			if self.lattice_rescore_path is not None:

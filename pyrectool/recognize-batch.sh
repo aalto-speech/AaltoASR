@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/bash -e
 #
-# Recognizes a batch, writing LNAs to
-#   /share/work/<username>/recognitions/<AM options>,
+# Recognizes a batch, writing LNAs in
+#   $WORK_DIR/recognitions/<AM options>,
 # and possibly lattices to
-#   /share/work/<username>/recognitions/<AM options>/<decoder options>,
+#   $WORK_DIR/recognitions/<AM options>/<decoder options>,
 # and writes the recognitions results (hypotheses) under
-#   /share/work/<username>/results
+#   $WORK_DIR/results
 # with a name unique to selected options.
 
 SCRIPT_DIR=$(dirname $0)
@@ -48,11 +48,11 @@ then
 fi
 if [ "$RECOGNITIONS_DIR" = "" ]
 then
-	RECOGNITIONS_DIR="$HOME/recognitions"
+	RECOGNITIONS_DIR="$WORK_DIR/recognitions"
 fi
 if [ "$RESULTS_DIR" = "" ]
 then
-	RESULTS_DIR="$HOME/results"
+	RESULTS_DIR="$WORK_DIR/results"
 fi
 
 AM_OPT=$(basename $AM)
@@ -189,9 +189,13 @@ PARAMS="$PARAMS -f $AUDIO_LIST"
 
 if [ $NUM_BATCHES -gt 1 ]
 then
+	set -x
 	"$SCRIPT_DIR/recognize-parallel.py" $PARAMS -B $NUM_BATCHES -P $MAX_PARALLEL
+	set +x
 else
+	set -x
 	"$SCRIPT_DIR/recognize.py" $PARAMS
+	set +x
 fi
 
 EXIT_STATUS=$?
