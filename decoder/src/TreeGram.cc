@@ -1,8 +1,9 @@
 // Fairly compact prefix tree represantation for n-gram language model
-#include <errno.h>
-#include <assert.h>
-#include <math.h>
-#include <string.h>
+#include <stdexcept>
+#include <cerrno>
+#include <cassert>
+#include <cmath>
+#include <cstring>
 
 // Use io.h in Visual Studio varjokal 17.3.2010
 #ifdef _MSC_VER
@@ -23,6 +24,8 @@ typedef int ssize_t;
 #include "misc/str.hh"
 #include "def.hh"
 #include "TreeGramArpaReader.hh"
+
+using namespace std;
 
 static std::string format_str("cis-binlm2\n");
 
@@ -231,7 +234,7 @@ TreeGram::find_path(const Gram &gram)
     if (index < 0) {
       fprintf(stderr, "prefix not found\n");
       print_gram(stderr, gram);
-      throw exception("TreeGram::find_path");
+      throw logic_error("TreeGram::find_path");
     }
 
     m_insert_stack.push_back(index);
@@ -247,7 +250,7 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off, bool add_mi
   if (m_nodes.empty()) {
     fprintf(stderr, "TreeGram::add_gram(): "
 	    "nodes must be reserved before calling this function\n");
-    throw exception("TreeGram::add_gram");
+    throw logic_error("TreeGram::add_gram");
   }
 
   check_order(gram, add_missing_unigrams);
