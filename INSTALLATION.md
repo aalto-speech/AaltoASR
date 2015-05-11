@@ -93,7 +93,7 @@ And import the resulting project in Eclipse.
 
 3. Install AaltoASR.
 
-  Enter in the MSYS2 prompt:
+  While in the MSYS2 prompt, download AaltoASR. Before building, specify the MinGW resource compiler (windres) in RC environment variable. Otherwise lapackpp may not find it (showing the error "ld.exe: cannot find ressource.o: No such file or directory").
 
       cd /mingw32
       mkdir src
@@ -102,13 +102,14 @@ And import the resulting project in Eclipse.
       cd AaltoASR
       mkdir build
       cd build
+      export RC=windres
       cmake .. -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_PREFIX_PATH=/mingw32 -DCMAKE_INSTALL_PREFIX=/mingw32 \
+        -DCMAKE_PREFIX_PATH=/mingw32 -DCMAKE_INSTALL_PREFIX:PATH=/mingw32 \
         -DDISABLE_SWIG=On -DDISABLE_TOOLS=On
       make
       make install
 
-### Common build problems in MSYS
+### Common build problems with MinGW and MSYS
 
 1. Lapackpp configuration fails at "could not determine path for home".
 
