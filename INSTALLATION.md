@@ -93,7 +93,7 @@ And import the resulting project in Eclipse.
 
 3. Install AaltoASR.
 
-  Enter in the MSYS2 prompt:
+  While in the MSYS2 prompt, download AaltoASR. Before building, specify the MinGW resource compiler (windres) in RC environment variable. Otherwise lapackpp may not find it (showing the error "ld.exe: cannot find ressource.o: No such file or directory").
 
       cd /mingw32
       mkdir src
@@ -102,12 +102,27 @@ And import the resulting project in Eclipse.
       cd AaltoASR
       mkdir build
       cd build
+      export RC=windres
       cmake .. -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_PREFIX_PATH=/mingw32 -DCMAKE_INSTALL_PREFIX=/mingw32 \
+        -DCMAKE_PREFIX_PATH=/mingw32 -DCMAKE_INSTALL_PREFIX:PATH=/mingw32 \
         -DDISABLE_SWIG=On -DDISABLE_TOOLS=On
       make
       make install
 
+### Common build problems with MinGW and MSYS
+
+1. Lapackpp configuration fails at "could not determine path for home".
+
+  Lapackpp configure command stops at the following error:
+  
+      checking for windoze home path (mingw)... configure: error: Could not determine path for home
+
+  AaltoASR/build/vendor/lapackpp/src/lapackpp_ext/config.log shows:
+  
+      C:/Development/msys32/mingw32/bin/../lib/gcc/i686-w64-mingw32/4.9.2/../../../../i686-w64-mingw32/bin/ld.exe: cannot open output file conftest.exe: Permission denied
+  
+  File problem may occur if you hae File System Auto-Protect enabled from Symantec Endpoint Protection.
+  
 ### Creating an Eclipse project
 
   It is possible to create an Eclipse project in Windows, but compilation has to be
