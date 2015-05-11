@@ -362,14 +362,13 @@ TreeGram::write_real(FILE *file, bool reflip)
   ssize_t ret = 
     ::write(fd, &m_nodes[0], bytes_to_write);
   if (ret < 0) {
-    perror("TreeGram::write(): write() system call failed");
-    abort();
+    throw system_error("write");
   }
   if ((size_t)ret != bytes_to_write) {
     fprintf(stderr, "TreeGram::write(): "
 	    "write() system call wrote only %zd of %zd bytes\n",
 	    (size_t)ret, bytes_to_write);
-    abort();
+    throw system_error("write");
   }
 #else
   // The original code

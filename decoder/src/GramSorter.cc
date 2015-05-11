@@ -1,6 +1,9 @@
-#include <stdio.h>
-#include <assert.h>
+#include <cstdio>
+#include <cassert>
+#include <stdexcept>
 #include "GramSorter.hh"
+
+using namespace std;
 
 GramSorter::GramSorter(int order, int grams)
   : m_sorted(true)
@@ -44,7 +47,7 @@ GramSorter::add_gram(const Gram &gram, float log_prob, float back_off)
   if (gram.size() != m_order) {
     fprintf(stderr, "GramSorter: got %zd-gram while expecting %d-grams\n",
 	    gram.size(), m_order);
-    exit(1);
+    throw logic_error("GramSorter::add_gram");
   }
 
   // Add gram to the node vector.

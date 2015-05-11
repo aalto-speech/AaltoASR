@@ -433,7 +433,7 @@ void TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
   if (m_print_text_result) {
     fprintf(stderr, "TokenPassSearch::get_path() should not be used with "
             "m_print_text_results set true\n");
-    abort();
+    throw logic_error("TokenPassSearch::get_path");
   }
 
   const TPLexPrefixTree::Token & token =
@@ -658,7 +658,7 @@ TokenPassSearch::get_best_final_token() const
   }
   else {
     fprintf(stderr, "ERROR: No active tokens. Did you forget to call reset()?\n");
-    abort();
+    throw logic_error("ERROR: No active tokens. Did you forget to call reset()?");
   }
 }
 
@@ -673,7 +673,7 @@ TokenPassSearch::get_first_token() const
   }
 
   fprintf(stderr, "ERROR: No active tokens. Did you forget to call reset()?\n");
-  abort();
+  throw logic_error("ERROR: No active tokens. Did you forget to call reset()?");
 }
 
 void TokenPassSearch::print_state_history(FILE *file)
