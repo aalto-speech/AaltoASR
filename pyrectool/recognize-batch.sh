@@ -123,7 +123,7 @@ DECODER_OPT="$DECODER_OPT--$(basename $DICTIONARY)-"
 if [ "$CLASSES" != "" ]
 then
         PARAMS="$PARAMS --classes $CLASSES"
-        DECODER_OPT="$DECODER_OPT-$(basename $CLASSES .classes)-"
+        DECODER_OPT="$DECODER_OPT-$(basename $CLASSES .sricls)-"
 fi
 
 if [ "$SPLIT_MULTIWORDS" != "" ]
@@ -189,13 +189,9 @@ PARAMS="$PARAMS -f $AUDIO_LIST"
 
 if [ $NUM_BATCHES -gt 1 ]
 then
-	set -x
 	"$SCRIPT_DIR/recognize-parallel.py" $PARAMS -B $NUM_BATCHES -P $MAX_PARALLEL
-	set +x
 else
-	set -x
 	"$SCRIPT_DIR/recognize.py" $PARAMS
-	set +x
 fi
 
 EXIT_STATUS=$?
