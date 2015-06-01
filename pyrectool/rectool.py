@@ -402,7 +402,7 @@ class RecognizerToolbox:
 			elif (self.arpa_lm is not None) and (self.lattice_tool_path is not None):
 				print "Generate and rescore word graphs using:", self.lattice_tool_path
 			else:
-				print "Generate but do not rescore word graphs."
+				print "Generate but do not rescore word graphs. LM probabilities will be incorrect!"
 			print "Use word pair approximation:", self.word_pair_approximation
 		else:
 			print "Do not generate word graphs and .wh files."
