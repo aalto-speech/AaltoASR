@@ -1,86 +1,52 @@
-#!/bin/sh
+#!/bin/bash -e
 #
 # Good for recognizing a couple of files specified in the command line. Writes
 # LNAs to
-#   /share/work/<username>/recognitions/<AM options>,
+#   $WORK_DIR/recognitions/<AM options>,
 # and possibly lattices to
-#   /share/work/<username>/recognitions/<AM options>/<decoder options>.
+#   $WORK_DIR/recognitions/<AM options>/<decoder options>,
 # Writes the recognitions results (hypotheses) under
-#   /share/work/<username>/results
-# and displays on the screen.
+#   $WORK_DIR/results
+# and displays them on the screen.
 
-SCRIPT_DIR=$(dirname $0)
+SCRIPT_DIR=$(dirname "$0")
 
-if [ "$AM" = "" ]
-then
-	echo "AM environment variable needs to be specified." >&2
-	exit 2
-fi
-if [ "$LM" = "" ]
-then
-	echo "LM environment variable needs to be specified." >&2
-	exit 2
-fi
-if [ "$DICTIONARY" = "" ]
-then
-	echo "DICTIONARY environment variable needs to be specified." >&2
-	exit 2
-fi
-if [ "$BEAM" = "" ]
-then
-	BEAM=280
-fi
-if [ "$LM_SCALE" = "" ]
-then
-	LM_SCALE=30
-fi
-if [ "$TOKEN_LIMIT" = "" ]
-then
-	TOKEN_LIMIT=100000
-fi
-if [ "$RECOGNITIONS_DIR" = "" ]
-then
-	RECOGNITIONS_DIR="/share/work/$USER/recognitions"
-fi
-if [ "$RESULTS_DIR" = "" ]
-then
-	RESULTS_DIR="/share/work/$USER/results"
-fi
+[ -n "$AM" ] || { echo "AM environment variable needs to be specified." >&2; exit 2; }
+[ -n "$LM" ] || { echo "LM environment variable needs to be specified." >&2; exit 2; }
+[ -n "$DICTIONARY" ] || { echo "DICTIONARY environment variable needs to be specified." >&2; exit 2; }
+[ -n "$BEAM" ] || BEAM=280
+[ -n "$LM_SCALE" ] || LM_SCALE=30
+[ -n "$TOKEN_LIMIT" ] || TOKEN_LIMIT=100000
+[ -n "$RECOGNITIONS_DIR" ] || RECOGNITIONS_DIR="$WORK_DIR/recognitions"
+[ -n "$RESULTS_DIR" ] || RESULTS_DIR="$WORK_DIR/results"
 
 AM_OPT=$(basename $AM)
 
 DECODER_OPT=""
-if [ "$DECODER_VER" != "" ]
-then
-	DECODER_OPT="$DECODER_VER--"
-fi
+[ -n "$DECODER_VER" ] && DECODER_OPT="$DECODER_VER--"
 DECODER_OPT="$DECODER_OPT$(basename $LM)"
 
 PARAMS=""
 
-if [ "$AKU" != "" ]
-then
-	PARAMS="$PARAMS --aku $AKU"
-fi
-if [ "$DECODER" != "" ]
-then
-	PARAMS="$PARAMS --decoder $DECODER"
-fi
+[ -n "$AKU" ] && PARAMS="$PARAMS --aku $AKU"
+[ -n "$DECODER" ] && PARAMS="$PARAMS --decoder $DECODER"
 
 # Specify binary LM if .bin or .fsabin file exists.
 if [ "$FSA" != "" ]
 then
 	PARAMS="$PARAMS --fsa"
-	if [ -e "$LM.fsabin" ]
-	then
-		PARAMS="$PARAMS --bin-lm $LM.fsabin"
-	fi
+	BIN_LM_PATH="$LM.fsabin"
 	DECODER_OPT=$DECODER_OPT-fsa
 else
-	if [ -e "$LM.bin" ]
-	then
-		PARAMS="$PARAMS --bin-lm $LM.bin"
-	fi
+	BIN_LM_PATH="$LM.bin"
+fi
+if [ -e "$BIN_LM_PATH" ]
+then
+	PARAMS="$PARAMS --bin-lm $BIN_LM_PATH"
+elif [ ! -e "$LM" ]
+then
+	echo "Neither binary LM ($BIN_LM_PATH) nor ARPA LM ($LM) was found." >&2
+	exit 2
 fi
 
 # ARPA LM may be needed in any case for rescoring lattices.
@@ -113,7 +79,7 @@ DECODER_OPT="$DECODER_OPT--$(basename $DICTIONARY)-"
 if [ "$CLASSES" != "" ]
 then
         PARAMS="$PARAMS --classes $CLASSES"
-        DECODER_OPT="$DECODER_OPT-$(basename $CLASSES .classes)-"
+        DECODER_OPT="$DECODER_OPT-$(basename $CLASSES .sricls)-"
 fi
 
 if [ "$SPLIT_MULTIWORDS" != "" ]
@@ -137,12 +103,11 @@ then
 	then
 		PARAMS="$PARAMS --lattice-rescore $LATTICE_RESCORE"
 	fi
-fi
-
-if [ "$HESITATIONS" != "" ]
-then
-	PARAMS="$PARAMS --hesitations"
-	DECODER_OPT=$DECODER_OPT-oh2
+	if [ "$WORD_PAIR_APPROXIMATION" != "" ]
+	then
+		PARAMS="$PARAMS --word-pair-approximation"
+		DECODER_OPT=$DECODER_OPT-wpa
+	fi
 fi
 
 DECODER_OPT=$DECODER_OPT-b$BEAM-s$LM_SCALE
@@ -152,6 +117,13 @@ if [ "$ADAPTATION" != "" ]
 then
 	PARAMS="$PARAMS --adapt $ADAPTATION"
 	DECODER_OPT="$DECODER_OPT-$ADAPTATION"
+	if [ "$SPEAKER_ID_FIELD" = "" ]
+	then
+		echo "Warning: speaker ID field not specified. Using default (3)." 2>&1
+		PARAMS="$PARAMS --speaker-id-field 3"
+	else
+		PARAMS="$PARAMS --speaker-id-field $SPEAKER_ID_FIELD"
+	fi
 fi
 
 WORK_DIR="$RECOGNITIONS_DIR/$AM_OPT"
