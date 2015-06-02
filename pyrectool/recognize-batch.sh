@@ -112,18 +112,11 @@ then
 		echo "Lookahead LM does not exist: $LOOKAHEAD_LM" >&2
 		exit 2
 	fi
-	
-	# Remove the common prefix from lookahead LM name to shorten the file names.
-	LOOKAHEAD_LM_UNIQUE=$(printf "%s\n%s\n" $(basename $LM) $(basename $LOOKAHEAD_LM) | sed -e 'N;s/^\(.*\).*\n\1//')
-	DECODER_OPT="$DECODER_OPT--$(basename $LOOKAHEAD_LM_UNIQUE)"
 fi
-
-DECODER_OPT="$DECODER_OPT--$(basename $DICTIONARY)-"
 
 if [ "$CLASSES" != "" ]
 then
-        PARAMS="$PARAMS --classes $CLASSES"
-        DECODER_OPT="$DECODER_OPT-$(basename $CLASSES .sricls)-"
+	PARAMS="$PARAMS --classes $CLASSES"
 fi
 
 if [ "$SPLIT_MULTIWORDS" != "" ]
