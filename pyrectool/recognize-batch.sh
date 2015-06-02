@@ -8,72 +8,30 @@
 #   $WORK_DIR/results
 # with a name unique to selected options.
 
-SCRIPT_DIR=$(dirname $0)
+SCRIPT_DIR=$(dirname "$0")
 SORT_TRN="$SCRIPT_DIR/../scoring-scripts/sort-trn.py"
 
-if [ "$AM" = "" ]
-then
-	echo "AM environment variable needs to be specified." >&2
-	exit 2
-fi
-if [ "$LM" = "" ]
-then
-	echo "LM environment variable needs to be specified." >&2
-	exit 2
-fi
-if [ "$DICTIONARY" = "" ]
-then
-	echo "DICTIONARY environment variable needs to be specified." >&2
-	exit 2
-fi
-if [ "$NUM_BATCHES" = "" ]
-then
-	NUM_BATCHES=1
-fi
-if [ "$MAX_PARALLEL" = "" ]
-then
-	MAX_PARALLEL=1
-fi
-if [ "$BEAM" = "" ]
-then
-	BEAM=280
-fi
-if [ "$LM_SCALE" = "" ]
-then
-	LM_SCALE=30
-fi
-if [ "$TOKEN_LIMIT" = "" ]
-then
-	TOKEN_LIMIT=100000
-fi
-if [ "$RECOGNITIONS_DIR" = "" ]
-then
-	RECOGNITIONS_DIR="$WORK_DIR/recognitions"
-fi
-if [ "$RESULTS_DIR" = "" ]
-then
-	RESULTS_DIR="$WORK_DIR/results"
-fi
+[ -n "$AM" ] || { echo "AM environment variable needs to be specified." >&2; exit 2; }
+[ -n "$LM" ] || { echo "LM environment variable needs to be specified." >&2; exit 2; }
+[ -n "$DICTIONARY" ] || { echo "DICTIONARY environment variable needs to be specified." >&2; exit 2; }
+[ -n "$NUM_BATCHES" ] || NUM_BATCHES=1
+[ -n "$MAX_PARALLEL" ] || MAX_PARALLEL=1
+[ -n "$BEAM" ] || BEAM=280
+[ -n "$LM_SCALE" ] || LM_SCALE=30
+[ -n "$TOKEN_LIMIT" ] || TOKEN_LIMIT=100000
+[ -n "$RECOGNITIONS_DIR" ] || RECOGNITIONS_DIR="$WORK_DIR/recognitions"
+[ -n "$RESULTS_DIR" ] || RESULTS_DIR="$WORK_DIR/results"
 
 AM_OPT=$(basename $AM)
 
 DECODER_OPT=""
-if [ "$DECODER_VER" != "" ]
-then
-	DECODER_OPT="$DECODER_VER--"
-fi
+[ -n "$DECODER_VER" ] && DECODER_OPT="$DECODER_VER--"
 DECODER_OPT="$DECODER_OPT$(basename $LM)"
 
 PARAMS=""
 
-if [ "$AKU" != "" ]
-then
-	PARAMS="$PARAMS --aku $AKU"
-fi
-if [ "$DECODER" != "" ]
-then
-	PARAMS="$PARAMS --decoder $DECODER"
-fi
+[ -n "$AKU" ] && PARAMS="$PARAMS --aku $AKU"
+[ -n "$DECODER" ] && PARAMS="$PARAMS --decoder $DECODER"
 
 # Specify binary LM if .bin or .fsabin file exists.
 if [ "$FSA" != "" ]
