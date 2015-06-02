@@ -933,6 +933,7 @@ class RecognizerToolbox:
 			command = [self.lattice_tool_path, \
 					'-in-lattice', self.slf_path, \
 					'-read-htk', \
+					'-no-htk-nulls', \
 					'-out-lattice', tmp_slf_path, \
 					'-write-htk', \
 					'-overwrite', \
