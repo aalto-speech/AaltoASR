@@ -5,6 +5,8 @@
 #include <vector>
 #include <string>
 
+namespace aku {
+
 class ModuleConfig {
 public:
   bool exists(const std::string &name) const;
@@ -45,5 +47,6 @@ private:
   int m_num_lines_read;
 };
 
+}
 
 #endif /* MODULECONFIG_HH */

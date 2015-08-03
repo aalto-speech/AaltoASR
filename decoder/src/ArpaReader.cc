@@ -3,15 +3,18 @@
 
 // Routines for reading and writing arpa format files from and to the 
 // internal prefix tree format.
-#include <stdlib.h>
+#include <cstdlib>
+#include <stdexcept>
 #include "ArpaReader.hh"
 #include "misc/str.hh"
+
+using namespace std;
 
 void
 ArpaReader::read_error()
 {
   fprintf(stderr, "ArpaReader::read(): error on line %d\n", m_lineno);
-  exit(1);
+  throw runtime_error("ArpaReader::read_error");
 }
 
 void
@@ -32,9 +35,9 @@ ArpaReader::read_header(FILE *file, bool &interpolated, std::string &line)
     m_lineno++;
 
     if (!ok) {
-      fprintf(stderr, "ArpaReader::read(): "
+      fprintf(stderr, "ArpaReader::read_header(): "
 	      "error on line %d while waiting \\data\\", m_lineno);
-      exit(1);
+      throw runtime_error("ArpaReader::read_header");
     }
 
     if (line == "\\interpolated")
@@ -52,9 +55,9 @@ ArpaReader::read_header(FILE *file, bool &interpolated, std::string &line)
     m_lineno++;
 
     if (!ok) {
-      fprintf(stderr, "ArpaReader::read(): "
+      fprintf(stderr, "ArpaReader::read_header(): "
 	      "error on line %d while reading counts", m_lineno);
-      exit(1);
+      throw runtime_error("ArpaReader::read_header");
     }
     
     // Header ends in a \-command
@@ -115,7 +118,7 @@ ArpaReader::next_gram(FILE *file, std::string &line, std::vector<int> &gram, flo
       if (line != "\\end\\") {
         fprintf(stderr, "ArpaReader::next_gram():"
                 "expected end, got '%s' on line %d\n", line.c_str(), m_lineno);
-        exit(1);
+        throw runtime_error("ArpaReader::next_gram");
       }
       return false;
     }
@@ -126,7 +129,7 @@ ArpaReader::next_gram(FILE *file, std::string &line, std::vector<int> &gram, flo
     if (line[0] != '\\') {
       fprintf(stderr, "ArpaReader::next_gram(): "
               "\\%d-grams expected on line %d\n", m_read_order, m_lineno);
-      exit(1);
+      throw runtime_error("ArpaReader::next_gram");
     }
 
     str::clean(line, " \t");
@@ -135,7 +138,7 @@ ArpaReader::next_gram(FILE *file, std::string &line, std::vector<int> &gram, flo
     if (atoi(vec[0].substr(1).c_str()) != m_read_order || vec[1] != "grams:") {
       fprintf(stderr, "ArpaReader::next_gram(): "
 	      "unexpected command on line %d: %s\n", m_lineno, line.c_str());
-      exit(1);
+      throw runtime_error("ArpaReader::next_gram");
     }
   }
 
@@ -160,7 +163,7 @@ ArpaReader::next_gram(FILE *file, std::string &line, std::vector<int> &gram, flo
   if (vec.size() < m_read_order + 1 || vec.size() > m_read_order + 2) {
     fprintf(stderr, "ArpaReader::next_gram(): "
             "%d columns on line %d\n", (int) vec.size(), m_lineno);
-    exit(1);
+    throw runtime_error("ArpaReader::next_gram");
   }
   if (m_read_order == counts.size() && vec.size() != m_read_order + 1) {
     fprintf(stderr, "WARNING: %d columns on line %d\n", (int) vec.size(), 

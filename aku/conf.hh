@@ -5,8 +5,9 @@
 #include <deque>
 #include <string>
 #include <map>
+#include <cstdio>
 
-#include <stdio.h>
+namespace aku {
 
 /** Configuration options, command line parameters and config files. 
  *
@@ -183,6 +184,8 @@ namespace conf {
     void parse_aux(std::deque<std::string> &argument_queue, bool override);
   };
 
-};
+}
+
+}
 
 #endif /* CONF_HH */

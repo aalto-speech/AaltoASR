@@ -1,32 +1,10 @@
 PROJECT (aku)
 
-include(CMakePushCheckState)
 
-Find_Package ( SNDFILE REQUIRED )
+IF(NOT SNDFILE_FOUND)
+  Find_Package ( SNDFILE REQUIRED )
+ENDIF(NOT SNDFILE_FOUND)
 
-Find_Package ( BLAS QUIET )
-IF(NOT BLAS_FOUND)
-  Find_Package ( OpenBLAS )
-  IF(NOT OPENBLAS_FOUND)
-    MESSAGE(FATAL_ERROR "BLAS or OpenBLAS not found.")
-  ELSE(NOT OPENBLAS_FOUND)
-    set(BLAS_LIBRARIES ${OPENBLAS_LIBRARIES})
-    set(LAPACK_LIBRARIES ${BLAS_LIBRARIES} "-lgfortran")
-    cmake_push_check_state()
-    set(CMAKE_REQUIRED_LIBRARIES ${LAPACK_LIBRARIES})
-    check_function_exists("cheev_" LAPACK_LIBRARY_WORKS)
-    mark_as_advanced(LAPACK_LIBRARY_WORKS)
-    cmake_pop_check_state()
-    if( NOT LAPACK_LIBRARY_WORKS )
-      message(FATAL_ERROR "LAPACK features in OpenBLAS not found")
-    else( )
-      SET(LAPACK_FOUND TRUE)
-      message(STATUS "Working build of OpenBLAS with LAPACK found")
-    endif( )
-  ENDIF(NOT OPENBLAS_FOUND)
-ELSE(NOT BLAS_FOUND)
-  Find_Package ( LAPACK REQUIRED )
-ENDIF(NOT BLAS_FOUND)
 
 link_libraries (
     ${LapackPP_LIBRARIES}
@@ -71,8 +49,6 @@ set(AKUSOURCES
     ${LapackPP_HEADER}
 )
 
-SET(KISS_FFT 0 CACHE BOOL "Use KissFFT instead of FFTW")
-
 IF(NOT KISS_FFT)
   Find_Package ( FFTW )
   IF(NOT FFTW_FOUND)
@@ -94,7 +70,11 @@ ELSE(FFTW_FOUND AND NOT KISS_FFT)
   set( AKUSOURCES "${AKUSOURCES}" ../vendor/kiss_fft/kiss_fft.c ../vendor/kiss_fft/kiss_fftr.c ) 
 ENDIF(FFTW_FOUND AND NOT KISS_FFT)
 
+IF(CROSS_MINGW)
+add_library( aku STATIC ${AKUSOURCES} )
+ELSE(CROSS_MINGW)
 add_library( aku ${AKUSOURCES} )
+ENDIF(CROSS_MINGW)
 add_dependencies(aku lapackpp_ext)
 
 set(AKU_CMDS feacat feadot feanorm phone_probs segfea vtln quanteq stats estimate align tie dur_est gconvert mllr logl gcluster lda optmodel cmpmodel combine_stats regtree clsstep clskld opt_ebw_d )
@@ -110,4 +90,4 @@ install(FILES ${AKU_HEADERS} DESTINATION include)
 install(TARGETS aku DESTINATION lib)
 if(NOT DISABLE_SWIG)
   add_subdirectory( swig )
-endif(NOT DISABLE_SWIG )
+endif(NOT DISABLE_SWIG)

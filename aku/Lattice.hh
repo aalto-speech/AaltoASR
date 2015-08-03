@@ -8,6 +8,8 @@
 
 #define INF (float)1e24
 
+namespace aku {
+
 /// A 2-dimensional lattice for the Viterbi search.
 /** 
  * The lattice maintains a 2-dimensional lattice which can be used for
@@ -211,6 +213,8 @@ Lattice::reset_frame(int frame, int new_start, int new_end)
   
   range.start = new_start;
   range.end = new_end;
+}
+
 }
 
 #endif /* LATTICE_HH */

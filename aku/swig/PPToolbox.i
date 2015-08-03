@@ -8,6 +8,7 @@
 // imported by f2c.h of Lapack++.
 #undef c_abs
 #include "PhoneProbsToolbox.hh"
+using namespace aku;
 %}
 
 %exception {

@@ -1,6 +1,5 @@
 #include <limits.h>
 #include <float.h>
-#include <values.h>
 #include <math.h>
 #include <string>
 #include <algorithm>
@@ -9,6 +8,7 @@
 #include "str.hh"
 #include "conf.hh"
 #include "FeatureGenerator.hh"
+#include "FeatureModules.hh"
 #include "Recipe.hh"
 #include "SpeakerConfig.hh"
 

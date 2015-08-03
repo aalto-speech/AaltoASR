@@ -6,6 +6,7 @@
 #include "conf.hh"
 #include "HmmSet.hh"
 #include "FeatureGenerator.hh"
+#include "FeatureModules.hh"
 #include "PhnReader.hh"
 #include "Recipe.hh"
 #include "SpeakerConfig.hh"

@@ -7,6 +7,7 @@
 #include "ModuleConfig.hh"
 #include "str.hh"
 #include "FeatureGenerator.hh"
+#include "FeatureModules.hh"
 
 
 namespace aku {
@@ -262,6 +263,41 @@ FeatureGenerator::module(const std::string &name)
   return it->second;
 }
 
+const FeatureVec
+FeatureGenerator::generate(int frame)
+{
+  assert( m_last_module != NULL );
+  const FeatureVec temp = m_last_module->at(frame);
+  m_eof_on_last_frame = m_base_module->eof(frame);
+  return temp;
+}
+
+int
+FeatureGenerator::last_frame()
+{
+  return m_base_module->last_frame();
+}
+
+int
+FeatureGenerator::sample_rate()
+{
+  assert( m_base_module != nullptr );
+  return m_base_module->sample_rate();
+}
+
+float
+FeatureGenerator::frame_rate()
+{
+  assert( m_base_module != nullptr );
+  return m_base_module->frame_rate();
+}
+
+int
+FeatureGenerator::dim()
+{
+  assert( m_last_module != nullptr );
+  return m_last_module->dim();
+}
 
 void // private
 FeatureGenerator::compute_init_buffers()

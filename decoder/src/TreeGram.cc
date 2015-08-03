@@ -1,8 +1,9 @@
 // Fairly compact prefix tree represantation for n-gram language model
-#include <errno.h>
-#include <assert.h>
-#include <math.h>
-#include <string.h>
+#include <stdexcept>
+#include <cerrno>
+#include <cassert>
+#include <cmath>
+#include <cstring>
 
 // Use io.h in Visual Studio varjokal 17.3.2010
 #ifdef _MSC_VER
@@ -23,6 +24,8 @@ typedef int ssize_t;
 #include "misc/str.hh"
 #include "def.hh"
 #include "TreeGramArpaReader.hh"
+
+using namespace std;
 
 static std::string format_str("cis-binlm2\n");
 
@@ -161,7 +164,7 @@ TreeGram::find_child(int word, int node_index)
   if (word < 0 || word >= m_words.size()) {
     fprintf(stderr, "TreeGram::find_child(): "
 	    "index %d out of vocabulary size %d\n", word, (int) m_words.size());
-    exit(1);
+    throw invalid_argument("TreeGram::find_child");
   }
 
   if (node_index < 0)
@@ -231,7 +234,7 @@ TreeGram::find_path(const Gram &gram)
     if (index < 0) {
       fprintf(stderr, "prefix not found\n");
       print_gram(stderr, gram);
-      exit(1);
+      throw logic_error("TreeGram::find_path");
     }
 
     m_insert_stack.push_back(index);
@@ -247,7 +250,7 @@ TreeGram::add_gram(const Gram &gram, float log_prob, float back_off, bool add_mi
   if (m_nodes.empty()) {
     fprintf(stderr, "TreeGram::add_gram(): "
 	    "nodes must be reserved before calling this function\n");
-    exit(1);
+    throw logic_error("TreeGram::add_gram");
   }
 
   check_order(gram, add_missing_unigrams);
@@ -359,14 +362,13 @@ TreeGram::write_real(FILE *file, bool reflip)
   ssize_t ret = 
     ::write(fd, &m_nodes[0], bytes_to_write);
   if (ret < 0) {
-    perror("TreeGram::write(): write() system call failed");
-    abort();
+    throw system_error("write");
   }
   if ((size_t)ret != bytes_to_write) {
     fprintf(stderr, "TreeGram::write(): "
 	    "write() system call wrote only %zd of %zd bytes\n",
 	    (size_t)ret, bytes_to_write);
-    abort();
+    throw system_error("write");
   }
 #else
   // The original code
@@ -379,7 +381,7 @@ TreeGram::write_real(FILE *file, bool reflip)
   
   if (ferror(file)) {
     fprintf(stderr, "TreeGram::write(): write error: %s\n", strerror(errno));
-    exit(1);
+    throw runtime_error("TreeGram::write");
   }
 
   // Restore to original endianess
@@ -404,7 +406,7 @@ TreeGram::read(FILE *file, bool binary)
   ret = str::read_string(line, format_str.length(), file);
   if (!ret || line != format_str) {
     fprintf(stderr, "TreeGram::read(): invalid file format\n");
-    exit(1);
+    throw ReadError();
   }
   
   // Read LM type
@@ -740,7 +742,7 @@ TreeGram::Iterator::next_order(int order)
   if (order < 1 || order > m_gram->m_order) {
     fprintf(stderr, "TreeGram::Iterator::next_order(): invalid order %d\n", 
 	    order);
-    exit(1);
+    throw invalid_argument("TreeGram::Iterator::next_order");
   }
 
   while (1) {

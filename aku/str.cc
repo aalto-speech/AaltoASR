@@ -7,6 +7,8 @@
 #include <assert.h>
 #include "str.hh"
 
+namespace aku {
+
 namespace str {
 
   std::string
@@ -290,5 +292,7 @@ namespace str {
   { 
     return str2float(str->c_str(), ok); 
   }
+
+}
 
 }

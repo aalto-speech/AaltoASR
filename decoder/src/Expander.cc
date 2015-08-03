@@ -1,4 +1,5 @@
 #include <cstddef>  // NULL
+#include <stdexcept>
 #include <iomanip>
 #include <iostream>
 #include <algorithm>
@@ -8,6 +9,8 @@
 #include <stdio.h>
 
 #include "Expander.hh"
+
+using namespace std;
 
 struct TokenCompare {
   inline bool operator()(Lexicon::Token *a, Lexicon::Token *b) {
@@ -189,7 +192,7 @@ Expander::check_best(int info, bool tmp)
   if (best > -1e10 && best_found != best) {
     fprintf(stderr, "%d best found %f, should be %f\n", info, best_found, 
 	    best);
-    abort();
+    throw logic_error("Expander::check_best");
   }
 }
 

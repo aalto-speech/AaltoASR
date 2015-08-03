@@ -7,6 +7,7 @@
 #include "conf.hh"
 #include "Recipe.hh"
 #include "FeatureGenerator.hh"
+#include "FeatureModules.hh"
 #include "SpeakerConfig.hh"
 
 using namespace aku;

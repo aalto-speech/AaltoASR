@@ -1,4 +1,5 @@
 #include "FeatureModules.hh"
+#include "AudioFileModule.hh"
 #include "FeatureGenerator.hh"
 
 #include <climits>
@@ -7,6 +8,7 @@
 #define _USE_MATH_DEFINES
 #endif
 #include <cmath>
+#include <cstring>
 #include <sstream>
 #include "util.hh"
 

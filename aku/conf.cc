@@ -5,6 +5,8 @@
 #include "str.hh"
 #include "io.hh"
 
+namespace aku {
+
 namespace conf {
 
   int
@@ -372,4 +374,7 @@ namespace conf {
     }
     return options[it->second];
   }
-};
+
+}
+
+}

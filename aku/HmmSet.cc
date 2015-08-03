@@ -2,10 +2,10 @@
 #include <iostream>
 #include <fstream>
 #include <math.h>
-#include <values.h>
 #include <algorithm>
 
 #include "HmmSet.hh"
+#include "FeatureModules.hh"
 #include "util.hh"
 #include "str.hh"
 

@@ -3,6 +3,8 @@
 #include "str.hh"
 #include "ModuleConfig.hh"
 
+namespace aku {
+
 bool
 ModuleConfig::exists(const std::string &name) const 
 {
@@ -233,4 +235,6 @@ ModuleConfig::insert(const std::string &name, const std::string &value)
     int index = ret.first->second;
     m_values[index] = value;
   }
+}
+
 }
