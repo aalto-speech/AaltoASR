@@ -94,9 +94,8 @@ use ClusterManager;
   my $SPKC_FILE = ""; # For initialization see e.g. $SCRIPTDIR/vtln_default.spkc
 
 ## Misc settings ##
-  # States without duration model (silences/noises). These must be first
-  # states of the models!
-  my $DUR_SKIP_MODELS = 6;
+  # Remove duration models for states that start with an underscore
+  my $REMOVE_DUR_MODELS = 1;
   my $VERBOSITY = 1;
   # NOTE: If you plan to recompile executables at the same time as running
   # them, it is a good idea to copy the old binaries to a different directory.
@@ -567,7 +566,14 @@ sub estimate_vtln {
 # NOTE: Uses alignments
 sub estimate_dur_model {
   my $om = shift(@_);
-  system("$BINDIR/dur_est -p $om.ph -r $RECIPE -O --gamma $om.dur --skip $DUR_SKIP_MODELS > $tempdir/dur_est.stdout 2> $tempdir/dur_est.stderr");
+  system("$BINDIR/dur_est -p $om.ph -r $RECIPE -O --gamma $om.dur > $tempdir/dur_est.stdout 2> $tempdir/dur_est.stderr");
+  if ($REMOVE_DUR_MODELS) {
+    my @states = `grep --no-group-separator -A1 -e "^[^\+]*_[^\-]*\$" $om.ph | grep -v "_" | cut -f 3- -d" " | sed "s/ /\\n/g"`;
+    s{^\s+|\s+$}{}g foreach @states;
+    foreach (@states) {
+      `sed -i "s/^$_ .*\$/$_ 0.000 0.000/" $om.dur`
+    }
+  }
   if (!(-e $om.".dur")) {
     die("Error estimating duration models\n");
   }
