@@ -25,7 +25,6 @@ use ClusterManager;
 ## Initial model names ##
   # Now initial model is created in tying, and we use only the .cfg file
   # of the original model.
-  my $init_model = "$HMMDIR/$BASE_ID";
   my $init_cfg = "$HMMDIR/init.cfg";
 
 ## Batch settings ##
@@ -116,20 +115,48 @@ my $tempdir = "$WORKDIR/temp";
 mkdir $WORKDIR;
 mkdir $tempdir;
 mkdir $HMMDIR;
-chdir $tempdir || die("Could not chdir to $tempdir");
+chdir $tempdir || die("Could not chdir to $tempdir: $!");
 
 if ($COPY_BINARY_TO_WORK > 0) {
-    copy_binary_to_work($BINDIR, "$tempdir/bin");
+  copy_binary_to_work($BINDIR, "$tempdir/bin");
 }
 
 # Generate initial model by context phone tying using existing alignments
-context_phone_tying($init_model, $init_cfg);
+my $init_model = "$HMMDIR/$BASE_ID";
+if ((-e "${init_model}.ph") && (-e "${init_model}.gk") && (-e "${init_model}.mc")) {
+  print "Initial model exists already, skipping context phone tying\n" if ($VERBOSITY > 0);
+} else {
+  context_phone_tying($init_model, $init_cfg);
+}
 
 # Convert the generated full covariance model to diagonal model
-convert_full_to_diagonal($init_model);
+if ((-e "${init_model}.gk") && (-e "${init_model}_full.gk")) {
+  print "Already converted to a diagonal model\n" if ($VERBOSITY > 0);
+} else {
+  convert_full_to_diagonal($init_model);
+}
 
-# Create the hmmnet files
-generate_hmmnet_files($init_model, $tempdir);
+# Check that hmmnet files exist, or generate them
+open my $recipe_file, $RECIPE or die("Could not open recipe file: $!");
+my @hmmnets;
+while (my $line = <$recipe_file>) {
+  # In a list context with /g flag, a regex will return all matched substrings
+  push @hmmnets, ($line =~ /hmmnet=(\S+)/g);
+}
+my $hmmnets_exist = 1;
+foreach my $hmmnet (@hmmnets) {
+  if (!(-e $hmmnet)) {
+    $hmmnets_exist = 0;
+    last;
+  }
+}
+close $recipe_file;
+if ($hmmnets_exist) {
+  print "$#hmmnets hmmnet files exists already, skipping generation\n" if ($VERBOSITY > 0);
+}
+else {
+  generate_hmmnet_files($init_model, $tempdir);
+}
 
 # ML/EM training
 my $ml_model;
@@ -228,26 +255,28 @@ sub ml_train {
   my $split_stop_iter = shift(@_);
   my $split_flag;
 
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $dstring = "$mday.".($mon+1).".".(1900+$year);
-  my $model_base = "$HMMDIR/${BASE_ID}_${dstring}";
+  my $model_base = "$HMMDIR/${BASE_ID}";
 
   my $stats_list_file = "statsfiles.lst";
   my $batch_info;
 
   for (my $i = $iter_init; $i <= $iter_end ; $i ++) {
+    my $om = "${model_base}_${i}";
+    if (-e "${om}.ph") {
+      print "ML iteration ${i} has finished already\n" if ($VERBOSITY > 0);
+      next;
+    } else {
+      print "ML iteration ${i}\n" if ($VERBOSITY > 0);
+    }
 
-    print "ML iteration ".$i."\n" if ($VERBOSITY > 0);
-    my $om = $model_base."_".$i;
-
-    my $log_dir = "$temp_dir/ml_iter_".$i;
+    my $log_dir = "${temp_dir}/ml_iter_${i}";
     mkdir $log_dir;
 
     $mllt_flag = 0;
     $mllt_flag = 1 if ($mllt_start && $i >= $mllt_start &&
 		       (($i-$mllt_start) % $mllt_frequency) == 0);
     
-    collect_stats("ml_$i", $temp_dir, $log_dir, $im, $im_cfg, $stats_list_file,
+    collect_stats("ml_${i}", $temp_dir, $log_dir, $im, $im_cfg, $stats_list_file,
                   $ML_STATS_MODE, $mllt_flag);
 
     my $fh;
@@ -271,7 +300,7 @@ sub ml_train {
                    $ML_ESTIMATE_MODE, $mllt_flag, $split_flag);
     
     # Check the models were really created
-    if (!(-e $om.".ph")) {
+    if (!(-e "${om}.ph")) {
       die "Error in training, no models were written\n";
     }
 
@@ -325,8 +354,26 @@ sub collect_stats {
 
   $batch_options = "-B $NUM_BATCHES -I \$BATCH" if ($NUM_BATCHES > 0);
 
-  my $failed_batches_file = "${id}_failed_batches.lst";
-  unlink($failed_batches_file);
+  my $failed_batches_file = "${temp_dir}/${id}_failed_batches.lst";
+
+  my @garbage_files = (
+    $failed_batches_file,
+    "${temp_dir}/${id}_stats.gks",
+    "${temp_dir}/${id}_stats.mcs",
+    "${temp_dir}/${id}_stats.phs",
+    "${temp_dir}/${id}_stats.lls",
+    "${temp_dir}/${id}_stats_list"
+  );
+  push @garbage_files, glob("${temp_dir}/temp_stats_*.gks");
+  push @garbage_files, glob("${temp_dir}/temp_stats_*.mcs");
+  push @garbage_files, glob("${temp_dir}/temp_stats_*.phs");
+  push @garbage_files, glob("${temp_dir}/temp_stats_*.lls");
+  foreach my $file (@garbage_files) {
+    if (-e $file) {
+      print "Deleting $file from previous statistics collection\n" if ($VERBOSITY > 0);
+      unlink $file or die "Could not unlink $file: $!";
+    }
+  }
 
   $cm->submit("$BINDIR/stats -b $model_base -c $cfg -r $RECIPE $bw_option -o temp_stats_\$BATCH $stats_mode -F $FORWARD_BEAM -W $BACKWARD_BEAM -A $AC_SCALE -t $spkc_switch $batch_options -i $VERBOSITY $mllt_option\n".
 "if [ \"\$?\" -ne \"0\" ]; then echo \$BATCH >> $failed_batches_file; exit 1; fi\n",
