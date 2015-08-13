@@ -110,6 +110,14 @@ use ClusterManager;
 # Training script begins
 ######################################################################
 
+if ($SPLIT_TARGET_GAUSSIANS != -1) {
+  print "Gaussian splitting target count: ${SPLIT_TARGET_GAUSSIANS}\n" if ($VERBOSITY > 0);
+}
+else {
+  print "Gaussian splitting alpha: ${SPLIT_ALPHA}\n" if ($VERBOSITY > 0);
+  print "Gaussian removal threshold: ${GAUSS_REMOVE_THRESHOLD}\n" if ($VERBOSITY > 0);
+}
+
 # Create own working directory
 my $tempdir = "$WORKDIR/temp";
 mkdir $WORKDIR;
@@ -136,27 +144,9 @@ if ((-e "${init_model}.gk") && (-e "${init_model}_full.gk")) {
   convert_full_to_diagonal($init_model);
 }
 
-# Check that hmmnet files exist, or generate them
-open my $recipe_file, $RECIPE or die("Could not open recipe file: $!");
-my @hmmnets;
-while (my $line = <$recipe_file>) {
-  # In a list context with /g flag, a regex will return all matched substrings
-  push @hmmnets, ($line =~ /hmmnet=(\S+)/g);
-}
-my $hmmnets_exist = 1;
-foreach my $hmmnet (@hmmnets) {
-  if (!(-e $hmmnet)) {
-    $hmmnets_exist = 0;
-    last;
-  }
-}
-close $recipe_file;
-if ($hmmnets_exist) {
-  print "$#hmmnets hmmnet files exists already, skipping generation\n" if ($VERBOSITY > 0);
-}
-else {
-  generate_hmmnet_files($init_model, $tempdir);
-}
+# Always generate hmmnet files. Could be that hmmnets from alignment exist with
+# alternative paths.
+generate_hmmnet_files($init_model, $tempdir);
 
 # ML/EM training
 my $ml_model;
@@ -431,7 +421,15 @@ sub estimate_model {
     }
   }
 
-  system("$BINDIR/estimate -b $im -c $im_cfg -L $stats_list_file -o $om -t -i $VERBOSITY --minvar $minvar $estimate_mode -s ${BASE_ID}_summary $extra_options > $log_dir/estimate.stdout 2> $log_dir/estimate.stderr");
+  my $command = "$BINDIR/estimate"
+    . " -b $im -c $im_cfg -L $stats_list_file -o $om"
+    . " -t -i $VERBOSITY --minvar $minvar"
+    . " $estimate_mode"
+    . " -s ${BASE_ID}_summary"
+    . " $extra_options"
+    . " >$log_dir/estimate.stdout 2>$log_dir/estimate.stderr";
+  print "$command\n" if ($VERBOSITY > 0);
+  system("$command");
 }
 
 
