@@ -11,23 +11,23 @@ using namespace std;
 
 int safe_tolower(int c)
 {
-  if (c == 'Å')
-    return 'å';
-  else if (c == 'Ä')
-    return 'ä';
-  else if (c == 'Ö')
-    return 'ö';
+  if (c == 'ï¿½')
+    return 'ï¿½';
+  else if (c == 'ï¿½')
+    return 'ï¿½';
+  else if (c == 'ï¿½')
+    return 'ï¿½';
   return tolower(c);
 }
 
 int safe_toupper(int c)
 {
-  if (c == 'å')
-    return 'Å';
-  else if (c == 'ä')
-    return 'Ä';
-  else if (c == 'ö')
-    return 'Ö';
+  if (c == 'ï¿½')
+    return 'ï¿½';
+  else if (c == 'ï¿½')
+    return 'ï¿½';
+  else if (c == 'ï¿½')
+    return 'ï¿½';
   return toupper(c);
 }
 
@@ -1121,8 +1121,11 @@ void TPLexPrefixTree::free_cross_word_network_connection_points(void)
 TPLexPrefixTree::Node*
 TPLexPrefixTree::get_short_silence_node(void)
 {
+  if (m_short_silence_state == NULL) {
+    throw NoShortSilence();
+  }
+
   Arc temp_arc;
-  assert( m_short_silence_state != NULL );
   Node *silence = new Node(m_word_boundary_id, m_short_silence_state);
   silence->node_id = m_nodes.size();
   silence->flags = NODE_FAN_OUT | NODE_USE_WORD_END_BEAM | NODE_FINAL;

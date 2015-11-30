@@ -196,6 +196,11 @@ public:
     {}
   };
 
+  struct NoShortSilence : public std::exception {
+    virtual const char *what() const throw()
+      { return "TPLexPrefixTree: no short silence"; }
+  };
+
   TPLexPrefixTree(std::map<std::string,int> &hmm_map, std::vector<Hmm> &hmms);
 
   /// \brief Deletes all the nodes from \ref m_nodes.
