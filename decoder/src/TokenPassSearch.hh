@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <vector>
 #include <cmath>
+#include <utility>
 
 #include "config.hh"
 #include "fsalm/LM.hh"
@@ -12,6 +13,7 @@
 #include "NGram.hh"
 #include "Acoustics.hh"
 #include "LMHistory.hh"
+#include "IteratorRange.hh"
 
 // Visual studio math.h doesn't have log1p function varjokal 17.3.2010
 #ifdef _MSC_VER
@@ -59,6 +61,9 @@ public:
     {
     }
   };
+
+  typedef std::vector<TPLexPrefixTree::Token *> token_list_type;
+  typedef IteratorRange<token_list_type::const_iterator> token_range_type;
 
   TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
                   Acoustics *acoustics);
@@ -145,6 +150,14 @@ public:
   ///
   void get_path(HistoryVector &vec, bool use_best_token, LMHistory *limit);
 
+  /// \brief Sorts active tokens by the order of descending log probability.
+  ///
+  /// Sorts active tokens, first final tokens in the order of descending log
+  /// probability, then non-final tokens in the order of descending log
+  /// probability, then NULL elements.
+  ///
+  token_range_type get_sorted_tokens();
+
   // Options
   void set_acoustics(Acoustics *acoustics) { m_acoustics = acoustics; }
   void set_global_beam(float beam) { m_global_beam = beam; if (m_word_end_beam > m_global_beam) m_word_end_beam = beam; }
@@ -154,7 +167,7 @@ public:
   void set_fan_in_beam(float beam) { m_fan_in_beam = beam; }
   void set_fan_out_beam(float beam) { m_fan_out_beam = beam; }
   void set_state_beam(float beam) { m_state_beam = beam; }
-  
+
   void set_similar_lm_history_span(int n) { m_similar_lm_hist_span = n; }
   void set_lm_scale(float lm_scale) { m_lm_scale = lm_scale; }
   void set_duration_scale(float dur_scale) { m_duration_scale = dur_scale; }
@@ -170,15 +183,12 @@ public:
 
   void set_print_probs(bool value) { m_print_probs = value; }
   void set_print_text_result(int print) { m_print_text_result = print; }
-  void set_print_state_segmentation(int print) 
-  { 
-    m_print_state_segmentation = print; 
+  void set_print_state_segmentation(int print)
+  {
+    m_print_state_segmentation = print;
     m_keep_state_segmentation = print;
   }
-  void set_keep_state_segmentation(int value)
-  {
-    m_keep_state_segmentation = value;
-  }
+  void set_keep_state_segmentation(int x) { m_keep_state_segmentation = x; }
   void set_verbose(int verbose) { m_verbose = verbose; }
 
   /// \brief Sets the word that represents word boundary.
@@ -388,7 +398,7 @@ private:
   ///
   const TPLexPrefixTree::Token & get_best_final_token() const;
 
-  /// \brief Returns the first token in the active token list.
+  /// \brief Returns the first non-NULL token in the active token list.
   ///
   const TPLexPrefixTree::Token & get_first_token() const;
 
@@ -579,10 +589,9 @@ private:
 #endif
   Acoustics *m_acoustics;
 
-  typedef std::vector<TPLexPrefixTree::Token *> token_list_type;
-  token_list_type * m_active_token_list;
-  token_list_type * m_new_token_list;
-  token_list_type * m_word_end_token_list;
+  token_list_type m_active_token_list;
+  token_list_type m_new_token_list;
+  token_list_type m_word_end_token_list;
   token_list_type m_token_pool;
   std::vector<LMHistory*> m_lmh_pool;
 
