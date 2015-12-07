@@ -489,14 +489,24 @@ Toolbox::init(int expand_window)
   m_search->init_search(expand_window);
 }
 
-const std::vector<timed_token_type>& Toolbox::best_timed_hypo_string(bool print_all){
+const std::vector<timed_token_type>& Toolbox::best_timed_hypo_string(bool print_all)
+{
+  if (m_tp_search->get_print_text_result()) {
+    fprintf(stderr, "Toolbox::best_timed_hypo_string() should not be used with "
+            "print_text_results set true\n");
+    throw logic_error("Toolbox::best_timed_hypo_string");
+  }
+
   HistoryVector hist_vec;
+  if (print_all)
+    m_tp_search->get_best_final_token().get_lm_history(hist_vec, NULL);
+  else
+    m_tp_search->get_first_token().get_lm_history(hist_vec, m_last_guaranteed_history);
+
   static std::vector<timed_token_type> retval;
   retval.clear();
-
-  m_tp_search->get_path(hist_vec, print_all, print_all ? NULL : m_last_guaranteed_history);
   bool all_guaranteed = true;
-  
+
   for (int i = hist_vec.size() - 1; i >= 0; i--) {
     std::string newstring("");
     LMHistory *hist = hist_vec[i];
@@ -516,12 +526,22 @@ const std::vector<timed_token_type>& Toolbox::best_timed_hypo_string(bool print_
   }
   return retval;
 }
-const bytestype& Toolbox::best_hypo_string(bool print_all, bool output_time) {
+const bytestype& Toolbox::best_hypo_string(bool print_all, bool output_time)
+{
+  if (m_tp_search->get_print_text_result()) {
+    fprintf(stderr, "Toolbox::best_hypo_string() should not be used with "
+            "print_text_results set true\n");
+    throw logic_error("Toolbox::best_hypo_string");
+  }
+
   HistoryVector hist_vec;
+  if (print_all)
+    m_tp_search->get_best_final_token().get_lm_history(hist_vec, NULL);
+  else
+    m_tp_search->get_first_token().get_lm_history(hist_vec, m_last_guaranteed_history);
+
   static std::string retval;
   retval.clear();
-
-  m_tp_search->get_path(hist_vec, print_all, print_all ? NULL : m_last_guaranteed_history);
   bool all_guaranteed = true;
 
   for (int i = hist_vec.size() - 1; i >= 0; i--) {

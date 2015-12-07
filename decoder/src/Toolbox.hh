@@ -323,7 +323,7 @@ public:
   void write_state_segmentation(const std::string & file_name)
   {
     io::Stream out(file_name, "w");
-    m_tp_search->get_best_final_token().print_state_history(out.file);
+    m_tp_search->print_state_history(out.file);
   }
 
   TokenPassSearch &debug_get_tp() { return *m_tp_search; }

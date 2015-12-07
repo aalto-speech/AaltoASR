@@ -20,6 +20,7 @@ set(DECODERSOURCES
   Search.cc
   TPLexPrefixTree.cc
   TPNowayLexReader.cc
+  Token.cc
   TokenPassSearch.cc
   Toolbox.cc
   TreeGram.cc

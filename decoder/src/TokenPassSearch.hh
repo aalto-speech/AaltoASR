@@ -41,8 +41,7 @@ public:
   struct WordGraphNotGenerated: public std::runtime_error
   {
     WordGraphNotGenerated() :
-      std::runtime_error(
-			 "Word graph was requested but it has not been generated.")
+      std::runtime_error("Word graph was requested but it has not been generated.")
     {
     }
   };
@@ -108,17 +107,25 @@ public:
   ///
   void print_lm_history(FILE *file = stdout, bool get_best_path = true);
 
-  /// \brief Writes the LM history of an active token into a vector.
+  /// \brief Writes the best state history into a file.
   ///
-  /// If \a use_best_token is true, finds the active token that is in the
-  /// NODE_FINAL state i.e. at the end of a word, with the highest
-  /// probability. Otherwise finds any active token. Then writes the
-  /// LMHistory objects in the lm_history of that token into
-  /// a vector.
+  /// Finds the active token that is in the NODE_FINAL state i.e. at the end
+  /// of a word, with the highest probability. Then writes its state history
+  /// into a file.
   ///
-  /// \param vec The vector where the result will be written.
+  /// \param file The file where the result will be written, stoudt by default.
   ///
-  void get_path(HistoryVector &vec, bool use_best_token, LMHistory *limit);
+  void print_state_history(FILE *file = stdout);
+
+  /// \brief Writes the best state history into a text string.
+  ///
+  /// Finds the active token that is in the NODE_FINAL state i.e. at the end
+  /// of a word, with the highest probability. Then writes its state history
+  /// into a text string.
+  ///
+  /// \return The best state history in a text string.
+  ///
+  std::string state_history_string();
 
   /// \brief Sorts active tokens by the order of descending log probability.
   ///
@@ -153,6 +160,7 @@ public:
 
   void set_print_probs(bool value) { m_print_probs = value; }
   void set_print_text_result(int print) { m_print_text_result = print; }
+  int get_print_text_result() { return m_print_text_result; }
   void set_print_state_segmentation(int print)
   {
     m_print_state_segmentation = print;
@@ -320,6 +328,10 @@ public:
   ///
   const Token & get_best_final_token() const;
 
+  /// \brief Returns the first non-NULL token in the active token list.
+  ///
+  const Token & get_first_token() const;
+
   /// \brief For unit testing.
   const std::vector<LMHistory::Word> & get_word_repository() const;
   const WordClasses * get_word_classes() const;
@@ -367,10 +379,6 @@ private:
   /// word or class does not exist in the lookahead LM.
   ///
   int find_word_from_lookahead_lm(int word_id, std::string word) const;
-
-  /// \brief Returns the first non-NULL token in the active token list.
-  ///
-  const Token & get_first_token() const;
 
   void add_sentence_end_to_hypotheses(void);
 

@@ -290,7 +290,7 @@ TokenPassSearch::run(void)
       print_lm_history(stdout, true);
 
     if (m_print_state_segmentation)
-      get_best_final_token().print_state_history();
+      print_state_history();
 
     return false;
   }
@@ -420,29 +420,6 @@ TokenPassSearch::analyze_tokens(void)
   }
 }
 #endif
-
-void TokenPassSearch::get_path(HistoryVector &vec, bool use_best_token,
-                               LMHistory *limit)
-{
-  if (m_print_text_result) {
-    fprintf(stderr, "TokenPassSearch::get_path() should not be used with "
-            "m_print_text_results set true\n");
-    throw logic_error("TokenPassSearch::get_path");
-  }
-
-  const Token & token =
-    use_best_token ? get_best_final_token() : get_first_token();
-
-  vec.clear();
-  LMHistory *hist = token.lm_history;
-  while (hist->last().word_id() >= 0) {
-    if (hist == limit)
-      break;
-    vec.push_back(hist);
-    hist = hist->previous;
-  }
-  assert(limit == NULL || hist->last().word_id() >= 0);
-}
 
 TokenPassSearch::token_range_type
 TokenPassSearch::get_sorted_tokens()
@@ -686,6 +663,32 @@ TokenPassSearch::get_first_token() const
 
   fprintf(stderr, "ERROR: No active tokens. Did you forget to call reset()?\n");
   throw logic_error("ERROR: No active tokens. Did you forget to call reset()?");
+}
+
+void TokenPassSearch::print_state_history(FILE *file)
+{
+  std::vector<Token::StateHistory*> stack;
+  get_best_final_token().get_state_history(stack);
+
+  for (int i = stack.size() - 1; i >= 0; i--) {
+    int end_time = i == 0 ? m_frame : stack[i - 1]->start_time;
+    fprintf(file, "%i %i %i\n", stack[i]->start_time, end_time,
+            stack[i]->hmm_model);
+  }
+  //fprintf(file, "DEBUG: %s\n", state_history_string().c_str());
+}
+
+std::string TokenPassSearch::state_history_string()
+{
+  std::vector<Token::StateHistory*> stack;
+  get_best_final_token().get_state_history(stack);
+
+  std::ostringstream buf;
+  for (int i = stack.size() - 1; i >= 0; i--)
+    buf << stack[i]->start_time << " " << stack[i]->hmm_model << " ";
+  buf << m_frame;
+
+  return buf.str();
 }
 
 void TokenPassSearch::propagate_tokens(void)
