@@ -10,6 +10,7 @@
 #include "fsalm/LM.hh"
 #include "WordGraph.hh"
 #include "TPLexPrefixTree.hh"
+#include "Token.hh"
 #include "NGram.hh"
 #include "Acoustics.hh"
 #include "LMHistory.hh"
@@ -62,7 +63,7 @@ public:
     }
   };
 
-  typedef std::vector<TPLexPrefixTree::Token *> token_list_type;
+  typedef std::vector<Token *> token_list_type;
   typedef IteratorRange<token_list_type::const_iterator> token_range_type;
 
   TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
@@ -131,12 +132,12 @@ public:
   ///
   /// Finds the active token that is in the NODE_FINAL state i.e. at the end
   /// of a word, with the highest probability. Then writes the
-  /// TPLexPrefixTree::StateHistory objects in the state_history of that
+  /// Token::StateHistory objects in the state_history of that
   /// token into a vector.
   ///
   /// \param stack The vector where the result will be written.
   ///
-  void get_state_history(std::vector<TPLexPrefixTree::StateHistory*> &stack);
+  void get_state_history(std::vector<Token::StateHistory*> &stack);
 
   /// \brief Writes the LM history of an active token into a vector.
   ///
@@ -396,11 +397,11 @@ private:
   /// highest probability. If none is found, returns the best token not in
   /// NODE_FINAL state.
   ///
-  const TPLexPrefixTree::Token & get_best_final_token() const;
+  const Token & get_best_final_token() const;
 
   /// \brief Returns the first non-NULL token in the active token list.
   ///
-  const TPLexPrefixTree::Token & get_first_token() const;
+  const Token & get_first_token() const;
 
   void add_sentence_end_to_hypotheses(void);
 
@@ -418,8 +419,8 @@ private:
   ///
   void update_final_tokens();
 
-  void copy_word_graph_info(TPLexPrefixTree::Token *src_token,
-			    TPLexPrefixTree::Token *tgt_token);
+  void copy_word_graph_info(Token *src_token,
+			    Token *tgt_token);
 
   /// \brief Adds an arc to the word graph from the previous endpoint of
   /// \a new_token to a node that represents the last word in its word
@@ -432,17 +433,17 @@ private:
   /// If there already exists an arc between the source node and the target
   /// node, just updates the arc probability.
   ///
-  void build_word_graph_aux(TPLexPrefixTree::Token *new_token,
-			    TPLexPrefixTree::WordHistory *word_history);
-  void build_word_graph(TPLexPrefixTree::Token *new_token);
+  void build_word_graph_aux(Token *new_token,
+			    Token::WordHistory *word_history);
+  void build_word_graph(Token *new_token);
 
   /// \brief Moves the token towards all the arcs leaving the token's node.
   ///
-  void propagate_token(TPLexPrefixTree::Token *token);
+  void propagate_token(Token *token);
 
   /// \brief Appends a word to the LMHistory of a token.
   ///
-  void append_to_word_history(TPLexPrefixTree::Token & token,
+  void append_to_word_history(Token & token,
 			      const LMHistory::Word & word);
 
   /// \brief Moves token to a connected node.
@@ -452,7 +453,7 @@ private:
   /// \param token The token to move.
   /// \param node A nodes that is connected to token's node
   ///
-  void move_token_to_node(TPLexPrefixTree::Token *token,
+  void move_token_to_node(Token *token,
                           TPLexPrefixTree::Node *node,
                           float transition_score);
 
@@ -465,8 +466,8 @@ private:
   void analyze_tokens(void);
 #endif
 
-  TPLexPrefixTree::Token*
-  find_similar_fsa_token(int fsa_lm_node, TPLexPrefixTree::Token *token_list);
+  Token*
+  find_similar_fsa_token(int fsa_lm_node, Token *token_list);
 
   /// \brief Finds a token from \a token_list that has similar LMHistory to
   /// \a wh up to m_similar_lm_hist_span words or classes.
@@ -477,8 +478,8 @@ private:
   /// Note: Doesn't work if the sentence end is the first one in the word
   /// history!
   ///
-  TPLexPrefixTree::Token* find_similar_lm_history(LMHistory *wh,
-						  int lm_hist_code, TPLexPrefixTree::Token *token_list);
+  Token* find_similar_lm_history(LMHistory *wh,
+                                 int lm_hist_code, Token *token_list);
 
   /// \brief Checks if wh1 and wh2 are similar up to m_similar_lm_hist_span
   /// words or classes.
@@ -528,12 +529,12 @@ private:
   /// \brief Moves a token to the next FSA language model node, and adds the
   /// transition probability to the LM log probability of the token.
   ///
-  void advance_fsa_lm(TPLexPrefixTree::Token & token);
+  void advance_fsa_lm(Token & token);
 
   /// \brief Updated lm_log_prob and lm_hist_code on token after adding a new
   /// word to the end of its lm_history.
   ///
-  void update_lm_log_prob(TPLexPrefixTree::Token & token);
+  void update_lm_log_prob(Token & token);
 
   /// \brief Computes the lookahead score as the maximum of possible word ends
   /// to the given LMHistory.
@@ -563,9 +564,9 @@ private:
     return (am_score + m_lm_scale * lm_score);
   }
 
-  TPLexPrefixTree::Token* acquire_token(void);
+  Token* acquire_token(void);
   LMHistory* acquire_lmhist(const LMHistory::Word *, LMHistory *);
-  void release_token(TPLexPrefixTree::Token *token);
+  void release_token(Token *token);
   void release_lmhist(LMHistory *);
 
   void save_token_statistics(int count);
@@ -573,7 +574,7 @@ private:
 
   // Help variables to cope with memory leaks
   // Vector of pointers to memory blocks for m_token_pool, this is only for freeing up memory at the destructor
-  std::vector<TPLexPrefixTree::Token *> m_token_dealloc_table;
+  std::vector<Token *> m_token_dealloc_table;
   std::vector<LMHistory *> m_lmhist_dealloc_table;
 
 public:
@@ -638,7 +639,7 @@ private:
   /// time instance.
   std::vector<WordGraphInfo> m_recent_word_graph_info;
 
-  TPLexPrefixTree::Token *m_best_final_token;
+  Token *m_best_final_token;
 
   /// The language model.
   NGram *m_ngram;
@@ -717,9 +718,9 @@ private:
 public:
   void debug_print_best_lm_history();
   void debug_print_token_lm_history(FILE * file,
-				    const TPLexPrefixTree::Token & token);
+				    const Token & token);
   void debug_print_token_word_history(FILE * file,
-				      const TPLexPrefixTree::Token & token);
+				      const Token & token);
 };
 
 #endif // TOKENPASSSEARCH_HH

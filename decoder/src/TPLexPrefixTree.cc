@@ -11,23 +11,23 @@ using namespace std;
 
 int safe_tolower(int c)
 {
-  if (c == '�')
-    return '�';
-  else if (c == '�')
-    return '�';
-  else if (c == '�')
-    return '�';
+  if (c == 0xC5)       // ISO-8895-15 'Å'
+    return 0xE5;       // ISO-8895-15 'å'
+  else if (c == 0xC4)  // ISO-8895-15 'Ä'
+    return 0xE4;       // ISO-8895-15 'ä'
+  else if (c == 0xD6)  // ISO-8859-15 'Ö'
+    return 0xF6;       // ISO-8859-15 'ö'
   return tolower(c);
 }
 
 int safe_toupper(int c)
 {
-  if (c == '�')
-    return '�';
-  else if (c == '�')
-    return '�';
-  else if (c == '�')
-    return '�';
+  if (c == 0xE5)       // ISO-8895-15 'å'
+    return 0xC5;       // ISO-8895-15 'Å'
+  else if (c == 0xE4)  // ISO-8895-15 'ä'
+    return 0xC4;       // ISO-8895-15 'Ä'
+  else if (c == 0xF6)  // ISO-8859-15 'ö'
+    return 0xD6;       // ISO-8859-15 'Ö'
   return toupper(c);
 }
 
