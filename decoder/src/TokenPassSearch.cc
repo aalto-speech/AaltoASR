@@ -667,25 +667,26 @@ TokenPassSearch::get_first_token() const
 
 void TokenPassSearch::print_state_history(FILE *file)
 {
-  std::vector<Token::StateHistory*> stack;
-  get_best_final_token().get_state_history(stack);
+  std::vector<Token::StateHistory*> state_history;
+  get_best_final_token().get_state_history(state_history);
 
-  for (int i = stack.size() - 1; i >= 0; i--) {
-    int end_time = i == 0 ? m_frame : stack[i - 1]->start_time;
-    fprintf(file, "%i %i %i\n", stack[i]->start_time, end_time,
-            stack[i]->hmm_model);
+  for (int i = 0; i < state_history.size(); ++i) {
+    int start_time = state_history[i]->start_time;
+    int end_time = i == state_history.size() - 1 ? m_frame : state_history[i + 1]->start_time;
+    int hmm_model = state_history[i]->hmm_model;
+    fprintf(file, "%i %i %i\n", start_time, end_time, hmm_model);
   }
   //fprintf(file, "DEBUG: %s\n", state_history_string().c_str());
 }
 
 std::string TokenPassSearch::state_history_string()
 {
-  std::vector<Token::StateHistory*> stack;
-  get_best_final_token().get_state_history(stack);
+  std::vector<Token::StateHistory*> state_history;
+  get_best_final_token().get_state_history(state_history);
 
   std::ostringstream buf;
-  for (int i = stack.size() - 1; i >= 0; i--)
-    buf << stack[i]->start_time << " " << stack[i]->hmm_model << " ";
+  for (auto state : state_history)
+    buf << state->start_time << " " << state->hmm_model << " ";
   buf << m_frame;
 
   return buf.str();

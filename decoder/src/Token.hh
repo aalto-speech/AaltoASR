@@ -99,7 +99,7 @@ public:
   /// \brief Writes the state history into a vector.
   ///
   /// Writes the Token::StateHistory objects from the state_history linked list
-  /// into a vector in reverse order.
+  /// into a vector. The order will be from the oldest to newest.
   ///
   /// \param result Vector where the result will be written.
   ///
@@ -108,7 +108,7 @@ public:
   /// \brief Writes the word history into a vector.
   ///
   /// Writes the LMHistory objects from the state_history linked list into a
-  /// vector in reverse order.
+  /// vector. The order will be from the oldest to newest.
   ///
   /// \param result Vector where the result will be written.
   /// \param limit If set to other than nullptr, prints only the history after

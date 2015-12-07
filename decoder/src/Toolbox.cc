@@ -507,9 +507,8 @@ const std::vector<timed_token_type>& Toolbox::best_timed_hypo_string(bool print_
   retval.clear();
   bool all_guaranteed = true;
 
-  for (int i = hist_vec.size() - 1; i >= 0; i--) {
+  for (auto hist : hist_vec) {
     std::string newstring("");
-    LMHistory *hist = hist_vec[i];
     assert(hist->reference_count > 0);
     if (hist->previous->reference_count == 1) {
       if (all_guaranteed)
@@ -544,8 +543,7 @@ const bytestype& Toolbox::best_hypo_string(bool print_all, bool output_time)
   retval.clear();
   bool all_guaranteed = true;
 
-  for (int i = hist_vec.size() - 1; i >= 0; i--) {
-    LMHistory *hist = hist_vec[i];
+  for (auto hist : hist_vec) {
     assert(hist->reference_count > 0);
     if (hist->previous->reference_count == 1) {
       if (all_guaranteed)

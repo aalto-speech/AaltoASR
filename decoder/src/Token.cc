@@ -1,5 +1,6 @@
 #include <vector>
 #include <sstream>
+#include <algorithm>  // reverse
 
 #include "Token.hh"
 
@@ -13,6 +14,7 @@ void Token::get_state_history(vector<StateHistory *> & result) const
        ptr = ptr->previous) {
     result.push_back(ptr);
   }
+  reverse(result.begin(), result.end());
 }
 
 void Token::get_lm_history(vector<LMHistory *> & result,
@@ -24,4 +26,5 @@ void Token::get_lm_history(vector<LMHistory *> & result,
        ptr = ptr->previous) {
     result.push_back(ptr);
   }
+  reverse(result.begin(), result.end());
 }
