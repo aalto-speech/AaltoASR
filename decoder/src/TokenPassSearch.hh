@@ -108,37 +108,6 @@ public:
   ///
   void print_lm_history(FILE *file = stdout, bool get_best_path = true);
 
-  /// \brief Writes the best state history into a file.
-  ///
-  /// Finds the active token that is in the NODE_FINAL state i.e. at the end
-  /// of a word, with the highest probability. Then writes its state history
-  /// into a file.
-  ///
-  /// \param file The file where the result will be written, stoudt by default.
-  ///
-  void print_state_history(FILE *file = stdout);
-
-  /// \brief Writes the best state history into a text string.
-  ///
-  /// Finds the active token that is in the NODE_FINAL state i.e. at the end
-  /// of a word, with the highest probability. Then writes its state history
-  /// into a text string.
-  ///
-  /// \return The best state history in a text string.
-  ///
-  std::string state_history_string();
-
-  /// \brief Writes the best state history into a vector.
-  ///
-  /// Finds the active token that is in the NODE_FINAL state i.e. at the end
-  /// of a word, with the highest probability. Then writes the
-  /// Token::StateHistory objects in the state_history of that
-  /// token into a vector.
-  ///
-  /// \param stack The vector where the result will be written.
-  ///
-  void get_state_history(std::vector<Token::StateHistory*> &stack);
-
   /// \brief Writes the LM history of an active token into a vector.
   ///
   /// If \a use_best_token is true, finds the active token that is in the
@@ -342,6 +311,15 @@ public:
   ///
   float get_total_log_prob(bool use_best_token) const;
 
+  /// \brief Finds the globally best token that is in the NODE_FINAL state,
+  /// i.e. at the end of a word.
+  ///
+  /// \return A reference to the active token in NODE_FINAL state with the
+  /// highest probability. If none is found, returns the best token not in
+  /// NODE_FINAL state.
+  ///
+  const Token & get_best_final_token() const;
+
   /// \brief For unit testing.
   const std::vector<LMHistory::Word> & get_word_repository() const;
   const WordClasses * get_word_classes() const;
@@ -389,15 +367,6 @@ private:
   /// word or class does not exist in the lookahead LM.
   ///
   int find_word_from_lookahead_lm(int word_id, std::string word) const;
-
-  /// \brief Finds the globally best token that is in the NODE_FINAL state,
-  /// i.e. at the end of a word.
-  ///
-  /// \return A reference to the active token in NODE_FINAL state with the
-  /// highest probability. If none is found, returns the best token not in
-  /// NODE_FINAL state.
-  ///
-  const Token & get_best_final_token() const;
 
   /// \brief Returns the first non-NULL token in the active token list.
   ///

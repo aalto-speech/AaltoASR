@@ -314,15 +314,16 @@ public:
   { m_search->print_prunings(); }
   void print_hypo(Hypo &hypo);
   void print_sure() { m_search->print_sure(); }
-  void write_word_history(const std::string file_name) {
+  void write_word_history(const std::string & file_name) {
     io::Stream out(file_name, "w");
     m_tp_search->write_word_history(out.file);
   }
   void write_word_history() { m_tp_search->write_word_history(); }
   void print_lm_history() { m_tp_search->print_lm_history(); }
-  void write_state_segmentation(const std::string &file)
-  { 
-    m_tp_search->print_state_history(io::Stream(file, "w").file);
+  void write_state_segmentation(const std::string & file_name)
+  {
+    io::Stream out(file_name, "w");
+    m_tp_search->get_best_final_token().print_state_history(out.file);
   }
 
   TokenPassSearch &debug_get_tp() { return *m_tp_search; }

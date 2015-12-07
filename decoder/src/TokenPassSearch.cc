@@ -290,7 +290,7 @@ TokenPassSearch::run(void)
       print_lm_history(stdout, true);
 
     if (m_print_state_segmentation)
-      print_state_history();
+      get_best_final_token().print_state_history();
 
     return false;
   }
@@ -686,47 +686,6 @@ TokenPassSearch::get_first_token() const
 
   fprintf(stderr, "ERROR: No active tokens. Did you forget to call reset()?\n");
   throw logic_error("ERROR: No active tokens. Did you forget to call reset()?");
-}
-
-void TokenPassSearch::print_state_history(FILE *file)
-{
-  std::vector<Token::StateHistory*> stack;
-  get_state_history(stack);
-
-  for (int i = stack.size() - 1; i >= 0; i--) {
-    int end_time = i == 0 ? m_frame : stack[i - 1]->start_time;
-    fprintf(file, "%i %i %i\n", stack[i]->start_time, end_time,
-            stack[i]->hmm_model);
-  }
-  //fprintf(file, "DEBUG: %s\n", state_history_string().c_str());
-}
-
-std::string TokenPassSearch::state_history_string()
-{
-  std::string str;
-  std::vector<Token::StateHistory*> stack;
-  get_state_history(stack);
-
-  std::ostringstream buf;
-  for (int i = stack.size() - 1; i >= 0; i--)
-    buf << stack[i]->start_time << " " << stack[i]->hmm_model << " ";
-  buf << m_frame;
-
-  return buf.str();
-}
-
-void TokenPassSearch::get_state_history(
-  std::vector<Token::StateHistory*> &stack)
-{
-  const Token & token = get_best_final_token();
-
-  // Determine the state sequence
-  stack.clear();
-  Token::StateHistory *state = token.state_history;
-  while (state != NULL && state->previous != NULL) {
-    stack.push_back(state);
-    state = state->previous;
-  }
 }
 
 void TokenPassSearch::propagate_tokens(void)
