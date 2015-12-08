@@ -7,17 +7,13 @@ endif(NOT DISABLE_SWIG)
 include_directories(".")
 
 set(DECODERSOURCES 
-  Expander.cc
   GramSorter.cc
   Hmm.cc
   HTKLatticeGrammar.cc
-  Lexicon.cc
   LMHistory.cc
   LnaReaderCircular.cc
   NowayHmmReader.cc
-  NowayLexiconReader.cc
   OneFrameAcoustics.cc
-  Search.cc
   TPLexPrefixTree.cc
   TPNowayLexReader.cc
   Token.cc
