@@ -121,7 +121,9 @@ And import the resulting project in Eclipse.
   
       C:/Development/msys32/mingw32/bin/../lib/gcc/i686-w64-mingw32/4.9.2/../../../../i686-w64-mingw32/bin/ld.exe: cannot open output file conftest.exe: Permission denied
   
-  File problem may occur if you hae File System Auto-Protect enabled from Symantec Endpoint Protection.
+  This problem occurs often when File System Auto-Protect is enabled from Symantec
+  Endpoint Protection. Disable Auto-Protect, wipe the build directory, and re-run
+  cmake and make.
   
 ### Creating an Eclipse project
 

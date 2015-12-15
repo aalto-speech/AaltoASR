@@ -9,9 +9,8 @@
 #include "config.hh"
 #include "HashCache.hh"
 #include "SimpleHashCache.hh"
-#include "LMHistory.hh"
 
-#include "history.hh"
+//#include "history.hh"
 #include "Hmm.hh"
 #include "Vocabulary.hh"
 #include "WordClasses.hh"
@@ -45,6 +44,7 @@
 #define NODE_DEBUG_PRUNED         0x4000
 #define NODE_DEBUG_PRINTED        0x8000
 
+class Token;
 
 /// The search network is built around a popular idea of a lexical prefix tree.
 /// As suggested by Demuynck et al. (2000), the traditional phone-level tree can
@@ -55,7 +55,7 @@
 /// linked to each other with arcs (TPLexPrefixTree::Arc). Nodes can either
 /// correspond to one HMM state, or be dummy nodes without any acoustic
 /// probabilities associated with them. In decoding, these dummy nodes are
-/// passed immediately, they merely mediate the tokens (TPLexPrefixTree::Token)
+/// passed immediately, they merely mediate the tokens (Token)
 /// used to represent the active search network. A node can also have a word
 /// identity (word_id) associated with it, which leads to insertion of the word
 /// into the word history of the token passing that node.
@@ -81,83 +81,6 @@ public:
 
   typedef std::vector<Node *> node_vector;
   typedef std::map<std::string, node_vector> string_to_nodes_map;
-
-  struct WordHistory {
-    inline WordHistory(int word_id, int frame, WordHistory *previous);
-
-    int word_id;
-    int end_frame;
-    int lex_node_id; // FIXME: debug info (node where the history was created)
-    int graph_node_id; // FIXME: debug info (word graph node)
-    float lm_log_prob;
-    float am_log_prob;
-    float cum_lm_log_prob;
-    float cum_am_log_prob;
-    bool printed;
-
-    WordHistory *previous;
-    int reference_count;
-  };
-
-  struct StateHistory {
-    inline StateHistory(int hmm_model, int start_time, StateHistory *previous);
-
-    int hmm_model;
-    int start_time;
-    float log_prob;
-
-    StateHistory *previous;
-    int reference_count;
-  };
-
-  class Token {
-  public:
-    Node *node;
-    Token *next_node_token;
-    float am_log_prob;
-    float lm_log_prob;
-    float cur_am_log_prob; // Used inside nodes
-    float cur_lm_log_prob; // Used for LM lookahead
-    float total_log_prob;
-    LMHistory *lm_history;
-    int lm_hist_code; // Hash code for word history (up to LM order)
-    int fsa_lm_node;
-    int recent_word_graph_node;
-    WordHistory *word_history;
-    int word_start_frame;
-
-#ifdef PRUNING_MEASUREMENT
-    float meas[6];
-#endif
-
-    int word_count;
-
-    StateHistory *state_history;
-
-    unsigned char depth;
-    unsigned char dur;
-
-    Token():
-      node(NULL),
-      next_node_token(NULL),
-      am_log_prob(0.0f),
-      lm_log_prob(0.0f),
-      cur_am_log_prob(0.0f),
-      cur_lm_log_prob(0.0f),
-      total_log_prob(0.0f),
-      lm_history(NULL),
-      lm_hist_code(0),
-      fsa_lm_node(0),
-      recent_word_graph_node(0),
-      word_history(NULL),
-      word_start_frame(0),
-      word_count(0),
-      state_history(NULL),
-      depth(0),
-      dur(0)
-    { }
-  };
-
 
   class Arc {
   public:
@@ -194,6 +117,11 @@ public:
       node(NULL),
       arc_index(0)
     {}
+  };
+
+  struct NoShortSilence : public std::exception {
+    virtual const char *what() const throw()
+      { return "TPLexPrefixTree: no short silence"; }
   };
 
   TPLexPrefixTree(std::map<std::string,int> &hmm_map, std::vector<Hmm> &hmms);
@@ -438,31 +366,5 @@ private:
   string_to_nodes_map m_fan_in_connection_nodes;
   std::vector<NodeArcId> m_silence_arcs;
 };
-
-//////////////////////////////////////////////////////////////////////
-
-TPLexPrefixTree::WordHistory::WordHistory(int word_id, int end_frame, 
-					  WordHistory *previous)
-  : word_id(word_id), end_frame(end_frame), 
-    lex_node_id(0), graph_node_id(0), lm_log_prob(0), am_log_prob(0), cum_lm_log_prob(0), cum_am_log_prob(0),
-    printed(false), previous(previous), reference_count(0)
-{
-  if (previous) {
-    hist::link(previous);
-    cum_am_log_prob = previous->cum_am_log_prob;
-    cum_lm_log_prob = previous->cum_lm_log_prob;
-  }
-}
-
-TPLexPrefixTree::StateHistory::StateHistory(int hmm_model, int start_time,
-                                            StateHistory *previous)
-  : hmm_model(hmm_model),
-    start_time(start_time),
-    previous(previous),
-    reference_count(0)
-{
-  if (previous)
-    hist::link(previous);
-}
 
 #endif /* TPLEXPREFIXTREE_HH */

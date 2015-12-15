@@ -4,14 +4,17 @@
 #include <stdexcept>
 #include <vector>
 #include <cmath>
+#include <utility>
 
 #include "config.hh"
 #include "fsalm/LM.hh"
 #include "WordGraph.hh"
 #include "TPLexPrefixTree.hh"
+#include "Token.hh"
 #include "NGram.hh"
 #include "Acoustics.hh"
 #include "LMHistory.hh"
+#include "IteratorRange.hh"
 
 // Visual studio math.h doesn't have log1p function varjokal 17.3.2010
 #ifdef _MSC_VER
@@ -38,8 +41,7 @@ public:
   struct WordGraphNotGenerated: public std::runtime_error
   {
     WordGraphNotGenerated() :
-      std::runtime_error(
-			 "Word graph was requested but it has not been generated.")
+      std::runtime_error("Word graph was requested but it has not been generated.")
     {
     }
   };
@@ -59,6 +61,9 @@ public:
     {
     }
   };
+
+  typedef std::vector<Token *> token_list_type;
+  typedef IteratorRange<token_list_type::const_iterator> token_range_type;
 
   TokenPassSearch(TPLexPrefixTree &lex, Vocabulary &vocab,
                   Acoustics *acoustics);
@@ -122,28 +127,13 @@ public:
   ///
   std::string state_history_string();
 
-  /// \brief Writes the best state history into a vector.
+  /// \brief Sorts active tokens by the order of descending log probability.
   ///
-  /// Finds the active token that is in the NODE_FINAL state i.e. at the end
-  /// of a word, with the highest probability. Then writes the
-  /// TPLexPrefixTree::StateHistory objects in the state_history of that
-  /// token into a vector.
+  /// Sorts active tokens, first final tokens in the order of descending log
+  /// probability, then non-final tokens in the order of descending log
+  /// probability, then NULL elements.
   ///
-  /// \param stack The vector where the result will be written.
-  ///
-  void get_state_history(std::vector<TPLexPrefixTree::StateHistory*> &stack);
-
-  /// \brief Writes the LM history of an active token into a vector.
-  ///
-  /// If \a use_best_token is true, finds the active token that is in the
-  /// NODE_FINAL state i.e. at the end of a word, with the highest
-  /// probability. Otherwise finds any active token. Then writes the
-  /// LMHistory objects in the lm_history of that token into
-  /// a vector.
-  ///
-  /// \param vec The vector where the result will be written.
-  ///
-  void get_path(HistoryVector &vec, bool use_best_token, LMHistory *limit);
+  token_range_type get_sorted_tokens();
 
   // Options
   void set_acoustics(Acoustics *acoustics) { m_acoustics = acoustics; }
@@ -154,7 +144,7 @@ public:
   void set_fan_in_beam(float beam) { m_fan_in_beam = beam; }
   void set_fan_out_beam(float beam) { m_fan_out_beam = beam; }
   void set_state_beam(float beam) { m_state_beam = beam; }
-  
+
   void set_similar_lm_history_span(int n) { m_similar_lm_hist_span = n; }
   void set_lm_scale(float lm_scale) { m_lm_scale = lm_scale; }
   void set_duration_scale(float dur_scale) { m_duration_scale = dur_scale; }
@@ -170,15 +160,13 @@ public:
 
   void set_print_probs(bool value) { m_print_probs = value; }
   void set_print_text_result(int print) { m_print_text_result = print; }
-  void set_print_state_segmentation(int print) 
-  { 
-    m_print_state_segmentation = print; 
+  int get_print_text_result() { return m_print_text_result; }
+  void set_print_state_segmentation(int print)
+  {
+    m_print_state_segmentation = print;
     m_keep_state_segmentation = print;
   }
-  void set_keep_state_segmentation(int value)
-  {
-    m_keep_state_segmentation = value;
-  }
+  void set_keep_state_segmentation(int x) { m_keep_state_segmentation = x; }
   void set_verbose(int verbose) { m_verbose = verbose; }
 
   /// \brief Sets the word that represents word boundary.
@@ -331,6 +319,19 @@ public:
   ///
   float get_total_log_prob(bool use_best_token) const;
 
+  /// \brief Finds the globally best token that is in the NODE_FINAL state,
+  /// i.e. at the end of a word.
+  ///
+  /// \return A reference to the active token in NODE_FINAL state with the
+  /// highest probability. If none is found, returns the best token not in
+  /// NODE_FINAL state.
+  ///
+  const Token & get_best_final_token() const;
+
+  /// \brief Returns the first non-NULL token in the active token list.
+  ///
+  const Token & get_first_token() const;
+
   /// \brief For unit testing.
   const std::vector<LMHistory::Word> & get_word_repository() const;
   const WordClasses * get_word_classes() const;
@@ -379,19 +380,6 @@ private:
   ///
   int find_word_from_lookahead_lm(int word_id, std::string word) const;
 
-  /// \brief Finds the globally best token that is in the NODE_FINAL state,
-  /// i.e. at the end of a word.
-  ///
-  /// \return A reference to the active token in NODE_FINAL state with the
-  /// highest probability. If none is found, returns the best token not in
-  /// NODE_FINAL state.
-  ///
-  const TPLexPrefixTree::Token & get_best_final_token() const;
-
-  /// \brief Returns the first token in the active token list.
-  ///
-  const TPLexPrefixTree::Token & get_first_token() const;
-
   void add_sentence_end_to_hypotheses(void);
 
   /// \brief Propagates all the tokens in the active token list to the
@@ -408,8 +396,8 @@ private:
   ///
   void update_final_tokens();
 
-  void copy_word_graph_info(TPLexPrefixTree::Token *src_token,
-			    TPLexPrefixTree::Token *tgt_token);
+  void copy_word_graph_info(Token *src_token,
+			    Token *tgt_token);
 
   /// \brief Adds an arc to the word graph from the previous endpoint of
   /// \a new_token to a node that represents the last word in its word
@@ -422,17 +410,17 @@ private:
   /// If there already exists an arc between the source node and the target
   /// node, just updates the arc probability.
   ///
-  void build_word_graph_aux(TPLexPrefixTree::Token *new_token,
-			    TPLexPrefixTree::WordHistory *word_history);
-  void build_word_graph(TPLexPrefixTree::Token *new_token);
+  void build_word_graph_aux(Token *new_token,
+			    Token::WordHistory *word_history);
+  void build_word_graph(Token *new_token);
 
   /// \brief Moves the token towards all the arcs leaving the token's node.
   ///
-  void propagate_token(TPLexPrefixTree::Token *token);
+  void propagate_token(Token *token);
 
   /// \brief Appends a word to the LMHistory of a token.
   ///
-  void append_to_word_history(TPLexPrefixTree::Token & token,
+  void append_to_word_history(Token & token,
 			      const LMHistory::Word & word);
 
   /// \brief Moves token to a connected node.
@@ -442,7 +430,7 @@ private:
   /// \param token The token to move.
   /// \param node A nodes that is connected to token's node
   ///
-  void move_token_to_node(TPLexPrefixTree::Token *token,
+  void move_token_to_node(Token *token,
                           TPLexPrefixTree::Node *node,
                           float transition_score);
 
@@ -455,8 +443,8 @@ private:
   void analyze_tokens(void);
 #endif
 
-  TPLexPrefixTree::Token*
-  find_similar_fsa_token(int fsa_lm_node, TPLexPrefixTree::Token *token_list);
+  Token*
+  find_similar_fsa_token(int fsa_lm_node, Token *token_list);
 
   /// \brief Finds a token from \a token_list that has similar LMHistory to
   /// \a wh up to m_similar_lm_hist_span words or classes.
@@ -467,8 +455,8 @@ private:
   /// Note: Doesn't work if the sentence end is the first one in the word
   /// history!
   ///
-  TPLexPrefixTree::Token* find_similar_lm_history(LMHistory *wh,
-						  int lm_hist_code, TPLexPrefixTree::Token *token_list);
+  Token* find_similar_lm_history(LMHistory *wh,
+                                 int lm_hist_code, Token *token_list);
 
   /// \brief Checks if wh1 and wh2 are similar up to m_similar_lm_hist_span
   /// words or classes.
@@ -518,12 +506,12 @@ private:
   /// \brief Moves a token to the next FSA language model node, and adds the
   /// transition probability to the LM log probability of the token.
   ///
-  void advance_fsa_lm(TPLexPrefixTree::Token & token);
+  void advance_fsa_lm(Token & token);
 
   /// \brief Updated lm_log_prob and lm_hist_code on token after adding a new
   /// word to the end of its lm_history.
   ///
-  void update_lm_log_prob(TPLexPrefixTree::Token & token);
+  void update_lm_log_prob(Token & token);
 
   /// \brief Computes the lookahead score as the maximum of possible word ends
   /// to the given LMHistory.
@@ -553,9 +541,9 @@ private:
     return (am_score + m_lm_scale * lm_score);
   }
 
-  TPLexPrefixTree::Token* acquire_token(void);
+  Token* acquire_token(void);
   LMHistory* acquire_lmhist(const LMHistory::Word *, LMHistory *);
-  void release_token(TPLexPrefixTree::Token *token);
+  void release_token(Token *token);
   void release_lmhist(LMHistory *);
 
   void save_token_statistics(int count);
@@ -563,7 +551,7 @@ private:
 
   // Help variables to cope with memory leaks
   // Vector of pointers to memory blocks for m_token_pool, this is only for freeing up memory at the destructor
-  std::vector<TPLexPrefixTree::Token *> m_token_dealloc_table;
+  std::vector<Token *> m_token_dealloc_table;
   std::vector<LMHistory *> m_lmhist_dealloc_table;
 
 public:
@@ -579,10 +567,9 @@ private:
 #endif
   Acoustics *m_acoustics;
 
-  typedef std::vector<TPLexPrefixTree::Token *> token_list_type;
-  token_list_type * m_active_token_list;
-  token_list_type * m_new_token_list;
-  token_list_type * m_word_end_token_list;
+  token_list_type m_active_token_list;
+  token_list_type m_new_token_list;
+  token_list_type m_word_end_token_list;
   token_list_type m_token_pool;
   std::vector<LMHistory*> m_lmh_pool;
 
@@ -629,7 +616,7 @@ private:
   /// time instance.
   std::vector<WordGraphInfo> m_recent_word_graph_info;
 
-  TPLexPrefixTree::Token *m_best_final_token;
+  Token *m_best_final_token;
 
   /// The language model.
   NGram *m_ngram;
@@ -708,9 +695,9 @@ private:
 public:
   void debug_print_best_lm_history();
   void debug_print_token_lm_history(FILE * file,
-				    const TPLexPrefixTree::Token & token);
+				    const Token & token);
   void debug_print_token_word_history(FILE * file,
-				      const TPLexPrefixTree::Token & token);
+				      const Token & token);
 };
 
 #endif // TOKENPASSSEARCH_HH
