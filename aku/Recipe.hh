@@ -70,7 +70,7 @@ public:
     PhnReader* init_phn_files(HmmSet *model, bool relative_sample_nums,
                               bool state_num_labels, bool out_phn,
                               FeatureGenerator *fea_gen,
-                              PhnReader *phn_reader);
+                              PhnReader *phn_reader) const;
     /** Open the relevant files for \ref HmmNetBaumWelch and
      * \ref FeatureGenerator.
      * \param model           Pointer to the \ref HmmSet. Required if

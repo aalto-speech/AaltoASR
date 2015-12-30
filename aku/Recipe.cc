@@ -44,13 +44,13 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
     // Do we have an error or eof?
     if (!ok) {
       if (ferror(f)) {
-	fprintf(stderr, "Recipe: str::read_file(): read error: %s\n",
-		strerror(errno));
-	exit(1);
+        fprintf(stderr, "Recipe: str::read_file(): read error: %s\n",
+                strerror(errno));
+        exit(1);
       }
 
       if (feof(f))
-	break;
+        break;
     }
 
     // Parse string in fields and skip empty or commented lines
@@ -76,7 +76,7 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
   }
   if (batch_remainder == 0)
     extra_line = 0;
-  
+
   for (i = 0; i < (int)line_buffer.size(); i++)
   {
     // Parse the recipe line
@@ -110,7 +110,7 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
       }
       cur_speaker = new_speaker;
     }
-    
+
     if (num_batches <= 1 || cur_index == batch_index)
     {
       // This line belongs to the current batch, save it
@@ -143,7 +143,7 @@ Recipe::read(FILE *f, int num_batches, int batch_index, bool cluster_speakers)
       if ((it = key_value_map.find("utterance")) != key_value_map.end())
         info.utterance_id = (*it).second;
     }
-    
+
     cur_line++;
   }
 }
@@ -153,7 +153,7 @@ PhnReader*
 Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
                              bool state_num_labels, bool out_phn,
                              FeatureGenerator *fea_gen,
-                             PhnReader *phn_reader)
+                             PhnReader *phn_reader) const
 {
   float frame_rate = 125; // Default value
 
@@ -182,14 +182,14 @@ Recipe::Info::init_phn_files(HmmSet *model, bool relative_sample_nums,
 
   if (start_time > 0 || end_time > 0)
   {
-    phn_reader->set_frame_limits((int)(start_time * frame_rate), 
+    phn_reader->set_frame_limits((int)(start_time * frame_rate),
                                 (int)(end_time * frame_rate));
   }
   if (start_line > 0 || end_line > 0)
   {
     phn_reader->set_line_limits(start_line, end_line);
   }
-  
+
   return phn_reader;
 }
 
@@ -215,15 +215,15 @@ Recipe::Info::init_hmmnet_files(HmmSet *model, bool den_hmmnet,
     hnbw->open(den_hmmnet_path);
   }
   else {
-	if (hmmnet_path.empty())
-	  throw std::string("Recipe::Info::init_hmmnet_files: hmmnet not specified in recipe.");
+        if (hmmnet_path.empty())
+          throw std::string("Recipe::Info::init_hmmnet_files: hmmnet not specified in recipe.");
     hnbw->open(hmmnet_path);
   }
 
   if (start_time > 0 || end_time > 0)
   {
     float frame_rate = fea_gen->frame_rate();
-    hnbw->set_frame_limits((int)(start_time * frame_rate), 
+    hnbw->set_frame_limits((int)(start_time * frame_rate),
                            (int)(end_time * frame_rate));
   }
 

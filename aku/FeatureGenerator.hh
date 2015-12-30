@@ -27,16 +27,16 @@ public:
 
   /** Open an audio file closing the possible previously opened file.
    *
-   * \param filename = The name of the audio file.  
+   * \param filename = The name of the audio file.
    * samples.  Otherwise, automatic file format is used.
    * \exception string If cannot open file.
    */
   void open(const std::string &filename);
-  void open_fd(const int fd, bool raw_audio);
+  void open_fd(const int fd);
 
   /** Open an audio file closing the possible previously opened file.
    *
-   * \param file = The file pointer of the audio file.  
+   * \param file = The file pointer of the audio file.
    * samples.  Otherwise, automatic file format is used.
    * \param dont_fclose = If true, the file is not closed by FeatureGenerator
    */
@@ -61,7 +61,7 @@ public:
    * Generating frames sequentially (either forward or backward)
    * is guaranteed to use buffers of the feature modules efficiently.
    * If you need more random access, you might want to buffer frames
-   * yourself.  
+   * yourself.
    *
    * \note Some feature configurations may allow generating features
    * after the physical file end.  Use \ref eof() after generate()
