@@ -141,10 +141,10 @@ void OpenFstSearch::run(bool *cancel_decoding) {
                 while (m_fst_acoustics->next_frame() &&
                        !(cancel_decoding && *cancel_decoding )) {
                         propagate_tokens();
-                        prune_nonfinals_set_final_weights();
                 }
                 //fprintf(stderr, "%s\n", tokens_at_final_states().c_str());
                 //fprintf(stderr, "%s\n", best_tokens().c_str());
+                prune_nonfinals_set_final_weights();
                 m_fst_acoustics->lna_close();
                 return;
         }
