@@ -149,7 +149,7 @@ class RecognizerToolbox:
 		parser.add_option('-y', '--hypothesis-file',
 		                  action='store', type='string', dest='hyp_path', default=None)
 		parser.add_option('-w', '--work-directory',
-		                  action='store', type='string', dest='work_directory', default='/u/drspeech/ttmp/senarvi/recognitions')
+		                  action='store', type='string', dest='work_directory', default=None)
 		parser.add_option('--feature-configuration',
 		                  action='store', type='string', dest='cfg_path', default=None)
 		parser.add_option('--speaker-configuration',
@@ -239,14 +239,17 @@ class RecognizerToolbox:
 		if not is_nonempty_file(options.dictionary):
 			abort("Invalid dictionary specified: " + options.dictionary)
 		self.dictionary = options.dictionary
-		
+
+		if options.work_directory is None:
+			abort("--work-directory option has to be specified.")
+		self.work_directory = options.work_directory
+
 		self.lm_scale = options.lm_scale
 		self.beam = options.beam
 		self.token_limit = options.token_limit
 		self.adaptation = options.adaptation
 		self.results_path = options.results_path
 		self.hyp_path = options.hyp_path
-		self.work_directory = options.work_directory
 
 		if options.cfg_path is not None:
 			self.cfg_path = options.cfg_path
