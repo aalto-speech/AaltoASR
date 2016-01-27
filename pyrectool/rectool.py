@@ -431,7 +431,10 @@ class RecognizerToolbox:
 		self.morph_lm = False
 		if self.arpa_lm is not None:
 			# Parse ARPA language model.
-			lm_file = open(self.arpa_lm, 'r')
+			if self.arpa_lm.endswith('.gz'):
+				lm_file = gzip.open(self.arpa_lm, 'rt')
+			else:
+				lm_file = open(self.arpa_lm, 'r')
 			while True:
 				line = lm_file.readline()
 				if line == '':
