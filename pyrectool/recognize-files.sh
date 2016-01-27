@@ -1,9 +1,9 @@
 #!/bin/bash -e
 #
 # Good for recognizing a couple of files specified in the command line. Writes
-# LNAs to
+# LNAs into $RECTOOL_LNA_DIR, or if not specified, into
 #   $WORK_DIR/recognitions/<AM options>,
-# and possibly lattices to
+# and possibly lattices into $RECTOOL_OUTPUT_DIR, or if not specified, into
 #   $WORK_DIR/recognitions/<AM options>/<decoder options>,
 # Writes the recognitions results (hypotheses) under
 #   $WORK_DIR/results
@@ -125,7 +125,7 @@ then
 fi
 
 work_dir="${RECOGNITIONS_DIR}/${am_opt}"
-rec_dir="${work_dir}/${decoder_opt}"
+output_dir="${RECTOOL_OUTPUT_DIR:-${work_dir}/${decoder_opt}}"
 
 if [ -n "${RESULTS}" ]
 then
@@ -136,7 +136,14 @@ else
 	mkdir -p "${hyp_dir}"
 fi
 
-mkdir -p "${rec_dir}"
+if [ -n "${RECTOOL_LNA_DIR}" ]
+then
+	params+=(--lna-directory "${RECTOOL_LNA_DIR}")
+	mkdir -p "${RECTOOL_LNA_DIR}"
+fi
+
+mkdir -p "${work_dir}"
+mkdir -p "${output_dir}"
 rm -f "${hyp_file}"
 
 params+=(--am "${AM}")
@@ -146,7 +153,8 @@ params+=(--language-model-scale "${LM_SCALE}")
 params+=(--token-limit "${TOKEN_LIMIT}")
 params+=(--hypothesis-file "${hyp_file}")
 params+=(--work-directory "${work_dir}")
-params+=(--rec-directory "${rec_dir}")
+params+=(--rec-directory "${output_dir}")
+[ -n "${RECTOOL_LNA_DIR}" ] && params+=(--lna-directory "${RECTOOL_LNA_DIR}")
 params+=(--verbose 1)
 params+=(${*})
 
