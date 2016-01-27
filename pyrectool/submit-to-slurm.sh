@@ -48,7 +48,7 @@ fi
 
 for i in $(seq 0 $((queuesize-1)))
 do
-	command="sbatch --partition=short --qos=short --time=4:00:00 --mem=8192"
+	command="sbatch --partition=short --qos=short --time=4:00:00 --mem=10G"
 	if [ "$SLURM_EXCLUDE_NODES" != "" ]; then
 		command="$command --exclude=$SLURM_EXCLUDE_NODES"
 	fi
