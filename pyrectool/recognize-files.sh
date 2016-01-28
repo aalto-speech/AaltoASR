@@ -156,7 +156,7 @@ params+=(--work-directory "${work_dir}")
 params+=(--rec-directory "${output_dir}")
 [ -n "${RECTOOL_LNA_DIR}" ] && params+=(--lna-directory "${RECTOOL_LNA_DIR}")
 params+=(--verbose 1)
-params+=(${*})
+params+=("${@}")
 
 # Uncomment for debugging:
 #gdb --args python "${script_dir}/recognize.py" "${params[@]}"
