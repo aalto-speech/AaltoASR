@@ -442,6 +442,10 @@ sub numerator_hmmnets_from_phns {
       print STDERR "Reading from ".$record->{transcript}.", writing to ".$record->{num}."\n";
       die "Error generating HMM networks directly from PHNs";
     }
+    if (!(-f $record->{num} && -s $record->{num})) {
+      print STDERR "Reading from ".$record->{transcript}.", writing to ".$record->{num}."\n";
+      die "phn2fst.pl generated no HMM network from PHN";
+    }
   }
 }
 
