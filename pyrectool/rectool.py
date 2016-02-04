@@ -519,9 +519,9 @@ class RecognizerToolbox:
 
 		import Decoder
 		if self.dur_path != '':
-			self.toolbox = Decoder.Toolbox(0, self.ph_path, self.dur_path)
+			self.toolbox = Decoder.Toolbox(self.ph_path, self.dur_path)
 		else:
-			self.toolbox = Decoder.Toolbox(0, self.ph_path)
+			self.toolbox = Decoder.Toolbox(self.ph_path)
 
 		if self.morph_lm:
 			self.toolbox.set_silence_is_word(1)
