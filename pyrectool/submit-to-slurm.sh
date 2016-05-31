@@ -2,17 +2,14 @@
 
 interrupt_handler() {
 	scancel $(printf " %s" "${jobs[@]}") 2>/dev/null
-	rm -f "${logfile}".out.* "${logfile}".err.*
+	[ -n "${logfile}" ] && rm -f "${logfile}.out."* "${logfile}.err."*
 	rmdir --ignore-fail-on-non-empty $(dirname "${logfile}")
 	exit 3
 }
 
-if [ -d "/triton/ics/work/${USER}" ]
+if [ -d "/scratch/work/${USER}" ]
 then
-	logfile="/triton/ics/work/${USER}/log/$(date '+%Y-%m-%d-%H%M%S')/rectool.log"
-elif [ -d "/triton/elec/work/${USER}" ]
-then
-	logfile="/triton/elec/work/${USER}/log/$(date '+%Y-%m-%d-%H%M%S')/rectool.log"
+	logfile="/scratch/work/${USER}/log/$(date '+%Y-%m-%d-%H%M%S')/rectool.log"
 else
 	logfile=
 fi
@@ -49,7 +46,7 @@ fi
 for i in $(seq 0 $((queuesize-1)))
 do
 	mem_limit="${RECTOOL_MEM_PER_CPU:-8G}"
-	command="sbatch --partition=short --qos=short --time=4:00:00 --mem-per-cpu=${mem_limit}"
+	command="sbatch --partition=short --time=4:00:00 --mem-per-cpu=${mem_limit}"
 	if [ "${SLURM_EXCLUDE_NODES}" != "" ]; then
 		command="${command} --exclude=${SLURM_EXCLUDE_NODES}"
 	fi
@@ -70,7 +67,7 @@ do
 		rm -f "${logfile}".out.* "${logfile}".err.*
 		exit ${rv}
 	fi
-	
+
 	jobid=$(echo ${output} | sed -r 's/^Submitted batch job ([0-9]+)$/\1/')
 	jobs[${i}]=${jobid}
 done
