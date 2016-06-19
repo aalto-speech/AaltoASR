@@ -59,6 +59,12 @@ then
 elif [ -e "${LM}.gz" ]
 then
 	params+=(--arpa-lm "${LM}.gz")
+elif [ -e "${LM}.arpa" ]
+then
+	params+=(--arpa-lm "${LM}.arpa")
+elif [ -e "${LM}.arpa.gz" ]
+then
+	params+=(--arpa-lm "${LM}.arpa.gz")
 fi
 
 # Specify binary lookahead LM if exists, otherwise ARPA.
