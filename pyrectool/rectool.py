@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from optparse import OptionParser
 from collections import namedtuple
 import os
@@ -369,62 +371,62 @@ class RecognizerToolbox:
 		# Lattice path will be set when / if written.
 		self.slf_path = None
 
-		print "=="
+		print("==")
 		if self.hyp_path is not None:
-			print "Hypotheses output path:", self.hyp_path
+			print("Hypotheses output path:", self.hyp_path)
 		else:
-			print "Do not write hypotheses into a .trn file."
-		print "Acoustic model path:", self.am
+			print("Do not write hypotheses into a .trn file.")
+		print("Acoustic model path:", self.am)
 		if self.gcl_path is not None:
-			print "Gaussian clustering:", self.gcl_path
+			print("Gaussian clustering:", self.gcl_path)
 		else:
-			print "No Gaussian clustering"
+			print("No Gaussian clustering")
 		if self.dur_path is not None:
-			print "Duration model:", self.dur_path
+			print("Duration model:", self.dur_path)
 		else:
-			print "No explicit duration modeling"
+			print("No explicit duration modeling")
 		if self.adaptation is not None:
-			print "Estimate speaker adaptation:", self.adaptation
+			print("Estimate speaker adaptation:", self.adaptation)
 		else:
-			print "Do not estimate speaker adaptation."
-		print "Dictionary:", self.dictionary
-		print "Language model path:", self.lm
-		print "FSA language model:", self.fsa
+			print("Do not estimate speaker adaptation.")
+		print("Dictionary:", self.dictionary)
+		print("Language model path:", self.lm)
+		print("FSA language model:", self.fsa)
 		if self.classes is not None:
-			print "Language model classes:", self.classes
+			print("Language model classes:", self.classes)
 		else:
-			print "Not a class-based language model."
+			print("Not a class-based language model.")
 		if self.lookahead_lm is not None:
-			print "Lookahead language model path:", self.lookahead_lm
+			print("Lookahead language model path:", self.lookahead_lm)
 		else:
-			print "No language model lookahead."
-		print "Split multiwords:", self.split_multiwords
+			print("No language model lookahead.")
+		print("Split multiwords:", self.split_multiwords)
 		if self.generate_word_graph:
 			if self.lattice_rescore_path is not None:
-				print "Generate and rescore word graphs using:", self.lattice_rescore_path
+				print("Generate and rescore word graphs using:", self.lattice_rescore_path)
 			elif (self.arpa_lm is not None) and (self.lattice_tool_path is not None):
-				print "Generate and rescore word graphs using:", self.lattice_tool_path
+				print("Generate and rescore word graphs using:", self.lattice_tool_path)
 			else:
-				print "Generate but do not rescore word graphs. LM probabilities will be incorrect!"
-			print "Use word pair approximation:", self.word_pair_approximation
+				print("Generate but do not rescore word graphs. LM probabilities will be incorrect!")
+			print("Use word pair approximation:", self.word_pair_approximation)
 		else:
-			print "Do not generate word graphs and .wh files."
-		print "Beam:", self.beam
-		print "Token limit:", self.token_limit
-		print "Language model scale factor:", self.lm_scale
+			print("Do not generate word graphs and .wh files.")
+		print("Beam:", self.beam)
+		print("Token limit:", self.token_limit)
+		print("Language model scale factor:", self.lm_scale)
 
-		print "Language model order:", self.lm_order
-		print "Morph-based language model:", self.morph_lm
+		print("Language model order:", self.lm_order)
+		print("Morph-based language model:", self.morph_lm)
 
-		print "Sample rate:", self.sample_rate
-		print "Frame rate:", self.frame_rate
+		print("Sample rate:", self.sample_rate)
+		print("Frame rate:", self.frame_rate)
 
 		phone_probs_path = self.aku_tool_path('phone_probs')
-		print "phone_probs path:", phone_probs_path
+		print("phone_probs path:", phone_probs_path)
 
 		if self.verbose > 0:
-			print "Verbose output."
-		print "=="
+			print("Verbose output.")
+		print("==")
 
 	# Parses lm_order from language model file, and sets morph_lm to True if
 	# the language model contains <w> word.
@@ -514,7 +516,7 @@ class RecognizerToolbox:
 		if self.toolbox != None:
 			return self.toolbox
 		
-		print "Loading acoustic model."
+		print("Loading acoustic model.")
 		sys.stdout.flush()
 
 		import Decoder
@@ -560,7 +562,7 @@ class RecognizerToolbox:
 		if self.morph_lm:
 			self.toolbox.set_word_boundary('<w>')
 
-		print "Loading lexicon."
+		print("Loading lexicon.")
 		sys.stdout.flush()
 
 		try:
@@ -571,13 +573,13 @@ class RecognizerToolbox:
 
 		self.toolbox.set_sentence_boundary("<s>", "</s>")
 
-		print "Loading language model."
+		print("Loading language model.")
 		sys.stdout.flush()
 
 		if self.classes is not None:
 			self.toolbox.read_word_classes(self.classes)
 		if self.fsa:
-			print "fsa_lm_read " + self.lm + " " + str(self.is_bin_lm)
+			print("fsa_lm_read " + self.lm + " " + str(self.is_bin_lm))
 			sys.stdout.flush()
 			self.toolbox.fsa_lm_read(self.lm, self.is_bin_lm)
 		else:
@@ -619,7 +621,7 @@ class RecognizerToolbox:
 			if not is_nonempty_file(lna_path):
 				return False
 
-		print "LNAs already generated in " + self.lna_directory + "."
+		print("LNAs already generated in " + self.lna_directory + ".")
 		if self.adaptation is not None:
 			# This won't be used but set it anyway so we're in exactly the same
 			# state as after estimate_adaptation().
@@ -631,12 +633,12 @@ class RecognizerToolbox:
 		return True
 
 	def generate_lnas(self):
-		print "Generating LNA files for batch " + str(self.batch_index) + "/" + str(self.num_batches) + " in " + self.lna_directory + "."
-		print "Aku module configuration:", self.cfg_path
+		print("Generating LNA files for batch " + str(self.batch_index) + "/" + str(self.num_batches) + " in " + self.lna_directory + ".")
+		print("Aku module configuration:", self.cfg_path)
 		if self.spkc_path is not None:
-			print "Speaker configuration:", self.spkc_path
+			print("Speaker configuration:", self.spkc_path)
 		else:
-			print "Not using speaker adaptation."
+			print("Not using speaker adaptation.")
 
 		recipe_file = tempfile.NamedTemporaryFile()
 
@@ -661,7 +663,7 @@ class RecognizerToolbox:
 			command.extend(['-C', self.gcl_path, '--eval-ming', '0.25'])
 		if self.spkc_path is not None:
 			command.extend(['-S', self.spkc_path])
-		print ' '.join(command)
+		print(' '.join(command))
 
 		recipe_file.flush()
 		self.os_command(command)
@@ -674,11 +676,11 @@ class RecognizerToolbox:
 			if not is_nonempty_file(phn_path):
 				return False
 
-		print "State segmentations exist already in " + self.phn_directory + "."
+		print("State segmentations exist already in " + self.phn_directory + ".")
 		return True
 
 	def decode_state_segmentations(self):
-		print "Decoding state segmentations for batch " + str(self.batch_index) + "/" + str(self.num_batches) + " in " + self.phn_directory + "."
+		print("Decoding state segmentations for batch " + str(self.batch_index) + "/" + str(self.num_batches) + " in " + self.phn_directory + ".")
 
 		toolbox = self.get_toolbox()
 		toolbox.set_generate_word_graph(0)
@@ -689,7 +691,7 @@ class RecognizerToolbox:
 			lna_path = self.lna_directory + '/' + utterance.utterance_id + '.lna'
 			phn_path = self.phn_directory + '/' + utterance.utterance_id + '.phn'
 			if not is_nonempty_file(phn_path):
-				print "Decoding state segmentation " + str(index + 1) + "/" + str(num_utterances) + ": " + utterance.utterance_id
+				print("Decoding state segmentation " + str(index + 1) + "/" + str(num_utterances) + ": " + utterance.utterance_id)
 
 				toolbox.lna_open(lna_path, 1024)
 				toolbox.reset(0)
@@ -736,7 +738,7 @@ class RecognizerToolbox:
 
 		# Use the speaker adaptation parameters we found.
 		self.spkc_path = spkc_path
-		print "Adaptation parameters already estimated in " + self.spkc_path + "."
+		print("Adaptation parameters already estimated in " + self.spkc_path + ".")
 		# From now on, use the adaptation configuration.
 		self.cfg_path = self.am + '_' + self.adaptation + '.cfg'
 		# Write / use LNAs in the adaptation subdirectory.
@@ -754,7 +756,7 @@ class RecognizerToolbox:
 		adaptation_directory = self.work_directory + '/' + self.adaptation
 
 		if self.spkc_path is not None:
-			print "Using the adaptation parameters provided in " + self.spkc_path + "."
+			print("Using the adaptation parameters provided in " + self.spkc_path + ".")
 			# From now on, use the adaptation configuration.
 			self.cfg_path = self.am + '_' + self.adaptation + '.cfg'
 			# Write / use LNAs in the adaptation subdirectory.
@@ -784,8 +786,8 @@ class RecognizerToolbox:
 		# overwrite the unadapted LNAs.
 		self.lna_directory = adaptation_directory
 
-		print "Estimating " + tool_name + " parameters in " + self.spkc_path + "."
-		print "Aku module configuration:", self.cfg_path
+		print("Estimating " + tool_name + " parameters in " + self.spkc_path + ".")
+		print("Aku module configuration:", self.cfg_path)
 
 		# Create one recipe with all the files. If there are multiple batches, they will all
 		# use the same recipe. Aku tools will decide what files they will use in each batch,
@@ -818,7 +820,7 @@ class RecognizerToolbox:
 
 		recipe_file.flush()
 		command = time_command(command)
-		print ' '.join(command)
+		print(' '.join(command))
 		self.os_command(command)
 		recipe_file.close()
 
@@ -832,7 +834,7 @@ class RecognizerToolbox:
 				":" + " ".join(command))
 
 	def batch_command(self, command):
-		print ' '.join(command)
+		print(' '.join(command))
 
 		if self.num_batches < 2:
 			command = [arg.replace('$BATCH', '1') for arg in command]
@@ -867,8 +869,8 @@ class RecognizerToolbox:
 				f = open(failed_batches_path, 'r')
 				failed_batches = f.read()
 				f.close()
-				print "Some batches failed:"
-				print failed_batches
+				print("Some batches failed:")
+				print(failed_batches)
 				os.remove(failed_batches_path)
 
 	# A hack that removes MLLR transformation matrix and bias from
@@ -1052,7 +1054,7 @@ class RecognizerToolbox:
 			return []
 
 	def decode_batch(self):
-		print "Decoding batch " + str(self.batch_index) + "/" + str(self.num_batches) + " in " + self.rec_directory + "."
+		print("Decoding batch " + str(self.batch_index) + "/" + str(self.num_batches) + " in " + self.rec_directory + ".")
 
 		already_decoded = self.list_decoded_utterances()
 
@@ -1069,13 +1071,13 @@ class RecognizerToolbox:
 		num_utterances = len(self.batch_utterances)
 		for index, utterance in enumerate(self.batch_utterances):
 			if utterance.utterance_id in already_decoded:
-				print "Utterance " + str(index + 1) + "/" + str(num_utterances) + " (" + utterance.utterance_id + ") already decoded."
+				print("Utterance " + str(index + 1) + "/" + str(num_utterances) + " (" + utterance.utterance_id + ") already decoded.")
 				continue
 
-			print "Decoding utterance " + str(index + 1) + "/" + str(num_utterances) + " (" + utterance.utterance_id + ")."
+			print("Decoding utterance " + str(index + 1) + "/" + str(num_utterances) + " (" + utterance.utterance_id + ").")
 
 			recognition = self.decode_utterance(utterance.utterance_id)
-			print 'CPU seconds used:', recognition.decode_time
+			print('CPU seconds used:', recognition.decode_time)
 
 			if hyp_file != None:
 				hyp_file.write(recognition.result + ' (' + utterance.utterance_id + ')\n')
