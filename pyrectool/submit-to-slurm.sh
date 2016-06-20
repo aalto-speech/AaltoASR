@@ -80,7 +80,7 @@ echo "Waiting for job to finish."
 
 while true
 do
-	output=$(squeue --jobs=$(printf ",%s" "${jobs[@]}") --noheader)
+	output=$(squeue --jobs=$(printf ",%s" "${jobs[@]}") --noheader || true)
 	if [ -z "${output}" ]
 	then
 		# Sometimes squeue fails because of domain name resolution
