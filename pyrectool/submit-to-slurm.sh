@@ -1,4 +1,4 @@
-qsq#!/bin/bash -e
+#!/bin/bash -e
 
 interrupt_handler() {
 	scancel $(printf " %s" "${jobs[@]}") 2>/dev/null
