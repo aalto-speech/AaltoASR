@@ -1,4 +1,4 @@
-#!/bin/bash -e
+qsq#!/bin/bash -e
 
 interrupt_handler() {
 	scancel $(printf " %s" "${jobs[@]}") 2>/dev/null
@@ -78,13 +78,20 @@ tail -f "${logfile}".out.* "${logfile}".err.* &
 
 echo "Waiting for job to finish."
 
-while output=$(squeue --jobs=$(printf ",%s" "${jobs[@]}") --noheader)
+while true
 do
+	output=$(squeue --jobs=$(printf ",%s" "${jobs[@]}") --noheader)
 	if [ -z "${output}" ]
 	then
-		break
+		# Sometimes squeue fails because of domain name resolution
+		# failure. First try again.
+		sleep 5
+		output=$(squeue --jobs=$(printf ",%s" "${jobs[@]}") --noheader)
 	fi
-	sleep 4
+	[ -z "${output}" ] && break
+	jobs_left=$(echo "${output}" | wc -l)
+	echo "Waiting for ${jobs_left} jobs."
+	sleep 5
 done
 
 failed=$(sacct --format=jobid,state --parsable2 --jobs=$(printf ",%s" "${jobs[@]}") --noheader | awk -F'|' '{ if ($2 != "COMPLETED") print; }')
@@ -95,6 +102,8 @@ if [ "${failed}" != "" ]; then
 	echo "${logfile}.out.*"
 	echo "${logfile}.err.*"
 	exit 2
+else
+	echo "All jobs finished successfully.
 fi
 
 # Kill the tail -f background job and delete the logs.
