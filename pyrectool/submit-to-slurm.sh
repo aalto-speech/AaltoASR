@@ -103,7 +103,7 @@ if [ "${failed}" != "" ]; then
 	echo "${logfile}.err.*"
 	exit 2
 else
-	echo "All jobs finished successfully.
+	echo "All jobs finished successfully."
 fi
 
 # Kill the tail -f background job and delete the logs.
