@@ -52,7 +52,7 @@ FeatureGenerator::open(const std::string &filename)
 }
 
 void
-FeatureGenerator::open_fd(const int fd, bool raw_audio)
+FeatureGenerator::open_fd(const int fd)
 {
   if (m_file != NULL)
     close();
@@ -103,7 +103,7 @@ FeatureGenerator::load_configuration(FILE *file)
   }
   std::string line;
   int lineno = 0;
-  
+
   while (str::read_line(&line, file, true)) {
     lineno++;
     str::clean(&line, " \t");
@@ -111,18 +111,18 @@ FeatureGenerator::load_configuration(FILE *file)
       continue;
     if (line != "module")
       throw str::fmt(256, "expected keyword 'module' on line %d: ", lineno) +
-	line;
+        line;
 
     // Read module config
     //
     ModuleConfig config;
-    try { 
+    try {
       config.read(file);
     }
     catch (std::string &str) {
       lineno += config.num_lines_read();
       throw str::fmt(256, "failed reading feature module around line %d: ",
-		     lineno) + str;
+                     lineno) + str;
     }
     lineno += config.num_lines_read();
 
@@ -133,14 +133,14 @@ FeatureGenerator::load_configuration(FILE *file)
     std::string name;
     if (!config.get("type", type))
       throw str::fmt(256, "type not defined for module ending on line %d",
-		     lineno);
+                     lineno);
     if (!config.get("name", name))
       throw str::fmt(256, "name not defined for module ending on line %d",
-		     lineno);
+                     lineno);
     assert(!name.empty());
     if (name.find_first_of(" \t\n") != std::string::npos)
       throw std::string("module name may not contain whitespaces");
-  
+
     FeatureModule *module = NULL;
     if (type == AudioFileModule::type_str())
       module = new AudioFileModule(this);
@@ -183,7 +183,7 @@ FeatureGenerator::load_configuration(FILE *file)
     if (m_modules.empty()) {
       m_base_module = dynamic_cast<BaseFeaModule*>(module);
       if (m_base_module == NULL)
-	throw std::string("first module should be a base module");
+        throw std::string("first module should be a base module");
     }
     m_last_module = module;
     m_modules.push_back(module);
@@ -204,13 +204,13 @@ FeatureGenerator::load_configuration(FILE *file)
       config.get("sources", sources);
       assert(!sources.empty());
       for (int i = 0; i < (int)sources.size(); i++) {
-	ModuleMap::iterator it = m_module_map.find(sources[i]);
-	if (it == m_module_map.end())
-	  throw std::string("unknown source module: ") + sources[i];
-	module->add_source(it->second);
+        ModuleMap::iterator it = m_module_map.find(sources[i]);
+        if (it == m_module_map.end())
+          throw std::string("unknown source module: ") + sources[i];
+        module->add_source(it->second);
       }
     }
-    
+
     module->set_config(config);
   }
 
@@ -232,7 +232,7 @@ FeatureGenerator::write_configuration(FILE *file)
     if (!module->sources().empty()) {
       std::vector<std::string> sources;
       for (int i = 0; i < (int)module->sources().size(); i++)
-	sources.push_back(module->sources().at(i)->name());
+        sources.push_back(module->sources().at(i)->name());
       config.set("sources", sources);
     }
 
@@ -373,17 +373,17 @@ FeatureGenerator::check_model_structure()
     for (int i = 0; i < (int)module->sources().size(); i++) {
       FeatureModule *source = module->sources().at(i);
       std::pair<std::set<FeatureModule*>::iterator, bool> ret =
-	reached.insert(source);
+        reached.insert(source);
       if (ret.second)
-	stack.push_back(source);
+        stack.push_back(source);
     }
   }
 
   assert(!m_modules.empty());
   for (int i = 0; i < (int)m_modules.size() - 1; i++)
     if (reached.find(m_modules[i]) == reached.end())
-      fprintf(stderr, "WARNING: module %s (type %s) not used as input\n", 
-	      m_modules[i]->name().c_str(), m_modules[i]->type_str().c_str());
+      fprintf(stderr, "WARNING: module %s (type %s) not used as input\n",
+              m_modules[i]->name().c_str(), m_modules[i]->type_str().c_str());
 }
 
 void
