@@ -254,6 +254,8 @@ sub ml_train {
     my $om = "${model_base}_${i}";
     if (-e "${om}.ph") {
       print "ML iteration ${i} has finished already\n" if ($VERBOSITY > 0);
+      $im = $om;
+      $im_cfg = "${om}.cfg";
       next;
     } else {
       print "ML iteration ${i}\n" if ($VERBOSITY > 0);
@@ -304,7 +306,7 @@ sub ml_train {
 
     # Read input from previously written model
     $im = $om;
-    $im_cfg = $om.".cfg";
+    $im_cfg = "${om}.cfg";
   }
   return $im;
 }

@@ -76,7 +76,7 @@ void TPLexPrefixTree::set_lm_lookahead(int lm_lookahead)
 {
   if (m_silence_node != NULL) {
     cerr << "WARNING: TPLexPrefixTree::set_lm_lookahead() called after reading lexicon." << endl;
-    cerr << "WARNING: Lookahead setting will not be apply to the existing lexicon." << endl;
+    cerr << "WARNING: Lookahead setting will not apply to the existing lexicon." << endl;
   }
   m_lm_lookahead = lm_lookahead;
 }
@@ -85,7 +85,7 @@ void TPLexPrefixTree::set_lm_scale(double lm_scale)
 {
   if (m_words > 0) {
     cerr << "WARNING: TPLexPrefixTree::set_lm_scale() called after reading words." << endl;
-    cerr << "WARNING: LM scale will not be apply to already read pronunciations." << endl;
+    cerr << "WARNING: LM scale will not apply to already read pronunciations." << endl;
   }
   m_lm_scale = lm_scale;
 }

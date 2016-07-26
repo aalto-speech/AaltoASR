@@ -53,8 +53,15 @@ IF(CROSS_MINGW)
 
   # Build also shared version of lapackpp for client applications.
   SET(LAPACKPP_CONFIGURE ${LAPACKPP_CONFIGURE} --enable-shared=yes --host=${CROSS_TARGET} CFLAGS=-I${CMAKE_PREFIX_PATH}/include LDFLAGS=-L${CMAKE_PREFIX_PATH}/lib)
-  install(FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.dll.a DESTINATION lib)
-  install(FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.la DESTINATION lib)
+  install(
+    FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.dll.a
+    DESTINATION lib
+  )
+  install(
+    FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.la
+    DESTINATION lib
+    USE_SOURCE_PERMISSIONS
+  )
 
 ### NORMAL BUILD OR IN UNIX OR MINGW
 ELSE(CROSS_MINGW)
@@ -93,8 +100,15 @@ SET(LapackPP_LIBRARIES LapackPP)
 add_library( LapackPP UNKNOWN IMPORTED )
 set_property( TARGET LapackPP PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.a )
 add_dependencies( LapackPP lapackpp_ext )
-install(DIRECTORY ${CMAKE_BINARY_DIR}/vendor/lapackpp/include/lapackpp DESTINATION include)
-install(FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.a DESTINATION lib)
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/vendor/lapackpp/include/lapackpp
+  DESTINATION include
+  USE_SOURCE_PERMISSIONS
+)
+install(
+  FILES ${CMAKE_BINARY_DIR}/vendor/lapackpp/lib/liblapackpp.a
+  DESTINATION lib
+)
 
 
 option(DISABLE_SWIG "Disable building swig/python interface for decoder")

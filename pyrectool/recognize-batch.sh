@@ -1,8 +1,9 @@
 #!/bin/bash -e
 #
-# Recognizes a batch, writing LNAs in
+# Recognizes a batch, writing LNAs into $RECTOOL_LNA_DIR, or if not specified,
+# into
 #   $WORK_DIR/recognitions/<AM options>,
-# and possibly lattices to
+# and possibly lattices into $RECTOOL_OUTPUT_DIR, or if not specified, into
 #   $WORK_DIR/recognitions/<AM options>/<decoder options>,
 # and writes the recognitions results (hypotheses) under
 #   $WORK_DIR/results
@@ -55,6 +56,15 @@ fi
 if [ -e "${LM}" ]
 then
 	params+=(--arpa-lm "${LM}")
+elif [ -e "${LM}.gz" ]
+then
+	params+=(--arpa-lm "${LM}.gz")
+elif [ -e "${LM}.arpa" ]
+then
+	params+=(--arpa-lm "${LM}.arpa")
+elif [ -e "${LM}.arpa.gz" ]
+then
+	params+=(--arpa-lm "${LM}.arpa.gz")
 fi
 
 # Specify binary lookahead LM if exists, otherwise ARPA.
@@ -122,7 +132,7 @@ then
 fi
 
 work_dir="${RECOGNITIONS_DIR}/${am_opt}"
-rec_dir="${work_dir}/${decoder_opt}"
+output_dir="${RECTOOL_OUTPUT_DIR:-${work_dir}/${decoder_opt}}"
 
 if [ -n "${RESULTS}" ]
 then
@@ -133,7 +143,14 @@ else
 	mkdir -p "${hyp_dir}"
 fi
 
-mkdir -p "${rec_dir}"
+if [ -n "${RECTOOL_LNA_DIR}" ]
+then
+	params+=(--lna-directory "${RECTOOL_LNA_DIR}")
+	mkdir -p "${RECTOOL_LNA_DIR}"
+fi
+
+mkdir -p "${work_dir}"
+mkdir -p "${output_dir}"
 
 params+=(--am "${AM}")
 params+=(--dictionary "${DICTIONARY}.lex")
@@ -142,7 +159,7 @@ params+=(--language-model-scale "${LM_SCALE}")
 params+=(--token-limit "${TOKEN_LIMIT}")
 params+=(--hypothesis-file "${hyp_file}")
 params+=(--work-directory "${work_dir}")
-params+=(--rec-directory "${rec_dir}")
+params+=(--rec-directory "${output_dir}")
 params+=(-f "${AUDIO_LIST}")
 
 if [ ${NUM_BATCHES} -gt 1 ]

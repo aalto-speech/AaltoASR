@@ -2,106 +2,113 @@
 
 interrupt_handler() {
 	scancel $(printf " %s" "${jobs[@]}") 2>/dev/null
-	rm -f "$logfile".out.* "$logfile".err.*
-	rmdir --ignore-fail-on-non-empty $(dirname "$logfile")
+	[ -n "${logfile}" ] && rm -f "${logfile}.out."* "${logfile}.err."*
+	rmdir --ignore-fail-on-non-empty $(dirname "${logfile}")
 	exit 3
 }
 
-if [ -d "/triton/ics/work/$USER" ]
+if [ -d "/scratch/work/${USER}" ]
 then
-	logfile="/triton/ics/work/$USER/log/$(date '+%Y-%m-%d-%H%M%S')/rectool.log"
-elif [ -d "/triton/elec/work/$USER" ]
-then
-	logfile="/triton/elec/work/$USER/log/$(date '+%Y-%m-%d-%H%M%S')/rectool.log"
+	logfile="/scratch/work/${USER}/log/$(date '+%Y-%m-%d-%H%M%S')/rectool.log"
 else
 	logfile=
 fi
 
-while [ $# -gt 1 ]
+while [ ${#} -gt 1 ]
 do
-	case "$1" in
+	case "${1}" in
 	-log)
-		logfile=$2;
+		logfile=${2};
 		shift; shift;;
 	-f)
-		script=$2;
+		script=${2};
 		shift; shift;;
 	-J)
-		njobs=$2;
+		njobs=${2};
 		shift; shift;;
 	-*)
-		echo "unknown $1 option "
+		echo "unknown ${1} option "
 		exit 1;;
 	*)
 		break;;
 	esac
 done
 
-wrapper="$(dirname $0)/srun-wrapper.sh"
-execline="$(readlink -f $(dirname $0))/exec-line.sh"
-queuesize=$(wc -l $script | awk '{print $1}')
+wrapper="$(dirname ${0})/srun-wrapper.sh"
+execline="$(readlink -f $(dirname ${0}))/exec-line.sh"
+queuesize=$(wc -l ${script} | awk '{print $1}')
 
-if [ "$logfile" != "" ]; then
-	mkdir -p $(dirname "$logfile")
-	rm -f "$logfile".out.* "$logfile".err.*
+if [ "${logfile}" != "" ]; then
+	mkdir -p $(dirname "${logfile}")
+	rm -f "${logfile}".out.* "${logfile}".err.*
 fi
 
 for i in $(seq 0 $((queuesize-1)))
 do
-	command="sbatch --partition=short --qos=short --time=4:00:00 --mem=8192"
-	if [ "$SLURM_EXCLUDE_NODES" != "" ]; then
-		command="$command --exclude=$SLURM_EXCLUDE_NODES"
+	mem_limit="${RECTOOL_MEM_PER_CPU:-8G}"
+	command="sbatch --partition=short --time=4:00:00 --mem-per-cpu=${mem_limit}"
+	if [ "${SLURM_EXCLUDE_NODES}" != "" ]; then
+		command="${command} --exclude=${SLURM_EXCLUDE_NODES}"
 	fi
-	if [ "$logfile" != "" ]; then
-		touch "$logfile".out.$i
-		touch "$logfile".err.$i
-		command="$command -o $logfile.out.$i -e $logfile.err.$i"
+	if [ "${logfile}" != "" ]; then
+		touch "${logfile}.out.$i"
+		touch "${logfile}.err.$i"
+		command="${command} -o ${logfile}.out.${i} -e ${logfile}.err.${i}"
 	fi
-	command="$command $execline $script $i"
-	output=$($command)
-	rv=$?
-	if [ $rv -ne 0 ]
+	command="${command} ${execline} ${script} ${i}"
+	output="$(${command})"
+	rv=${?}
+	if [ ${rv} -ne 0 ]
 	then
-		echo "Command returned a non-zero exit code: $command"
-		echo "Output: $output"
-		echo "Exit code: $rv"
-		scancel $jobs
-		rm -f "$logfile".out.* "$logfile".err.*
-		exit $rv
+		echo "Command returned a non-zero exit code: ${command}"
+		echo "Output: ${output}"
+		echo "Exit code: ${rv}"
+		scancel ${jobs}
+		rm -f "${logfile}".out.* "${logfile}".err.*
+		exit ${rv}
 	fi
-	
-	jobid=$(echo $output | sed -r 's/^Submitted batch job ([0-9]+)$/\1/')
-	jobs[$i]=$jobid
+
+	jobid=$(echo ${output} | sed -r 's/^Submitted batch job ([0-9]+)$/\1/')
+	jobs[${i}]=${jobid}
 done
 
 trap 'interrupt_handler' INT
 
-tail -f "$logfile".out.* "$logfile".err.* &
+tail -f "${logfile}".out.* "${logfile}".err.* &
 
 echo "Waiting for job to finish."
 
-while output=$(squeue --jobs=$(printf ",%s" "${jobs[@]}") --noheader)
+while true
 do
-	if [ -z "$output" ]
+	output=$(squeue --jobs=$(printf ",%s" "${jobs[@]}") --noheader || true)
+	if [ -z "${output}" ]
 	then
-		break
+		# Sometimes squeue fails because of domain name resolution
+		# failure. First try again.
+		sleep 5
+		output=$(squeue --jobs=$(printf ",%s" "${jobs[@]}") --noheader)
 	fi
-	sleep 4
+	[ -z "${output}" ] && break
+	jobs_left=$(echo "${output}" | wc -l)
+	echo "Waiting for ${jobs_left} jobs."
+	sleep 5
 done
 
 failed=$(sacct --format=jobid,state --parsable2 --jobs=$(printf ",%s" "${jobs[@]}") --noheader | awk -F'|' '{ if ($2 != "COMPLETED") print; }')
-if [ "$failed" != "" ]; then
+if [ "${failed}" != "" ]; then
 	echo "Some jobs failed:"
-	echo "$failed"
+	echo "${failed}"
 	echo "See log files for details:"
-	echo "$logfile.out.*"
-	echo "$logfile.err.*"
+	echo "${logfile}.out.*"
+	echo "${logfile}.err.*"
 	exit 2
+else
+	echo "All jobs finished successfully."
 fi
 
 # Kill the tail -f background job and delete the logs.
 kill $!
-rm -f "$logfile".out.* "$logfile".err.*
+rm -f "${logfile}".out.* "${logfile}".err.*
 rmdir --ignore-fail-on-non-empty $(dirname "$logfile")
 
 trap - INT
