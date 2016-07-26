@@ -171,6 +171,7 @@ int
 main(int argc, char *argv[])
 {
   double sum_data_likelihood = 0.0, prec_buff = 0.0;
+  bool try_again = false;
   io::Stream phn_out_file;
   double ll;
   PhnReader phn_reader(&model);
@@ -187,6 +188,7 @@ main(int argc, char *argv[])
       ('\0', "swins=INT", "arg", "1000", "window size (default: 1000)")
       ('\0', "beam=FLOAT", "arg", "100.0", "log prob beam (default 100.0)")
       ('\0', "sbeam=INT", "arg", "100", "state beam (default 100)")
+      ('\0', "maxbeam=FLOAT", "arg", "1600.0", "max beam for retries (default 1600.0)")
       ('\0', "overlap=FLOAT", "arg", "0.4", "Viterbi window overlap (default 0.4)")
       ('\0', "no-force-end", "", "", "do not force to the last state")
       ('\0', "phoseg", "", "", "print phoneme segmentation instead of states")
@@ -249,6 +251,7 @@ main(int argc, char *argv[])
     // These are for handling beam problems
     double orig_beam = config["beam"].get_float();
     int orig_sbeam = config["sbeam"].get_int();
+    double max_beam = config["maxbeam"].get_float();
     double curr_beam = orig_beam;
     int curr_sbeam = orig_sbeam;
     bool ok = true;
@@ -307,20 +310,19 @@ main(int argc, char *argv[])
         }
 
       } catch (std::string err) {
-        curr_beam *= 2;
-        curr_sbeam *= 2;
-        std::cerr << "Too low beams, doubling to beam " << curr_beam
-                  << " and state beam " << curr_sbeam << std::endl; 
-        viterbi.set_prob_beam(curr_beam);
-        viterbi.set_state_beam(curr_sbeam);
-        viterbi.resize(win_size, win_size, curr_sbeam / 4);
-        ok = false;
-        if (curr_beam < 100000)
-          goto retry;
-        else
-          std::cerr << "Have to stop trying, beam already 100 000" << std::endl;
+	curr_beam *= 2;
+	curr_sbeam *= 2;
+	std::cerr << "Too low beams, doubling to beam " << curr_beam
+		  << " and state beam " << curr_sbeam << std::endl; 
+	viterbi.set_prob_beam(curr_beam);
+	viterbi.set_state_beam(curr_sbeam);
+	viterbi.resize(win_size, win_size, curr_sbeam / 4);
+	ok = false;
+	if (curr_beam <= max_beam)
+	  goto retry;
+	else
+	  std::cerr << "Have to stop trying, beam already over max" << std::endl;
       }
-      
       sum_data_likelihood += prec_buff;
       if (info > 0)
       {
