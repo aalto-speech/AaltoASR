@@ -209,14 +209,14 @@ void get_likelihoods(HmmSet & hmm_set, const FeatureVec & features, probabilitie
 
 void print_result(Toolbox & toolbox, int num_frames)
 {
-	HistoryVector path;
-	toolbox.tp_search().get_path(path, true, NULL);
+	std::vector<LMHistory::Word> path;
+	path = toolbox.tp_search().get_word_repository();
 
 	cout << "RESULT:";
 	HistoryVector::const_reverse_iterator iter = path.rbegin();
 	for (; iter != path.rend(); ++iter) {
-		LMHistory * history = *iter;
-		const string & word = toolbox.word(history->last().word_id());
+		LMHistory::Word history = *iter;
+		const string & word = toolbox.word(history.word_id());
 		cout << " " << word;
 	}
 	cout << endl;
@@ -271,4 +271,3 @@ int main()
 	print_result(toolbox, current_frame);
 	return 0;
 }
-
