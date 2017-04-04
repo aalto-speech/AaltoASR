@@ -1,0 +1,131 @@
+C-Vowel context 	 e ä a o Y O I i Q A U u E Ä Å å R ö W
+C-Consonant context 	 p t k b d g C J s z S Z f v T D H m n N l r j w
+C-Voiced_Consonant context 	 b d g z Z v D r j w m n N J
+C-Unvoiced_Consonant context 	 p t k s S f T H C l
+C-Pulmonic_Consonant context 	 p t k b d g C J s z S Z f v T D H m n N l r j
+C-Voiced_Pulmonic_Consonant context 	 b d g z Z v D r j m n N J
+C-Unvoiced_Pulmonic_Consonant context 	 p t k s S f T H C l
+C-Plosive context 	 p t k b d g
+C-Voiced_Plosive context 	 b d g
+C-Unvoiced_Plosive context 	 p t k
+C-Bilabial_Plosive context 	 p b
+C-Coronal_Plosive context 	 t d
+C-Velar_Plosive context 	 k g
+C-Fricative context 	 s z S Z f v T D H
+C-Voiced_Fricative context 	 z Z v D
+C-Unvoiced_Fricative context 	 s S f T H
+C-Labiodental_Fricative context 	 f v
+C-Coronal_Fricative context 	 T D s z S Z
+C-Dental_Fricative context 	 T D
+C-Alveolar_Fricative context 	 s z
+C-Postalveolar_Fricative context 	 S Z
+C-Approximant context 	 r j w
+C-Pulmonic_Approximant context 	 r j
+C-Nasal context 	 m n N
+C-Pulmonic_Nasal context 	 m n N
+C-Affricates context 	 C J
+C-Lateral context 	 l
+C-Labial context 	 m p b f v w
+C-Voiced_Labial context 	 m b v w
+C-Unvoiced_Labial context 	 p f
+C-Bilabial context 	 m b w
+C-Voiced_Bilabial context 	 m p
+C-Unvoiced_Bilabial context 	 p b w
+C-Pulmonic_Bilabial context 	 m p b
+C-Pulmonic_Voiced_Bilabial context 	 m p
+C-Coronal context 	 t d T D s z S Z l n C J r
+C-General_Voiced_Coronal context 	 d D z Z n J r
+C-General_Unvoiced_Coronal context 	 t T s S l C
+C-Pulmonic_Coronal context 	 t d T D s z S Z l n r
+C-Voiced_Coronal context 	 d D z Z n r
+C-Unvoiced_Coronal context 	 t T s S l
+C-Dorsal context 	 N k g j
+C-Voiced_Dorsal context 	 N g j
+C-Dorsal_Velar context 	 N k g
+C-Labialized_velar_approximant context 	 w
+C-Fortis_Consonant context 	 p t k f s S C
+C-Lenis_Consonant context 	 b d g v D z Z J
+C-General_Front_Vowel context 	 e ä I E Ä å W
+C-Front_Vowel context 	 e ä I
+C-Front_close_vowel context 	 I
+C-Front_open_mid_vowel context 	 e
+C-Front_near_open_vowel context 	 ä
+C-Ge_Front_nearfront_Vowel context 	 E Ä
+C-Front_nearfront_Vowel context 	 E Ä
+C-Ge_Front_nearback_Vowel context 	 å
+C-Front_nearback_Vowel context 	 å
+C-General_Nearfront_Vowel context 	 i E Ä Å R
+C-Nearfront_Vowel context 	 i
+C-General_Central_Vowel context 	 o Q R ö W
+C-Central_Vowel context 	 Q ö
+C-Central_Mid_Vowel context 	 Q
+C-Cebtral_OpenMid_Vowel context 	 ö
+C-General_Nearback_Vowel context 	 o U å
+C-Nearback_Vowel context 	 U
+C-General_Back_Vowel context 	 a Y O A u Å
+C-Back_Vowel context 	 a Y O A u
+C-Back_Open_Vowel context 	 a Y
+C-Back_OpenMid_Vowel context 	 O A
+C-Back_Close_Vowel context 	 u
+C-Long_Vowel context 	 a O I u ö
+C-Long_Back_Vowel context 	 a O u
+C-Long_Close_Vowel context 	 I u
+C-Long_OpenMid_Vowel context 	 O ö
+C-Close_Vowel context 	 I u
+C-NearClose_Vowel context 	 i U
+C-OpenMid_Vowel context 	 e O A ö
+C-Open_Vowel context 	 a Y
+C-OpenMid_NearClose_Vowel context 	 E Å
+C-Ge_Open_NearClose_Vowel context 	 Ä å
+C-Open_NearClose_Vowel context 	 Ä å
+C-NearClose_Mid_Vowel context 	 R
+C-Dipthong context 	 o E Ä Å å R W
+C-Rounded context 	 Y O U u
+C-Unrounded context 	 e ä a I i A E Ä ö
+C-Unround-Schwa context 	 R W
+C-silences context 	 __ _
+C-e context 	 e
+C-a context 	 ä
+C-aa context 	 a
+C-ou context 	 o
+C-o context 	 Y
+C-oo context 	 O
+C-ii context 	 I
+C-i context 	 i
+C-@ context 	 Q
+C-uh context 	 A
+C-u context 	 U
+C-uu context 	 u
+C-ei context 	 E
+C-ai context 	 Ä
+C-oi context 	 Å
+C-ow context 	 å
+C-i@ context 	 R
+C-@@r context 	 ö
+C-eir context 	 W
+C-p context 	 p
+C-t context 	 t
+C-k context 	 k
+C-b context 	 b
+C-d context 	 d
+C-g context 	 g
+C-ch context 	 C
+C-jh context 	 J
+C-s context 	 s
+C-z context 	 z
+C-sh context 	 S
+C-zh context 	 Z
+C-f context 	 f
+C-v context 	 v
+C-th context 	 T
+C-dh context 	 D
+C-h context 	 H
+C-m context 	 m
+C-n context 	 n
+C-ng context 	 N
+C-lw context 	 l
+C-r context 	 r
+C-y context 	 j
+C-w context 	 w
+C-# context 	 __
+C-pau context 	 _

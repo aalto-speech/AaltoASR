@@ -46,7 +46,7 @@ fi
 for i in $(seq 0 $((queuesize-1)))
 do
 	mem_limit="${RECTOOL_MEM_PER_CPU:-8G}"
-	command="sbatch --partition=short --time=4:00:00 --mem-per-cpu=${mem_limit}"
+	command="sbatch --partition=short-hsw,short-wsm,short-ivb,batch-hsw,batch-wsm,batch-ivb,coin --time=4:00:00 --mem-per-cpu=${mem_limit}"
 	if [ "${SLURM_EXCLUDE_NODES}" != "" ]; then
 		command="${command} --exclude=${SLURM_EXCLUDE_NODES}"
 	fi
@@ -56,6 +56,7 @@ do
 		command="${command} -o ${logfile}.out.${i} -e ${logfile}.err.${i}"
 	fi
 	command="${command} ${execline} ${script} ${i}"
+	echo "${command}"
 	output="$(${command})"
 	rv=${?}
 	if [ ${rv} -ne 0 ]

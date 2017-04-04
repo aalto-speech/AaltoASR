@@ -42,7 +42,7 @@ sub shutdown_jobs {
 sub submit_batches {
   my ($self, $first_batch, $last_batch, $wrapper, $record_jobs) = @_;
 
-  my $submit_command = "sbatch --no-requeue --partition=batch";
+  my $submit_command = "sbatch --no-requeue --partition=batch,coin";
   $submit_command = $submit_command." --nice=".$self->{"priority"} if ($self->{"priority"} > 0);
   $submit_command = $submit_command." --mem-per-cpu=".$self->{"mem_req"} if ($self->{"mem_req"} > 0);
   $submit_command = $submit_command." --time=".$self->{"run_time"} if ($self->{"run_time"} > 0);
