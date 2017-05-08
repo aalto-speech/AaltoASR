@@ -5,8 +5,9 @@ if(NOT DISABLE_SWIG)
   add_subdirectory( swig )
 endif(NOT DISABLE_SWIG)
 include_directories(".")
+include_directories("/opt/openfst/include")
 
-set(DECODERSOURCES 
+set(DECODERSOURCES
   GramSorter.cc
   Hmm.cc
   HTKLatticeGrammar.cc
@@ -26,8 +27,7 @@ set(DECODERSOURCES
   InterTreeGram.cc
   WordClasses.cc
   FstAcoustics.cc
-  Fst.cc
-  FstConfidence.cc
+  OpenFstSearch.cc
 )
 
 ADD_DEFINITIONS(-std=gnu++0x)
@@ -35,13 +35,11 @@ add_library( decoder ${DECODERSOURCES} )
 add_executable ( arpa2bin arpa2bin.cc )
 add_executable ( bin2arpa bin2arpa.cc )
 add_executable ( hmm2fsm hmm2fsm.cc )
-#add_executable ( fst_test fst_test.cc )
 target_link_libraries ( arpa2bin decoder fsalm misc)
 target_link_libraries ( bin2arpa decoder fsalm misc)
 target_link_libraries ( hmm2fsm decoder )
-#target_link_libraries ( fst_test decoder )
 
 install(TARGETS arpa2bin bin2arpa DESTINATION bin)
-file(GLOB DECODER_HEADERS "*.hh") 
+file(GLOB DECODER_HEADERS "*.hh")
 install(FILES ${DECODER_HEADERS} DESTINATION include)
 install(TARGETS decoder DESTINATION lib)

@@ -28,8 +28,10 @@ void
 FstAcoustics::hmm_read(const char *file)
 {
   std::ifstream in(file);
-  if (!in)
-    throw OpenError();
+  if (!in) {
+          std::cerr << "Problems opening " << file << std::endl;
+          throw OpenError();
+  }
   if (m_hmm_reader) {
     delete m_hmm_reader;
   }
@@ -40,27 +42,55 @@ FstAcoustics::hmm_read(const char *file)
 // This is a direct copy from Toolbox.cc. FIXME: Code duplication
 void FstAcoustics::lna_open(const char *file, int size)
 {
-  m_lna_reader.open_file(file, size);
-  m_acoustics = &m_lna_reader;
+        //std::cerr << "Lock held by " << lock_held_by << " " <<1 << std::endl;
+        //lock_held_by=1;
+        {
+#ifdef THREAD_LOCKS
+                std::lock_guard<std::mutex> lock(m_fstaio_lock);
+#endif
+                m_lna_reader.open_file(file, size);
+                m_acoustics = &m_lna_reader;
+        }
+        //lock_held_by=-1;
 }
 
 // This is a direct copy from Toolbox.cc. FIXME: Code duplication
 void FstAcoustics::lna_open_fd(const int fd, int size)
 {
-  m_lna_reader.open_fd(fd, size);
-  m_acoustics = &m_lna_reader;
+        //std::cerr << "Lock held by " << lock_held_by << " " <<2 << std::endl;
+        //lock_held_by=2;
+        {
+#ifdef THREAD_LOCKS
+                std::lock_guard<std::mutex> lock(m_fstaio_lock);
+#endif
+                m_lna_reader.open_fd(fd, size);
+                m_acoustics = &m_lna_reader;
+        }
+        //lock_held_by=-1;
+        //std::cerr << "Lock release 2" << std::endl;
 }
 
 // This is a direct copy from Toolbox.cc. FIXME: Code duplication
 void FstAcoustics::lna_close()
 {
-  m_lna_reader.close();
+        //std::cerr << "Lock held by " << lock_held_by << " " <<3 << std::endl;
+        //lock_held_by=3;
+        {
+#ifdef THREAD_LOCKS
+                std::lock_guard<std::mutex> lock(m_fstaio_lock);
+#endif
+                m_lna_reader.close();
+                m_frame = 0;
+        }
+        //lock_held_by=-1;
 }
 
 void FstAcoustics::duration_read(const char *fname, std::vector<float> *a_table_ptr, std::vector<float> *b_table_ptr) {
   std::ifstream dur_in(fname);
-  if (!dur_in) 
-    throw OpenError();
+  if (!dur_in) {
+          std::cerr << "Problems opening " << fname << std::endl;
+          throw OpenError();
+  }
 
   int version;
   float a,b;
@@ -69,14 +99,14 @@ void FstAcoustics::duration_read(const char *fname, std::vector<float> *a_table_
   std::vector<float> &b_table = b_table_ptr ? *b_table_ptr : m_b_table;
 
   dur_in >> version;
-  if (version!=4) 
+  if (version!=4)
     throw InvalidFormat();
-  
+
   int num_states, state_id;
   dur_in >> num_states;
   a_table.resize(num_states);
   b_table.resize(num_states);
-  
+
   for (int i=0; i<num_states; i++) {
     dur_in >> state_id;
     if (state_id != i) {
