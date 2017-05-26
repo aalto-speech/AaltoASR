@@ -562,6 +562,7 @@ public:
 private:
   TPLexPrefixTree &m_lexicon;
   Vocabulary &m_vocabulary;
+  int m_long_duration_pass;
 #ifdef ENABLE_WORDCLASS_SUPPORT
   const WordClasses * m_word_classes;
 #endif
