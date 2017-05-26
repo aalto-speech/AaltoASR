@@ -243,6 +243,7 @@ main(int argc, char *argv[])
     // Load speaker configurations
     if (config["speakers"].specified)
     {
+      speaker_config.get_model_transformer().set_model(&model);
       speaker_config.read_speaker_file(
         io::Stream(config["speakers"].get_str()));
       set_speakers = true;
